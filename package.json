@@ -1,0 +1,65 @@
+{
+  "name": "@inferdi/inferdi",
+  "version": "0.1.0",
+  "description": "Type-safe fluent DI container for TypeScript with scopes, lazy injection, lifetime guards and proper async teardown.",
+  "keywords": [
+    "typescript",
+    "dependency-injection",
+    "di",
+    "ioc",
+    "container",
+    "inversion-of-control",
+    "scoped",
+    "disposable"
+  ],
+  "author": "InferDI",
+  "license": "MIT",
+  "homepage": "https://github.com/inferdi/inferdi#readme",
+  "bugs": {
+    "url": "https://github.com/inferdi/inferdi/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/inferdi/inferdi.git"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": false
+  },
+  "scripts": {
+    "build": "tsup",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run clean && npm run typecheck && npm run build"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0"
+  }
+}
