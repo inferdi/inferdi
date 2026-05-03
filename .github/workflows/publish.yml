@@ -57,8 +57,9 @@ jobs:
     name: Publish to npm (with provenance)
     needs: verify
     runs-on: ubuntu-latest
-    # Same OIDC story as JSR — `npm publish --provenance` requires `id-token: write`
-    # to attach a sigstore signature linking the tarball to this exact workflow run.
+    # OIDC token request — npm Trusted Publishing exchanges this for a short-lived
+    # scoped publish token, no NPM_TOKEN required. Same permission also drives
+    # provenance attestation in sigstore.
     permissions:
       contents: read
       id-token: write
@@ -71,11 +72,15 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
 
+      # Trusted Publishing requires npm CLI ≥ 11. Node 22 ships npm 10.x;
+      # upgrade explicitly so the OIDC handshake is supported.
+      - name: Upgrade npm to ≥11 for Trusted Publishing
+        run: npm install -g npm@latest
+
       - run: npm ci
 
-      # `prepublishOnly` (defined in package.json) runs clean → typecheck → build,
-      # so we don't need a separate build step here.
+      # `prepublishOnly` (defined in package.json) runs clean → typecheck → build.
+      # No NODE_AUTH_TOKEN env — npm CLI auto-detects GitHub Actions OIDC and
+      # exchanges the id-token for a publish credential at the registry.
       - name: Publish ${{ needs.verify.outputs.version }} to npm
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
