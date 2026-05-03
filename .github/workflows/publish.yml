@@ -76,6 +76,16 @@ jobs:
 
       - run: npm ci
 
+      # Diagnostic — these three values MUST match the Trusted Publisher
+      # configuration on npmjs.com for `@inferdi/inferdi`. If 404 keeps coming
+      # back, compare these with what's set on the package's settings page.
+      - name: Debug — show Trusted Publisher claim values
+        run: |
+          echo "GITHUB_REPOSITORY  = $GITHUB_REPOSITORY"      # = <org>/<repo>
+          echo "Workflow filename  = $(basename ${GITHUB_WORKFLOW_REF%@*})"
+          echo "GITHUB_WORKFLOW_REF= $GITHUB_WORKFLOW_REF"
+          echo "GITHUB_REF         = $GITHUB_REF"
+
       # `prepublishOnly` (defined in package.json) runs clean → typecheck → build.
       # No NODE_AUTH_TOKEN env — npm CLI auto-detects GitHub Actions OIDC and
       # exchanges the id-token for a publish credential at the registry.
