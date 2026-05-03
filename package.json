@@ -16,8 +16,9 @@
     "fluent-api"
   ],
   "author": {
-    "name": "InferDI",
-    "url": "https://github.com/inferdi"
+    "name": "Viacheslav Kabanov",
+    "email": "vkabanov@inferdi.com",
+    "url": "https://github.com/maxrendel"
   },
   "license": "MIT",
   "homepage": "https://github.com/inferdi/inferdi#readme",

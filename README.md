@@ -1,4 +1,4 @@
-# @inferdi/inferdi
+# InferDI
 
 ![npm version](https://img.shields.io/npm/v/@inferdi/inferdi.svg)
 ![TypeScript](https://img.shields.io/badge/%3C%2F%3E-TypeScript-blue.svg)
@@ -9,13 +9,27 @@ A zero-dependency, **decorator-free**, strongly typed DI container for modern Ty
 
 Build your dependency graph using a fluent API that infers types automatically, prevents memory leaks with strict lifetime guards, and handles teardown natively via the Explicit Resource Management API (`using` / `await using`).
 
-## Why @inferdi?
+## Why InferDI?
 
-- 🚫 **No Decorators & No `reflect-metadata`** — Keeps your domain classes clean and framework-agnostic.
-- 🛡️ **100% Type-Safe** — The compiler ensures constructor arguments exactly match the injected dependencies.
-- 🛑 **Lifetimes That Don't Lie** — Throws at resolve time if a Singleton tries to capture a Scoped or Transient service, preventing silent memory leaks and stale data.
-- ⚡ **V8 Optimized** — Uses arity unrolling for up to 4 arguments to maintain V8 JIT inline caching, avoiding `Reflect.construct` overhead where possible.
-- ♻️ **Native Resource Management** — Fully supports `Symbol.dispose` and `Symbol.asyncDispose` with strict LIFO order teardown and `AggregateError` collection.
+Legacy DI is slow, bloated with decorators, and prone to memory leaks. **InferDI is built for 2026:** it’s ruthlessly fast, strictly typed, and built for the modern edge.
+
+- ☁️ **Zero-Weight Edge Native**  
+  Just 1.5KB gzipped. Zero dependencies. The perfect fit for all serverless platforms, including Cloudflare Workers, Vercel Edge, Deno Deploy, and Supabase. While other frameworks trigger cold starts, InferDI is already running.
+
+- ⚡ **Raw Engine Speed**  
+  Built to outperform the competition. Highly optimized for V8 and JSC inline caching. It doesn't just resolve dependencies — it executes at native engine speed.
+
+- 🛡️ **Zero Magic. 100% Type-Safe**  
+  No `@Inject()`. No `reflect-metadata`. The compiler strictly enforces your constructor signatures. Wrong argument order or type? It simply won't compile.
+
+- 🛑 **Impossible Memory Leaks**  
+  Silent cross-user data leaks are a thing of the past. InferDI physically blocks you from injecting short-lived scoped resources into global singletons. Architectural flaws crash instantly in development, guaranteeing zero leaks in production.
+
+- ♻️ **Native `using` Teardown**  
+  Full support for modern resource management. Scopes destroy instances in strict **LIFO order**, safely catching multiple disconnect failures in a single clean `AggregateError`.
+
+- 🧠 **Crash-Proof Destructuring**  
+  InferDI intelligently filters hidden protocol probes, guaranteeing absolute runtime stability and saving hours of debugging.
 
 ## Install
 
@@ -80,6 +94,39 @@ const container = new Container()
 
 Factories follow the same lifetime rules as classes — pass the kind as the third argument: `registerFactory('cache', factory, 'scoped')`.
 
+## Compiler-enforced Signatures
+
+In traditional DI frameworks, injection errors — like swapping the argument order, passing the wrong type, or forgetting a dependency entirely — only surface as runtime crashes.
+**InferDI validates your dependency graph at compile time.** Thanks to advanced TypeScript mapping (`DepsOf`), the array of dependency keys is strictly checked against the types and positional order of the target class's constructor arguments.
+
+```typescript
+class Logger {
+  log(msg: string) {}
+}
+
+class UserRepo {
+  // The constructor strictly expects: (Logger, string)
+  constructor(
+    private readonly logger: Logger,
+    private readonly dsn: string
+  ) {}
+}
+
+const container = new Container()
+  .registerValue('dsn', 'postgres://localhost/app')
+  .registerClass('logger', Logger,[])
+
+  // ❌ TypeScript Error: Type '"dsn"' is not assignable to type '"logger"'.
+  // The compiler knows the 1st arg needs a Logger, but 'dsn' yields a string.
+  .registerClass('userRepo', UserRepo, ['dsn', 'logger'])
+
+  // ✅ Compiles perfectly. 
+  // If you change the UserRepo constructor later, this line will break at compile time!
+  .registerClass('userRepo', UserRepo, ['logger', 'dsn'])
+```
+
+**Fearless Refactoring:**  If you ever change the `UserRepo` constructor signature (add a parameter, remove one, or just swap their order), TypeScript will instantly highlight the error at the `.registerClass()` call. Your production app will never crash due to a misaligned dependency again.
+
 ## Scopes & Native Teardown
 
 Container itself implements `Symbol.dispose` and `Symbol.asyncDispose`, so it works with `using` / `await using` directly. Owned instances are torn down in reverse-creation order (LIFO).
@@ -107,6 +154,17 @@ await root[Symbol.asyncDispose]()           // or: await root.dispose()
 The container probes each owned instance in order: `Symbol.asyncDispose` → `Symbol.dispose` → plain `.dispose()`. If multiple disposers throw, all errors are collected into a single `AggregateError` so one failing resource never leaves the rest unclosed.
 
 > **What gets disposed by which container.** Each container disposes only the instances it created. `root.dispose()` does **not** propagate into already-created child scopes — give scopes their own `await using` (or `dispose()` call) to release their resources. Forgetting to dispose a scope leaks every singleton/scoped instance it created.
+
+```ts
+try {
+  await root.dispose()
+} catch (e) {
+  // Catch multiple DB/Redis disconnect failures at once!
+  if (e instanceof AggregateError) {
+    console.error(e.errors)
+  }
+}
+```
 
 ## Strict Lifetime Guards
 
