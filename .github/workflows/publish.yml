@@ -1,0 +1,81 @@
+name: Publish
+
+# Triggers on a semver tag like v1.0.1. The version embedded in the tag must
+# match both package.json and jsr.json — the `verify` job enforces this.
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  verify:
+    name: Verify versions
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: check
+        name: Tag must match package.json AND jsr.json
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          PKG=$(node -p "require('./package.json').version")
+          JSR=$(node -p "require('./jsr.json').version")
+          echo "tag=$TAG package.json=$PKG jsr.json=$JSR"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::Tag v$TAG does not match package.json version $PKG"
+            exit 1
+          fi
+          if [ "$TAG" != "$JSR" ]; then
+            echo "::error::Tag v$TAG does not match jsr.json version $JSR"
+            exit 1
+          fi
+          echo "version=$TAG" >> "$GITHUB_OUTPUT"
+
+  publish-jsr:
+    name: Publish to JSR
+    needs: verify
+    runs-on: ubuntu-latest
+    # `id-token: write` is the OIDC permission JSR uses to bind this run to the
+    # publish event in its public transparency log — this is what earns the
+    # "Has provenance" score on jsr.io.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Publish ${{ needs.verify.outputs.version }} to JSR
+        run: npx --yes jsr publish
+
+  publish-npm:
+    name: Publish to npm (with provenance)
+    needs: verify
+    runs-on: ubuntu-latest
+    # Same OIDC story as JSR — `npm publish --provenance` requires `id-token: write`
+    # to attach a sigstore signature linking the tarball to this exact workflow run.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      - run: npm ci
+
+      # `prepublishOnly` (defined in package.json) runs clean → typecheck → build,
+      # so we don't need a separate build step here.
+      - name: Publish ${{ needs.verify.outputs.version }} to npm
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

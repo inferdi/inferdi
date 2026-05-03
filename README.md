@@ -33,13 +33,57 @@ Legacy DI is slow, bloated with decorators, and prone to memory leaks. **InferDI
 
 ## Install
 
+InferDI is published to **two registries** with identical contents:
+
+- **npm** as `@inferdi/inferdi` — for Node, Bun, and any tooling that resolves npm.
+- **JSR** as `@inferdi/inferdi` — for Deno and any runtime that prefers TypeScript sources directly.
+
+Pick the channel that matches your runtime — the import code below stays the same.
+
+### Node.js
+
 ```bash
-npm i @inferdi/inferdi
+npm  i   @inferdi/inferdi   # npm
+pnpm add @inferdi/inferdi   # pnpm
+yarn add @inferdi/inferdi   # yarn
 ```
 
-**Requirements**
+```ts
+import { Container } from '@inferdi/inferdi'
+```
+
+### Bun
+
+```bash
+bun add @inferdi/inferdi          # from npm
+# or
+bun add jsr:@inferdi/inferdi      # from JSR (TypeScript sources)
+```
+
+```ts
+import { Container } from '@inferdi/inferdi'
+```
+
+### Deno
+
+```bash
+deno add jsr:@inferdi/inferdi
+```
+
+```ts
+import { Container } from '@inferdi/inferdi'
+```
+
+Or import via the full JSR specifier without an `add` step:
+
+```ts
+import { Container } from 'jsr:@inferdi/inferdi'
+```
+
+### Requirements
 
 - **Node ≥ 16.** On Node < 20.4 `Symbol.dispose` / `Symbol.asyncDispose` are auto-polyfilled via `Symbol.for` on import, so `using` / `await using` interop is preserved.
+- **Bun ≥ 1.0** and **Deno ≥ 1.40** ship native `Symbol.dispose` / `Symbol.asyncDispose` — the polyfill is a no-op there.
 - **TypeScript ≥ 5.2** is recommended on the consumer side if you want to use `using` / `await using` syntax. The library itself works with older TypeScript versions — only the explicit-resource-management syntax requires 5.2+.
 
 ## Quick Start

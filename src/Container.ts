@@ -6,19 +6,69 @@
 ;(Symbol as { dispose?: symbol }).dispose ??= Symbol.for('Symbol.dispose')
 ;(Symbol as { asyncDispose?: symbol }).asyncDispose ??= Symbol.for('Symbol.asyncDispose')
 
+/**
+ * A deferred reference to a value of type `T`. Calling `.get()` resolves the
+ * underlying value on demand, without capturing the instance at construction time.
+ *
+ * Produced automatically when you register a service with `lazy: true` — the
+ * container then exposes both the eager key (`name`) and a sibling lazy key
+ * (`${name}Lazy`) typed as `Lazy<T>`. Inject the lazy companion when a
+ * long-lived consumer needs a fresh per-access view of a short-lived service.
+ *
+ * @example
+ * ```ts
+ * import { Container, type Lazy } from '@inferdi/inferdi'
+ *
+ * class Audit {
+ *   constructor(private readonly clockLazy: Lazy<Clock>) {}
+ *   record() { this.clockLazy.get().now() }
+ * }
+ * ```
+ */
 export type Lazy<T> = { readonly get: () => T }
+
+/**
+ * Upper bound for the type-level "registry" carried by a {@link Container} —
+ * a string-keyed map of registered service types. Used as the constraint on
+ * `Container<T>` and on the `TIn` / `TOut` parameters of {@link Module}.
+ *
+ * You rarely need to write this type by hand: the fluent `register*` methods
+ * accumulate the map for you, and `Container.Resolve<typeof builder>` extracts
+ * the final shape after the chain.
+ */
 export type DependenciesMap = Record<string, unknown>
 
-// A DI module — a function that takes a container with the accumulated key set TIn
-// and returns a container extended with its own keys TOut. Used in Container.use():
-// handy for grouping registrations and reading previously registered values
-// to decide what to register next (see the example in the JSDoc on use()).
-//
-// USAGE: `Module<TIn, TOut>` requires the input container's T to match TIn EXACTLY.
-// For one-shot grouping inside a fluent chain, prefer inline lambdas in `.use()` —
-// TypeScript infers the container's full T at the call site, so `c.registerXyz(...)`
-// works without re-listing prior keys. The named `Module<TIn, TOut>` type is most
-// useful for fixture builders that always start from a known base shape.
+/**
+ * A reusable registration unit for {@link Container.use}. Takes a container
+ * carrying the keys `TIn` and returns it widened by the keys in `TOut`.
+ *
+ * `Module<TIn, TOut>` requires the container's `T` at the `.use()` call site
+ * to match `TIn` **exactly**. For one-shot grouping inside a fluent chain,
+ * prefer inline lambdas in `.use((c) => c.registerXyz(...))` — TypeScript
+ * infers the container's full `T` at the call site, so registrations work
+ * without re-listing prior keys. The named `Module<TIn, TOut>` type is most
+ * useful for fixture builders that always start from a known base shape.
+ *
+ * @template TIn  - Required input keys (the container's T at the use-site).
+ * @template TOut - Keys this module adds.
+ *
+ * @example
+ * ```ts
+ * import { Container, type Module } from '@inferdi/inferdi'
+ *
+ * const fixtureMailer: Module<{ config: { env: string } }, { mailer: Mailer }> =
+ *   (c) => {
+ *     const { env } = c.get('config')
+ *     return env === 'test'
+ *       ? c.registerClass('mailer', MockMailer, [])
+ *       : c.registerClass('mailer', RealMailer, [])
+ *   }
+ *
+ * new Container()
+ *   .registerValue('config', { env: 'test' })
+ *   .use(fixtureMailer)
+ * ```
+ */
 export type Module<TIn extends DependenciesMap, TOut extends DependenciesMap> =
   (c: Container<TIn>) => Container<TIn & TOut>
 
@@ -50,6 +100,42 @@ interface DisposableLike {
   dispose?: () => void | PromiseLike<void>
 }
 
+/**
+ * A type-safe, fluent dependency-injection container with scopes, lazy
+ * injection, lifetime guards, and explicit resource management.
+ *
+ * Each `register*` call returns a new `Container` whose type parameter `T` is
+ * widened with the new key — letting `.get(key)` return the precisely typed
+ * service. A fresh container starts empty (`T = Record<never, never>`), so
+ * `.get('anything')` is rejected at compile time until the key is registered.
+ *
+ * **Lifetimes**
+ * - `singleton` (default) — one instance per owning container.
+ * - `scoped` — one instance per `createScope()` child.
+ * - `transient` — a new instance for every `.get()`. Caller-owned, never disposed.
+ *
+ * **Resource management.** `Container` itself implements `Symbol.dispose` and
+ * `Symbol.asyncDispose`, so it composes with `using` / `await using`. Owned
+ * instances are torn down in reverse-creation (LIFO) order; multiple disposer
+ * failures are surfaced as a single `AggregateError`.
+ *
+ * @template T - The map of registered keys to service types. Accumulates
+ *               automatically through the fluent `register*` methods.
+ *
+ * @example
+ * ```ts
+ * import { Container } from '@inferdi/inferdi'
+ *
+ * class Logger { log(msg: string) { console.log(msg) } }
+ * class UserRepo { constructor(private readonly logger: Logger) {} }
+ *
+ * const c = new Container()
+ *   .registerClass('logger', Logger, [])
+ *   .registerClass('userRepo', UserRepo, ['logger'])
+ *
+ * c.get('userRepo')  // ← typed as UserRepo
+ * ```
+ */
 export class Container<T extends DependenciesMap = Record<never, never>> {
 
   /** @internal */
@@ -91,6 +177,15 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   /** @internal */
   private parent: Container<T> | undefined
 
+  /**
+   * Creates a new container. The `parent` parameter is internal — to spawn a
+   * child scope, call `parent.createScope()` rather than the constructor.
+   *
+   * @param parent - Optional parent container; passed by `createScope()`.
+   *                 When provided, the child shares cycle-detection state with
+   *                 its ancestors and inherits all registrations through the
+   *                 scope chain.
+   */
   public constructor(parent?: Container<T>) {
     this.parent = parent
     this.resolving = parent ? parent.resolving : new Set()
@@ -126,10 +221,35 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   }
 
   /**
-   * Registers a class under a key. Returns a container whose type already contains
-   * the `[K, V]` pair. With `lazy: true` an additional key `${K}Lazy` of type
-   * `Lazy<V>` is registered — the user does not have to declare it; the type is
-   * inferred automatically.
+   * Registers a class constructor under a specific key.
+   *
+   * The container automatically infers the created type and adds it to the
+   * container's registry. The compiler strictly checks that the `deps` array
+   * precisely matches the constructor's arguments by both type and position.
+   * With `lazy: true` an additional key `${K}Lazy` of type `Lazy<V>` is
+   * registered — the user does not have to declare it; the type is inferred.
+   *
+   * @template K - The string key to register the class under. Must not be already registered.
+   * @template V - The instance type created by the constructor.
+   * @template A - The tuple of constructor argument types.
+   * @template L - Boolean literal for the `lazy` flag (defaults to `false`).
+   *
+   * @param key - The unique string identifier for this dependency.
+   * @param Ctor - The class constructor to instantiate.
+   * @param deps - A tuple of dependency keys that map positionally to the constructor's parameters.
+   * @param kind - The lifetime of the instance: `'singleton'` (default), `'scoped'`, or `'transient'`.
+   * @param lazy - If `true`, additionally registers a `Lazy<V>` wrapper under `${key}Lazy`.
+   * @returns A new container reference typed with the additionally registered key(s).
+   *
+   * @example
+   * ```ts
+   * class UserRepo { constructor(private readonly logger: Logger, private readonly dsn: string) {} }
+   *
+   * new Container()
+   *   .registerValue('dsn', 'postgres://localhost')
+   *   .registerClass('logger', Logger, [])
+   *   .registerClass('userRepo', UserRepo, ['logger', 'dsn'])
+   * ```
    */
   public registerClass<
     K extends string,
@@ -242,8 +362,32 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   }
 
   /**
-   * Registers a factory under a key. The type V is inferred from the factory's return
-   * value and is automatically added to the container's map.
+   * Registers a factory function under a specific key.
+   *
+   * The type `V` is inferred from the factory's return value and is automatically
+   * added to the container's map. The factory receives the container as its only
+   * argument, allowing it to resolve and combine other registered dependencies
+   * (e.g., reading a config value to construct a connection pool).
+   *
+   * @template K - The string key to register the factory under. Must not be already registered.
+   * @template V - The return type of the factory.
+   *
+   * @param key - The unique string identifier for this dependency.
+   * @param factory - A function that takes the current container and returns the instance.
+   * @param kind - The lifetime of the instance: `'singleton'` (default), `'scoped'`, or `'transient'`.
+   * @returns A new container reference typed with the additionally registered key.
+   *
+   * @example
+   * ```ts
+   * import { Pool } from 'pg'
+   *
+   * new Container()
+   *   .registerValue('config', { dsn: 'postgres://...', poolSize: 10 })
+   *   .registerFactory('pgPool', (c) => {
+   *     const { dsn, poolSize } = c.get('config')
+   *     return new Pool({ connectionString: dsn, max: poolSize })
+   *   })
+   * ```
    */
   public registerFactory<K extends string, V>(
     key: Exclude<K, keyof T>,
@@ -258,8 +402,26 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   }
 
   /**
-   * Registers a ready-made value. The container does not consider this value its own
-   * (does not call dispose on it) — external ownership.
+   * Registers a ready-made static value under a specific key.
+   *
+   * The container treats this value as **externally owned** — it does not enter
+   * the teardown queue and `dispose()` will not be called on it during shutdown.
+   * Use this for primitives, configs, and pre-constructed objects whose lifecycle
+   * you manage outside the container.
+   *
+   * @template K - The string key to register the value under. Must not be already registered.
+   * @template V - The type of the value being registered (inferred).
+   *
+   * @param key - The unique string identifier for this dependency.
+   * @param value - The static value to register.
+   * @returns A new container reference typed with the additionally registered key.
+   *
+   * @example
+   * ```ts
+   * new Container()
+   *   .registerValue('config', { port: 8080, env: 'production' as const })
+   *   .registerValue('startedAt', Date.now())
+   * ```
    */
   public registerValue<K extends string, V>(
     key: Exclude<K, keyof T>,
@@ -275,21 +437,53 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   }
 
   /**
-   * Applies a registration module on top of the current container. Returns a container
-   * extended with the module's keys. Useful when you need to read an already-registered
-   * value to decide what to register next:
+   * Applies a registration module (or inline configuration function) on top of
+   * the current container.
    *
-   *   const c = new Container()
-   *     .registerValue('config', { port: 8080 })
-   *     .use((c) => {
-   *       const port = c.get('config').port
-   *       return port === 8080 ? c.registerClass('a', A, []) : c.registerClass('b', B, [])
-   *     })
+   * Returns a container extended with the module's newly registered keys. Useful
+   * for grouping registrations into reusable chunks or reading already-registered
+   * values to decide what to register next.
+   *
+   * @template R - The additional dependencies map introduced by the module.
+   *
+   * @param fn - A module function that takes the current container and returns a newly built one.
+   * @returns A new container type combining the previous and new registrations.
+   *
+   * @example
+   * ```ts
+   * const c = new Container()
+   *   .registerValue('config', { port: 8080 })
+   *   .use((c) => {
+   *     const port = c.get('config').port
+   *     return port === 8080
+   *       ? c.registerClass('a', A, [])
+   *       : c.registerClass('b', B, [])
+   *   })
+   * ```
    */
   public use<R extends DependenciesMap>(fn: Module<T, R>): Container<T & R> {
     return fn(this) as unknown as Container<T & R>
   }
 
+  /**
+   * Creates a child scope that inherits every registration from this container.
+   * Resolutions through the child cache `scoped` services per-scope; singletons
+   * remain on their owning container; transients stay caller-owned.
+   *
+   * Each scope owns the instances it creates and disposes them when the scope
+   * itself is disposed (`using` / `await using` / explicit `.dispose()`).
+   *
+   * @throws {Error} If this container has already been disposed.
+   * @returns A new child container with the same `T` and an isolated cache.
+   *
+   * @example
+   * ```ts
+   * async function handle(req: Request) {
+   *   await using scope = root.createScope()
+   *   const ctx = scope.get('reqCtx')   // cached on this scope only
+   * }
+   * ```
+   */
   public createScope(): Container<T> {
     if (this._disposed) {
       throw new Error('Cannot create scope from a disposed container')
@@ -297,6 +491,23 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     return new Container<T>(this)
   }
 
+  /**
+   * Resolves a registered service by key with full type safety. Walks up the
+   * scope chain to find the registration, then honours the registered lifetime
+   * (singleton / scoped / transient).
+   *
+   * @template K - One of the keys registered on this container or any ancestor.
+   *               Restricted to `keyof T`, so unknown keys fail at compile time.
+   * @param key - The registration key to resolve.
+   * @returns The resolved service. Each call returns a fresh instance for
+   *          `transient`; the cached instance for `singleton` and `scoped`.
+   * @throws {Error} If the container is disposed.
+   * @throws {Error} If the key is not registered (`Key "..." not found`).
+   * @throws {Error} On a circular dependency
+   *                 (`Circular dependency detected: a -> b -> a ...`).
+   * @throws {Error} On a lifetime violation
+   *                 (`Singleton "..." cannot depend on scoped "..."`).
+   */
   public get<K extends keyof T>(key: K): T[K] {
     if (this._disposed) {
       throw new Error(`Container is disposed (key: "${String(key)}")`)
@@ -435,6 +646,11 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     })
   }
 
+  /**
+   * `true` once the container has been disposed (via {@link Container.dispose},
+   * `using`, or `await using`). A disposed container rejects all subsequent
+   * `.get()`, `.cradle`, and `createScope()` calls.
+   */
   public get disposed(): boolean {
     return this._disposed
   }
@@ -496,6 +712,18 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     }
   }
 
+  /**
+   * `Symbol.asyncDispose` integration — invoked automatically by `await using`.
+   * Equivalent to `await container.dispose()`.
+   *
+   * @example
+   * ```ts
+   * async function handle() {
+   *   await using scope = root.createScope()
+   *   // scope is asyncDispose'd here when the function exits
+   * }
+   * ```
+   */
   public [Symbol.asyncDispose](): Promise<void> {
     return this.dispose()
   }
@@ -571,8 +799,27 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
 }
 
 // Declaration merging — attach a helper type to the class as a namespace.
-// Used as `Container.Resolve<typeof container>` to extract the map T from a
-// fully fluent-built container.
 export namespace Container {
+  /**
+   * Extracts the registered key map from a fully-built container type.
+   * Lets you reuse the inferred DI shape elsewhere (handlers, factories,
+   * tests) without duplicating the list of keys.
+   *
+   * @template C - A `Container<T>` type, typically obtained as
+   *               `ReturnType<typeof buildContainer>`.
+   *
+   * @example
+   * ```ts
+   * function buildContainer() {
+   *   return new Container()
+   *     .registerClass('logger', Logger, [])
+   *     .registerClass('db', Db, [])
+   * }
+   *
+   * type AppContainer = ReturnType<typeof buildContainer>
+   * type AppDeps      = Container.Resolve<AppContainer>
+   * //   ^? { logger: Logger; db: Db }
+   * ```
+   */
   export type Resolve<C> = C extends Container<infer U> ? U : never
 }
