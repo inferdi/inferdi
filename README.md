@@ -31,6 +31,23 @@ Legacy DI is slow, bloated with decorators, and prone to memory leaks. **InferDI
 - 🧠 **Crash-Proof Destructuring**  
   InferDI intelligently filters hidden protocol probes, guaranteeing absolute runtime stability and saving hours of debugging.
 
+## Table of Contents
+
+- [Install](#install)
+- [Quick Start](#quick-start)
+- [Factories](#factories)
+- [Binding Interfaces](#binding-interfaces)
+- [Compiler-enforced Signatures](#compiler-enforced-signatures)
+- [Scopes & Native Teardown](#scopes--native-teardown)
+- [Strict Lifetime Guards](#strict-lifetime-guards)
+- [Lazy Injection](#lazy-injection)
+- [Modularity with `.use()`](#modularity-with-use)
+- [Typing a Built Container — `Container.Resolve<C>`](#typing-a-built-container--containerresolvec)
+- [Cradle (Proxy Access)](#cradle-proxy-access)
+- [Errors](#errors)
+- [API Summary](#api-summary)
+- [License](#license)
+
 ## Install
 
 InferDI is published to **two registries** with identical contents:
@@ -138,6 +155,24 @@ const container = new Container()
 
 Factories follow the same lifetime rules as classes — pass the kind as the third argument: `registerFactory('cache', factory, 'scoped')`.
 
+## Binding Interfaces
+
+TypeScript interfaces do not exist at runtime, so you cannot pass them to `registerClass` — the key would be inferred as the concrete class, not the abstraction. To bind an interface to a concrete implementation, use `registerFactory` with an explicit type argument:
+
+```ts
+interface Mailer { send(msg: string): void }
+
+class SendGridMailer implements Mailer {
+  send(msg: string) { /* ... */ }
+}
+
+const container = new Container()
+  // Explicitly tell InferDI this key yields a `Mailer`, not a `SendGridMailer`.
+  .registerFactory<'mailer', Mailer>('mailer', () => new SendGridMailer())
+```
+
+Now any consumer that depends on `'mailer'` sees the `Mailer` abstraction, and you can swap `SendGridMailer` for another implementation (e.g. `MockMailer` in tests) without touching downstream types.
+
 ## Compiler-enforced Signatures
 
 In traditional DI frameworks, injection errors — like swapping the argument order, passing the wrong type, or forgetting a dependency entirely — only surface as runtime crashes.
@@ -218,7 +253,7 @@ try {
 | `scoped`    | once per scope                                  | the scope                | yes |
 | `transient` | every time requested                            | never                    | no (caller owns it)   |
 
-**The Lifetime Rule:** A singleton cannot directly depend on a scoped or transient service. That would freeze a short-lived value inside a long-lived cache. `inferdi` prevents this design flaw by throwing at resolve time:
+**The Lifetime Rule:** A singleton cannot directly depend on a scoped or transient service. That would freeze a short-lived value inside a long-lived cache. `InferDI` prevents this design flaw by throwing at resolve time:
 
 ```
 Error: Singleton "userService" cannot depend on scoped "requestCtx".
@@ -322,7 +357,7 @@ This pattern keeps registration (the builder) and consumption (handlers, tests) 
 ## Cradle (Proxy Access)
 
 `container.cradle` provides a soft-mode proxy for ergonomic destructuring.
-Unlike basic proxies, `inferdi`'s cradle safely ignores symbol probes and Promise `then` checks, meaning `Promise.resolve(cradle)` won't crash your app with "Key 'then' not found".
+Unlike basic proxies, `InferDI`'s cradle safely ignores symbol probes and Promise `then` checks, meaning `Promise.resolve(cradle)` won't crash your app with "Key 'then' not found".
 
 ```ts
 // Safely destructure your entire graph, fully typed!
@@ -336,6 +371,8 @@ const { db, logger, mailer } = container.cradle
 > because the Proxy's `get` trap is not reflected in the declared type.
 > If you need a hard failure on missing keys, use `container.get(key)` — it throws
 > synchronously and is fully typed (`K extends keyof T`).
+
+> ⚡ **Performance note.** While `cradle` is highly ergonomic, property access through a JavaScript `Proxy` is slower than a direct method call or a plain object read. For performance-critical hot paths (e.g. per-row processing of a large database result, or tight rendering loops), prefer resolving once via `container.get('key')` at the top of the function, or destructure the cradle **outside** the hot loop and reuse the bindings.
 
 ## Errors
 

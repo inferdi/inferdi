@@ -8,12 +8,8 @@ export default defineConfig({
   clean: true,
   splitting: false,
   treeshake: true,
-  minify: true,
   target: 'node16',
   outExtension({ format }) {
     return { js: format === 'cjs' ? '.cjs' : '.js' }
-  },
-  esbuildOptions(opts) {
-    opts.sourcesContent = false
   },
 })
