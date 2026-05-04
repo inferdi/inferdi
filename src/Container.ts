@@ -3,6 +3,9 @@
 // consistency: any other code reading Symbol.dispose after this module is loaded
 // observes the same registry symbol, so `using` / `await using` interop is preserved.
 // On Node 20.4+ the well-known symbol already exists and the ??= is a no-op.
+// v8-ignore: the right-hand side never executes on modern Node (target audience),
+// so coverage cannot reach it without dropping support for older runtimes.
+/* v8 ignore next 2 */
 ;(Symbol as { dispose?: symbol }).dispose ??= Symbol.for('Symbol.dispose')
 ;(Symbol as { asyncDispose?: symbol }).asyncDispose ??= Symbol.for('Symbol.asyncDispose')
 
@@ -429,8 +432,13 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   ): Container<T & Record<K, V>> {
     // The value is external — it does not enter `owned`, dispose is not called on it.
     this.cache.set(key as unknown as keyof T, value)
+    // The factory is unreachable at runtime: cache.set above always wins the
+    // fast-path in get() (it checks cache.has(key) first). The Registration is
+    // kept for shape-uniformity with registerClass/registerFactory and to keep
+    // hasKey() simple. v8-ignore on the lambda body avoids a phantom branch.
     this.regs.set(
       key as unknown as keyof T,
+      /* v8 ignore next */
       {kind: 'singleton', fn: () => value as any},
     )
     return this.as()
@@ -686,6 +694,11 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     const errors: unknown[] = []
 
     for (const inst of instances) {
+      // Defensive: `owned` is a Set and we only ever insert real instances in
+      // get(); a null/undefined element is unreachable in practice. The check
+      // is kept as a runtime safety net but excluded from coverage so the
+      // ceiling is not dragged down by a path no test can legitimately exercise.
+      /* v8 ignore next 3 */
       if (inst == null) {
         continue
       }
@@ -754,6 +767,11 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     const errors: unknown[] = []
 
     for (const inst of instances) {
+      // Defensive: `owned` is a Set and we only ever insert real instances in
+      // get(); a null/undefined element is unreachable in practice. The check
+      // is kept as a runtime safety net but excluded from coverage so the
+      // ceiling is not dragged down by a path no test can legitimately exercise.
+      /* v8 ignore next 3 */
       if (inst == null) {
         continue
       }
