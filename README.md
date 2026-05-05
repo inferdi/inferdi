@@ -15,7 +15,7 @@ Build your dependency graph using a fluent API that infers types automatically, 
 Legacy DI is slow, bloated with decorators, and prone to memory leaks. **InferDI is built for 2026:** it’s ruthlessly fast, strictly typed, and built for the modern edge.
 
 - ☁️ **Zero-Weight Edge Native**  
-  Just 1.5KB gzipped. Zero dependencies. The perfect fit for all serverless platforms, including Cloudflare Workers, Vercel Edge, Deno Deploy, and Supabase. While other frameworks trigger cold starts, InferDI is already running.
+  Just 1.7KB gzipped. Zero dependencies. The perfect fit for all serverless platforms, including Cloudflare Workers, Vercel Edge, Deno Deploy, and Supabase. While other frameworks trigger cold starts, InferDI is already running.
 
 - ⚡ **Raw Engine Speed**  
   Built to outperform the competition. Highly optimized for V8 and JSC inline caching. It doesn't just resolve dependencies — it executes at native engine speed.
@@ -29,23 +29,25 @@ Legacy DI is slow, bloated with decorators, and prone to memory leaks. **InferDI
 - ♻️ **Native `using` Teardown**  
   Full support for modern resource management. Scopes destroy instances in strict **LIFO order**, safely catching multiple disconnect failures in a single clean `AggregateError`.
 
-- 🧠 **Crash-Proof Destructuring**  
-  InferDI intelligently filters hidden protocol probes, guaranteeing absolute runtime stability and saving hours of debugging.
+- 🔣 **String *or* Symbol keys**  
+  Register services under either a plain string or a `symbol`. Use `Symbol.for('shared')` for cross-module identity without imports, `unique symbol` constants for type-level branding, or local `Symbol()` for collision-free private DI.
 
 ## Table of Contents
 
 - [Install](#install)
 - [Quick Start](#quick-start)
+- [Performance](#performance)
 - [Factories](#factories)
 - [Binding Interfaces](#binding-interfaces)
 - [Compiler-enforced Signatures](#compiler-enforced-signatures)
 - [Scopes & Native Teardown](#scopes--native-teardown)
 - [Strict Lifetime Guards](#strict-lifetime-guards)
 - [Lazy Injection](#lazy-injection)
+- [Symbol Keys](#symbol-keys)
 - [Modularity with `.use()`](#modularity-with-use)
 - [Typing a Built Container — `Container.Resolve<C>`](#typing-a-built-container--containerresolvec)
-- [Cradle (Proxy Access)](#cradle-proxy-access)
 - [Errors](#errors)
+- [Migration](#migration)
 - [API Summary](#api-summary)
 - [License](#license)
 
@@ -135,7 +137,35 @@ const container = new Container()
 container.get('userRepo').find('42')
 ```
 
-`.get(key)` is the primary, type-safe way to resolve. `container.cradle` is a Proxy alternative for ergonomic destructuring (see [Cradle](#cradle-proxy-access) below).
+`.get(key)` is the only way to resolve a registration: it is fully typed (`K extends keyof T`), throws synchronously on a missing key, and stays out of the way at runtime — there is no Proxy overhead.
+
+## Performance
+
+InferDI is built for raw engine speed. Static type checking instead of runtime reflection, no `Proxy` traps on resolve, and arity-unrolled constructor calls (0–4 args take a direct `new Ctor(...)` path) translate into measurable wins across every common DI workload.
+
+The repository ships a comprehensive benchmark suite in [`benchmarks/`](./benchmarks) comparing InferDI against the five widely used TypeScript DI containers — **InversifyJS v8, Awilix v13 (both PROXY and CLASSIC modes), TSyringe v4, TypeDI v0.10, and Typed Inject v5**. All numbers below are operations per second on Node 22 — higher is better. Reproduce locally with `cd benchmarks && npm install && npm run bench`.
+
+| Scenario                                              | InferDI    | Typed Inject | Awilix (PROXY) | Awilix (CLASSIC) | InversifyJS | TSyringe | TypeDI |
+|-------------------------------------------------------|------------|--------------|----------------|------------------|-------------|----------|--------|
+| **1. Hot singleton resolve** (warm cache)             | **14.2 M** | 7.0 M        | 7.2 M          | 6.9 M            | 6.3 M       | 6.2 M    | 6.4 M  |
+| **2. Transient resolve** (new instance per call)      | **8.4 M**  | 4.3 M        | 3.4 M          | 2.9 M            | 3.4 M       | 2.4 M    | 1.6 M  |
+| **3. Deep graph** (10 levels, all transient)          | **1.85 M** | 1.28 M       | 701 k          | 739 k            | 750 k       | 601 k    | 214 k  |
+| **4a. Wide graph** (4 deps, root transient)           | **7.3 M**  | 3.2 M        | 2.2 M          | 2.3 M            | 2.3 M       | 1.6 M    | 1.1 M  |
+| **4b. Wide graph** (10 deps, root transient)          | **3.5 M**  | 2.6 M        | 1.2 M          | 1.3 M            | 1.6 M       | 1.0 M    | 437 k  |
+| **5. Container build + first resolve**                | **400 k**  | 228 k        | 10 k           | 8 k              | 13 k        | 202 k    | 272 k  |
+| **6. Scoped lifecycle** (create + resolve + cleanup)  | **2.66 M** | 2.39 M       | 492 k          | 413 k            | 28 k        | 1.08 M   | 637 k  |
+| **7. Lazy resolve** (deferred wrapper)                | **12.1 M** | 7.0 M        | 5.5 M          | 4.7 M            | 4.2 M       | 4.0 M    | 2.8 M  |
+
+### Highlights
+
+- **~2× faster on the hot path** than every competitor. A cached singleton resolve in InferDI effectively reduces to a hot `Map.get()` fast path — no Proxy, no metadata lookup, no parent-chain walk for warm services.
+- **30× faster than InversifyJS and 48× faster than Awilix** at building a fresh container with a 30+ key graph and resolving its first service. Registration is a flat `Map.set` per service — no fluent-builder chains, no AST parsing of constructor signatures, no decorator side-effects to apply.
+- **Wide-graph leadership confirms the arity-unrolling fast path:** for 4 dependencies V8 inlines the direct `new Ctor(a, b, c, d)` call instead of going through `Reflect.construct`. Even at 10 dependencies — where InferDI falls back to `Reflect.construct` — it stays **1.35× ahead** of the next-fastest non-reflection-based competitor (Typed Inject) and up to **3.5× ahead** of reflection-based containers.
+- **Clean sweep across all eight scenarios.** InferDI now leads every workload, including the previously close ones: the deep-graph 10-level chain (**1.44× over Typed Inject**) and the scope lifecycle (Scenario 6, **1.11× over Typed Inject**) — while including a synchronous `Symbol.dispose` on every iteration of the latter and beating InversifyJS by **94×**.
+- **Typed Inject is the strongest non-InferDI baseline.** Its compile-time-known graph and `static inject = [...] as const` design let it close the gap on deep graphs and scoped flows where reflection-based containers fall apart. InferDI still pulls ahead in every scenario, but the proximity is real and worth crediting.
+- **Scenario 5 caveat:** decorator-based libraries (TypeDI, TSyringe) register classes at *import time* via decorator side-effects, so their registration cost is paid during module evaluation — what's measured for them at "build time" is only child-context creation. InferDI still beats them while registering an entire graph from scratch in under 3 μs.
+
+Full methodology, fairness notes, fixture sources, and per-scenario reasoning: see [`benchmarks/README.md`](./benchmarks/README.md).
 
 ## Factories
 
@@ -194,13 +224,13 @@ class UserRepo {
 
 const container = new Container()
   .registerValue('dsn', 'postgres://localhost/app')
-  .registerClass('logger', Logger,[])
+  .registerClass('logger', Logger, [])
 
   // ❌ TypeScript Error: Type '"dsn"' is not assignable to type '"logger"'.
   // The compiler knows the 1st arg needs a Logger, but 'dsn' yields a string.
   .registerClass('userRepo', UserRepo, ['dsn', 'logger'])
 
-  // ✅ Compiles perfectly. 
+  // ✅ Compiles perfectly.
   // If you change the UserRepo constructor later, this line will break at compile time!
   .registerClass('userRepo', UserRepo, ['logger', 'dsn'])
 ```
@@ -258,12 +288,12 @@ try {
 
 ```
 Error: Singleton "userService" cannot depend on scoped "requestCtx".
-Use Lazy<T> (register with lazy: true) to get a fresh instance per access.
+Use Lazy<T> (register with a lazyKey companion) to get a fresh instance per access.
 ```
 
 ## Lazy Injection
 
-When a singleton legitimately needs a fresh per-access view of a short-lived service, register the target with `lazy: true`. This auto-generates a sibling `${key}Lazy` of type `Lazy<T>`:
+When a singleton legitimately needs a fresh per-access view of a short-lived service, pass a `lazyKey` to its registration. The container then registers a companion `Lazy<T>` under that explicit key — the wrapper key is yours to pick (string or symbol):
 
 ```ts
 import { Container, type Lazy } from '@inferdi/inferdi'
@@ -276,9 +306,9 @@ class Audit {
 }
 
 const c = new Container()
-  .registerClass('clock', Clock, [], 'transient', true)
+  .registerClass('clock', Clock, [], 'transient', 'clockLazy')
   // ^ registers BOTH 'clock' (transient) AND 'clockLazy' (Lazy<Clock>).
-  //   The compiler infers the Lazy<Clock> type — you don't declare it.
+  //   The companion key is passed explicitly — TS infers Lazy<Clock>.
   .registerClass('audit', Audit, ['clockLazy'], 'singleton')
 
 c.get('audit').record('login')   // a fresh Clock instance per .record()
@@ -288,6 +318,55 @@ c.get('audit').record('login')   // a fresh Clock instance per .record()
 > The lazy wrapper captures the container in which it was *resolved*, not in which it is later *called*. A singleton resolves on its owning container (usually root), so its captured `c` is root. The first `lazyWrapper.get()` then resolves the scoped target on root and caches it there — effectively turning it into a singleton. `Lazy<T>` legalizes the injection per the lifetime check, but it does **not** make a scoped target truly per-scope when used from a long-lived consumer. For request-scoped values inside long-lived services, use `AsyncLocalStorage` instead. (Transient is unaffected: it is never cached, every `.get()` creates a new instance.)
 
 > **Note on circular dependencies.** True mutual recursion (A's constructor needs B, B's constructor needs A) cannot be expressed in fluent registration — both sides would forward-reference each other's keys, which the type system rejects by design. The container's runtime cycle detector exists to catch accidental cycles introduced via factories, not to "break" them automatically. If you have a real A↔B cycle, restructure: extract a shared dependency, switch to event-based communication, or split one of the classes.
+
+## Symbol Keys
+
+Every `register*` method also accepts a `symbol` for the key. String and symbol keys mix freely in the same container — `deps` arrays, the `lazyKey` companion, factory bodies and `Module<TIn, TOut>` all accept both interchangeably. Using symbols unlocks three patterns that string keys cannot express:
+
+- **Collision-free private DI.** A local `Symbol(desc)` exists only inside the module that created it. Registering under it makes the service unreachable from outside without explicitly exporting the token.
+- **Cross-module sharing via `Symbol.for(name)`.** Two parts of the codebase agree on a name; `Symbol.for` returns the same token everywhere, so they share identity without importing each other.
+- **Type-level branding.** A symbol token is nominally typed: two structurally identical services keyed by distinct symbols are no longer interchangeable in `DepsOf`. (For maximum nominal precision, annotate as `unique symbol` — but ordinary `const` declarations are enough for runtime identity and most type checking.)
+
+```ts
+import { Container } from '@inferdi/inferdi'
+
+const DB    = Symbol('db')
+const CACHE = Symbol('cache')
+
+const c = new Container()
+  // String key for plain config, symbol keys for the privately-shared services.
+  .registerValue('config', { dsn: 'postgres://localhost/app' })
+  .registerClass(DB,    PgPool,    ['config'])
+  .registerClass(CACHE, RedisPool, [])
+  // `deps` mixes string and symbol keys in a single tuple — both are typed.
+  .registerClass('repo', UserRepo, [DB, CACHE])
+
+c.get(DB)     // typed as PgPool
+c.get(CACHE)  // typed as RedisPool
+c.get('repo') // typed as UserRepo
+```
+
+Lazy companions follow the same rule — pass any string or symbol as `lazyKey` to expose the `Lazy<V>` wrapper. The companion key kind does not have to match the primary key kind:
+
+```ts
+const DB       = Symbol('db')
+const DB_LAZY  = Symbol('dbLazy')
+
+const c = new Container()
+  // Symbol primary, symbol companion.
+  .registerClass(DB, PgPool, [], 'singleton', DB_LAZY)
+  // String primary, string companion.
+  .registerClass('clock', Clock, [], 'transient', 'clockLazy')
+  // String primary, symbol companion (or vice versa) — also accepted.
+  .registerClass('cache', RedisPool, [], 'singleton', Symbol('cacheLazy'))
+
+c.get(DB_LAZY).get()      // typed as Lazy<PgPool>
+c.get('clockLazy').get()  // typed as Lazy<Clock>
+```
+
+> **⚡ Performance tip — prefer symbol keys for the absolute limit.** V8 hashes symbols by identity (a single pointer comparison), while strings are hashed by content. Because V8 internalizes string literals used as `Map` keys, the difference on a direct cache hit is tiny (symbols are **~2% faster** in our micro-benchmarks). However, in deep-graph resolutions with multiple nested dependencies, these micro-optimizations compound, and symbol keys can come out ~10% ahead. For maximum raw throughput, register hot services under a symbol.
+
+> **Local vs registry symbols.** `Symbol(desc)` is unique per call — re-creating it yields a different identity, so it is realm-local and not shareable across worker threads. `Symbol.for(name)` lives in the global symbol registry and shares identity across all realms (Workers, `vm` modules) — but is never garbage-collected. Pick the one whose lifetime matches the service.
 
 ## Modularity with `.use()`
 
@@ -355,26 +434,6 @@ function buildHandler(c: AppContainer) {
 
 This pattern keeps registration (the builder) and consumption (handlers, tests) in separate places without duplicating type information.
 
-## Cradle (Proxy Access)
-
-`container.cradle` provides a soft-mode proxy for ergonomic destructuring.
-Unlike basic proxies, `InferDI`'s cradle safely ignores symbol probes and Promise `then` checks, meaning `Promise.resolve(cradle)` won't crash your app with "Key 'then' not found".
-
-```ts
-// Safely destructure your entire graph, fully typed!
-const { db, logger, mailer } = container.cradle
-```
-
-> ⚠️ **Type warning — the cradle is optimistically typed.**
-> The return type is `T` (the registered map) for ergonomic destructuring, but the
-> Proxy is permissive at runtime: a typo like `cradle.userRpo` (instead of
-> `cradle.userRepo`) will silently return `undefined` with **no compile-time error**,
-> because the Proxy's `get` trap is not reflected in the declared type.
-> If you need a hard failure on missing keys, use `container.get(key)` — it throws
-> synchronously and is fully typed (`K extends keyof T`).
-
-> ⚡ **Performance note.** While `cradle` is highly ergonomic, property access through a JavaScript `Proxy` is slower than a direct method call or a plain object read. For performance-critical hot paths (e.g. per-row processing of a large database result, or tight rendering loops), prefer resolving once via `container.get('key')` at the top of the function, or destructure the cradle **outside** the hot loop and reuse the bindings.
-
 ## Errors
 
 The container throws structured errors with actionable messages — surface these in your test assertions so registration mistakes show up early:
@@ -384,9 +443,14 @@ The container throws structured errors with actionable messages — surface thes
 | `.get(k)` on unregistered key | `Key "k" not found` |
 | Singleton depends on scoped/transient | `Singleton "x" cannot depend on scoped "y". Use Lazy<T> ...` |
 | Resolution loop | `Circular dependency detected: a -> b -> a. Consider breaking the cycle with Lazy<T> ...` |
-| Use of disposed container | `Container is disposed (key: "k")` / `Container is disposed (cradle access)` |
+| Use of disposed container | `Container is disposed (key: "k")` |
+| Resolving across a disposed ancestor | `Ancestor container is disposed (key: "k")` |
 | `createScope()` after dispose | `Cannot create scope from a disposed container` |
 | Sync `[Symbol.dispose]` over an async resource | `Sync [Symbol.dispose] called on a resource whose .dispose() returned a Promise. Use \`await using\` / container.dispose() for async teardown.` |
+
+## Migration
+
+Upgrading from a previous major version? See **[MIGRATION.md](./MIGRATION.md)** for the full per-version checklist (breaking changes, one-line rewrites, and what's new).
 
 ## API Summary
 
@@ -397,21 +461,26 @@ class Container<T extends DependenciesMap = Record<never, never>> {
   constructor(parent?: Container<T>)
 
   // Registration — each call returns a Container with T widened by Record<K, V>.
-  registerClass<K extends string, V, A extends readonly unknown[], L extends boolean = false>(
+  registerClass<
+    K extends string | symbol,
+    V,
+    A extends readonly unknown[],
+    LK extends string | symbol = never,
+  >(
     key: Exclude<K, keyof T>,
     Ctor: new (...args: A) => V,
     deps: DepsOf<T, A>,
-    kind?: 'singleton' | 'transient' | 'scoped',  // default: 'singleton'
-    lazy?: L,                                      // default: false; true also registers `${K}Lazy`
-  ): Container<T & Record<K, V> & (L extends true ? Record<`${K}Lazy`, Lazy<V>> : {})>
+    kind?: 'singleton' | 'transient' | 'scoped',     // default: 'singleton'
+    lazyKey?: Exclude<LK, keyof T | K>,              // optional companion key for `Lazy<V>`
+  ): Container<T & Record<K, V> & ([LK] extends [never] ? {} : Record<LK, Lazy<V>>)>
 
-  registerFactory<K extends string, V>(
+  registerFactory<K extends string | symbol, V>(
     key: Exclude<K, keyof T>,
     factory: (c: Container<T>) => V,
-    kind?: 'singleton' | 'transient' | 'scoped',  // default: 'singleton'
+    kind?: 'singleton' | 'transient' | 'scoped',     // default: 'singleton'
   ): Container<T & Record<K, V>>
 
-  registerValue<K extends string, V>(
+  registerValue<K extends string | symbol, V>(
     key: Exclude<K, keyof T>,
     value: V,
   ): Container<T & Record<K, V>>
@@ -421,7 +490,6 @@ class Container<T extends DependenciesMap = Record<never, never>> {
   // Scopes & resolution
   createScope(): Container<T>
   get<K extends keyof T>(key: K): T[K]
-  get cradle(): T            // optimistically typed Proxy — see Cradle section
 
   // Lifecycle
   get disposed(): boolean
@@ -440,7 +508,7 @@ namespace Container {
 type Lazy<T> = { readonly get: () => T }
 type Module<TIn extends DependenciesMap, TOut extends DependenciesMap> =
   (c: Container<TIn>) => Container<TIn & TOut>
-type DependenciesMap = Record<string, unknown>
+type DependenciesMap = Record<string | symbol, unknown>
 ```
 
 ## License

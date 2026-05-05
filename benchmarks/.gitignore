@@ -1,0 +1,4 @@
+node_modules
+.vitest-cache
+*.log
+package-lock.json

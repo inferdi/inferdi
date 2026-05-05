@@ -1,5 +1,5 @@
 import {describe, it, expectTypeOf} from 'vitest'
-import {Container, type Lazy} from '../src/Container'
+import {Container, type Lazy, type Module} from '../src/Container'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Phase 4 — Type-level tests (fluent API)
@@ -42,8 +42,6 @@ describe('Phase 4 — fluent: T accumulation while chaining', () => {
       .registerValue('config', {port: 8080})
       .registerClass('logger', L, [])
 
-    expectTypeOf(c.cradle.config).toEqualTypeOf<{port: number}>()
-    expectTypeOf(c.cradle.logger).toEqualTypeOf<L>()
     expectTypeOf(c.get('config')).toEqualTypeOf<{port: number}>()
     expectTypeOf(c.get('logger')).toEqualTypeOf<L>()
   })
@@ -73,14 +71,7 @@ describe('Phase 4 — Container.Resolve', () => {
   })
 })
 
-describe('Phase 4 — cradle type safety', () => {
-  it('accessing an unknown key through cradle is a TS error', () => {
-    const c = new Container().registerClass('logger', L, [])
-
-    // @ts-expect-error — unknownKey is not in the map; Proxy must not break typing
-    c.cradle.unknownKey
-  })
-
+describe('Phase 4 — unknown-key type safety', () => {
   it('get() with an unknown key is a TS error', () => {
     const c = new Container().registerClass('logger', L, [])
 
@@ -157,34 +148,37 @@ describe('Phase 4 — duplicate key guard', () => {
     c.registerFactory('config', () => ({port: 9000}))
   })
 
-  it('lazy key ${K}Lazy after auto-generation is also considered taken', () => {
-    const c = new Container().registerClass('foo', L, [], 'singleton', true)
+  it('lazyKey companion is considered taken after registration', () => {
+    const c = new Container().registerClass('foo', L, [], 'singleton', 'fooLazy')
 
-    // @ts-expect-error — fooLazy was already added by auto-Lazy
+    // @ts-expect-error — fooLazy was already added by the lazyKey companion
     c.registerValue('fooLazy', {get: () => new L()})
   })
 })
 
-describe('Phase 4 — auto-Lazy', () => {
-  it('lazy: true automatically adds ${K}Lazy: Lazy<V>', () => {
-    const c = new Container().registerClass('foo', L, [], 'singleton', true)
+describe('Phase 4 — Lazy companion via lazyKey', () => {
+  it('lazyKey adds the companion under the requested key with type Lazy<V>', () => {
+    const c = new Container().registerClass('foo', L, [], 'singleton', 'fooLazy')
 
-    expectTypeOf(c.cradle.fooLazy).toEqualTypeOf<Lazy<L>>()
     expectTypeOf(c.get('fooLazy')).toEqualTypeOf<Lazy<L>>()
   })
 
-  it('lazy: false does NOT add a lazy key', () => {
-    const c = new Container().registerClass('foo', L, [], 'singleton', false)
-
-    // @ts-expect-error — without lazy:true the fooLazy key is not in the map
-    c.cradle.fooLazy
-  })
-
-  it('no lazy argument — behaves like lazy: false', () => {
+  it('omitting lazyKey does NOT add a companion key', () => {
     const c = new Container().registerClass('foo', L, [])
 
-    // @ts-expect-error — fooLazy must not be inferred
-    c.cradle.fooLazy
+    // @ts-expect-error — without lazyKey the fooLazy key is not in the map
+    c.get('fooLazy')
+  })
+
+  it('lazyKey cannot equal the primary key', () => {
+    // @ts-expect-error — Exclude<LK, keyof T | K> rejects key === lazyKey
+    new Container().registerClass('foo', L, [], 'singleton', 'foo')
+  })
+
+  it('lazyKey cannot collide with an already-registered key', () => {
+    const c = new Container().registerValue('busy', 1)
+    // @ts-expect-error — lazyKey conflicts with the already-registered 'busy'
+    c.registerClass('svc', L, [], 'singleton', 'busy')
   })
 })
 
@@ -234,5 +228,54 @@ describe('Phase 4 — dispose types', () => {
   it('[Symbol.dispose] — () => void', () => {
     const c = new Container().registerClass('r', L, [])
     expectTypeOf(c[Symbol.dispose]).returns.toEqualTypeOf<void>()
+  })
+})
+
+describe('Phase 4 — symbol keys', () => {
+  it('registerValue with a symbol — get returns precise type', () => {
+    const SYM: unique symbol = Symbol('x') as unique symbol
+    const c = new Container().registerValue(SYM, 42 as const)
+    expectTypeOf(c.get(SYM)).toEqualTypeOf<42>()
+  })
+
+  it('mixing string and symbol keys — both reachable with precise types', () => {
+    const SYM: unique symbol = Symbol('s') as unique symbol
+    const c = new Container()
+      .registerValue('a', 1 as const)
+      .registerValue(SYM, 'x' as const)
+    expectTypeOf(c.get('a')).toEqualTypeOf<1>()
+    expectTypeOf(c.get(SYM)).toEqualTypeOf<'x'>()
+  })
+
+  it('re-registering the same unique symbol — TS error via Exclude<K, keyof T>', () => {
+    const SYM: unique symbol = Symbol('s') as unique symbol
+    const c = new Container().registerValue(SYM, 1)
+    // @ts-expect-error — duplicate symbol key
+    c.registerValue(SYM, 2)
+  })
+
+  it('lazyKey: symbol — companion appears in T with the right type', () => {
+    const SVC: unique symbol = Symbol('svc') as unique symbol
+    const SVC_LAZY: unique symbol = Symbol('svcLazy') as unique symbol
+    const c = new Container().registerClass(SVC, L, [], 'singleton', SVC_LAZY)
+    expectTypeOf(c.get(SVC_LAZY)).toEqualTypeOf<Lazy<L>>()
+  })
+
+  it('Module<TIn, TOut> with symbol keys', () => {
+    const CFG: unique symbol = Symbol('cfg') as unique symbol
+    const MAILER: unique symbol = Symbol('mailer') as unique symbol
+    const m: Module<Record<typeof CFG, {env: string}>, Record<typeof MAILER, L>> =
+      (c) => c.registerClass(MAILER, L, [])
+    void m
+  })
+
+  it('DepsOf accepts symbol-typed deps and validates order', () => {
+    const LOG: unique symbol = Symbol('logger') as unique symbol
+    class R {}
+    class S { constructor(_r: R, _l: L) {} }
+    const c = new Container()
+      .registerClass(LOG, L, [])
+      .registerClass('repo', R, [])
+    c.registerClass('svc', S, ['repo', LOG])
   })
 })

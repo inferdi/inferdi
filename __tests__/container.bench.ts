@@ -8,16 +8,17 @@ import {Container} from '../src/Container'
 // to track performance regressions across container changes.
 // ────────────────────────────────────────────────────────────────────────────
 
-describe('cradle vs get', () => {
-  const c = new Container().registerValue('foo', {n: 42})
-  const cradle = c.cradle
+describe('symbol vs string: singleton cache hit', () => {
+  const SYM = Symbol('foo')
+  const cStr = new Container().registerValue('foo', {n: 42})
+  const cSym = new Container().registerValue(SYM, {n: 42})
 
-  bench('container.get("foo") (singleton, cache hit)', () => {
-    c.get('foo')
+  bench('container.get("foo") (string key, cached)', () => {
+    cStr.get('foo')
   })
 
-  bench('container.cradle.foo (Proxy trap)', () => {
-    cradle.foo
+  bench('container.get(SYM) (symbol key, cached)', () => {
+    cSym.get(SYM)
   })
 })
 
@@ -150,7 +151,7 @@ describe('lazy overhead', () => {
     public value = 42
   }
 
-  const c = new Container().registerClass('target', Target, [], 'singleton', true)
+  const c = new Container().registerClass('target', Target, [], 'singleton', 'targetLazy')
   c.get('target') // warm-up
   const wrapper = c.get('targetLazy')
 
@@ -323,5 +324,81 @@ describe('error paths', () => {
 
   bench('baseline: successful get (singleton cached)', () => {
     happyC.get('x')
+  })
+})
+
+// ────────────────────────────────────────────────────────────────────────────
+// Deep dependency graph — all-symbol variant. Mirrors the string-keyed deep
+// graph above so we can compare V8 Map performance for symbol vs string keys.
+// ────────────────────────────────────────────────────────────────────────────
+
+function buildDeepSymbolContainer(): {
+  container: Container<Record<symbol, {level: number}>>
+  topKey: symbol
+} {
+  type Deps = Record<symbol, {level: number}>
+  const container = new Container<Deps>()
+  const keys: symbol[] = [Symbol('level0')]
+
+  container.registerFactory(keys[0]! as never, () => ({level: 0}))
+
+  for (let i = 1; i < DEPTH; i++) {
+    const k = Symbol(`level${i}`)
+    keys.push(k)
+    const prev = keys[i - 1]!
+    container.registerFactory(k as never, (c) => ({level: c.get(prev as never).level + 1}))
+  }
+
+  return {container, topKey: keys[DEPTH - 1]!}
+}
+
+describe('deep graph: symbol keys', () => {
+  bench(
+    `deep graph cold resolve (symbol, ${DEPTH} levels)`,
+    () => {
+      const {container, topKey} = buildDeepSymbolContainer()
+      container.get(topKey as never)
+    },
+    {iterations: 200},
+  )
+
+  const warmSym = buildDeepSymbolContainer()
+  warmSym.container.get(warmSym.topKey as never)
+
+  bench(`deep graph hot resolve (symbol, cached, ${DEPTH} levels)`, () => {
+    warmSym.container.get(warmSym.topKey as never)
+  })
+})
+
+// ────────────────────────────────────────────────────────────────────────────
+// Mixed fan-out — string + symbol deps in the same constructor. Targets the
+// arity-tail loop (5+ deps). If V8's `c.get(keys[i])` IC degrades from
+// monomorphic to polymorphic in mixed key shapes, this bench surfaces it.
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('fan-out: mixed string + symbol (IC polymorphism check)', () => {
+  class M0 {}
+  class M1 {}
+  class M2 {}
+  class M3 {}
+  class M4 {}
+  class WideMix {
+    constructor(public a: M0, public b: M1, public c: M2, public d: M3, public e: M4) {}
+  }
+
+  const S1 = Symbol('m1')
+  const S3 = Symbol('m3')
+
+  const cMix = new Container()
+    .registerClass('m0', M0, [])
+    .registerClass(S1, M1, [])
+    .registerClass('m2', M2, [])
+    .registerClass(S3, M3, [])
+    .registerClass('m4', M4, [])
+    .registerClass('topMix', WideMix, ['m0', S1, 'm2', S3, 'm4'])
+  cMix.get('topMix')
+
+  bench('fan-out 5 mixed string+symbol deps (cached)', () => {
+    cMix.get('topMix')
   })
 })

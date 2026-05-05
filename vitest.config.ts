@@ -3,6 +3,11 @@ import {defineConfig} from 'vitest/config'
 export default defineConfig({
   test: {
     include: ['__tests__/**/*.test.ts'],
+    exclude: ['**/benchmarks/**'],
+    benchmark: {
+      include: ['__tests__/**/*.bench.ts'],
+      exclude: ['**/benchmarks/**'],
+    },
     execArgv: ['--expose-gc'],
     coverage: {
       provider: 'v8',

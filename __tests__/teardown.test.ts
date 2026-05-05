@@ -270,6 +270,17 @@ describe('Phase 3 — idempotency and blocking', () => {
     expect(() => c.createScope()).toThrow(/Cannot create scope from a disposed container/)
   })
 
+  it('descendant.get() after parent dispose — throws "Ancestor container is disposed"', async () => {
+    // Parent was torn down (regs.clear() emptied its registrations) while a child
+    // scope is still live and reaching for a key registered on the parent. Without
+    // the explicit ancestor check, the user would see a misleading "Key not found".
+    const root = new Container().registerValue('cfg', {port: 8080})
+    const scope = root.createScope()
+    await root.dispose()
+
+    expect(() => scope.get('cfg')).toThrow(/Ancestor container is disposed \(key: "cfg"\)/)
+  })
+
   it('re-entrancy: disposer calls container.get — receives disposed, does not loop', async () => {
     let disposerCalled = 0
     let caughtInDisposer: unknown = null
@@ -450,6 +461,47 @@ describe('Phase 3 — sync [Symbol.dispose]', () => {
     expect(caught).toBeInstanceOf(AggregateError)
     const agg = caught as AggregateError
     expect(agg.errors.map((e: Error) => e.message).sort()).toEqual(['boom-1', 'boom-2'])
+  })
+})
+
+describe('Phase 3 — symbol keys', () => {
+  it('LIFO order is preserved when keys mix string and symbol', async () => {
+    const log: string[] = []
+    const SYM_B = Symbol('B')
+    const c = new Container()
+      .registerFactory('a', () => new OrderedDisposable('A', log))
+      .registerFactory(SYM_B, () => new OrderedDisposable('B', log))
+      .registerFactory('c', () => new OrderedDisposable('C', log))
+
+    c.get('a')
+    c.get(SYM_B)
+    c.get('c')
+
+    await c.dispose()
+
+    expect(log).toEqual(['C', 'B', 'A'])
+  })
+
+  it('Symbol.dispose on a value registered under a symbol key is still called', async () => {
+    const RES = Symbol('resource')
+    const inst = new TrackableSync()
+    const c = new Container().registerFactory(RES, () => inst)
+
+    c.get(RES)
+    await c.dispose()
+
+    expect(inst.disposeCalls).toBe(1)
+  })
+
+  it('symbol-keyed registerValue is NOT in the teardown queue', async () => {
+    const SYM = Symbol('external')
+    const ext = new TrackableAsync()
+    const c = new Container().registerValue(SYM, ext)
+
+    c.get(SYM)
+    await c.dispose()
+
+    expect(ext.asyncDisposeCalls).toBe(0)
   })
 })
 

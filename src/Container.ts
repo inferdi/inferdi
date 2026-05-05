@@ -9,14 +9,16 @@
 ;(Symbol as { dispose?: symbol }).dispose ??= Symbol.for('Symbol.dispose')
 ;(Symbol as { asyncDispose?: symbol }).asyncDispose ??= Symbol.for('Symbol.asyncDispose')
 
+const UNDEFINED_MARKER = Symbol('UNDEFINED_MARKER')
+
 /**
  * A deferred reference to a value of type `T`. Calling `.get()` resolves the
  * underlying value on demand, without capturing the instance at construction time.
  *
- * Produced automatically when you register a service with `lazy: true` — the
- * container then exposes both the eager key (`name`) and a sibling lazy key
- * (`${name}Lazy`) typed as `Lazy<T>`. Inject the lazy companion when a
- * long-lived consumer needs a fresh per-access view of a short-lived service.
+ * Produced when you register a service with a non-empty `lazyKey` — the
+ * container additionally registers a sibling key of the user's choice typed as
+ * `Lazy<T>`. Inject the lazy companion when a long-lived consumer needs a
+ * fresh per-access view of a short-lived service.
  *
  * @example
  * ```ts
@@ -32,14 +34,15 @@ export type Lazy<T> = { readonly get: () => T }
 
 /**
  * Upper bound for the type-level "registry" carried by a {@link Container} —
- * a string-keyed map of registered service types. Used as the constraint on
- * `Container<T>` and on the `TIn` / `TOut` parameters of {@link Module}.
+ * a string-or-symbol-keyed map of registered service types. Used as the
+ * constraint on `Container<T>` and on the `TIn` / `TOut` parameters of
+ * {@link Module}.
  *
- * You rarely need to write this type by hand: the fluent `register*` methods
- * accumulate the map for you, and `Container.Resolve<typeof builder>` extracts
- * the final shape after the chain.
+ * The fluent `register*` methods accumulate the map for you, so you rarely
+ * need to write this type by hand — `Container.Resolve<typeof builder>`
+ * extracts the final shape after the chain.
  */
-export type DependenciesMap = Record<string, unknown>
+export type DependenciesMap = Record<string | symbol, unknown>
 
 /**
  * A reusable registration unit for {@link Container.use}. Takes a container
@@ -87,6 +90,18 @@ interface Registration<T extends DependenciesMap, K extends keyof T> {
   // WARNING: if you ever change the lazy implementation — preserve this invariant,
   // otherwise the lifetime check below will start letting real leaks slip through.
   readonly lazy?: boolean
+}
+
+// Snapshot of "where does this key live" cached on the resolving container.
+// Stored only after a successful walk-up (this.parent → ... → owner.regs.get(key) hit).
+// `ownerRegsVersion` is the value of `owner.regsVersion` at the moment of caching;
+// on a cache hit we compare it against `cached.owner.regsVersion` to invalidate
+// stale entries when an ancestor (or the owner itself) re-registered the key.
+// This is the lightweight alternative to recursively walking children on register*.
+interface LookupEntry<T extends DependenciesMap> {
+  readonly owner: Container<T>
+  readonly reg: Registration<T, any>
+  readonly ownerRegsVersion: number
 }
 
 // Projects the constructor parameter types onto the allowed DI-map keys.
@@ -145,13 +160,30 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   private readonly regs = new Map<keyof T, Registration<T, any>>()
   /** @internal */
   private readonly cache = new Map<keyof T, unknown>()
+  // Bumped on every register* on this container. Read by descendants' lookupCache
+  // entries to detect that a previously-cached (owner, reg) snapshot is stale —
+  // see LookupEntry.ownerRegsVersion above. Cheap to read (integer field) and the
+  // compare lands on the cold path of get() (lookupCache is reached only after a
+  // cache miss + local fast-path miss).
+  /** @internal */
+  private regsVersion = 0
+  // Memoizes the result of the parent-chain walk-up: key → { owner, reg, version }.
+  // Lazily allocated on first miss (a brand-new container that never resolves
+  // through a parent — typical for root or for build-only intermediates — pays
+  // zero allocation). Entries cover ONLY parent-chain hits; the local-regs hit
+  // is served by a direct `this.regs.get(key)` fast-path before consulting this
+  // map. Negative lookups (key not found anywhere) are not cached.
+  // Declared as `Map | undefined` (not `lookupCache?: Map`) to satisfy
+  // exactOptionalPropertyTypes when reset to undefined in dispose().
+  /** @internal */
+  private lookupCache: Map<keyof T, LookupEntry<T>> | undefined = undefined
   // Teardown queue. Only instances created by THIS container land here
   // (not registerValue — external ownership; not transient — owned by the caller).
-  // Set guards against double dispose when the same instance is registered under
+  // Guards against double dispose when the same instance is registered under
   // multiple keys (registerFactory('a', () => shared); registerFactory('b', () => shared)).
-  // Set preserves insertion order — on dispose we iterate in reverse for LIFO.
+  // Array preserves insertion order — on dispose we iterate in reverse for LIFO.
   /** @internal */
-  private readonly owned = new Set<unknown>()
+  private readonly owned: unknown[] = []
   // resolving and singletonStack are shared across the whole tree — children inherit
   // references from the parent. resolving catches cycles, singletonStack catches an
   // attempt by a singleton to take a scoped dependency.
@@ -160,16 +192,14 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   // INVARIANT: get() MUST stay synchronous. resolving works as a precise projection of
   // the call stack only because a single get() runs atomically before returning to the
   // event loop. If async factories are ever added and get() becomes async — concurrent
-  // resolves (different HTTP requests) will start mutating the shared resolving Set /
+  // resolves (different HTTP requests) will start mutating the shared resolving array /
   // singletonStack at the same time, raising false cycles and false lifetime violations.
   // Async factories require either a per-resolve local resolving (not shared), or a
   // separate two-phase API (resolveAsync on top of a sync get with pre-warming).
   /** @internal */
-  private readonly resolving: Set<keyof T>
+  private readonly resolving: (keyof T)[]
   /** @internal */
   private readonly singletonStack: (keyof T)[]
-  /** @internal */
-  private _cradle: T | undefined = undefined
   /** @internal */
   private _disposed = false
   // parent is mutable: dispose nulls the reference so a disposed child does not hold
@@ -191,27 +221,8 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    */
   public constructor(parent?: Container<T>) {
     this.parent = parent
-    this.resolving = parent ? parent.resolving : new Set()
+    this.resolving = parent ? parent.resolving : []
     this.singletonStack = parent ? parent.singletonStack : []
-  }
-
-  // Walk-up through the scope chain: do we (or any ancestor) have this key?
-  // Used by the cradle Proxy to NOT throw on protocol probes ('then', 'toJSON', and
-  // other standard property accesses). Without this check, Promise.resolve(cradle) or
-  // await cradle would route into this.get('then') and crash the application.
-  /** @internal */
-  private hasKey(key: keyof T): boolean {
-    if (this.cache.has(key)) {
-      return true
-    }
-    let owner: Container<T> | undefined = this
-    while (owner !== undefined) {
-      if (owner.regs.has(key)) {
-        return true
-      }
-      owner = owner.parent
-    }
-    return false
   }
 
   // Internal cast for fluent narrowing of T. The actual instance does not change,
@@ -229,19 +240,22 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * The container automatically infers the created type and adds it to the
    * container's registry. The compiler strictly checks that the `deps` array
    * precisely matches the constructor's arguments by both type and position.
-   * With `lazy: true` an additional key `${K}Lazy` of type `Lazy<V>` is
-   * registered — the user does not have to declare it; the type is inferred.
+   * Passing a `lazyKey` additionally registers a `Lazy<V>` wrapper under that
+   * companion identifier — the user picks the wrapper key explicitly, which
+   * lets `string` and `symbol` keys coexist on equal footing.
    *
-   * @template K - The string key to register the class under. Must not be already registered.
+   * @template K - The string-or-symbol key to register the class under. Must not be already registered.
    * @template V - The instance type created by the constructor.
    * @template A - The tuple of constructor argument types.
-   * @template L - Boolean literal for the `lazy` flag (defaults to `false`).
+   * @template LK - The string-or-symbol companion key for the optional `Lazy<V>` wrapper.
    *
-   * @param key - The unique string identifier for this dependency.
+   * @param key - The unique string-or-symbol identifier for this dependency.
    * @param Ctor - The class constructor to instantiate.
    * @param deps - A tuple of dependency keys that map positionally to the constructor's parameters.
    * @param kind - The lifetime of the instance: `'singleton'` (default), `'scoped'`, or `'transient'`.
-   * @param lazy - If `true`, additionally registers a `Lazy<V>` wrapper under `${key}Lazy`.
+   * @param lazyKey - Optional companion key (string or symbol). When provided, registers a
+   *                  `Lazy<V>` wrapper under that key. Must differ from `key` and from any
+   *                  already-registered key.
    * @returns A new container reference typed with the additionally registered key(s).
    *
    * @example
@@ -252,23 +266,28 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    *   .registerValue('dsn', 'postgres://localhost')
    *   .registerClass('logger', Logger, [])
    *   .registerClass('userRepo', UserRepo, ['logger', 'dsn'])
+   *
+   * // Lazy companion under an explicit key:
+   * const DB: unique symbol = Symbol('db') as unique symbol
+   * const DB_LAZY: unique symbol = Symbol('dbLazy') as unique symbol
+   * new Container().registerClass(DB, PgPool, [], 'singleton', DB_LAZY)
    * ```
    */
   public registerClass<
-    K extends string,
+    K extends string | symbol,
     V,
     A extends readonly unknown[],
-    L extends boolean = false,
+    LK extends string | symbol = never,
   >(
     key: Exclude<K, keyof T>,
     Ctor: new (...args: A) => V,
     deps: DepsOf<T, A>,
     kind: RegistrationKind = 'singleton',
-    lazy?: L,
+    lazyKey?: Exclude<LK, keyof T | K>,
   ): Container<
     T
     & Record<K, V>
-    & (L extends true ? Record<`${K}Lazy`, Lazy<V>> : {})
+    & ([LK] extends [never] ? {} : Record<LK, Lazy<V>>)
   > {
     // Keep the reference to the original array — in DI idiom deps are passed as a
     // literal and never mutated after registration. Saves one allocation per registerClass.
@@ -324,6 +343,16 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     }
 
     this.regs.set(key as unknown as keyof T, {kind, fn} as Registration<T, any>)
+    this.cache.delete(key as unknown as keyof T)
+    this.regsVersion++
+    // Local lookupCache holds (owner, reg) pairs found via walk-up — re-registering
+    // anything on this container can change which `reg` a previous walk-up should
+    // have returned (if the new key shadows a parent registration). Descendants
+    // that cached an entry pointing to this container are invalidated through the
+    // version bump above, so we only need to clear our own.
+    if (this.lookupCache !== undefined) {
+      this.lookupCache.clear()
+    }
 
     // Lazy alias: a thin { get } wrapper on top of the eager key. The instance itself
     // is not created until the consumer calls .get(). The wrapper is transient — it
@@ -331,9 +360,9 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     //
     // INVARIANT: fn must NOT call c.get(key) synchronously — only return a closure.
     // This fact makes the lazy wrapper safe to inject into a singleton and justifies
-    // the `lazy: true` flag, which excludes it from the lifetime check in get().
-    // If this implementation is ever "simplified" to a direct c.get(key) — the
-    // protection against short-lived deps leaking into long-lived ones will break.
+    // the `lazy: true` marker on the Registration, which excludes it from the lifetime
+    // check in get(). If this implementation is ever "simplified" to a direct c.get(key)
+    // — the protection against short-lived deps leaking into long-lived ones will break.
     //
     // NOTE (captured scope): `c` is captured at the moment the lazy wrapper is RESOLVED,
     // not at the moment .get() is called. If you store the wrapper and call .get() later
@@ -351,10 +380,9 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     // singletons, the only correct solution is AsyncLocalStorage; a DI container with
     // captured scope cannot solve this on its own.
     // No pitfall for transient: transient is not cached, every .get() creates a new instance.
-    if (lazy) {
-      const lazyKey = `${key as string}Lazy` as keyof T
+    if (lazyKey !== undefined) {
       const targetKey = key as unknown as keyof T
-      this.regs.set(lazyKey, {
+      this.regs.set(lazyKey as unknown as keyof T, {
         kind: 'transient',
         lazy: true,
         fn: (c) => ({get: () => c.get(targetKey)} as T[keyof T]),
@@ -372,10 +400,10 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * argument, allowing it to resolve and combine other registered dependencies
    * (e.g., reading a config value to construct a connection pool).
    *
-   * @template K - The string key to register the factory under. Must not be already registered.
+   * @template K - The string-or-symbol key to register the factory under. Must not be already registered.
    * @template V - The return type of the factory.
    *
-   * @param key - The unique string identifier for this dependency.
+   * @param key - The unique string-or-symbol identifier for this dependency.
    * @param factory - A function that takes the current container and returns the instance.
    * @param kind - The lifetime of the instance: `'singleton'` (default), `'scoped'`, or `'transient'`.
    * @returns A new container reference typed with the additionally registered key.
@@ -392,7 +420,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    *   })
    * ```
    */
-  public registerFactory<K extends string, V>(
+  public registerFactory<K extends string | symbol, V>(
     key: Exclude<K, keyof T>,
     factory: (c: Container<T>) => V,
     kind: RegistrationKind = 'singleton',
@@ -401,6 +429,11 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       key as unknown as keyof T,
       {kind, fn: factory as (c: Container<T>) => any},
     )
+    this.cache.delete(key as unknown as keyof T)
+    this.regsVersion++
+    if (this.lookupCache !== undefined) {
+      this.lookupCache.clear()
+    }
     return this.as()
   }
 
@@ -412,10 +445,10 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * Use this for primitives, configs, and pre-constructed objects whose lifecycle
    * you manage outside the container.
    *
-   * @template K - The string key to register the value under. Must not be already registered.
+   * @template K - The string-or-symbol key to register the value under. Must not be already registered.
    * @template V - The type of the value being registered (inferred).
    *
-   * @param key - The unique string identifier for this dependency.
+   * @param key - The unique string-or-symbol identifier for this dependency.
    * @param value - The static value to register.
    * @returns A new container reference typed with the additionally registered key.
    *
@@ -426,21 +459,25 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    *   .registerValue('startedAt', Date.now())
    * ```
    */
-  public registerValue<K extends string, V>(
+  public registerValue<K extends string | symbol, V>(
     key: Exclude<K, keyof T>,
     value: V,
   ): Container<T & Record<K, V>> {
     // The value is external — it does not enter `owned`, dispose is not called on it.
-    this.cache.set(key as unknown as keyof T, value)
+    this.cache.set(key as unknown as keyof T, value === undefined ? UNDEFINED_MARKER : value)
     // The factory is unreachable at runtime: cache.set above always wins the
-    // fast-path in get() (it checks cache.has(key) first). The Registration is
-    // kept for shape-uniformity with registerClass/registerFactory and to keep
-    // hasKey() simple. v8-ignore on the lambda body avoids a phantom branch.
+    // fast-path in get(). The Registration is
+    // kept for shape-uniformity with registerClass/registerFactory.
+    // v8-ignore on the lambda body avoids a phantom branch.
     this.regs.set(
       key as unknown as keyof T,
       /* v8 ignore next */
       {kind: 'singleton', fn: () => value as any},
     )
+    this.regsVersion++
+    if (this.lookupCache !== undefined) {
+      this.lookupCache.clear()
+    }
     return this.as()
   }
 
@@ -517,89 +554,204 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    *                 (`Singleton "..." cannot depend on scoped "..."`).
    */
   public get<K extends keyof T>(key: K): T[K] {
+    // 1. Hot path: local cache hit.
+    //    Single Map.get covers ≥99.9% of resolves. `UNDEFINED_MARKER` covers the
+    //    rare deliberately-registered `undefined`. Note that `_disposed` is checked
+    //    AFTER the cache lookup — dispose() clears `cache`, so a disposed container
+    //    falls through to the explicit check below; observable semantics unchanged.
+    const cached = this.cache.get(key)
+
+    if (cached !== undefined) {
+      return (cached === UNDEFINED_MARKER ? undefined : cached) as T[K]
+    }
+
     if (this._disposed) {
       throw new Error(`Container is disposed (key: "${String(key)}")`)
     }
 
-    // 1. Local cache (singleton on root / already-created scoped in the current scope).
-    //    Fast path with no extra lookup if the value is not undefined.
-    const cached = this.cache.get(key) as T[K] | undefined
+    // 2. Local fast-path: registration on THIS container.
+    //    Most common case in flat (non-scope-tree) DI graphs and in scope-tree DI
+    //    for child-owned services. Skips lookupCache + entry deconstruction.
+    const localReg = this.regs.get(key) as Registration<T, K> | undefined
 
-    if (cached !== undefined || this.cache.has(key)) {
-      return cached as T[K]
-    }
+    if (localReg !== undefined) {
+      if (localReg.kind === 'transient') {
+        if (!localReg.lazy && this.singletonStack.length > 0) {
+          const parent = this.singletonStack[this.singletonStack.length - 1]!
+          throw new Error(
+            `Singleton "${String(parent)}" cannot depend on transient "${String(key)}". ` +
+            `Use Lazy<T> (register with a lazyKey companion) to get a fresh instance per access.`,
+          )
+        }
 
-    // 2. Look up the registration up the scope chain (any depth).
-    let owner: Container<T> | undefined = this
-    let reg: Registration<T, K> | undefined
+        if (this.resolving.includes(key)) {
+          const chain = [...this.resolving, key].map((k) => String(k)).join(' -> ')
+          throw new Error(
+            `Circular dependency detected: ${chain}. ` +
+            `Consider breaking the cycle with Lazy<T> (register one side with a lazyKey ` +
+            `companion and inject that companion key instead).`,
+          )
+        }
 
-    while (owner !== undefined) {
-      reg = owner.regs.get(key) as Registration<T, K> | undefined
-
-      if (reg !== undefined) {
-        break
+        this.resolving.push(key)
+        try {
+          return localReg.fn(this)
+        } finally {
+          this.resolving.pop()
+        }
       }
 
-      owner = owner.parent
+      // Self-resolve: owner === this for every kind, so target === this.
+      return this.resolveWithOwnerAndReg(this, localReg, key)
     }
 
-    if (reg === undefined) {
-      throw new Error(`Key "${String(key)}" not found`)
+    // 3. Walk-up across the parent chain, with a per-container memoization of the
+    //    found (owner, reg) pair. The cache is invalidated lazily through a version
+    //    snapshot on `owner.regsVersion`, so a register* on any ancestor (including
+    //    grandparent) will be observed on the next resolve in this scope.
+    let owner: Container<T> | undefined
+    let reg: Registration<T, K> | undefined
+
+    const cachedEntry = this.lookupCache?.get(key)
+    if (cachedEntry !== undefined && cachedEntry.ownerRegsVersion === cachedEntry.owner.regsVersion) {
+      owner = cachedEntry.owner
+      reg = cachedEntry.reg as Registration<T, K>
+    } else {
+      let cur: Container<T> | undefined = this.parent
+
+      while (cur !== undefined) {
+        const r = cur.regs.get(key) as Registration<T, K> | undefined
+
+        if (r !== undefined) {
+          owner = cur
+          reg = r
+          break
+        }
+
+        cur = cur.parent
+      }
+
+      // Cold error path: nothing was found anywhere up the chain. Before throwing the
+      // generic "Key not found", surface a more actionable message if any ancestor was
+      // already disposed. dispose() runs `regs.clear()` + `cache.clear()`, so the lookup
+      // above silently slides past a disposed ancestor as if the key were missing — that
+      // hides a real bug ("you are reaching into a torn-down container") behind a
+      // misleading "Key not found". The extra walk is safe to do here because we are
+      // already on the error path; the hot path is untouched.
+      if (reg === undefined) {
+        let ancestor: Container<T> | undefined = this.parent
+
+        while (ancestor !== undefined) {
+          if (ancestor._disposed) {
+            throw new Error(`Ancestor container is disposed (key: "${String(key)}")`)
+          }
+
+          ancestor = ancestor.parent
+        }
+
+        throw new Error(`Key "${String(key)}" not found`)
+      }
+
+      // Memoize the successful walk-up. Negative results are not cached.
+      if (this.lookupCache === undefined) {
+        this.lookupCache = new Map()
+      }
+      this.lookupCache.set(key, {
+        owner: owner as Container<T>,
+        reg,
+        ownerRegsVersion: (owner as Container<T>).regsVersion,
+      })
     }
 
-    // 3. A short-lived dependency inside a singleton is a lifetime leak: a scoped
-    // instance would "escape" into a long-lived cache; a transient would freeze in
-    // a field and lose its "fresh on every request" contract. For deliberate cases
-    // — Lazy<T> (the lazy wrapper itself is marked reg.lazy and excluded from the check).
+    // 4. Dispatch to the shared resolver.
+    //    - singleton: instance lives on `owner`, even when `this !== owner`. Factory
+    //      receives `owner` so the singleton's deps resolve through owner-scope —
+    //      preserves lifetime guard and prevents child-scope from masking deps.
+    //    - scoped:    one instance per `this` scope (caller-side ownership).
+    //    - transient: caller-owned, never cached.
+    const target = reg.kind === 'singleton' ? (owner as Container<T>) : this
+    return this.resolveWithOwnerAndReg(target, reg, key)
+  }
+
+  // Shared resolution path used both for self-resolves (owner === this) and for
+  // delegated singleton resolves (owner !== this). The split avoids the previous
+  // `owner.get(key)` re-entry, which paid for a full second walk-up on every
+  // singleton resolve from a child scope.
+  //
+  // Invariants (see plan in /home/korsox/.claude/plans/jaunty-wibbling-lovelace.md):
+  // - `resolving` and `singletonStack` are shared across the scope tree (initialized
+  //   from parent in the constructor) — manipulating them through `this` is safe
+  //   regardless of whether `target` is `this` or `owner`.
+  // - `resolving.add/delete` is unconditional: cycle detection MUST cover transient↔
+  //   transient cycles, otherwise stack overflow replaces a clean diagnostic.
+  // - `singletonStack.push/pop` is conditional on `kind === 'singleton'`, matching
+  //   the lifetime-guard contract.
+  // - `owned.add` always lands on `owner.owned` so disposing `owner` releases the
+  //   instance even when it was originally requested from a child scope.
+  // - `reg.fn(owner)` is intentional: the factory must observe owner-scope, not the
+  //   caller's scope. Changing this to `reg.fn(this)` would let a child override
+  //   parent-scope dependencies of an owner-scope singleton.
+  /** @internal */
+  private resolveWithOwnerAndReg<K extends keyof T>(
+    target: Container<T>,
+    reg: Registration<T, K>,
+    key: K,
+  ): T[K] {
+    // Cache check on the owning container. For self-resolves the get() hot-path
+    // already cleared `this.cache`, so this branch is reachable only when the
+    // singleton is delegated from a child scope (this !== target).
+    if (reg.kind !== 'transient' && target !== this) {
+      const cached = target.cache.get(key)
+
+      if (cached !== undefined) {
+        return (cached === UNDEFINED_MARKER ? undefined : cached) as T[K]
+      }
+    }
+
+    // Lifetime guard — short-lived dep inside a long-lived (singleton) factory.
+    // `singletonStack.length > 0` is a cheap integer field-access; the rest of the
+    // condition only runs inside an active singleton resolution.
     if (!reg.lazy && (reg.kind === 'scoped' || reg.kind === 'transient') && this.singletonStack.length > 0) {
-      // Safe ! — guarded by length > 0 in the condition above.
       const parent = this.singletonStack[this.singletonStack.length - 1]!
       throw new Error(
         `Singleton "${String(parent)}" cannot depend on ${reg.kind} "${String(key)}". ` +
-        `Use Lazy<T> (register with lazy: true) to get a fresh instance per access.`,
+        `Use Lazy<T> (register with a lazyKey companion) to get a fresh instance per access.`,
       )
     }
 
-    // 4. A singleton lives on the container where it was registered (owner), not always
-    // on root. This makes singletons registered in child scopes work correctly.
-    //
-    // NOTE: after delegation, creation runs with this = owner, meaning ALL of the
-    // singleton's dependencies are resolved from owner, not from the scope that
-    // initiated the call. This is safe thanks to the lifetime check above: short-lived
-    // deps are already cut off, and the singleton/singleton chain correctly lives on owner.
-    if (reg.kind === 'singleton' && this !== owner) {
-      return (owner as Container<T>).get(key)
-    }
-
-    // 5. Cycle detection. The Set is shared across the tree; the path is cleaned up in finally.
-    if (this.resolving.has(key)) {
+    // Cycle detection — needed for ALL kinds (incl. transient↔transient).
+    if (this.resolving.includes(key)) {
       const chain = [...this.resolving, key].map((k) => String(k)).join(' -> ')
       throw new Error(
         `Circular dependency detected: ${chain}. ` +
-        `Consider breaking the cycle with Lazy<T> (register one side with lazy: true ` +
-        `and inject the '${chain.split(' -> ').pop()}Lazy' key instead).`,
+        `Consider breaking the cycle with Lazy<T> (register one side with a lazyKey ` +
+        `companion and inject that companion key instead).`,
       )
     }
 
-    this.resolving.add(key)
+    // Disposed check on the owner — relevant only for delegated singleton resolves.
+    // Self-resolves already passed the disposed check at the top of get().
+    if (target !== this && target._disposed) {
+      throw new Error(`Container is disposed (key: "${String(key)}")`)
+    }
+
+    this.resolving.push(key)
 
     if (reg.kind === 'singleton') {
       this.singletonStack.push(key)
     }
     try {
-      const instance = reg.fn(this)
+      const instance = reg.fn(target)
 
-      // Teardown tracking: cacheable instances (singleton/scoped) created by THIS container.
-      // Transient is owned by the caller — otherwise the container leaks memory.
-      // The lazy wrapper is also transient and is not tracked: the resource will be closed
-      // via the real key.
       if (reg.kind !== 'transient') {
-        this.cache.set(key, instance)
-        this.owned.add(instance)
+        target.cache.set(key, instance === undefined ? UNDEFINED_MARKER : instance)
+        if (!target.owned.includes(instance)) {
+          target.owned.push(instance)
+        }
       }
       return instance
     } finally {
-      this.resolving.delete(key)
+      this.resolving.pop()
 
       if (reg.kind === 'singleton') {
         this.singletonStack.pop()
@@ -608,56 +760,9 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   }
 
   /**
-   * Soft-mode access to registered values via a Proxy. Useful for ergonomic
-   * destructuring: `const { db, logger } = container.cradle`.
-   *
-   * Behavior:
-   * - Registered keys resolve through `.get()`.
-   * - Unregistered string keys return `undefined` (do NOT throw), so `Promise.resolve(cradle)`,
-   *   `await cradle`, `console.log(cradle)`, and other thenable / inspector probes do
-   *   not crash the application.
-   * - Symbol probes (Symbol.toPrimitive, Symbol.iterator, etc.) return `undefined`.
-   *
-   * ⚠️ TYPE WARNING — the return type is "optimistic".
-   * The signature is typed as `T` (the registered map) for ergonomic destructuring,
-   * but the underlying Proxy is permissive: a typo like `cradle.userRpo` (instead of
-   * `cradle.userRepo`) will silently return `undefined` with NO compile-time error,
-   * because the Proxy's `get` trap is not reflected in the declared type.
-   * If you need a hard error on missing keys, use `container.get(key)` instead — it
-   * throws synchronously with a "Key not found" message and is fully covered by the
-   * type system (`K extends keyof T`).
-   */
-  get cradle(): T {
-    // Throw immediately on a disposed container. Without this check, cradle would
-    // create a fresh Proxy after dispose (because _cradle was cleared), and the user
-    // would only see the error on key access — one step deeper than expected.
-    if (this._disposed) {
-      throw new Error('Container is disposed (cradle access)')
-    }
-    // Cradle is a soft-mode access (in contrast to .get()):
-    // 1) Symbols are filtered out — these are protocol probes (Symbol.toPrimitive,
-    //    Symbol.iterator, nodejs.util.inspect.custom). Return undefined.
-    // 2) Unregistered string keys also return undefined instead of throwing.
-    //    Otherwise Promise.resolve(cradle) / await cradle / console.log / any thenable
-    //    check would pull Get('then') and crash the app with an unexpected
-    //    "Key 'then' not found".
-    //    If a hard error on a missing key is needed — c.get(key) is still available
-    //    and still throws Key not found.
-    return this._cradle ??= new Proxy({} as T, {
-      get: (_, p) => {
-        if (typeof p === 'symbol') {
-          return undefined
-        }
-        const key = p as keyof T
-        return this.hasKey(key) ? this.get(key) : undefined
-      },
-    })
-  }
-
-  /**
    * `true` once the container has been disposed (via {@link Container.dispose},
    * `using`, or `await using`). A disposed container rejects all subsequent
-   * `.get()`, `.cradle`, and `createScope()` calls.
+   * `.get()` and `createScope()` calls.
    */
   public get disposed(): boolean {
     return this._disposed
@@ -677,24 +782,28 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
 
     this._disposed = true
 
-    // Snapshot in LIFO order. Set is not indexable but preserves insertion order.
-    const instances = [...this.owned].reverse() as readonly (DisposableLike | null | undefined)[]
+    // Snapshot in LIFO order.
+    const instances = this.owned.splice(0) as readonly (DisposableLike | null | undefined)[]
 
     // Clear state BEFORE invoking disposers: re-entrancy safety (if a disposer tries
     // to resolve something — it will already see the disposed state) plus releasing
     // factory closures that hold Ctor/deps/factory and parent objects.
-    this.owned.clear()
     this.cache.clear()
     this.regs.clear()
-    this._cradle = undefined
+    // Drop the lookupCache outright: a disposed container is unusable, and the Map
+    // would otherwise hold strong refs to ancestor containers through cached entries,
+    // blocking GC of the parent chain.
+    this.lookupCache = undefined
     // Detach the parent: otherwise an externally-held reference to a disposed scope
     // would keep the entire parent chain (root and all of its caches/factories) from GC.
     this.parent = undefined
 
     const errors: unknown[] = []
 
-    for (const inst of instances) {
-      // Defensive: `owned` is a Set and we only ever insert real instances in
+    for (let i = instances.length - 1; i >= 0; i--) {
+      const inst = instances[i]
+
+      // Defensive: `owned` only ever inserts real instances in
       // get(); a null/undefined element is unreachable in practice. The check
       // is kept as a runtime safety net but excluded from coverage so the
       // ceiling is not dragged down by a path no test can legitimately exercise.
@@ -709,7 +818,10 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
         } else if (typeof inst[Symbol.dispose] === 'function') {
           inst[Symbol.dispose]!()
         } else if (typeof inst.dispose === 'function') {
-          await inst.dispose()
+          const r = inst.dispose()
+          if (r != null && typeof (r as { then?: unknown }).then === 'function') {
+            await r
+          }
         }
       } catch (err) {
         errors.push(err)
@@ -754,20 +866,21 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
 
     this._disposed = true
 
-    const instances = [...this.owned].reverse() as readonly (DisposableLike | null | undefined)[]
+    const instances = this.owned.splice(0) as readonly (DisposableLike | null | undefined)[]
 
-    this.owned.clear()
     this.cache.clear()
     this.regs.clear()
-    this._cradle = undefined
+    this.lookupCache = undefined
     // Detach the parent: otherwise an externally-held reference to a disposed scope
     // would keep the entire parent chain (root and all of its caches/factories) from GC.
     this.parent = undefined
 
     const errors: unknown[] = []
 
-    for (const inst of instances) {
-      // Defensive: `owned` is a Set and we only ever insert real instances in
+    for (let i = instances.length - 1; i >= 0; i--) {
+      const inst = instances[i]
+
+      // Defensive: `owned` only ever inserts real instances in
       // get(); a null/undefined element is unreachable in practice. The check
       // is kept as a runtime safety net but excluded from coverage so the
       // ceiling is not dragged down by a path no test can legitimately exercise.

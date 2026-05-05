@@ -1,5 +1,4 @@
 import {describe, it, expect} from 'vitest'
-import {inspect} from 'node:util'
 import {Container, type DependenciesMap} from '../src/Container'
 import {
   AppConfig,
@@ -161,48 +160,14 @@ describe('Phase 1 — Functional', () => {
 
       expect(c.get('v')).toBe(value)
     })
-  })
 
-  describe('cradle', () => {
-    it('cradle.key === get("key")', () => {
-      const c = new Container().registerClass('logger', ConsoleLogger, [])
+    it('explicit undefined value: cache.has fallback returns it (rare path)', () => {
+      // Anti-pattern, but supported for correctness: registering `undefined` makes the
+      // first `Map.get` return undefined, falling through to the `Map.has` branch
+      // in get(). The branch is not on the hot path — guarded only for completeness.
+      const c = new Container().registerValue('explicit', undefined as unknown)
 
-      expect(c.cradle.logger).toBe(c.get('logger'))
-    })
-
-    it('cradle ignores Symbol-key access', () => {
-      const c = new Container().registerClass('logger', ConsoleLogger, [])
-
-      const anyCradle = c.cradle as unknown as Record<symbol, unknown>
-      expect(anyCradle[Symbol.iterator]).toBeUndefined()
-      expect(anyCradle[Symbol.toStringTag]).toBeUndefined()
-      expect(anyCradle[Symbol.toPrimitive]).toBeUndefined()
-    })
-
-    it('util.inspect(cradle) does not throw (the main motivator for Symbol-ignore)', () => {
-      const c = new Container().registerClass('logger', ConsoleLogger, [])
-
-      expect(() => inspect(c.cradle)).not.toThrow()
-    })
-
-    it('cradle is memoized: repeated access returns the same Proxy', () => {
-      const c = new Container().registerClass('logger', ConsoleLogger, [])
-
-      expect(c.cradle).toBe(c.cradle)
-    })
-
-    it('cradle on a disposed container throws immediately, not on the next level', async () => {
-      const c = new Container().registerClass('logger', ConsoleLogger, [])
-      await c.dispose()
-
-      expect(() => c.cradle).toThrow(/Container is disposed/)
-    })
-
-    it('cradle with a numeric key resolves (runtime: string)', () => {
-      const c = new Container().registerValue('404', 'Not Found')
-
-      // In JS, p[404] arrives at the Proxy trap as the string '404'.
-      expect((c.cradle as Record<string, string>)[404]).toBe('Not Found')
+      expect(c.get('explicit')).toBeUndefined()
     })
   })
 
@@ -213,35 +178,14 @@ describe('Phase 1 — Functional', () => {
       expect(() => c.get('unknown')).toThrow(/Key "unknown" not found/)
     })
 
-    it('cradle.unknownKey returns undefined (soft mode)', () => {
-      // Soft mode is required: otherwise any protocol probe (then/toJSON/...)
-      // would crash the app. The hard throw stays in c.get().
-      const c = new Container<Record<string, unknown>>()
-      expect((c.cradle as Record<string, unknown>).unknownKey).toBeUndefined()
-    })
+    it('missing key inside a live scope chain — still "Key not found", not a disposed message', () => {
+      // The error path walks every ancestor checking _disposed. With a fully live chain
+      // it must complete the walk and fall through to the regular "Key not found" throw.
+      const root = new Container().registerValue('known', 1)
+      const child = root.createScope()
 
-    it('cradle.then returns undefined — Promise.resolve(cradle) does not crash', async () => {
-      const c = new Container().registerValue('foo', 1)
-
-      // Without the has-check in Proxy this await would crash, because
-      // Promise.resolve(cradle) reads Get('then'), and 'then' is not registered.
-      const adopted = await Promise.resolve(c.cradle)
-
-      // Resolve would adopt a thenable if .then were a function.
-      // Here .then === undefined → resolve returned the proxy itself.
-      expect(adopted.foo).toBe(1)
-    })
-
-    it('cradle supports common protocol probes: toJSON, toString, valueOf', () => {
-      const c = new Container().registerValue('foo', 1)
-      const cr = c.cradle as Record<string, unknown>
-
-      // All these keys are accessed by JSON.stringify, console.log, +cradle, etc.
-      // Soft mode returns undefined, not throw.
-      expect(cr.toJSON).toBeUndefined()
-      expect(cr.toString).toBeUndefined()
-      expect(cr.valueOf).toBeUndefined()
-      expect(cr.then).toBeUndefined()
+      // @ts-expect-error — missing key from a child of a live root
+      expect(() => child.get('unknown')).toThrow(/Key "unknown" not found/)
     })
   })
 
@@ -304,6 +248,89 @@ describe('Phase 1 — Functional', () => {
       expect(() => c.get('a')).toThrow(/Circular/)
       // pulling a broken key does not corrupt other keys
       expect(c.get('other').ok).toBe(true)
+    })
+  })
+
+  describe('symbol keys', () => {
+    it('registerValue with a local Symbol() — resolve via get()', () => {
+      const KEY = Symbol('config')
+      const c = new Container().registerValue(KEY, {port: 3000})
+      expect(c.get(KEY)).toEqual({port: 3000})
+    })
+
+    it('registerClass with a symbol key — deps mixing string + symbol', () => {
+      const LOG = Symbol('logger')
+      const c = new Container()
+        .registerClass(LOG, ConsoleLogger, [])
+        .registerClass('service', Service, [LOG])
+      expect(c.get('service').logger).toBe(c.get(LOG))
+    })
+
+    it('registerFactory with a symbol key reads another symbol-keyed dep', () => {
+      const N = Symbol('n')
+      const D = Symbol('doubled')
+      const c = new Container()
+        .registerValue(N, 21)
+        .registerFactory(D, (ctx) => ctx.get(N) * 2)
+      expect(c.get(D)).toBe(42)
+    })
+
+    it('Symbol.for shares identity across registration sites', () => {
+      const c = new Container().registerValue(Symbol.for('shared'), 'a')
+      expect(c.get(Symbol.for('shared'))).toBe('a')
+    })
+
+    it('local Symbol() is unique — re-creating yields a different key', () => {
+      const a = Symbol('x')
+      const b = Symbol('x')
+      const c = new Container().registerValue(a, 1) as Container<Record<symbol, number>>
+      expect(() => c.get(b)).toThrow(/Key "Symbol\(x\)" not found/)
+    })
+
+    it('error message formats a missing symbol as Symbol(desc)', () => {
+      const SYM = Symbol('missing')
+      const c = new Container() as Container<Record<symbol, never>>
+      expect(() => c.get(SYM)).toThrow(/Key "Symbol\(missing\)" not found/)
+    })
+
+    it('cycle detection: chain renders symbol keys', () => {
+      const A = Symbol('A')
+      const B = Symbol('B')
+      class CA { constructor(_b: unknown) {} }
+      class CB { constructor(_a: unknown) {} }
+      const c = new Container() as Container<Record<symbol, unknown>>
+      c.registerClass(A as never, CA, [B as never])
+      c.registerClass(B as never, CB, [A as never])
+      expect(() => c.get(A)).toThrow(/Symbol\(A\) -> Symbol\(B\) -> Symbol\(A\)/)
+    })
+
+    it('lifetime guard formats symbol parent and child', () => {
+      const SCOPED = Symbol('scoped')
+      const SINGLE = Symbol('singleton')
+      class Dep {}
+      class Svc { constructor(_d: Dep) {} }
+      const c = new Container()
+        .registerClass(SCOPED, Dep, [], 'scoped')
+        .registerClass(SINGLE, Svc, [SCOPED], 'singleton')
+      expect(() => c.get(SINGLE)).toThrow(
+        /Singleton "Symbol\(singleton\)" cannot depend on scoped "Symbol\(scoped\)"/,
+      )
+    })
+
+    it('lazyKey accepts a symbol — companion is registered under that key', () => {
+      const SVC = Symbol('svc')
+      const SVC_LAZY = Symbol('svcLazy')
+      class Svc {}
+      const c = new Container().registerClass(SVC, Svc, [], 'singleton', SVC_LAZY)
+      const wrapper = c.get(SVC_LAZY)
+      expect(wrapper.get()).toBe(c.get(SVC))
+    })
+
+    it('lazyKey accepts a string companion for a symbol-keyed service (mixed)', () => {
+      const SVC = Symbol('svc')
+      class Svc {}
+      const c = new Container().registerClass(SVC, Svc, [], 'singleton', 'svcLazy')
+      expect(c.get('svcLazy').get()).toBe(c.get(SVC))
     })
   })
 })
@@ -415,9 +442,9 @@ describe('Phase 2 — Lifetimes', () => {
       expect(s1.get('logger')).not.toBe(s2.get('logger'))
     })
 
-    it('hasKey walk: key resolves across a 3-level parent chain', () => {
-      // Isolated test for the full chain walk in Container.hasKey() and in
-      // get()'s walk-up: registration on root, access from l3 (3 levels of parent links).
+    it('walk-up: key resolves across a 3-level parent chain', () => {
+      // Isolated test for the full chain walk in get(): registration on root,
+      // access from l3 (3 levels of parent links).
       const root = new Container().registerValue('depth', 0)
       const l1 = root.createScope()
       const l2 = l1.createScope()
@@ -425,8 +452,6 @@ describe('Phase 2 — Lifetimes', () => {
 
       // .get() walks up 3 levels and finds the registration on root
       expect(l3.get('depth')).toBe(0)
-      // cradle proxies through hasKey() → also a walk-up
-      expect(l3.cradle.depth).toBe(0)
       // Any intermediate level returns the same value
       expect(l1.get('depth')).toBe(0)
       expect(l2.get('depth')).toBe(0)
@@ -494,7 +519,7 @@ describe('Phase 2 — Lifetimes', () => {
           created++
         }
       }
-      const c = new Container().registerClass('db', DbClass, [], 'singleton', true)
+      const c = new Container().registerClass('db', DbClass, [], 'singleton', 'dbLazy')
 
       const wrapper = c.get('dbLazy')
       expect(created).toBe(0) // wrapper acquired, but the instance has not been created
@@ -506,19 +531,19 @@ describe('Phase 2 — Lifetimes', () => {
     })
 
     it('lazy.get() is idempotent: the same singleton', () => {
-      const c = new Container().registerClass('db', TrackableAsync, [], 'singleton', true)
+      const c = new Container().registerClass('db', TrackableAsync, [], 'singleton', 'dbLazy')
 
       const wrapper = c.get('dbLazy')
       expect(wrapper.get()).toBe(wrapper.get())
       expect(wrapper.get()).toBe(c.get('db'))
     })
 
-    it('lazy: true legalizes injecting short-lived into a singleton', () => {
+    it('lazyKey legalizes injecting short-lived into a singleton', () => {
       class Holder {
         constructor(public readonly leakyLazy: { readonly get: () => ConsoleLogger }) {}
       }
       const c = new Container()
-        .registerClass('leaky', ConsoleLogger, [], 'scoped', true)
+        .registerClass('leaky', ConsoleLogger, [], 'scoped', 'leakyLazy')
         .registerClass('holder', Holder, ['leakyLazy'], 'singleton')
 
       // Without the lazy escape this would fail: Singleton "holder" cannot depend on scoped "leaky".
@@ -527,7 +552,7 @@ describe('Phase 2 — Lifetimes', () => {
 
     // ────────── Captured scope: the key invariant ─────────
     it('Lazy obtained in scopeA resolves the target through scopeA — even if .get() is called later', () => {
-      const root = new Container().registerClass('svc', ConsoleLogger, [], 'scoped', true)
+      const root = new Container().registerClass('svc', ConsoleLogger, [], 'scoped', 'svcLazy')
 
       const a = root.createScope()
       const b = root.createScope()
@@ -552,7 +577,7 @@ describe('Phase 2 — Lifetimes', () => {
     })
 
     it('Lazy.get() after dispose of the captured scope → throws "Container is disposed"', async () => {
-      const root = new Container().registerClass('svc', ConsoleLogger, [], 'scoped', true)
+      const root = new Container().registerClass('svc', ConsoleLogger, [], 'scoped', 'svcLazy')
 
       const scope = root.createScope()
       const wrapper = scope.get('svcLazy')
@@ -571,7 +596,7 @@ describe('fluent shape', () => {
     const c = new Container()
       .registerClass('logger', ConsoleLogger, [])
       .registerFactory('config', () => new AppConfig(8080))
-      .registerClass('db', TrackableAsync, [], 'singleton', true)
+      .registerClass('db', TrackableAsync, [], 'singleton', 'dbLazy')
       .registerClass('service', Service, ['logger'])
 
     expect(c.get('logger')).toBeInstanceOf(ConsoleLogger)
@@ -609,6 +634,276 @@ describe('use() — runtime', () => {
       )
 
     expect(c.get('out')).toBe('alpha')
+  })
+})
+
+// ────────────────────────────────────────────────────────────────────────────
+// Regression suite for the get() refactor — lookup cache + helper-based
+// singleton resolution. Each test guards an invariant from the implementation
+// plan that could quietly break under future refactors.
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('get() refactor — invariants under lookup cache + shared helper', () => {
+  describe('owned-on-owner invariant', () => {
+    it('singleton resolved from a child is disposed by the owner, not by the child', async () => {
+      const root = new Container().registerClass('db', TrackableAsync, [])
+      const child = root.createScope()
+
+      const inst = child.get('db')
+      expect(inst.asyncDisposeCalls).toBe(0)
+
+      await child.dispose()
+      // child does not own the singleton — it lives on root
+      expect(inst.asyncDisposeCalls).toBe(0)
+
+      await root.dispose()
+      expect(inst.asyncDisposeCalls).toBe(1)
+    })
+  })
+
+  describe('singleton dependencies resolve through the owner scope', () => {
+    it('child override of a key does NOT leak into a singleton owned by the parent', () => {
+      class Holder {
+        constructor(public readonly cfg: AppConfig) {}
+      }
+      const root = new Container()
+        .registerValue('cfg', new AppConfig(8000))
+        .registerClass('holder', Holder, ['cfg'])
+
+      const child = (root.createScope() as unknown as { registerValue: (k: string, v: unknown) => unknown })
+      // Bypass the compile-time re-registration guard to model a feature-module
+      // test that re-registers a key in a child scope on purpose.
+      child.registerValue('cfg', new AppConfig(9999))
+
+      const holder = (child as unknown as { get: (k: string) => Holder }).get('holder')
+      // Singleton's factory ran on root, so it sees root's cfg, not child's.
+      expect(holder.cfg.port).toBe(8000)
+    })
+  })
+
+  describe('scoped lifetime under shared parent registration', () => {
+    it('two child scopes get distinct instances of a parent-registered scoped service', () => {
+      class Box { public value = 0 }
+      const root = new Container().registerClass('box', Box, [], 'scoped')
+
+      const a = root.createScope()
+      const b = root.createScope()
+
+      const ax = a.get('box')
+      const ay = a.get('box')
+      const bx = b.get('box')
+
+      expect(ax).toBe(ay)         // stable within one scope
+      expect(ax).not.toBe(bx)     // distinct across sibling scopes
+    })
+  })
+
+  describe('lookup cache invalidation via version snapshot', () => {
+    it('re-registering on the owner after a child resolve is observed on the next get', () => {
+      const root = new Container().registerValue('a', 1)
+      const child = root.createScope()
+
+      expect(child.get('a')).toBe(1)
+
+      // Bypass compile-time re-registration guard to model a runtime override
+      // (lazy modules / test fixtures / hot-reload scenarios).
+      ;(root as unknown as { registerValue: (k: string, v: unknown) => unknown })
+        .registerValue('a', 2)
+
+      expect(child.get('a')).toBe(2)
+    })
+
+    it('re-registering on the owner is observed from a grandchild scope (3-level chain)', () => {
+      const root = new Container().registerValue('a', 'first')
+      const child = root.createScope()
+      const grand = child.createScope()
+
+      expect(grand.get('a')).toBe('first')
+
+      ;(root as unknown as { registerValue: (k: string, v: unknown) => unknown })
+        .registerValue('a', 'second')
+
+      expect(grand.get('a')).toBe('second')
+    })
+
+    it('registering an unrelated key on the owner does not affect cached resolution of other keys', () => {
+      const root = new Container().registerValue('a', 'A')
+      const child = root.createScope()
+
+      // First resolve — populates child.lookupCache with entry for 'a'
+      expect(child.get('a')).toBe('A')
+
+      // Bump root.regsVersion via a brand-new key. The cached entry for 'a' will
+      // miss the version compare on next access, fall back to walk-up, and find
+      // the same registration — correct result even if the cache invalidation
+      // is over-eager.
+      ;(root as unknown as { registerValue: (k: string, v: unknown) => unknown })
+        .registerValue('b', 'B')
+
+      expect(child.get('a')).toBe('A')
+      expect((child as unknown as { get: (k: string) => string }).get('b')).toBe('B')
+    })
+
+    it('child override after a parent-resolve clears the child lookupCache', () => {
+      const root = new Container().registerValue('a', 'parent')
+      const child = root.createScope()
+
+      // Child reaches into parent — caches { owner: root, reg, version }
+      expect(child.get('a')).toBe('parent')
+
+      // Override locally on child — must invalidate child.lookupCache so the
+      // next resolve sees the local registration.
+      ;(child as unknown as { registerValue: (k: string, v: unknown) => unknown })
+        .registerValue('a', 'child')
+
+      expect(child.get('a')).toBe('child')
+    })
+  })
+
+  describe('cycle detection coexistence with lookup cache', () => {
+    it('a successful resolve does not let a later cycle escape the detector', () => {
+      const c = new Container()
+        .registerValue('safe', 42)
+        .registerFactory('a', (ctx) => ctx.get('b' as never))
+        .registerFactory('b', (ctx) => ctx.get('a' as never))
+
+      // First, a clean resolve — fully exercises the helper + cache writes.
+      expect(c.get('safe')).toBe(42)
+
+      // Now the cycle must still throw — `resolving` is shared and lives outside
+      // any caching path.
+      expect(() => c.get('a' as never)).toThrowError(/Circular dependency/)
+
+      // After the throw, the container is still healthy.
+      expect(c.get('safe')).toBe(42)
+    })
+
+    it('transient ↔ transient cycle is caught (resolving.add must run for every kind)', () => {
+      const c = new Container()
+        .registerFactory('x', (ctx) => ctx.get('y' as never), 'transient')
+        .registerFactory('y', (ctx) => ctx.get('x' as never), 'transient')
+
+      expect(() => c.get('x' as never)).toThrowError(/Circular dependency/)
+    })
+  })
+
+  describe('lifetime guard remains active across repeated cold resolves', () => {
+    it('singleton → scoped throws on every fresh scope, not just the first', () => {
+      class Bad {
+        constructor(public readonly s: { value: number }) {}
+      }
+      const root = new Container()
+        .registerFactory('shortLived', () => ({value: 1}), 'scoped')
+        .registerClass('bad', Bad, ['shortLived'])
+
+      const a = root.createScope()
+      const b = root.createScope()
+
+      expect(() => a.get('bad')).toThrowError(/Singleton .* cannot depend on scoped/)
+      expect(() => b.get('bad')).toThrowError(/Singleton .* cannot depend on scoped/)
+    })
+  })
+
+  describe('local fast-path does not skip walk-up for missing local keys', () => {
+    it('child without a local registration resolves correctly through the parent', () => {
+      const root = new Container().registerValue('shared', 'from-root')
+      const child = root.createScope()
+
+      expect(child.get('shared')).toBe('from-root')
+      // Repeat to exercise the cached path.
+      expect(child.get('shared')).toBe('from-root')
+    })
+  })
+
+  describe('lookup cache invalidation across all register* methods', () => {
+    it('registerClass on a scope with a populated lookupCache clears the cache', () => {
+      const root = new Container().registerValue('x', 'parent')
+      const child = root.createScope()
+
+      // Populate child.lookupCache
+      expect(child.get('x')).toBe('parent')
+
+      class Local { public hello = 'world' }
+      ;(child as unknown as { registerClass: (k: string, c: typeof Local, d: readonly never[]) => unknown })
+        .registerClass('local', Local, [])
+
+      expect((child as unknown as { get: (k: string) => Local }).get('local').hello).toBe('world')
+    })
+
+    it('registerFactory on a scope with a populated lookupCache clears the cache', () => {
+      const root = new Container().registerValue('x', 'parent')
+      const child = root.createScope()
+
+      expect(child.get('x')).toBe('parent')
+
+      ;(child as unknown as { registerFactory: (k: string, f: () => unknown) => unknown })
+        .registerFactory('built', () => 'fresh')
+
+      expect((child as unknown as { get: (k: string) => string }).get('built')).toBe('fresh')
+    })
+  })
+
+  describe('delegated resolve of explicit undefined and disposed owners', () => {
+    it('singleton owned by parent stored as explicit undefined: child resolves it through cache.has fallback', () => {
+      const root = new Container().registerValue('maybe', undefined)
+      const child = root.createScope()
+
+      // First child.get drives the lookupCache miss → walk-up → cache entry.
+      expect(child.get('maybe')).toBeUndefined()
+
+      // Second child.get drives the LOOKUP CACHE HIT path into the helper, where
+      // target.cache.get returns undefined and target.cache.has(key) === true is
+      // the only way to distinguish "registered as undefined" from "miss".
+      expect(child.get('maybe')).toBeUndefined()
+    })
+
+    it('singleton resolved from child after the owner is disposed throws via helper disposed-check', async () => {
+      const root = new Container().registerClass('svc', AppConfig as never, [] as never)
+      const child = root.createScope()
+
+      // Populate child.lookupCache by resolving once while root is still alive.
+      child.get('svc')
+
+      await root.dispose()
+
+      // Cache entry on child still points at the (now disposed) root.
+      // root.regsVersion is unchanged by dispose(), so the cached entry passes
+      // the version check and lands in the helper's disposed-target branch.
+      expect(() => child.get('svc')).toThrowError(/Container is disposed/)
+    })
+  })
+  describe('owned array de-duplication', () => {
+    it('does not push the same instance twice if it is returned by multiple registrations', () => {
+      const instance = { dispose: () => {} }
+      
+      // Registering the exact same instance under two keys
+      const c = new Container()
+        .registerFactory('a', () => instance)
+        .registerFactory('b', () => instance)
+        
+      c.get('a') // pushes instance to target.owned
+      c.get('b') // hits the !target.owned.includes(instance) branch, evaluates to false
+      
+      // Cast to inspect private field to ensure it was only added once
+      expect((c as unknown as { owned: unknown[] }).owned.length).toBe(1)
+    })
+  })
+
+  describe('explicit undefined from factory', () => {
+    it('caches UNDEFINED_MARKER when a factory returns undefined', () => {
+      let calls = 0
+      const c = new Container().registerFactory('nil', () => {
+        calls++
+        return undefined
+      })
+      
+      // First call executes the factory and hits the `instance === undefined` branch
+      expect(c.get('nil')).toBeUndefined()
+      // Second call reads from cache, proving it was cached properly
+      expect(c.get('nil')).toBeUndefined()
+      
+      expect(calls).toBe(1)
+    })
   })
 })
 

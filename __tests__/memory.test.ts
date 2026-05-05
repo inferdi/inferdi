@@ -53,16 +53,17 @@ async function allocateFactoryClosureAndDispose(): Promise<WeakRef<object>> {
   return weak
 }
 
-// _cradle is set to undefined on dispose. The Proxy must become unreferenced.
-async function allocateCradleAndDispose(): Promise<WeakRef<object>> {
-  class Svc {
+// Symbol-keyed singleton must be released after dispose just like a string-keyed one.
+async function allocateSymbolKeyedSingletonAndDispose(): Promise<WeakRef<object>> {
+  class Heavy {
     public payload = new Array(1000).fill(0)
   }
 
-  const c = new Container().registerClass('svc', Svc, [])
-  const cradleWeak = new WeakRef(c.cradle)
+  const SYM = Symbol('heavy')
+  const c = new Container().registerClass(SYM, Heavy, [])
+  const ref = new WeakRef(c.get(SYM) as object)
   await c.dispose()
-  return cradleWeak
+  return ref
 }
 
 describe.skipIf(!hasGc)('Phase 5 — memory leaks', () => {
@@ -76,8 +77,8 @@ describe.skipIf(!hasGc)('Phase 5 — memory leaks', () => {
     expect(await waitForGC(ref)).toBe(true)
   })
 
-  it('cradle Proxy is released after dispose (_cradle = undefined)', async () => {
-    const ref = await allocateCradleAndDispose()
+  it('symbol-keyed singleton instance is released after dispose', async () => {
+    const ref = await allocateSymbolKeyedSingletonAndDispose()
     expect(await waitForGC(ref)).toBe(true)
   })
 
