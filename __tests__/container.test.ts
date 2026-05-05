@@ -14,13 +14,13 @@ import {
 
 describe('Phase 1 — Functional', () => {
   describe('registerClass', () => {
-    it('резолвит класс с нулевой арностью', () => {
+    it('resolves a class with zero arity', () => {
       const c = new Container().registerClass('logger', ConsoleLogger, [])
 
       expect(c.get('logger')).toBeInstanceOf(ConsoleLogger)
     })
 
-    it('передаёт зависимости в конструктор в объявленном порядке', () => {
+    it('passes dependencies to the constructor in declared order', () => {
       const c = new Container()
         .registerClass('logger', ConsoleLogger, [])
         .registerClass('service', Service, ['logger'])
@@ -32,11 +32,11 @@ describe('Phase 1 — Functional', () => {
     })
   })
 
-  // Arity unrolling в Container.registerClass — отдельные ветки for len === 0..4
-  // и tail (len >= 5) через Reflect.construct. len === 0 и 1 уже проверены выше
-  // (ConsoleLogger / Service); здесь дозакрываем 2, 3, 4 и tail.
-  describe('arity unrolling — все ветки JIT-оптимизации', () => {
-    it('len === 2: оба аргумента прокидываются в правильном порядке', () => {
+  // Arity unrolling in Container.registerClass — separate branches for len === 0..4
+  // and the tail (len >= 5) via Reflect.construct. len === 0 and 1 are already
+  // covered above (ConsoleLogger / Service); here we cover 2, 3, 4 and the tail.
+  describe('arity unrolling — all JIT-optimization branches', () => {
+    it('len === 2: both args are passed in the right order', () => {
       class Two {
         constructor(public a: number, public b: string) {}
       }
@@ -84,7 +84,7 @@ describe('Phase 1 — Functional', () => {
       expect([inst.a, inst.b, inst.c, inst.d]).toEqual([1, 'x', true, 2])
     })
 
-    it('len === 5: tail-ветка через Reflect.construct', () => {
+    it('len === 5: tail branch via Reflect.construct', () => {
       class Five {
         constructor(
           public a: number,
@@ -106,7 +106,7 @@ describe('Phase 1 — Functional', () => {
       expect([inst.a, inst.b, inst.c, inst.d, inst.e]).toEqual([1, 2, 3, 4, 5])
     })
 
-    it('len === 6: tail-ветка с большей арностью (стабильность)', () => {
+    it('len === 6: tail branch with higher arity (stability)', () => {
       class Six {
         constructor(
           public a: number,
@@ -132,13 +132,13 @@ describe('Phase 1 — Functional', () => {
   })
 
   describe('registerFactory', () => {
-    it('фабрика получает контейнер и её результат доступен через get', () => {
+    it('factory receives the container and its result is reachable via get', () => {
       const c = new Container().registerFactory('config', () => ({port: 3000}))
 
       expect(c.get('config')).toEqual({port: 3000})
     })
 
-    it('фабрика видит ранее зарегистрированные зависимости', () => {
+    it('factory sees previously registered dependencies', () => {
       const c = new Container()
         .registerValue('base', 21)
         .registerFactory('doubled', (ctx) => ctx.get('base') * 2)
@@ -148,14 +148,14 @@ describe('Phase 1 — Functional', () => {
   })
 
   describe('registerValue', () => {
-    it('возвращает то же значение по ссылке', () => {
+    it('returns the same value by reference', () => {
       const cfg = new AppConfig(9000)
       const c = new Container().registerValue('config', cfg)
 
       expect(c.get('config')).toBe(cfg)
     })
 
-    it('значение доступно сразу через cache (fast-path)', () => {
+    it('value is reachable immediately through the cache (fast path)', () => {
       const value = {marker: Symbol('v')}
       const c = new Container().registerValue('v', value)
 
@@ -170,7 +170,7 @@ describe('Phase 1 — Functional', () => {
       expect(c.cradle.logger).toBe(c.get('logger'))
     })
 
-    it('cradle игнорирует обращения по Symbol-ключам', () => {
+    it('cradle ignores Symbol-key access', () => {
       const c = new Container().registerClass('logger', ConsoleLogger, [])
 
       const anyCradle = c.cradle as unknown as Record<symbol, unknown>
@@ -179,65 +179,65 @@ describe('Phase 1 — Functional', () => {
       expect(anyCradle[Symbol.toPrimitive]).toBeUndefined()
     })
 
-    it('util.inspect(cradle) не падает (основной мотиватор Symbol-игнора)', () => {
+    it('util.inspect(cradle) does not throw (the main motivator for Symbol-ignore)', () => {
       const c = new Container().registerClass('logger', ConsoleLogger, [])
 
       expect(() => inspect(c.cradle)).not.toThrow()
     })
 
-    it('cradle — мемоизирован: повторное обращение возвращает тот же Proxy', () => {
+    it('cradle is memoized: repeated access returns the same Proxy', () => {
       const c = new Container().registerClass('logger', ConsoleLogger, [])
 
       expect(c.cradle).toBe(c.cradle)
     })
 
-    it('cradle на disposed-контейнере бросает сразу, не на следующем уровне', async () => {
+    it('cradle on a disposed container throws immediately, not on the next level', async () => {
       const c = new Container().registerClass('logger', ConsoleLogger, [])
       await c.dispose()
 
       expect(() => c.cradle).toThrow(/Container is disposed/)
     })
 
-    it('cradle с числовым ключом резолвится (runtime: строка)', () => {
+    it('cradle with a numeric key resolves (runtime: string)', () => {
       const c = new Container().registerValue('404', 'Not Found')
 
-      // В JS обращение по числу p[404] на этапе Proxy-trap прилетает как строка '404'.
+      // In JS, p[404] arrives at the Proxy trap as the string '404'.
       expect((c.cradle as Record<string, string>)[404]).toBe('Not Found')
     })
   })
 
   describe('unknown keys', () => {
-    it('get() бросает "Key ... not found"', () => {
+    it('get() throws "Key ... not found"', () => {
       const c = new Container().registerValue('known', 'x')
-      // @ts-expect-error — пытаемся резолвить незарегистрированный ключ
+      // @ts-expect-error — trying to resolve an unregistered key
       expect(() => c.get('unknown')).toThrow(/Key "unknown" not found/)
     })
 
-    it('cradle.unknownKey возвращает undefined (soft-режим)', () => {
-      // Soft-режим обязателен, иначе любые протокольные пробы (then/toJSON/...)
-      // крашат приложение. Жёсткий throw остаётся в c.get().
+    it('cradle.unknownKey returns undefined (soft mode)', () => {
+      // Soft mode is required: otherwise any protocol probe (then/toJSON/...)
+      // would crash the app. The hard throw stays in c.get().
       const c = new Container<Record<string, unknown>>()
       expect((c.cradle as Record<string, unknown>).unknownKey).toBeUndefined()
     })
 
-    it('cradle.then возвращает undefined — Promise.resolve(cradle) не падает', async () => {
+    it('cradle.then returns undefined — Promise.resolve(cradle) does not crash', async () => {
       const c = new Container().registerValue('foo', 1)
 
-      // Без has-проверки в Proxy этот await крашил бы приложение, потому что
-      // Promise.resolve(cradle) дёргает Get('then'), а 'then' не зарегистрирован.
+      // Without the has-check in Proxy this await would crash, because
+      // Promise.resolve(cradle) reads Get('then'), and 'then' is not registered.
       const adopted = await Promise.resolve(c.cradle)
 
-      // Resolve адаптировал бы thenable, если бы .then оказался функцией.
-      // У нас .then === undefined → resolve вернул сам proxy.
+      // Resolve would adopt a thenable if .then were a function.
+      // Here .then === undefined → resolve returned the proxy itself.
       expect(adopted.foo).toBe(1)
     })
 
-    it('cradle поддерживает популярные протокольные пробы: toJSON, toString, valueOf', () => {
+    it('cradle supports common protocol probes: toJSON, toString, valueOf', () => {
       const c = new Container().registerValue('foo', 1)
       const cr = c.cradle as Record<string, unknown>
 
-      // Все эти ключи дёргаются JSON.stringify, console.log, +cradle, и т.п.
-      // Soft-режим возвращает undefined, не throw.
+      // All these keys are accessed by JSON.stringify, console.log, +cradle, etc.
+      // Soft mode returns undefined, not throw.
       expect(cr.toJSON).toBeUndefined()
       expect(cr.toString).toBeUndefined()
       expect(cr.valueOf).toBeUndefined()
@@ -246,7 +246,7 @@ describe('Phase 1 — Functional', () => {
   })
 
   describe('cycle detection', () => {
-    it('A→B→C→A: бросает с цепочкой в сообщении', () => {
+    it('A→B→C→A: throws with the chain in the message', () => {
       class A {
         constructor(public b: B) {}
       }
@@ -257,10 +257,10 @@ describe('Phase 1 — Functional', () => {
         constructor(public a: A) {}
       }
 
-      // Регистрация рекурсивных классов в fluent-стиле невозможна без приведения,
-      // потому что 'b' нужен для 'a', но регистрируется позже. Используем pre-declared
-      // тип через Container<{}> + явный каст в Container с известной формой —
-      // проверяем именно runtime-поведение цикл-детекции.
+      // Registering recursive classes in fluent style is impossible without casts
+      // because 'b' is needed by 'a' but registered later. We use a pre-declared
+      // type via Container<{}> + an explicit cast to Container with a known shape —
+      // we are testing the runtime cycle-detection behavior specifically.
       const c = new Container() as Container<{a: A; b: B; cc: C}>
       c.registerClass('a' as never, A, ['b' as never])
       c.registerClass('b' as never, B, ['cc' as never])
@@ -269,7 +269,7 @@ describe('Phase 1 — Functional', () => {
       expect(() => c.get('a')).toThrow(/Circular dependency detected: a -> b -> cc -> a/)
     })
 
-    it('саморекурсия A→A — тоже ловится', () => {
+    it('self-recursion A→A is also caught', () => {
       class A {
         constructor(_a: A) {}
       }
@@ -279,7 +279,7 @@ describe('Phase 1 — Functional', () => {
       expect(() => c.get('a')).toThrow(/Circular dependency detected: a -> a/)
     })
 
-    it('сообщение содержит подсказку про Lazy', () => {
+    it('the message contains a hint about Lazy', () => {
       class A {
         constructor(_a: A) {}
       }
@@ -289,7 +289,7 @@ describe('Phase 1 — Functional', () => {
       expect(() => c.get('a')).toThrow(/Lazy<T>/)
     })
 
-    it('после исключения в цикле контейнер остаётся валидным (finally очищает resolving)', () => {
+    it('after a cycle exception the container stays valid (finally clears `resolving`)', () => {
       class A {
         constructor(_a: A) {}
       }
@@ -302,7 +302,7 @@ describe('Phase 1 — Functional', () => {
       expect(() => c.get('a')).toThrow()
       // second resolve should still surface same error (not "already resolving")
       expect(() => c.get('a')).toThrow(/Circular/)
-      // ни тот факт, что мы дергали broken ключ, не портит другие ключи
+      // pulling a broken key does not corrupt other keys
       expect(c.get('other').ok).toBe(true)
     })
   })
@@ -314,13 +314,13 @@ describe('Phase 1 — Functional', () => {
 
 describe('Phase 2 — Lifetimes', () => {
   describe('singleton (default)', () => {
-    it('multiple get() возвращают один и тот же инстанс', () => {
+    it('multiple get() return the same instance', () => {
       const c = new Container().registerClass('logger', ConsoleLogger, [])
 
       expect(c.get('logger')).toBe(c.get('logger'))
     })
 
-    it('singleton работает и с registerFactory', () => {
+    it('singleton also works with registerFactory', () => {
       let calls = 0
       const c = new Container().registerFactory('obj', () => ({n: ++calls}), 'singleton')
 
@@ -330,7 +330,7 @@ describe('Phase 2 — Lifetimes', () => {
   })
 
   describe('transient', () => {
-    it('multiple get() возвращают новые инстансы', () => {
+    it('multiple get() return new instances', () => {
       const c = new Container().registerClass('logger', ConsoleLogger, [], 'transient')
 
       const a = c.get('logger')
@@ -341,7 +341,7 @@ describe('Phase 2 — Lifetimes', () => {
       expect(b).toBeInstanceOf(ConsoleLogger)
     })
 
-    it('transient — каждая фабрика вызывается заново', () => {
+    it('transient — every factory is called fresh', () => {
       let calls = 0
       const c = new Container().registerFactory('obj', () => ({n: ++calls}), 'transient')
 
@@ -354,7 +354,7 @@ describe('Phase 2 — Lifetimes', () => {
   })
 
   describe('scoped', () => {
-    it('внутри одного scope — один инстанс', () => {
+    it('within one scope — one instance', () => {
       const c = new Container().registerClass('logger', ConsoleLogger, [], 'scoped')
 
       const scope = c.createScope()
@@ -362,7 +362,7 @@ describe('Phase 2 — Lifetimes', () => {
       expect(scope.get('logger')).toBe(scope.get('logger'))
     })
 
-    it('разные scope — разные инстансы', () => {
+    it('different scopes — different instances', () => {
       const c = new Container().registerClass('logger', ConsoleLogger, [], 'scoped')
 
       const s1 = c.createScope()
@@ -373,40 +373,40 @@ describe('Phase 2 — Lifetimes', () => {
   })
 
   describe('scope hierarchy', () => {
-    it('зависимость, не найденная локально, резолвится из parent', () => {
+    it('a dependency not found locally is resolved from the parent', () => {
       const root = new Container().registerClass('logger', ConsoleLogger, [])
 
       const child = root.createScope()
 
-      // child не имеет локальной регистрации — walk вверх находит в root
+      // child has no local registration — walk-up finds it on root
       expect(child.get('logger')).toBe(root.get('logger'))
     })
 
-    it('singleton, запрошенный из child, инстанцируется на owner (root)', () => {
+    it('singleton requested from a child is instantiated on the owner (root)', () => {
       const root = new Container()
         .registerClass('logger', ConsoleLogger, [])
         .registerClass('service', Service, ['logger'])
 
       const child = root.createScope()
 
-      // Инстанс должен быть общий: один и тот же между root и child
+      // The instance must be shared: same between root and child
       expect(child.get('service')).toBe(root.get('service'))
-      // И логгер общий (резолвится в контексте owner = root)
+      // The logger is shared too (resolved in the owner = root context)
       expect(child.get('service').logger).toBe(root.get('logger'))
     })
 
-    it('child-owned singleton живёт на child, не на root', () => {
+    it('child-owned singleton lives on the child, not on root', () => {
       const root = new Container()
       const child = root.createScope().registerClass('childOnly', ConsoleLogger, [], 'singleton')
 
       const inst = child.get('childOnly')
       expect(inst).toBeInstanceOf(ConsoleLogger)
-      // root не видит child-only регистрацию
-      // @ts-expect-error — childOnly не в типе root
+      // root does not see the child-only registration
+      // @ts-expect-error — childOnly is not in root's type
       expect(() => root.get('childOnly')).toThrow(/Key "childOnly" not found/)
     })
 
-    it('scoped на root: в каждом child-scope свой инстанс', () => {
+    it('scoped on root: every child scope has its own instance', () => {
       const root = new Container().registerClass('logger', ConsoleLogger, [], 'scoped')
 
       const s1 = root.createScope()
@@ -415,19 +415,19 @@ describe('Phase 2 — Lifetimes', () => {
       expect(s1.get('logger')).not.toBe(s2.get('logger'))
     })
 
-    it('hasKey walk: ключ резолвится через 3 уровня parent-chain', () => {
-      // Изолированный тест на полный обход цепи в Container.hasKey() и в get()'s
-      // walk-up: регистрация на root, обращение из l3 (3 уровня parent links).
+    it('hasKey walk: key resolves across a 3-level parent chain', () => {
+      // Isolated test for the full chain walk in Container.hasKey() and in
+      // get()'s walk-up: registration on root, access from l3 (3 levels of parent links).
       const root = new Container().registerValue('depth', 0)
       const l1 = root.createScope()
       const l2 = l1.createScope()
       const l3 = l2.createScope()
 
-      // .get() уходит вверх по 3 уровням и находит регистрацию на root
+      // .get() walks up 3 levels and finds the registration on root
       expect(l3.get('depth')).toBe(0)
-      // cradle проксирует через hasKey() → тоже walk-up
+      // cradle proxies through hasKey() → also a walk-up
       expect(l3.cradle.depth).toBe(0)
-      // Любой из промежуточных уровней даёт то же значение
+      // Any intermediate level returns the same value
       expect(l1.get('depth')).toBe(0)
       expect(l2.get('depth')).toBe(0)
     })
@@ -454,7 +454,7 @@ describe('Phase 2 — Lifetimes', () => {
       )
     })
 
-    it('scoped → scoped: OK (оба короткоживущие в одном scope)', () => {
+    it('scoped → scoped: OK (both short-lived within one scope)', () => {
       const c = new Container()
         .registerClass('a', ConsoleLogger, [], 'scoped')
         .registerClass('b', Service, ['a'], 'scoped')
@@ -463,7 +463,7 @@ describe('Phase 2 — Lifetimes', () => {
       expect(() => scope.get('b')).not.toThrow()
     })
 
-    it('scoped → transient: OK (серая зона, разрешено)', () => {
+    it('scoped → transient: OK (grey area, allowed)', () => {
       const c = new Container()
         .registerClass('a', ConsoleLogger, [], 'transient')
         .registerClass('b', Service, ['a'], 'scoped')
@@ -472,21 +472,21 @@ describe('Phase 2 — Lifetimes', () => {
       expect(() => scope.get('b')).not.toThrow()
     })
 
-    it('после leak-ошибки finally корректно очищает singletonStack', () => {
+    it('after a leak error, finally correctly clears the singletonStack', () => {
       const c = new Container()
         .registerClass('scoped', ConsoleLogger, [], 'scoped')
         .registerClass('singleton', Service, ['scoped'], 'singleton')
         .registerValue('other', {ok: true})
 
       expect(() => c.get('singleton')).toThrow()
-      // singletonStack должен быть очищен — последующий scoped-резолв в другом контейнере
-      // в том же дереве не должен глючить (косвенно — доступность other)
+      // singletonStack must be cleared — a subsequent scoped resolve in a different
+      // container of the same tree must not glitch (indirectly — `other` is reachable).
       expect(c.get('other').ok).toBe(true)
     })
   })
 
   describe('Lazy injection', () => {
-    it('lazy-обёртка не инстанцирует таргет до первого .get()', () => {
+    it('lazy wrapper does not instantiate the target before the first .get()', () => {
       let created = 0
       class DbClass extends TrackableAsync {
         constructor() {
@@ -497,7 +497,7 @@ describe('Phase 2 — Lifetimes', () => {
       const c = new Container().registerClass('db', DbClass, [], 'singleton', true)
 
       const wrapper = c.get('dbLazy')
-      expect(created).toBe(0) // wrapper получен, но инстанс не создан
+      expect(created).toBe(0) // wrapper acquired, but the instance has not been created
       expect(wrapper).toHaveProperty('get')
 
       const real = wrapper.get()
@@ -505,7 +505,7 @@ describe('Phase 2 — Lifetimes', () => {
       expect(real).toBeInstanceOf(DbClass)
     })
 
-    it('lazy.get() — идемпотентен: тот же singleton', () => {
+    it('lazy.get() is idempotent: the same singleton', () => {
       const c = new Container().registerClass('db', TrackableAsync, [], 'singleton', true)
 
       const wrapper = c.get('dbLazy')
@@ -513,7 +513,7 @@ describe('Phase 2 — Lifetimes', () => {
       expect(wrapper.get()).toBe(c.get('db'))
     })
 
-    it('lazy: true легализует инжекцию short-lived в singleton', () => {
+    it('lazy: true legalizes injecting short-lived into a singleton', () => {
       class Holder {
         constructor(public readonly leakyLazy: { readonly get: () => ConsoleLogger }) {}
       }
@@ -521,12 +521,12 @@ describe('Phase 2 — Lifetimes', () => {
         .registerClass('leaky', ConsoleLogger, [], 'scoped', true)
         .registerClass('holder', Holder, ['leakyLazy'], 'singleton')
 
-      // Без lazy-эскейпа это упало бы: Singleton "holder" cannot depend on scoped "leaky".
+      // Without the lazy escape this would fail: Singleton "holder" cannot depend on scoped "leaky".
       expect(() => c.get('holder')).not.toThrow()
     })
 
-    // ────────── Captured scope: ключевой инвариант ─────────
-    it('Lazy, полученный в scopeA, резолвит таргет через scopeA — даже если .get() вызван позже', () => {
+    // ────────── Captured scope: the key invariant ─────────
+    it('Lazy obtained in scopeA resolves the target through scopeA — even if .get() is called later', () => {
       const root = new Container().registerClass('svc', ConsoleLogger, [], 'scoped', true)
 
       const a = root.createScope()
@@ -538,20 +538,20 @@ describe('Phase 2 — Lifetimes', () => {
       const instA = lazyFromA.get()
       const instB = lazyFromB.get()
 
-      // 1. Каждая обёртка резолвит СВОЙ scope → разные инстансы
+      // 1. Each wrapper resolves through its OWN scope → different instances
       expect(instA).not.toBe(instB)
 
-      // 2. lazyFromA.get() возвращает тот же инстанс, что и a.get('svc')
+      // 2. lazyFromA.get() returns the same instance as a.get('svc')
       expect(instA).toBe(a.get('svc'))
 
-      // 3. lazyFromA.get() НЕ совпадает с b.get('svc') — captured scope, не dynamic
+      // 3. lazyFromA.get() does NOT match b.get('svc') — captured scope, not dynamic
       expect(instA).not.toBe(b.get('svc'))
 
-      // 4. повторные .get() идемпотентны в рамках одного scope
+      // 4. repeated .get() is idempotent within a single scope
       expect(lazyFromA.get()).toBe(instA)
     })
 
-    it('Lazy.get() после dispose захваченного scope → throws "Container is disposed"', async () => {
+    it('Lazy.get() after dispose of the captured scope → throws "Container is disposed"', async () => {
       const root = new Container().registerClass('svc', ConsoleLogger, [], 'scoped', true)
 
       const scope = root.createScope()
@@ -564,10 +564,10 @@ describe('Phase 2 — Lifetimes', () => {
 })
 
 // ────────────────────────────────────────────────────────────────────────────
-// Sanity: накопление T при chaining + auto-Lazy
+// Sanity: T accumulation while chaining + auto-Lazy
 // ────────────────────────────────────────────────────────────────────────────
 describe('fluent shape', () => {
-  it('registerClass + registerFactory + registerValue в chain — компилируется и резолвится', () => {
+  it('registerClass + registerFactory + registerValue in a chain — compiles and resolves', () => {
     const c = new Container()
       .registerClass('logger', ConsoleLogger, [])
       .registerFactory('config', () => new AppConfig(8080))
@@ -578,17 +578,17 @@ describe('fluent shape', () => {
     expect(c.get('config').port).toBe(8080)
     expect(c.get('db')).toBeInstanceOf(TrackableAsync)
     expect(c.get('service').run()).toBe('ok')
-    // auto-Lazy: dbLazy выводится автоматически без явного объявления
+    // auto-Lazy: dbLazy is inferred automatically without explicit declaration
     expect(c.get('dbLazy').get()).toBe(c.get('db'))
   })
 })
 
 // ────────────────────────────────────────────────────────────────────────────
-// .use() — runtime-тест (типовой контракт уже проверен в container.test-d.ts).
-// Покрывает Container.use(): runtime-делегацию модуль-функции и накопление T.
+// .use() — runtime test (the type contract is already checked in container.test-d.ts).
+// Covers Container.use(): runtime delegation to a module function and T accumulation.
 // ────────────────────────────────────────────────────────────────────────────
 describe('use() — runtime', () => {
-  it('inline-функция получает контейнер и возвращает расширенный', () => {
+  it('inline function receives the container and returns an extended one', () => {
     const c = new Container()
       .registerValue('base', 21)
       .use((inner) => inner.registerFactory('doubled', (ctx) => ctx.get('base') * 2))
@@ -597,7 +597,7 @@ describe('use() — runtime', () => {
     expect(c.get('doubled')).toBe(42)
   })
 
-  it('use может читать конфиг и решать, что регистрировать (branching)', () => {
+  it('use can read config and decide what to register (branching)', () => {
     type Mode = 'A' | 'B'
     const env: Mode = 'A'
     const c = new Container()
@@ -612,5 +612,5 @@ describe('use() — runtime', () => {
   })
 })
 
-// Подавляем unused warnings для импортов, используемых только в type-тестах
+// Suppress unused warnings for imports used only in type tests.
 void ({} as DependenciesMap)

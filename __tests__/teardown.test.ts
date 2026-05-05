@@ -14,15 +14,15 @@ import {
 // Phase 3 — Teardown / Disposal
 // ────────────────────────────────────────────────────────────────────────────
 
-describe('Phase 3 — LIFO порядок', () => {
-  it('регистрация A → B → C, dispose в порядке C → B → A', async () => {
+describe('Phase 3 — LIFO order', () => {
+  it('registered A → B → C, dispose order C → B → A', async () => {
     const log: string[] = []
     const container = new Container()
       .registerFactory('a', () => new OrderedDisposable('A', log))
       .registerFactory('b', () => new OrderedDisposable('B', log))
       .registerFactory('c', () => new OrderedDisposable('C', log))
 
-    // Резолвим в порядке A → B → C
+    // Resolve in A → B → C order
     container.get('a')
     container.get('b')
     container.get('c')
@@ -33,8 +33,8 @@ describe('Phase 3 — LIFO порядок', () => {
   })
 })
 
-describe('Phase 3 — приоритет disposer-протоколов', () => {
-  it('asyncDispose имеет приоритет над Symbol.dispose и плоским dispose', async () => {
+describe('Phase 3 — disposer protocol priority', () => {
+  it('asyncDispose takes priority over Symbol.dispose and the plain dispose', async () => {
     const inst = new TriProtocol()
     const c = new Container().registerFactory('r', () => inst)
     c.get('r')
@@ -46,7 +46,7 @@ describe('Phase 3 — приоритет disposer-протоколов', () => {
     expect(inst.plainDisposeCalls).toBe(0)
   })
 
-  it('без asyncDispose вызывается Symbol.dispose', async () => {
+  it('without asyncDispose, Symbol.dispose is called', async () => {
     const inst = new TrackableSync()
     const c = new Container().registerFactory('r', () => inst)
     c.get('r')
@@ -56,7 +56,7 @@ describe('Phase 3 — приоритет disposer-протоколов', () => {
     expect(inst.disposeCalls).toBe(1)
   })
 
-  it('без Symbol.* вызывается плоский .dispose()', async () => {
+  it('without Symbol.*, the plain .dispose() is called', async () => {
     const inst = new TrackablePlain()
     const c = new Container().registerFactory('r', () => inst)
     c.get('r')
@@ -66,7 +66,7 @@ describe('Phase 3 — приоритет disposer-протоколов', () => {
     expect(inst.disposeCalls).toBe(1)
   })
 
-  it('плоский async dispose() ожидается (awaited) в async dispose', async () => {
+  it('a plain async dispose() is awaited inside async dispose', async () => {
     const inst = new TrackableAsyncPlain()
     const c = new Container().registerFactory('r', () => inst)
     c.get('r')
@@ -77,23 +77,23 @@ describe('Phase 3 — приоритет disposer-протоколов', () => {
   })
 })
 
-describe('Phase 3 — агрегация ошибок', () => {
-  it('1 упавший disposer — ошибка прокидывается как есть (не в AggregateError)', async () => {
+describe('Phase 3 — error aggregation', () => {
+  it('1 failed disposer — the error is propagated as-is (not wrapped in AggregateError)', async () => {
     const c = new Container().registerFactory('a', () => new Throwing('boom'))
     c.get('a')
 
     await expect(c.dispose()).rejects.toThrow('boom')
-    await expect(c.dispose()).resolves.toBeUndefined() // повторно — no-op
+    await expect(c.dispose()).resolves.toBeUndefined() // second time — no-op
   })
 
-  it('≥2 упавших disposer — AggregateError со всеми причинами; остальные закрываются', async () => {
+  it('≥2 failed disposers — AggregateError with all causes; the rest are still closed', async () => {
     const okInst = new TrackableAsync()
     const c = new Container()
       .registerFactory('ok', () => okInst)
       .registerFactory('err1', () => new Throwing('boom-1'))
       .registerFactory('err2', () => new Throwing('boom-2'))
 
-    // Резолвим в порядке ok, err1, err2 — dispose в обратном
+    // Resolve in ok, err1, err2 order — dispose in reverse
     c.get('ok')
     c.get('err1')
     c.get('err2')
@@ -109,13 +109,13 @@ describe('Phase 3 — агрегация ошибок', () => {
     const agg = caught as AggregateError
     expect(agg.errors).toHaveLength(2)
     expect(agg.errors.map((e: Error) => e.message).sort()).toEqual(['boom-1', 'boom-2'])
-    // ok-ресурс должен быть закрыт даже при падении других
+    // The ok resource must be closed even when others fail
     expect(okInst.asyncDisposeCalls).toBe(1)
   })
 })
 
-describe('Phase 3 — duplicate dispose (Set дедупликация)', () => {
-  it('shared инстанс под двумя ключами — dispose вызывается ровно ОДИН раз', async () => {
+describe('Phase 3 — duplicate dispose (Set deduplication)', () => {
+  it('shared instance under two keys — dispose is called exactly ONCE', async () => {
     const shared = new TrackableAsync()
     const c = new Container()
       .registerFactory('a', () => shared)
@@ -129,7 +129,7 @@ describe('Phase 3 — duplicate dispose (Set дедупликация)', () => {
     expect(shared.asyncDisposeCalls).toBe(1)
   })
 
-  it('три ключа — всё ещё один dispose', async () => {
+  it('three keys — still one dispose', async () => {
     const shared = new TrackableAsync()
     const c = new Container()
       .registerFactory('a', () => shared)
@@ -146,12 +146,12 @@ describe('Phase 3 — duplicate dispose (Set дедупликация)', () => {
   })
 })
 
-describe('Phase 3 — границы владения', () => {
-  it('registerValue НЕ попадает в teardown (внешнее владение)', async () => {
+describe('Phase 3 — ownership boundaries', () => {
+  it('registerValue is NOT included in teardown (external ownership)', async () => {
     const external = new TrackableAsync()
     const c = new Container().registerValue('external', external)
 
-    // Обращение — чтобы на всякий случай прогреть все пути
+    // Access it just in case — warms up all paths
     c.get('external')
 
     await c.dispose()
@@ -159,7 +159,7 @@ describe('Phase 3 — границы владения', () => {
     expect(external.asyncDisposeCalls).toBe(0)
   })
 
-  it('transient инстансы не трекаются и не закрываются контейнером', async () => {
+  it('transient instances are not tracked and not closed by the container', async () => {
     let created: TrackableAsync[] = []
     const c = new Container().registerFactory(
       't',
@@ -177,13 +177,13 @@ describe('Phase 3 — границы владения', () => {
 
     await c.dispose()
 
-    // Ни один из трёх transient-инстансов не должен быть тронут
+    // None of the three transient instances must be touched
     for (const inst of created) {
       expect(inst.asyncDisposeCalls).toBe(0)
     }
   })
 
-  it('scoped-инстанс с scope.dispose — закрывается', async () => {
+  it('scoped instance with scope.dispose — is closed', async () => {
     const root = new Container().registerClass('s', TrackableAsync, [], 'scoped')
 
     const scope = root.createScope()
@@ -196,7 +196,7 @@ describe('Phase 3 — границы владения', () => {
 })
 
 describe('Phase 3 — scope hierarchy', () => {
-  it('child.dispose() НЕ трогает ресурсы, созданные на parent/root', async () => {
+  it('child.dispose() does NOT touch resources created on parent/root', async () => {
     const root = new Container()
       .registerClass('rootSvc', TrackableAsync, [], 'singleton')
       .registerClass('scopedSvc', TrackableAsync, [], 'scoped')
@@ -207,11 +207,11 @@ describe('Phase 3 — scope hierarchy', () => {
 
     await child.dispose()
 
-    expect(childScopedInst.asyncDisposeCalls).toBe(1) // child закрыл своего scoped
-    expect(rootInst.asyncDisposeCalls).toBe(0) // root нетронут
+    expect(childScopedInst.asyncDisposeCalls).toBe(1) // child closed its own scoped resource
+    expect(rootInst.asyncDisposeCalls).toBe(0) // root is untouched
   })
 
-  it('parent.dispose() работает после ранее dispose-нутого child', async () => {
+  it('parent.dispose() works after a previously disposed child', async () => {
     const root = new Container()
       .registerClass('rootSvc', TrackableAsync, [], 'singleton')
       .registerClass('scopedSvc', TrackableAsync, [], 'scoped')
@@ -226,7 +226,7 @@ describe('Phase 3 — scope hierarchy', () => {
     expect(rootInst.asyncDisposeCalls).toBe(1)
   })
 
-  it('parent.dispose() НЕ каскадирует в незакрытый child (документируем поведение)', async () => {
+  it('parent.dispose() does NOT cascade into an unclosed child (documenting behavior)', async () => {
     const root = new Container().registerClass('scopedSvc', TrackableAsync, [], 'scoped')
 
     const child = root.createScope()
@@ -234,7 +234,7 @@ describe('Phase 3 — scope hierarchy', () => {
 
     await root.dispose()
 
-    // Child остался валиден до своего собственного dispose
+    // Child stays valid until its own dispose
     expect(childInst.asyncDisposeCalls).toBe(0)
     expect(child.disposed).toBe(false)
 
@@ -243,8 +243,8 @@ describe('Phase 3 — scope hierarchy', () => {
   })
 })
 
-describe('Phase 3 — идемпотентность и блокировка', () => {
-  it('двойной dispose() — второй — no-op', async () => {
+describe('Phase 3 — idempotency and blocking', () => {
+  it('double dispose() — the second is a no-op', async () => {
     const inst = new TrackableAsync()
     const c = new Container().registerFactory('r', () => inst)
     c.get('r')
@@ -256,21 +256,21 @@ describe('Phase 3 — идемпотентность и блокировка', (
     expect(c.disposed).toBe(true)
   })
 
-  it('get() после dispose — throws', async () => {
+  it('get() after dispose — throws', async () => {
     const c = new Container().registerFactory('r', () => new TrackableAsync())
     await c.dispose()
 
     expect(() => c.get('r')).toThrow(/Container is disposed/)
   })
 
-  it('createScope() после dispose — throws', async () => {
+  it('createScope() after dispose — throws', async () => {
     const c = new Container().registerFactory('r', () => new TrackableAsync())
     await c.dispose()
 
     expect(() => c.createScope()).toThrow(/Cannot create scope from a disposed container/)
   })
 
-  it('re-entrancy: disposer зовёт container.get — получает disposed, не зацикливается', async () => {
+  it('re-entrancy: disposer calls container.get — receives disposed, does not loop', async () => {
     let disposerCalled = 0
     let caughtInDisposer: unknown = null
     const saved: {container?: ReturnType<typeof build>} = {}
@@ -300,12 +300,12 @@ describe('Phase 3 — идемпотентность и блокировка', (
 })
 
 // ────────────────────────────────────────────────────────────────────────────
-// Sync teardown через [Symbol.dispose]
+// Sync teardown via [Symbol.dispose]
 // ────────────────────────────────────────────────────────────────────────────
 
 describe('Phase 3 — sync [Symbol.dispose]', () => {
-  // Контролируем unhandledRejection, чтобы подтвердить, что мы гасим промисы
-  // от async-плоского .dispose() без flooding event loop'а.
+  // Watch unhandledRejection to confirm we swallow promises from
+  // an async plain .dispose() without flooding the event loop.
   let rejections: unknown[] = []
   let handler: (reason: unknown) => void
 
@@ -319,7 +319,7 @@ describe('Phase 3 — sync [Symbol.dispose]', () => {
     process.off('unhandledRejection', handler)
   })
 
-  it('sync dispose вызывает только sync [Symbol.dispose] / плоский dispose', () => {
+  it('sync dispose only invokes sync [Symbol.dispose] / plain dispose', () => {
     const sync = new TrackableSync()
     const plain = new TrackablePlain()
     const asyncOnly = new TrackableAsync()
@@ -336,32 +336,32 @@ describe('Phase 3 — sync [Symbol.dispose]', () => {
 
     expect(sync.disposeCalls).toBe(1)
     expect(plain.disposeCalls).toBe(1)
-    expect(asyncOnly.asyncDisposeCalls).toBe(0) // async-only пропущен
+    expect(asyncOnly.asyncDisposeCalls).toBe(0) // async-only is skipped
   })
 
-  it('ресурс только с asyncDispose — пропускается без ошибок', () => {
+  it('resource with only asyncDispose is skipped without errors', () => {
     const a = new TrackableAsync()
     const c = new Container().registerFactory('a', () => a)
     c.get('a')
 
-    // Ни throw, ни попытки запуска Symbol.asyncDispose
+    // Neither a throw nor an attempt to run Symbol.asyncDispose
     expect(() => c[Symbol.dispose]()).not.toThrow()
     expect(a.asyncDisposeCalls).toBe(0)
   })
 
-  it('плоский async dispose() в sync-контексте — errors.push СИНХРОННО с сообщением про await using', () => {
+  it('plain async dispose() in sync context — errors.push SYNCHRONOUSLY with an "await using" message', () => {
     const r = new TrackableAsyncPlain()
     const c = new Container().registerFactory('r', () => r)
     c.get('r')
 
     expect(() => c[Symbol.dispose]()).toThrow(/await using/i)
-    // disposer всё-таки был вызван (он запустил промис) — счётчик увеличился
+    // The disposer was still invoked (it started the promise) — the counter went up
     expect(r.disposeCalls).toBe(1)
   })
 
-  it('unhandledRejection от async-в-sync dispose — подавлен', async () => {
-    // Ресурс, чей плоский dispose() возвращает rejected Promise.
-    // Без .catch(() => {}) внутри Container'а — поймали бы unhandledRejection.
+  it('unhandledRejection from async-in-sync dispose is suppressed', async () => {
+    // A resource whose plain dispose() returns a rejected Promise.
+    // Without .catch(() => {}) inside Container — we would catch unhandledRejection.
     class RejectingPlain {
       public disposeCalls = 0
       public dispose(): Promise<void> {
@@ -376,15 +376,15 @@ describe('Phase 3 — sync [Symbol.dispose]', () => {
 
     expect(() => c[Symbol.dispose]()).toThrow(/await using/i)
 
-    // Подождём микротаски, чтобы промис точно разрешился. Ошибка должна быть
-    // поймана внутренним .catch(() => {}) и НЕ попасть в process unhandledRejection.
+    // Wait for microtasks so the promise definitely settles. The error should be
+    // caught by the internal .catch(() => {}) and NOT reach process unhandledRejection.
     await new Promise((resolve) => setImmediate(resolve))
     await new Promise((resolve) => setImmediate(resolve))
 
     expect(rejections).toHaveLength(0)
   })
 
-  it('смешанный сценарий: один sync ок + один sync-misuse → AggregateError не нужен (1 ошибка) либо простой throw', () => {
+  it('mixed scenario: one sync ok + one sync-misuse → AggregateError is not needed (1 error) or a plain throw', () => {
     const okSync = new TrackableSync()
     const asyncPlain = new TrackableAsyncPlain()
 
@@ -395,10 +395,10 @@ describe('Phase 3 — sync [Symbol.dispose]', () => {
     c.get('bad')
 
     expect(() => c[Symbol.dispose]()).toThrow(/await using/i)
-    expect(okSync.disposeCalls).toBe(1) // sync ресурс всё равно закрылся
+    expect(okSync.disposeCalls).toBe(1) // sync resource was still closed
   })
 
-  it('двойной [Symbol.dispose] — no-op', () => {
+  it('double [Symbol.dispose] — no-op', () => {
     const r = new TrackableSync()
     const c = new Container().registerFactory('r', () => r)
     c.get('r')
@@ -410,9 +410,9 @@ describe('Phase 3 — sync [Symbol.dispose]', () => {
     expect(c.disposed).toBe(true)
   })
 
-  it('один sync disposer бросает — ошибка прокидывается как есть (не AggregateError)', () => {
-    // Sync-вариант исключения внутри [Symbol.dispose]: покрывает ветку
-    // catch → errors.push в Container[Symbol.dispose].
+  it('one sync disposer throws — the error is propagated as-is (not AggregateError)', () => {
+    // Sync variant of an exception inside [Symbol.dispose]: covers the
+    // catch → errors.push branch in Container[Symbol.dispose].
     class ThrowingSync {
       public [Symbol.dispose](): void {
         throw new Error('sync-boom')
@@ -425,9 +425,9 @@ describe('Phase 3 — sync [Symbol.dispose]', () => {
     expect(c.disposed).toBe(true)
   })
 
-  it('два sync disposer бросают — AggregateError со всеми причинами', () => {
-    // Покрывает второй `if (errors.length > 1)` ветку и AggregateError-throw
-    // в sync-варианте Container[Symbol.dispose].
+  it('two sync disposers throw — AggregateError with all causes', () => {
+    // Covers the second `if (errors.length > 1)` branch and the AggregateError throw
+    // in the sync variant of Container[Symbol.dispose].
     class ThrowingSync {
       constructor(private readonly msg: string) {}
       public [Symbol.dispose](): void {
@@ -454,18 +454,18 @@ describe('Phase 3 — sync [Symbol.dispose]', () => {
 })
 
 describe('Phase 3 — TC39 using / await using', () => {
-  it('await using корректно вызывает asyncDispose на выходе из блока', async () => {
+  it('await using correctly invokes asyncDispose on block exit', async () => {
     const inst = new TrackableAsync()
     const outer = new Container().registerFactory('r', () => inst)
 
     {
       await using scope = outer.createScope()
-      // scope создаёт свой собственный scoped-инстанс (НЕ тот же, что outer)
-      scope.get('r') // resolves через parent, singleton живёт на outer → не в owned scope
-      // Явно проверим, что dispose на scope отработает, даже если своих owned нет
+      // scope creates its own scoped instance (NOT the same one as outer)
+      scope.get('r') // resolves via parent, singleton lives on outer → not in owned scope
+      // Explicitly verify that scope's dispose runs even when it has no owned resources
       void scope
     }
-    // На этом этапе scope должен быть dispose-нут. Inst принадлежит outer — не закрыт.
+    // At this point scope must be disposed. inst belongs to outer — not yet closed.
     expect(inst.asyncDisposeCalls).toBe(0)
 
     await outer.dispose()

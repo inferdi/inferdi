@@ -1,7 +1,7 @@
 import type {Lazy} from '../src/Container'
 
-// Моки ресурсов для teardown-тестов. Каждый инстанс несёт собственные счётчики,
-// чтобы в assertion'ах можно было проверить кратность вызовов disposer'а.
+// Resource mocks for teardown tests. Each instance carries its own counters
+// so assertions can verify how many times the disposer was invoked.
 
 export class TrackableAsync {
   public asyncDisposeCalls = 0
@@ -24,8 +24,8 @@ export class TrackablePlain {
   }
 }
 
-// Плоский .dispose(), возвращающий Promise. Нужен для теста sync-misuse:
-// [Symbol.dispose]() должен зафиксировать мисюз СИНХРОННО и погасить unhandledRejection.
+// Plain .dispose() returning a Promise. Needed for the sync-misuse test:
+// [Symbol.dispose]() must record the misuse SYNCHRONOUSLY and swallow unhandledRejection.
 export class TrackableAsyncPlain {
   public disposeCalls = 0
   public async dispose(): Promise<void> {
@@ -33,7 +33,7 @@ export class TrackableAsyncPlain {
   }
 }
 
-// Ресурс, который всегда падает на закрытии. Для AggregateError-теста.
+// Resource that always fails on close. Used in the AggregateError test.
 export class Throwing {
   public asyncDisposeCalls = 0
   constructor(public readonly msg: string) {}
@@ -43,7 +43,7 @@ export class Throwing {
   }
 }
 
-// Лог порядка уничтожения. Для проверки LIFO.
+// Logs disposal order. Used to verify LIFO.
 export class OrderedDisposable {
   constructor(public readonly label: string, public readonly log: string[]) {}
   public async [Symbol.asyncDispose](): Promise<void> {
@@ -51,7 +51,7 @@ export class OrderedDisposable {
   }
 }
 
-// Ресурс с ВСЕМИ тремя интерфейсами — для теста приоритета (вызываться должен только asyncDispose).
+// Resource implementing ALL three interfaces — for the priority test (only asyncDispose should be called).
 export class TriProtocol {
   public asyncDisposeCalls = 0
   public symbolDisposeCalls = 0
@@ -67,18 +67,18 @@ export class TriProtocol {
   }
 }
 
-// Проверка доступности GC. Если глобальный gc не проброшен (--expose-gc не выставлен) —
-// мемори-тесты скипаются через describe.skipIf(!hasGc).
+// GC availability check. If global gc is not exposed (--expose-gc not set),
+// memory tests are skipped via describe.skipIf(!hasGc).
 type GcFn = ((arg?: unknown) => void) | undefined
 export const hasGc: boolean = typeof (globalThis as {gc?: GcFn}).gc === 'function'
 
 const gc = (globalThis as {gc?: GcFn}).gc
 
-// Принудительный major-GC. Разные версии Node принимают разные API:
-//  • Node 21+: gc({type:'major', execution:'sync'}) — явный major+sync
-//  • Node <21: gc(true) — старый boolean-hint API (true = full GC, false = scavenge)
-//  • Node любой: gc() — без args, в Node <21 обычно только scavenge (young-gen)
-// Пробуем все три и игнорируем падения — хотя бы один из них сработает.
+// Force a major GC. Different Node versions accept different APIs:
+//  • Node 21+: gc({type:'major', execution:'sync'}) — explicit major+sync
+//  • Node <21: gc(true) — old boolean-hint API (true = full GC, false = scavenge)
+//  • Any Node: gc() — no args, on Node <21 usually only scavenge (young-gen)
+// Try all three and ignore failures — at least one of them will work.
 function forceFullGC(): void {
   if (!gc) return
   const g = gc
@@ -99,33 +99,33 @@ function forceFullGC(): void {
   }
 }
 
-// Создаёт memory pressure — форсит V8 промотить объекты из young в old generation
-// и затем сделать major GC. Нужно в окружениях, где gc() делает только scavenge
-// (Node 20 + Alpine musl — известный кейс).
+// Creates memory pressure — forces V8 to promote objects from young to old generation
+// and then run a major GC. Needed in environments where gc() does only scavenge
+// (Node 20 + Alpine musl is a known case).
 function allocateMemoryPressure(): void {
   let chunks: unknown[] | null = []
   for (let i = 0; i < 2000; i++) {
     chunks!.push(new Array(100).fill(i))
   }
-  // Отпускаем сразу — следующий major GC обязан это забрать вместе с нашей целью.
+  // Release immediately — the next major GC must collect this along with our target.
   chunks = null
 }
 
-// Поллит GC до тех пор, пока WeakRef не разыменуется в undefined или не истечёт timeout.
+// Polls GC until the WeakRef dereferences to undefined or the timeout expires.
 //
-// Две важные детали:
-// 1. Pre-drain event loop'а — V8 может удерживать stack frames async-функции до
-//    полного drain'а микротасок. Рекомендуется вызывать эту функцию после того,
-//    как allocation был сделан в ОТДЕЛЬНОЙ async function, не в inline IIFE.
-// 2. Memory pressure между итерациями — форсит major GC в окружениях, где gc()
-//    по умолчанию делает только minor/scavenge (Node 20, Alpine, musl).
+// Two important details:
+// 1. Pre-drain the event loop — V8 may hold an async function's stack frames
+//    until microtasks have fully drained. It is recommended to call this function
+//    after the allocation was performed in a SEPARATE async function, not in an inline IIFE.
+// 2. Memory pressure between iterations — forces a major GC in environments where gc()
+//    by default does only minor/scavenge (Node 20, Alpine, musl).
 export async function waitForGC(
   ref: WeakRef<object>,
   timeoutMs = 5000,
 ): Promise<boolean> {
   if (!gc) return false
 
-  // Pre-drain: даём V8 полностью сбросить stack frames вызывающей функции.
+  // Pre-drain: let V8 fully release the caller's stack frames.
   for (let i = 0; i < 10; i++) {
     await new Promise((resolve) => setTimeout(resolve, 0))
   }
@@ -145,9 +145,9 @@ export async function waitForGC(
   return false
 }
 
-// Типовая DI-карта для большинства тестов. Покрывает три kind'а и lazy-алиас.
-// ВАЖНО: type alias, не interface — DependenciesMap (Record<string, unknown>) требует
-// implicit string index signature, которую interface не даёт.
+// Standard DI map used by most tests. Covers three kinds and a lazy alias.
+// IMPORTANT: type alias, not interface — DependenciesMap (Record<string, unknown>) requires
+// an implicit string index signature, which interface does not provide.
 export type CommonDeps = {
   logger: Logger
   config: Config

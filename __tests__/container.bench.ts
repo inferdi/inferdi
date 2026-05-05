@@ -4,8 +4,8 @@ import {Container} from '../src/Container'
 // ────────────────────────────────────────────────────────────────────────────
 // Phase 6 — Benchmarks
 //
-// Запускается через `npm run bench` (vitest bench). Не часть CI-прогона;
-// цель — трекинг регрессий производительности при изменениях контейнера.
+// Run via `npm run bench` (vitest bench). Not part of the CI run; the goal is
+// to track performance regressions across container changes.
 // ────────────────────────────────────────────────────────────────────────────
 
 describe('cradle vs get', () => {
@@ -22,21 +22,21 @@ describe('cradle vs get', () => {
 })
 
 // ────────────────────────────────────────────────────────────────────────────
-// Глубокий граф зависимостей: 50 звеньев, каждое зависит от предыдущего.
-// Cold — первый резолв, проходит всю цепочку конструкторов.
-// Hot — второй+ резолв, всё в кэше, должен быть ≈ O(1).
+// Deep dependency graph: 50 links, each depending on the previous one.
+// Cold — first resolve, walks the full constructor chain.
+// Hot — second+ resolve, fully cached, should be ≈ O(1).
 // ────────────────────────────────────────────────────────────────────────────
 
 const DEPTH = 50
 type DeepDeps = Record<string, {level: number}>
 
 function buildDeepContainer(): {container: Container<DeepDeps>; topKey: string} {
-  // Используем "wide" стартовый T = DeepDeps через явный каст. Регистрация по строковым
-  // ключам через `as never` обходит Exclude<K, keyof T> (для бенчмарка важен runtime,
-  // а не type-safety цикла регистрации).
+  // Use a "wide" starting T = DeepDeps via an explicit cast. Registering string
+  // keys through `as never` bypasses Exclude<K, keyof T> (for the benchmark only
+  // runtime matters, not type-safety of the registration loop).
   const container = new Container<DeepDeps>()
 
-  // level0 — фундамент, без зависимостей
+  // level0 — foundation, no dependencies
   container.registerFactory('level0' as never, () => ({level: 0}))
 
   for (let i = 1; i < DEPTH; i++) {
@@ -49,9 +49,9 @@ function buildDeepContainer(): {container: Container<DeepDeps>; topKey: string} 
 }
 
 describe('deep graph resolution', () => {
-  // Cold: новый контейнер на КАЖДЫЙ вызов.
+  // Cold: a fresh container on EVERY call.
   bench(
-    `deep graph cold resolve (${DEPTH} уровней, первый get)`,
+    `deep graph cold resolve (${DEPTH} levels, first get)`,
     () => {
       const {container, topKey} = buildDeepContainer()
       container.get(topKey)
@@ -59,17 +59,17 @@ describe('deep graph resolution', () => {
     {iterations: 200},
   )
 
-  // Hot: один контейнер, прогретый кэш.
+  // Hot: a single container with a warmed-up cache.
   const warm = buildDeepContainer()
   warm.container.get(warm.topKey)
 
-  bench(`deep graph hot resolve (cached singleton, ${DEPTH} уровней)`, () => {
+  bench(`deep graph hot resolve (cached singleton, ${DEPTH} levels)`, () => {
     warm.container.get(warm.topKey)
   })
 })
 
 // ────────────────────────────────────────────────────────────────────────────
-// Overhead DI vs raw instantiation — baseline для понимания "цены" контейнера.
+// DI overhead vs raw instantiation — a baseline for understanding the container's "cost".
 // ────────────────────────────────────────────────────────────────────────────
 
 class Leaf {}
@@ -91,7 +91,7 @@ describe('DI overhead vs raw new', () => {
     .registerClass('mid', Mid, ['leaf'], 'transient')
     .registerClass('top', Top, ['mid'], 'transient')
 
-  bench('container.get("top") (transient, новые Leaf/Mid/Top каждый раз)', () => {
+  bench('container.get("top") (transient, new Leaf/Mid/Top each time)', () => {
     transientC.get('top')
   })
 
@@ -99,7 +99,7 @@ describe('DI overhead vs raw new', () => {
     .registerClass('leaf', Leaf, [])
     .registerClass('mid', Mid, ['leaf'])
     .registerClass('top', Top, ['mid'])
-  singletonC.get('top') // прогрев
+  singletonC.get('top') // warm-up
 
   bench('container.get("top") (singleton, cache hit)', () => {
     singletonC.get('top')
@@ -117,7 +117,7 @@ describe('scoped lifetime', () => {
 
   const root = new Container().registerClass('svc', Svc, [], 'scoped')
 
-  // Прогретый scope: инстанс уже в scope.cache, идёт fast-path
+  // Warmed-up scope: instance is already in scope.cache, takes the fast path.
   const warmScope = root.createScope()
   warmScope.get('svc')
 
@@ -125,24 +125,24 @@ describe('scoped lifetime', () => {
     warmScope.get('svc')
   })
 
-  // Fresh scope + первый резолв — стоимость создания scope'а + обхода вверх по parent'ам
-  bench('root.createScope() + scope.get("svc") (первый резолв в свежем scope)', () => {
+  // Fresh scope + first resolve — cost of scope creation + walking up through parents.
+  bench('root.createScope() + scope.get("svc") (first resolve in a fresh scope)', () => {
     const s = root.createScope()
     s.get('svc')
   })
 
-  // Сравнение: scope.get против root.get singleton'а (обход через parent vs локальный кэш)
+  // Comparison: scope.get vs root.get for a singleton (parent walk vs local cache).
   const rootSingleton = new Container().registerClass('svc', Svc, [], 'singleton')
   const singletonChild = rootSingleton.createScope()
-  singletonChild.get('svc') // прогрев owner-кэша (singleton живёт на root, а не на child)
+  singletonChild.get('svc') // warm up the owner cache (singleton lives on root, not child)
 
-  bench('scope.get("svc") → root (singleton, parent walk + cache hit на root)', () => {
+  bench('scope.get("svc") → root (singleton, parent walk + cache hit on root)', () => {
     singletonChild.get('svc')
   })
 })
 
 // ────────────────────────────────────────────────────────────────────────────
-// Lazy overhead — обёртка vs прямой резолв
+// Lazy overhead — wrapper vs direct resolve
 // ────────────────────────────────────────────────────────────────────────────
 
 describe('lazy overhead', () => {
@@ -151,26 +151,26 @@ describe('lazy overhead', () => {
   }
 
   const c = new Container().registerClass('target', Target, [], 'singleton', true)
-  c.get('target') // прогрев
+  c.get('target') // warm-up
   const wrapper = c.get('targetLazy')
 
   bench('container.get("target") (direct, cached singleton)', () => {
     c.get('target')
   })
 
-  bench('wrapper.get() (lazy обёртка → резолв cached target)', () => {
+  bench('wrapper.get() (lazy wrapper → resolve cached target)', () => {
     wrapper.get()
   })
 
-  // Обёртка — transient: каждый get возвращает НОВЫЙ объект {get}. Замеряем стоимость
-  // создания самой обёртки (одна аллокация + замыкание).
-  bench('container.get("targetLazy") (создание новой transient обёртки)', () => {
+  // The wrapper is transient: each get returns a NEW {get} object. We measure the
+  // cost of creating the wrapper itself (one allocation + closure).
+  bench('container.get("targetLazy") (creation of a new transient wrapper)', () => {
     c.get('targetLazy')
   })
 })
 
 // ────────────────────────────────────────────────────────────────────────────
-// Fan-out — широкий граф (class с 5-8 deps), сравниваем с chain
+// Fan-out — wide graph (class with 5-8 deps), compared against the chain
 // ────────────────────────────────────────────────────────────────────────────
 
 describe('fan-out (wide graph)', () => {
@@ -205,7 +205,7 @@ describe('fan-out (wide graph)', () => {
     ) {}
   }
 
-  // Warm-контейнер: top в кэше, benchmark меряет чистый hit
+  // Warm container: top is cached, benchmark measures a pure hit.
   const warm5 = new Container()
     .registerClass('d0', D0, [])
     .registerClass('d1', D1, [])
@@ -235,7 +235,7 @@ describe('fan-out (wide graph)', () => {
     warm8.get('top')
   })
 
-  // Cold: top строится впервые — стоимость цикла по deps + N рекурсивных get
+  // Cold: top is built for the first time — cost of iterating deps + N recursive gets.
   bench(
     'fan-out 5 deps cold (fresh container, first resolve)',
     () => {
@@ -271,23 +271,23 @@ describe('fan-out (wide graph)', () => {
 })
 
 // ────────────────────────────────────────────────────────────────────────────
-// Error paths — missing key и cycle detection
+// Error paths — missing key and cycle detection
 // ────────────────────────────────────────────────────────────────────────────
 
 describe('error paths', () => {
-  // Отдельный контейнер — `get('missing')` пройдёт walk вверх (parent нет), потом throw
+  // Standalone container — `get('missing')` will walk up (no parent), then throw.
   const emptyC = new Container<Record<string, unknown>>()
 
   bench('get() missing key → throw "Key not found"', () => {
     try {
       emptyC.get('nonExistent')
     } catch {
-      // baseline для измерения стоимости: Map miss + walk (owner=undefined) + throw + unwind
+      // baseline cost measurement: Map miss + walk (owner=undefined) + throw + unwind
     }
   })
 
-  // Сравнение: ручной throw без контейнера — показывает "голую" стоимость throw+catch
-  bench('baseline: bare try/throw/catch (без контейнера)', () => {
+  // Comparison: a manual throw without the container — shows the "bare" throw+catch cost.
+  bench('baseline: bare try/throw/catch (no container)', () => {
     try {
       throw new Error('bare')
     } catch {
@@ -295,7 +295,7 @@ describe('error paths', () => {
     }
   })
 
-  // Cycle: A → B → A. Детекция срабатывает на 3-м вызове get('a'), разворачивает 2 try-finally.
+  // Cycle: A → B → A. Detection triggers on the third get('a') call, unwinds 2 try-finally blocks.
   class A {
     constructor(public b: B) {}
   }
@@ -303,8 +303,8 @@ describe('error paths', () => {
     constructor(public a: A) {}
   }
 
-  // Циклическая регистрация невозможна в чистом fluent-стиле (a ссылается на b, который
-  // регистрируется позже). Используем pre-declared T + `as never` каст для регистрации.
+  // Cyclic registration is impossible in pure fluent style (a references b, which is
+  // registered later). We use a pre-declared T + `as never` cast for registration.
   const cycleC = new Container() as Container<{a: A; b: B}>
   cycleC.registerClass('a' as never, A, ['b' as never])
   cycleC.registerClass('b' as never, B, ['a' as never])
@@ -313,12 +313,12 @@ describe('error paths', () => {
     try {
       cycleC.get('a')
     } catch {
-      // finally в try-блоках get() корректно очищает resolving между итерациями
+      // finally in get()'s try-blocks correctly clears `resolving` between iterations
     }
   })
 
-  // Для сравнения: успешный singleton-hit в том же контейнере — baseline, показывает
-  // насколько error path дороже fast-path'а
+  // For comparison: a successful singleton hit on the same container — baseline showing
+  // how much more expensive the error path is than the fast path.
   const happyC = new Container().registerValue('x', {value: 1})
 
   bench('baseline: successful get (singleton cached)', () => {

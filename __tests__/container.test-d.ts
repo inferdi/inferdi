@@ -4,10 +4,10 @@ import {Container, type Lazy} from '../src/Container'
 // ────────────────────────────────────────────────────────────────────────────
 // Phase 4 — Type-level tests (fluent API)
 //
-// Запускается через `npm run test:types` (vitest --typecheck).
-// Vitest ловит @ts-expect-error: если в помеченной строке TS ошибки НЕТ —
-// тест падает. Значит, эти комментарии одновременно проверяют негативные
-// кейсы (должно не компилиться) и позитивные (должно компилиться).
+// Run via `npm run test:types` (vitest --typecheck).
+// Vitest enforces @ts-expect-error: if the marked line has NO TS error, the
+// test fails. So these comments simultaneously verify negative cases
+// (must not compile) and positive cases (must compile).
 // ────────────────────────────────────────────────────────────────────────────
 
 interface Logger {
@@ -36,8 +36,8 @@ class UserServiceImpl implements UserService {
   }
 }
 
-describe('Phase 4 — fluent: накопление T при chaining', () => {
-  it('каждый register* сужает тип контейнера', () => {
+describe('Phase 4 — fluent: T accumulation while chaining', () => {
+  it('every register* narrows the container type', () => {
     const c = new Container()
       .registerValue('config', {port: 8080})
       .registerClass('logger', L, [])
@@ -48,7 +48,7 @@ describe('Phase 4 — fluent: накопление T при chaining', () => {
     expectTypeOf(c.get('logger')).toEqualTypeOf<L>()
   })
 
-  it('use() прокидывает накопленный T внутрь и наружу', () => {
+  it('use() passes the accumulated T both inwards and outwards', () => {
     const c = new Container()
       .registerValue('a', 1 as const)
       .use((inner) => {
@@ -62,7 +62,7 @@ describe('Phase 4 — fluent: накопление T при chaining', () => {
 })
 
 describe('Phase 4 — Container.Resolve', () => {
-  it('извлекает накопленный T из готового контейнера', () => {
+  it('extracts the accumulated T from a built container', () => {
     const c = new Container()
       .registerValue('a', 1)
       .registerClass('logger', L, [])
@@ -74,125 +74,125 @@ describe('Phase 4 — Container.Resolve', () => {
 })
 
 describe('Phase 4 — cradle type safety', () => {
-  it('обращение к неизвестному ключу через cradle — TS ошибка', () => {
+  it('accessing an unknown key through cradle is a TS error', () => {
     const c = new Container().registerClass('logger', L, [])
 
-    // @ts-expect-error — unknownKey не в карте, Proxy не должен ломать типизацию
+    // @ts-expect-error — unknownKey is not in the map; Proxy must not break typing
     c.cradle.unknownKey
   })
 
-  it('get() с неизвестным ключом — TS ошибка', () => {
+  it('get() with an unknown key is a TS error', () => {
     const c = new Container().registerClass('logger', L, [])
 
-    // @ts-expect-error — get требует точно keyof T
+    // @ts-expect-error — get requires exactly keyof T
     c.get('unknownKey')
   })
 })
 
-describe('Phase 4 — DepsOf валидация', () => {
-  it('правильный порядок и типы deps — компилируется', () => {
+describe('Phase 4 — DepsOf validation', () => {
+  it('correct order and dep types — compiles', () => {
     const c = new Container()
       .registerClass('logger', L, [])
       .registerClass('userRepo', UserRepoImpl, [])
-    // Корректный порядок: [UserRepo, Logger] ↔ ['userRepo', 'logger']
+    // Correct order: [UserRepo, Logger] ↔ ['userRepo', 'logger']
     c.registerClass('userService', UserServiceImpl, ['userRepo', 'logger'])
   })
 
-  it('неверный порядок — TS ошибка', () => {
+  it('wrong order — TS error', () => {
     const c = new Container()
       .registerClass('logger', L, [])
       .registerClass('userRepo', UserRepoImpl, [])
 
-    // @ts-expect-error — порядок перепутан: первый параметр UserRepo, но передано 'logger'
+    // @ts-expect-error — order is swapped: first parameter is UserRepo but 'logger' was passed
     c.registerClass('userService', UserServiceImpl, ['logger', 'userRepo'])
   })
 
-  it('недостаточно элементов — TS ошибка', () => {
+  it('not enough elements — TS error', () => {
     const c = new Container()
       .registerClass('logger', L, [])
       .registerClass('userRepo', UserRepoImpl, [])
 
-    // @ts-expect-error — не хватает второго ключа
+    // @ts-expect-error — missing the second key
     c.registerClass('userService', UserServiceImpl, ['userRepo'])
   })
 
-  it('лишний элемент — TS ошибка', () => {
+  it('extra element — TS error', () => {
     const c = new Container()
       .registerClass('logger', L, [])
       .registerClass('userRepo', UserRepoImpl, [])
 
-    // @ts-expect-error — лишний 'logger' (конструктор UserServiceImpl берёт только 2 аргумента)
+    // @ts-expect-error — extra 'logger' (UserServiceImpl's ctor takes only 2 args)
     c.registerClass('userService', UserServiceImpl, ['userRepo', 'logger', 'logger'])
   })
 
-  it('несуществующий ключ в deps — TS ошибка', () => {
+  it('non-existent key in deps — TS error', () => {
     const c = new Container()
       .registerClass('logger', L, [])
       .registerClass('userRepo', UserRepoImpl, [])
 
-    // @ts-expect-error — 'nonExistent' не зарегистрирован
+    // @ts-expect-error — 'nonExistent' is not registered
     c.registerClass('userService', UserServiceImpl, ['userRepo', 'nonExistent'])
   })
 })
 
 describe('Phase 4 — duplicate key guard', () => {
-  it('повторная регистрация одного и того же ключа — TS ошибка', () => {
+  it('re-registering the same key — TS error', () => {
     const c = new Container().registerValue('x', 1)
 
-    // @ts-expect-error — 'x' уже зарегистрирован, Exclude<K, keyof T> = never
+    // @ts-expect-error — 'x' is already registered, Exclude<K, keyof T> = never
     c.registerValue('x', 2)
   })
 
-  it('дубликат через registerClass — тоже TS ошибка', () => {
+  it('duplicate via registerClass — also a TS error', () => {
     const c = new Container().registerClass('logger', L, [])
 
-    // @ts-expect-error — 'logger' уже зарегистрирован
+    // @ts-expect-error — 'logger' is already registered
     c.registerClass('logger', L, [])
   })
 
-  it('дубликат через registerFactory — тоже TS ошибка', () => {
+  it('duplicate via registerFactory — also a TS error', () => {
     const c = new Container().registerValue('config', {port: 8080})
 
-    // @ts-expect-error — 'config' уже зарегистрирован
+    // @ts-expect-error — 'config' is already registered
     c.registerFactory('config', () => ({port: 9000}))
   })
 
-  it('lazy-ключ ${K}Lazy после auto-генерации тоже считается занятым', () => {
+  it('lazy key ${K}Lazy after auto-generation is also considered taken', () => {
     const c = new Container().registerClass('foo', L, [], 'singleton', true)
 
-    // @ts-expect-error — fooLazy уже добавлен auto-Lazy
+    // @ts-expect-error — fooLazy was already added by auto-Lazy
     c.registerValue('fooLazy', {get: () => new L()})
   })
 })
 
 describe('Phase 4 — auto-Lazy', () => {
-  it('lazy: true автоматически добавляет ${K}Lazy: Lazy<V>', () => {
+  it('lazy: true automatically adds ${K}Lazy: Lazy<V>', () => {
     const c = new Container().registerClass('foo', L, [], 'singleton', true)
 
     expectTypeOf(c.cradle.fooLazy).toEqualTypeOf<Lazy<L>>()
     expectTypeOf(c.get('fooLazy')).toEqualTypeOf<Lazy<L>>()
   })
 
-  it('lazy: false НЕ добавляет lazy-ключ', () => {
+  it('lazy: false does NOT add a lazy key', () => {
     const c = new Container().registerClass('foo', L, [], 'singleton', false)
 
-    // @ts-expect-error — без lazy:true ключа fooLazy в карте нет
+    // @ts-expect-error — without lazy:true the fooLazy key is not in the map
     c.cradle.fooLazy
   })
 
-  it('без аргумента lazy — поведение как при lazy: false', () => {
+  it('no lazy argument — behaves like lazy: false', () => {
     const c = new Container().registerClass('foo', L, [])
 
-    // @ts-expect-error — fooLazy не должен быть выведен
+    // @ts-expect-error — fooLazy must not be inferred
     c.cradle.fooLazy
   })
 })
 
-describe('Phase 4 — документированное ограничение: ambiguous deps', () => {
-  it('два ключа с одинаковой структурой типа — TS не различает их (by design)', () => {
-    // Это ограничение, а не баг: DepsOf использует structural assignability,
-    // и если два сервиса имеют один и тот же runtime-тип, TS разрешит любой из них
-    // в любой позиции. Решается branding (см. di-stydy.md).
+describe('Phase 4 — documented limitation: ambiguous deps', () => {
+  it('two keys with identical structural type — TS does not distinguish them (by design)', () => {
+    // This is a limitation, not a bug: DepsOf uses structural assignability,
+    // so if two services share the same runtime type, TS will accept either
+    // in either position. Branding solves this (see di-stydy.md).
 
     class Holder {
       constructor(public readonly master: Logger, public readonly slave: Logger) {}
@@ -202,21 +202,21 @@ describe('Phase 4 — документированное ограничение:
       .registerClass('master', L, [])
       .registerClass('slave', L, [])
 
-    // НЕ @ts-expect-error — TS пропускает, хоть порядок и "логически" перепутан.
-    // Это документированное ограничение.
+    // NOT @ts-expect-error — TS passes it, even though the order is "logically" swapped.
+    // This is a documented limitation.
     c.registerClass('holder', Holder, ['slave', 'master'])
   })
 })
 
-describe('Phase 4 — Lazy тип-выводы', () => {
-  it('Lazy<T>.get() возвращает T', () => {
+describe('Phase 4 — Lazy type inference', () => {
+  it('Lazy<T>.get() returns T', () => {
     const wrapper: Lazy<Logger> = {get: () => ({log: () => {}} as Logger)}
     expectTypeOf(wrapper.get()).toEqualTypeOf<Logger>()
   })
 })
 
 describe('Phase 4 — dispose types', () => {
-  it('dispose() возвращает Promise<void>', () => {
+  it('dispose() returns Promise<void>', () => {
     const c = new Container().registerClass('r', L, [])
     expectTypeOf(c.dispose()).toEqualTypeOf<Promise<void>>()
   })

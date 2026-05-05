@@ -3,7 +3,7 @@
 ![npm version](https://img.shields.io/npm/v/@inferdi/inferdi.svg)
 ![TypeScript](https://img.shields.io/badge/%3C%2F%3E-TypeScript-blue.svg)
 ![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)
-[![codecov](https://codecov.io/gh/inferdi/inferdi/graph/badge.svg)](https://codecov.io/gh/inferdi/inferdi)
+[![codecov](https://codecov.io/gh/inferdi/inferdi/graph/badge.svg?token=IHAXLIFHF3)](https://codecov.io/gh/inferdi/inferdi)
 ![License](https://img.shields.io/npm/l/@inferdi/inferdi.svg)
 
 A zero-dependency, **decorator-free**, strongly typed DI container for modern TypeScript.
