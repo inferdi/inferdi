@@ -1,7 +1,7 @@
 # InferDI
 
 ![npm version](https://img.shields.io/npm/v/@inferdi/inferdi.svg)
-![TypeScript](https://img.shields.io/badge/%3C%2F%3E-TypeScript-blue.svg)
+![npm package minimized gzipped size](https://img.shields.io/bundlejs/size/%40inferdi%2Finferdi)
 ![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)
 [![codecov](https://codecov.io/gh/inferdi/inferdi/graph/badge.svg?token=IHAXLIFHF3)](https://codecov.io/gh/inferdi/inferdi)
 ![License](https://img.shields.io/npm/l/@inferdi/inferdi.svg)
@@ -15,7 +15,7 @@ Build your dependency graph using a fluent API that infers types automatically, 
 Legacy DI is slow, bloated with decorators, and prone to memory leaks. **InferDI is built for 2026:** it’s ruthlessly fast, strictly typed, and built for the modern edge.
 
 - ☁️ **Zero-Weight Edge Native**  
-  Just 1.7KB gzipped. Zero dependencies. The perfect fit for all serverless platforms, including Cloudflare Workers, Vercel Edge, Deno Deploy, and Supabase. While other frameworks trigger cold starts, InferDI is already running.
+  Just 1.8KB gzipped. Zero dependencies. The perfect fit for all serverless platforms, including Cloudflare Workers, Vercel Edge, Deno Deploy, and Supabase. While other frameworks trigger cold starts, InferDI is already running.
 
 - ⚡ **Raw Engine Speed**  
   Built to outperform the competition. Highly optimized for V8 and JSC inline caching. It doesn't just resolve dependencies — it executes at native engine speed.
@@ -366,9 +366,7 @@ c.get(DB_LAZY).get()      // typed as Lazy<PgPool>
 c.get('clockLazy').get()  // typed as Lazy<Clock>
 ```
 
-> **⚡ Performance tip — prefer symbol keys for the absolute limit.** V8 hashes symbols by identity (a single pointer comparison), while strings are hashed by content. Because V8 internalizes string literals used as `Map` keys, the difference on a direct cache hit is tiny (symbols are **~2% faster** in our micro-benchmarks). However, in deep-graph resolutions with multiple nested dependencies, these micro-optimizations compound, and symbol keys can come out ~10% ahead. For maximum raw throughput, register hot services under a symbol.
-
-> **Local vs registry symbols.** `Symbol(desc)` is unique per call — re-creating it yields a different identity, so it is realm-local and not shareable across worker threads. `Symbol.for(name)` lives in the global symbol registry and shares identity across all realms (Workers, `vm` modules) — but is never garbage-collected. Pick the one whose lifetime matches the service.
+> **⚡ Performance tip — prefer symbol keys for the absolute limit.**
 
 ## Modularity with `.use()`
 

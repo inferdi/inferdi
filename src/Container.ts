@@ -75,8 +75,12 @@ export type DependenciesMap = Record<string | symbol, unknown>
  *   .use(fixtureMailer)
  * ```
  */
+type NoKeyOverlap<A, B> = keyof A & keyof B extends never
+  ? B
+  : `Error: module tries to override existing keys: ${string & keyof A & keyof B}`
+
 export type Module<TIn extends DependenciesMap, TOut extends DependenciesMap> =
-  (c: Container<TIn>) => Container<TIn & TOut>
+  (c: Container<TIn>) => Container<TIn & NoKeyOverlap<TIn, TOut>>
 
 type RegistrationKind = 'singleton' | 'transient' | 'scoped'
 
@@ -98,16 +102,21 @@ interface Registration<T extends DependenciesMap, K extends keyof T> {
 // on a cache hit we compare it against `cached.owner.regsVersion` to invalidate
 // stale entries when an ancestor (or the owner itself) re-registered the key.
 // This is the lightweight alternative to recursively walking children on register*.
-interface LookupEntry<T extends DependenciesMap> {
+interface LookupEntry<T extends DependenciesMap, K extends keyof T = keyof T> {
   readonly owner: Container<T>
-  readonly reg: Registration<T, any>
+  readonly reg: Registration<T, K>
   readonly ownerRegsVersion: number
 }
 
 // Projects the constructor parameter types onto the allowed DI-map keys.
 // Prevents passing a deps key whose value is not assignable to the corresponding argument.
 type DepsOf<T extends DependenciesMap, A extends readonly unknown[]> = {
-  readonly [I in keyof A]: { [K in keyof T]: T[K] extends A[I] ? K : never }[keyof T]
+  readonly [I in keyof A]: Extract<
+    keyof T,
+    {
+      [K in keyof T]: unknown extends A[I] ? never : T[K] extends A[I] ? K : never
+    }[keyof T]
+  >
 }
 
 // Instances that the container knows how to close on dispose.
@@ -157,7 +166,7 @@ interface DisposableLike {
 export class Container<T extends DependenciesMap = Record<never, never>> {
 
   /** @internal */
-  private readonly regs = new Map<keyof T, Registration<T, any>>()
+  private readonly regs = new Map<keyof T, Registration<T, keyof T>>()
   /** @internal */
   private readonly cache = new Map<keyof T, unknown>()
   // Bumped on every register* on this container. Read by descendants' lookupCache
@@ -276,19 +285,34 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   public registerClass<
     K extends string | symbol,
     V,
-    A extends readonly unknown[],
-    LK extends string | symbol = never,
+    A extends readonly unknown[]
   >(
     key: Exclude<K, keyof T>,
-    Ctor: new (...args: A) => V,
-    deps: DepsOf<T, A>,
+    Ctor: new (...args: A) => NoInfer<V>,
+    deps: NoInfer<DepsOf<T, A>>,
+    kind?: RegistrationKind
+  ): Container<T & Record<K, V>>
+
+  public registerClass<
+    K extends string | symbol,
+    V,
+    A extends readonly unknown[],
+    LK extends string | symbol
+  >(
+    key: Exclude<K, keyof T>,
+    Ctor: new (...args: A) => NoInfer<V>,
+    deps: NoInfer<DepsOf<T, A>>,
+    kind: RegistrationKind | undefined,
+    lazyKey: Exclude<LK, keyof T | K>
+  ): Container<T & Record<K, V> & Record<LK, Lazy<V>>>
+
+  public registerClass<V>(
+    key: string | symbol,
+    Ctor: new (...args: any[]) => any,
+    deps: any[],
     kind: RegistrationKind = 'singleton',
-    lazyKey?: Exclude<LK, keyof T | K>,
-  ): Container<
-    T
-    & Record<K, V>
-    & ([LK] extends [never] ? {} : Record<LK, Lazy<V>>)
-  > {
+    lazyKey?: string | symbol
+  ): any {
     // Keep the reference to the original array — in DI idiom deps are passed as a
     // literal and never mutated after registration. Saves one allocation per registerClass.
     const keys = deps as readonly (keyof T)[]
@@ -296,8 +320,8 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
 
     // Arity unrolling. V8 JITs a direct `new Ctor(a, b)` with an inline cache keyed on
     // Ctor's shape; Reflect.construct goes through a runtime stub, ArrayLike iteration,
-    // and is not inlined. We cover 0..4 args via direct calls — this is ≥95% of real
-    // classes in DI. The tail (5+) falls back to Reflect.construct, preserving type
+    // and is not inlined. We cover 0..7 args via direct calls — this is ≥99% of real
+    // classes in DI. The tail (8+) falls back to Reflect.construct, preserving type
     // safety (Reflect.construct is typed via ArrayLike, no unsound `args as unknown as A` cast).
     //
     // Additionally, the 0-ary path saves an allocation: no array, no closure over keys.
@@ -326,8 +350,23 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       fn = (c) => new (Ctor as unknown as new (a0: unknown, a1: unknown, a2: unknown, a3: unknown) => V)(
         c.get(k0), c.get(k1), c.get(k2), c.get(k3),
       )
+    } else if (len === 5) {
+      const k0 = keys[0]!, k1 = keys[1]!, k2 = keys[2]!, k3 = keys[3]!, k4 = keys[4]!
+      fn = (c) => new (Ctor as unknown as new (a0: unknown, a1: unknown, a2: unknown, a3: unknown, a4: unknown) => V)(
+        c.get(k0), c.get(k1), c.get(k2), c.get(k3), c.get(k4)
+      )
+    } else if (len === 6) {
+      const k0 = keys[0]!, k1 = keys[1]!, k2 = keys[2]!, k3 = keys[3]!, k4 = keys[4]!, k5 = keys[5]!
+      fn = (c) => new (Ctor as unknown as new (a0: unknown, a1: unknown, a2: unknown, a3: unknown, a4: unknown, a5: unknown) => V)(
+        c.get(k0), c.get(k1), c.get(k2), c.get(k3), c.get(k4), c.get(k5)
+      )
+    } else if (len === 7) {
+      const k0 = keys[0]!, k1 = keys[1]!, k2 = keys[2]!, k3 = keys[3]!, k4 = keys[4]!, k5 = keys[5]!, k6 = keys[6]!
+      fn = (c) => new (Ctor as unknown as new (a0: unknown, a1: unknown, a2: unknown, a3: unknown, a4: unknown, a5: unknown, a6: unknown) => V)(
+        c.get(k0), c.get(k1), c.get(k2), c.get(k3), c.get(k4), c.get(k5), c.get(k6)
+      )
     } else {
-      // Tail: 5+ deps. Start from an empty array and push — V8 keeps the array as
+      // Tail: 8+ deps. Start from an empty array and push — V8 keeps the array as
       // PACKED_ELEMENTS kind. `new Array(len)` + `args[i] = ...` would create a HOLEY
       // array, which V8 only transitions to PACKED after full filling, and Reflect.construct
       // on the intermediate HOLEY runs slightly slower.
@@ -342,7 +381,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       }
     }
 
-    this.regs.set(key as unknown as keyof T, {kind, fn} as Registration<T, any>)
+    this.regs.set(key as keyof T, {kind, fn} as Registration<T, keyof T>)
     this.cache.delete(key as unknown as keyof T)
     this.regsVersion++
     // Local lookupCache holds (owner, reg) pairs found via walk-up — re-registering
@@ -385,7 +424,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       this.regs.set(lazyKey as unknown as keyof T, {
         kind: 'transient',
         lazy: true,
-        fn: (c) => ({get: () => c.get(targetKey)} as T[keyof T]),
+        fn: (c) => ({get: () => c.get(targetKey)} as unknown as T[keyof T]),
       })
     }
 
@@ -422,12 +461,12 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    */
   public registerFactory<K extends string | symbol, V>(
     key: Exclude<K, keyof T>,
-    factory: (c: Container<T>) => V,
+    factory: (c: Container<T>) => NoInfer<V>,
     kind: RegistrationKind = 'singleton',
   ): Container<T & Record<K, V>> {
     this.regs.set(
       key as unknown as keyof T,
-      {kind, fn: factory as (c: Container<T>) => any},
+      {kind, fn: factory as (c: Container<T>) => T[keyof T]},
     )
     this.cache.delete(key as unknown as keyof T)
     this.regsVersion++
@@ -459,7 +498,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    *   .registerValue('startedAt', Date.now())
    * ```
    */
-  public registerValue<K extends string | symbol, V>(
+  public registerValue<K extends string | symbol, const V>(
     key: Exclude<K, keyof T>,
     value: V,
   ): Container<T & Record<K, V>> {
@@ -472,7 +511,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     this.regs.set(
       key as unknown as keyof T,
       /* v8 ignore next */
-      {kind: 'singleton', fn: () => value as any},
+      {kind: 'singleton', fn: () => value as unknown as T[keyof T]},
     )
     this.regsVersion++
     if (this.lookupCache !== undefined) {
@@ -700,7 +739,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     // Cache check on the owning container. For self-resolves the get() hot-path
     // already cleared `this.cache`, so this branch is reachable only when the
     // singleton is delegated from a child scope (this !== target).
-    if (reg.kind !== 'transient' && target !== this) {
+    if (target !== this && reg.kind !== 'transient') {
       const cached = target.cache.get(key)
 
       if (cached !== undefined) {
@@ -719,7 +758,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       )
     }
 
-    // Cycle detection — needed for ALL kinds (incl. transient↔transient).
+    // Cycle detection — needed for ALL kinds (incl. transient<->transient).
     if (this.resolving.includes(key)) {
       const chain = [...this.resolving, key].map((k) => String(k)).join(' -> ')
       throw new Error(
@@ -740,6 +779,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     if (reg.kind === 'singleton') {
       this.singletonStack.push(key)
     }
+
     try {
       const instance = reg.fn(target)
 
@@ -953,4 +993,15 @@ export namespace Container {
    * ```
    */
   export type Resolve<C> = C extends Container<infer U> ? U : never
+
+  /** Unwraps Lazy<T> back to T (ideal for mocks in tests) */
+  export type ResolveUnwrapped<C> = {
+    [K in keyof Resolve<C>]: Resolve<C>[K] extends Lazy<infer V> ? V : Resolve<C>[K]
+  }
+
+  /** Gets the type of a specific service by its key */
+  export type Value<C, K extends keyof Resolve<C>> = Resolve<C>[K]
+
+  /** Gets the "unwrapped" service type (without Lazy) */
+  export type UnwrappedValue<C, K extends keyof Resolve<C>> = ResolveUnwrapped<C>[K]
 }

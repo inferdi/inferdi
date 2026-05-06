@@ -128,6 +128,60 @@ describe('Phase 1 — Functional', () => {
       const inst = c.get('six')
       expect([inst.a, inst.b, inst.c, inst.d, inst.e, inst.f]).toEqual([1, 2, 3, 4, 5, 6])
     })
+
+    it('len === 7: explicitly unrolled arity 7', () => {
+      class Seven {
+        constructor(
+          public a: number,
+          public b: number,
+          public c: number,
+          public d: number,
+          public e: number,
+          public f: number,
+          public g: number,
+        ) {}
+      }
+      const c = new Container()
+        .registerValue('a', 1)
+        .registerValue('b', 2)
+        .registerValue('c', 3)
+        .registerValue('d', 4)
+        .registerValue('e', 5)
+        .registerValue('f', 6)
+        .registerValue('g', 7)
+        .registerClass('seven', Seven, ['a', 'b', 'c', 'd', 'e', 'f', 'g'])
+
+      const inst = c.get('seven')
+      expect([inst.a, inst.b, inst.c, inst.d, inst.e, inst.f, inst.g]).toEqual([1, 2, 3, 4, 5, 6, 7])
+    })
+
+    it('len === 8: tail branch with higher arity using Reflect.construct', () => {
+      class Eight {
+        constructor(
+          public a: number,
+          public b: number,
+          public c: number,
+          public d: number,
+          public e: number,
+          public f: number,
+          public g: number,
+          public h: number,
+        ) {}
+      }
+      const c = new Container()
+        .registerValue('a', 1)
+        .registerValue('b', 2)
+        .registerValue('c', 3)
+        .registerValue('d', 4)
+        .registerValue('e', 5)
+        .registerValue('f', 6)
+        .registerValue('g', 7)
+        .registerValue('h', 8)
+        .registerClass('eight', Eight, ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'])
+
+      const inst = c.get('eight')
+      expect([inst.a, inst.b, inst.c, inst.d, inst.e, inst.f, inst.g, inst.h]).toEqual([1, 2, 3, 4, 5, 6, 7, 8])
+    })
   })
 
   describe('registerFactory', () => {
