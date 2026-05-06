@@ -145,6 +145,8 @@ InferDI is built for raw engine speed. Static type checking instead of runtime r
 
 The repository ships a comprehensive benchmark suite in [`benchmarks/`](./benchmarks) comparing InferDI against the five widely used TypeScript DI containers — **InversifyJS v8, Awilix v13 (both PROXY and CLASSIC modes), TSyringe v4, TypeDI v0.10, and Typed Inject v5**. All numbers below are operations per second on Node 22 — higher is better. Reproduce locally with `cd benchmarks && npm install && npm run bench`.
 
+![benchmarks](assets/benchmarking_results.png)
+
 | Scenario                                              | InferDI    | Typed Inject | Awilix (PROXY) | Awilix (CLASSIC) | InversifyJS | TSyringe | TypeDI |
 |-------------------------------------------------------|------------|--------------|----------------|------------------|-------------|----------|--------|
 | **1. Hot singleton resolve** (warm cache)             | **14.2 M** | 7.0 M        | 7.2 M          | 6.9 M            | 6.3 M       | 6.2 M    | 6.4 M  |
