@@ -44,6 +44,10 @@ export type Lazy<T> = { readonly get: () => T }
  */
 export type DependenciesMap = Record<string | symbol, unknown>
 
+type NoKeyOverlap<A, B> = keyof A & keyof B extends never
+  ? B
+  : `Error: module tries to override existing keys: ${string & keyof A & keyof B}`
+
 /**
  * A reusable registration unit for {@link Container.use}. Takes a container
  * carrying the keys `TIn` and returns it widened by the keys in `TOut`.
@@ -75,10 +79,6 @@ export type DependenciesMap = Record<string | symbol, unknown>
  *   .use(fixtureMailer)
  * ```
  */
-type NoKeyOverlap<A, B> = keyof A & keyof B extends never
-  ? B
-  : `Error: module tries to override existing keys: ${string & keyof A & keyof B}`
-
 export type Module<TIn extends DependenciesMap, TOut extends DependenciesMap> =
   (c: Container<TIn>) => Container<TIn & NoKeyOverlap<TIn, TOut>>
 
@@ -969,7 +969,11 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
 
 }
 
-// Declaration merging — attach a helper type to the class as a namespace.
+/**
+ * Declaration merging — attaches helper types to the class as a namespace.
+ * Contains utility types for extracting and unwrapping the dependency map
+ * from a fully-built container.
+ */
 export namespace Container {
   /**
    * Extracts the registered key map from a fully-built container type.
@@ -994,14 +998,29 @@ export namespace Container {
    */
   export type Resolve<C> = C extends Container<infer U> ? U : never
 
-  /** Unwraps Lazy<T> back to T (ideal for mocks in tests) */
+  /**
+   * Unwraps `Lazy<T>` back to `T` in the extracted dependency map.
+   * Ideal for type-checking mocks in tests without dealing with lazy wrappers.
+   *
+   * @template C - A `Container<T>` type.
+   */
   export type ResolveUnwrapped<C> = {
     [K in keyof Resolve<C>]: Resolve<C>[K] extends Lazy<infer V> ? V : Resolve<C>[K]
   }
 
-  /** Gets the type of a specific service by its key */
+  /**
+   * Gets the type of a specific registered service by its key.
+   *
+   * @template C - A `Container<T>` type.
+   * @template K - The registered key to look up.
+   */
   export type Value<C, K extends keyof Resolve<C>> = Resolve<C>[K]
 
-  /** Gets the "unwrapped" service type (without Lazy) */
+  /**
+   * Gets the "unwrapped" service type (without `Lazy`) by its key.
+   *
+   * @template C - A `Container<T>` type.
+   * @template K - The registered key to look up.
+   */
   export type UnwrappedValue<C, K extends keyof Resolve<C>> = ResolveUnwrapped<C>[K]
 }
