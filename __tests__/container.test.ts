@@ -950,14 +950,162 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
         calls++
         return undefined
       })
-      
+
       // First call executes the factory and hits the `instance === undefined` branch
       expect(c.get('nil')).toBeUndefined()
       // Second call reads from cache, proving it was cached properly
       expect(c.get('nil')).toBeUndefined()
-      
+
       expect(calls).toBe(1)
     })
+  })
+})
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 7 — Test Overrides (.override())
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('Phase 7 — Test Overrides', () => {
+  it('replaces a registered class with a mock value before first resolve', () => {
+    class MockLogger extends ConsoleLogger {}
+    const c = new Container()
+      .registerClass('logger', ConsoleLogger, [])
+    const mock = new MockLogger()
+
+    c.override('logger', mock)
+
+    expect(c.get('logger')).toBe(mock)
+  })
+
+  it('returns `this` for fluent chaining', () => {
+    const c = new Container().registerClass('logger', ConsoleLogger, [])
+    expect(c.override('logger', new ConsoleLogger())).toBe(c)
+  })
+
+  it('override on a child scope does not affect the parent', () => {
+    const root = new Container().registerClass('logger', ConsoleLogger, [])
+    const child = root.createScope()
+    const mock = new ConsoleLogger()
+
+    child.override('logger', mock)
+
+    expect(child.get('logger')).toBe(mock)
+    expect(root.get('logger')).not.toBe(mock)
+    expect(root.get('logger')).toBeInstanceOf(ConsoleLogger)
+  })
+
+  it('parent override propagates to a child via walk-up', () => {
+    const root = new Container().registerClass('cfg', AppConfig, [])
+    const child = root.createScope()
+    const mock = new AppConfig(9999)
+
+    root.override('cfg', mock)
+
+    expect(child.get('cfg')).toBe(mock)
+    expect(root.get('cfg')).toBe(mock)
+  })
+
+  it('throws if the key has already been resolved', () => {
+    const c = new Container().registerClass('db', TrackableAsync, [])
+
+    c.get('db')
+
+    expect(() => c.override('db', new TrackableAsync())).toThrowError(
+      /Cannot override "db" because it has already been resolved/,
+    )
+  })
+
+  it('throws on a second override (the first override populates the cache)', () => {
+    const c = new Container().registerClass('logger', ConsoleLogger, [])
+
+    c.override('logger', new ConsoleLogger())
+
+    expect(() => c.override('logger', new ConsoleLogger())).toThrowError(
+      /Cannot override "logger" because it has already been resolved/,
+    )
+  })
+
+  it('throws on a disposed container', async () => {
+    const c = new Container().registerClass('logger', ConsoleLogger, [])
+    await c.dispose()
+
+    expect(() => c.override('logger', new ConsoleLogger())).toThrowError(
+      /Cannot override on a disposed container \(key: "logger"\)/,
+    )
+  })
+
+  it('accepts symbol keys', () => {
+    const DB = Symbol('db')
+    const c = new Container().registerClass(DB, TrackableAsync, [])
+    const mock = new TrackableAsync()
+
+    c.override(DB, mock)
+
+    expect(c.get(DB)).toBe(mock)
+  })
+
+  it('override value is externally owned — not disposed by the container', async () => {
+    const c = new Container().registerClass('db', TrackableAsync, [])
+    const mock = new TrackableAsync()
+
+    c.override('db', mock)
+    expect(c.get('db')).toBe(mock)
+
+    await c.dispose()
+
+    expect(mock.asyncDisposeCalls).toBe(0)
+  })
+
+  it('clears the child lookupCache when an override is applied to the child', () => {
+    const root = new Container().registerClass('logger', ConsoleLogger, [])
+    const child = root.createScope()
+
+    // Walk-up populates child.lookupCache with entry { owner: root, ... }.
+    // Singleton lives on root, so child.cache stays empty for this key.
+    expect(child.get('logger')).toBeInstanceOf(ConsoleLogger)
+
+    const mock = new ConsoleLogger()
+    child.override('logger', mock)
+
+    expect(child.get('logger')).toBe(mock)
+    expect(root.get('logger')).not.toBe(mock)
+  })
+
+  it('cannot override a registerValue-seeded key (it is in cache from registration)', () => {
+    const c = new Container().registerValue('flag', 'on' as string)
+
+    expect(() => c.override('flag', 'off')).toThrowError(
+      /Cannot override "flag" because it has already been resolved/,
+    )
+  })
+
+  it('handles override(key, undefined) via UNDEFINED_MARKER on a non-seeded key', () => {
+    const c = new Container().registerFactory<'maybe', string | undefined>(
+      'maybe',
+      () => 'real',
+    )
+
+    c.override('maybe', undefined)
+
+    expect(c.get('maybe')).toBeUndefined()
+  })
+
+  it('overrides a Lazy<T> companion key — UnwrappedValue types the inner mock', () => {
+    class Clock {
+      now() { return 0 }
+    }
+    const builder = new Container()
+      .registerClass('clock', Clock, [], 'transient', 'clockLazy')
+
+    // Container.UnwrappedValue<typeof builder, 'clockLazy'> resolves to Clock,
+    // not Lazy<Clock> — the wrapper is added at the call site below.
+    const clockMock: Container.UnwrappedValue<typeof builder, 'clockLazy'> = {
+      now: () => 42,
+    }
+
+    builder.override('clockLazy', {get: () => clockMock})
+
+    expect(builder.get('clockLazy').get().now()).toBe(42)
   })
 })
 

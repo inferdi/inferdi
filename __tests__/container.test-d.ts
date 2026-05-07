@@ -71,6 +71,35 @@ describe('Phase 4 — Container.Resolve', () => {
   })
 })
 
+describe('Phase 4 — Container.ResolveUnwrapped & UnwrappedValue', () => {
+  it('ResolveUnwrapped unwraps Lazy<T> entries to T, leaves the rest unchanged', () => {
+    const c = new Container()
+      .registerValue('a', 1 as const)
+      .registerClass('clock', L, [], 'transient', 'clockLazy')
+    type Flat = Container.ResolveUnwrapped<typeof c>
+
+    expectTypeOf<Flat['a']>().toEqualTypeOf<1>()
+    expectTypeOf<Flat['clock']>().toEqualTypeOf<L>()
+    // Lazy<L> → L
+    expectTypeOf<Flat['clockLazy']>().toEqualTypeOf<L>()
+  })
+
+  it('UnwrappedValue<C, K> equals the unwrapped service type for that key', () => {
+    const c = new Container()
+      .registerClass('clock', L, [], 'transient', 'clockLazy')
+
+    expectTypeOf<Container.UnwrappedValue<typeof c, 'clock'>>().toEqualTypeOf<L>()
+    expectTypeOf<Container.UnwrappedValue<typeof c, 'clockLazy'>>().toEqualTypeOf<L>()
+  })
+
+  it('UnwrappedValue rejects unknown keys', () => {
+    const c = new Container().registerClass('logger', L, [])
+    // @ts-expect-error — 'missing' is not in keyof Resolve<C>
+    type _ = Container.UnwrappedValue<typeof c, 'missing'>
+    void (null as unknown as _)
+  })
+})
+
 describe('Phase 4 — unknown-key type safety', () => {
   it('get() with an unknown key is a TS error', () => {
     const c = new Container().registerClass('logger', L, [])
@@ -277,5 +306,49 @@ describe('Phase 4 — symbol keys', () => {
       .registerClass(LOG, L, [])
       .registerClass('repo', R, [])
     c.registerClass('svc', S, ['repo', LOG])
+  })
+})
+
+describe('Phase 4 — override types', () => {
+  it('positive: known key, exact type compiles', () => {
+    const c = new Container().registerClass('logger', L, [])
+    c.override('logger', new L())
+  })
+
+  it('return type is `this` — preserves the container type for chaining', () => {
+    const c = new Container().registerValue('n', 1 as number)
+    expectTypeOf(c.override('n', 2)).toEqualTypeOf<typeof c>()
+  })
+
+  it('@ts-expect-error: unknown key — must be keyof T', () => {
+    const c = new Container().registerClass('logger', L, [])
+    // @ts-expect-error — 'missing' is not a key of T
+    c.override('missing', new L())
+  })
+
+  it('@ts-expect-error: value of a wrong primitive type', () => {
+    const c = new Container().registerClass('logger', L, [])
+    // @ts-expect-error — number is not assignable to L
+    c.override('logger', 42)
+  })
+
+  it('@ts-expect-error: structurally incompatible class', () => {
+    const c = new Container().registerClass('logger', L, [])
+    class Other { other = true }
+    // @ts-expect-error — Other lacks `log(msg: string)`
+    c.override('logger', new Other())
+  })
+
+  it('positive: subclass is assignable to the registered type', () => {
+    class SubL extends L { extra = 1 }
+    const c = new Container().registerClass('logger', L, [])
+    c.override('logger', new SubL())
+  })
+
+  it('positive: symbol key', () => {
+    const DB: unique symbol = Symbol('db') as unique symbol
+    class Db {}
+    const c = new Container().registerClass(DB, Db, [])
+    c.override(DB, new Db())
   })
 })

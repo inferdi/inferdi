@@ -32,11 +32,40 @@ Legacy DI is slow, bloated with decorators, and prone to memory leaks. **InferDI
 - 🔣 **String *or* Symbol keys**  
   Register services under either a plain string or a `symbol`. Use `Symbol.for('shared')` for cross-module identity without imports, `unique symbol` constants for type-level branding, or local `Symbol()` for collision-free private DI.
 
+## Performance
+
+InferDI is built for raw engine speed. Static type checking instead of runtime reflection, no `Proxy` traps on resolve, and arity-unrolled constructor calls (0–4 args take a direct `new Ctor(...)` path) translate into measurable wins across every common DI workload.
+
+The repository ships a comprehensive benchmark suite in [`benchmarks/`](./benchmarks) comparing InferDI against the five widely used TypeScript DI containers — **InversifyJS v8, Awilix v13 (both PROXY and CLASSIC modes), TSyringe v4, TypeDI v0.10, and Typed Inject v5**. All numbers below are operations per second on Node 22 — higher is better. Reproduce locally with `cd benchmarks && npm install && npm run bench`.
+
+![benchmarks](assets/benchmarking_results.png)
+
+| Scenario                                              | InferDI    | Typed Inject | Awilix (PROXY) | Awilix (CLASSIC) | InversifyJS | TSyringe | TypeDI |
+|-------------------------------------------------------|------------|--------------|----------------|------------------|-------------|----------|--------|
+| **1. Hot singleton resolve** (warm cache)             | **14.2 M** | 7.0 M        | 7.2 M          | 6.9 M            | 6.3 M       | 6.2 M    | 6.4 M  |
+| **2. Transient resolve** (new instance per call)      | **8.4 M**  | 4.3 M        | 3.4 M          | 2.9 M            | 3.4 M       | 2.4 M    | 1.6 M  |
+| **3. Deep graph** (10 levels, all transient)          | **1.85 M** | 1.28 M       | 701 k          | 739 k            | 750 k       | 601 k    | 214 k  |
+| **4a. Wide graph** (4 deps, root transient)           | **7.3 M**  | 3.2 M        | 2.2 M          | 2.3 M            | 2.3 M       | 1.6 M    | 1.1 M  |
+| **4b. Wide graph** (10 deps, root transient)          | **3.5 M**  | 2.6 M        | 1.2 M          | 1.3 M            | 1.6 M       | 1.0 M    | 437 k  |
+| **5. Container build + first resolve**                | **400 k**  | 228 k        | 10 k           | 8 k              | 13 k        | 202 k    | 272 k  |
+| **6. Scoped lifecycle** (create + resolve + cleanup)  | **2.66 M** | 2.39 M       | 492 k          | 413 k            | 28 k        | 1.08 M   | 637 k  |
+| **7. Lazy resolve** (deferred wrapper)                | **12.1 M** | 7.0 M        | 5.5 M          | 4.7 M            | 4.2 M       | 4.0 M    | 2.8 M  |
+
+### Highlights
+
+- **~2× faster on the hot path** than every competitor. A cached singleton resolve in InferDI effectively reduces to a hot `Map.get()` fast path — no Proxy, no metadata lookup, no parent-chain walk for warm services.
+- **30× faster than InversifyJS and 48× faster than Awilix** at building a fresh container with a 30+ key graph and resolving its first service. Registration is a flat `Map.set` per service — no fluent-builder chains, no AST parsing of constructor signatures, no decorator side-effects to apply.
+- **Wide-graph leadership confirms the arity-unrolling fast path:** for 4 dependencies V8 inlines the direct `new Ctor(a, b, c, d)` call instead of going through `Reflect.construct`. Even at 10 dependencies — where InferDI falls back to `Reflect.construct` — it stays **1.35× ahead** of the next-fastest non-reflection-based competitor (Typed Inject) and up to **3.5× ahead** of reflection-based containers.
+- **Clean sweep across all eight scenarios.** InferDI now leads every workload, including the previously close ones: the deep-graph 10-level chain (**1.44× over Typed Inject**) and the scope lifecycle (Scenario 6, **1.11× over Typed Inject**) — while including a synchronous `Symbol.dispose` on every iteration of the latter and beating InversifyJS by **94×**.
+- **Typed Inject is the strongest non-InferDI baseline.** Its compile-time-known graph and `static inject = [...] as const` design let it close the gap on deep graphs and scoped flows where reflection-based containers fall apart. InferDI still pulls ahead in every scenario, but the proximity is real and worth crediting.
+- **Scenario 5 caveat:** decorator-based libraries (TypeDI, TSyringe) register classes at *import time* via decorator side-effects, so their registration cost is paid during module evaluation — what's measured for them at "build time" is only child-context creation. InferDI still beats them while registering an entire graph from scratch in under 3 μs.
+
+Full methodology, fairness notes, fixture sources, and per-scenario reasoning: see [`benchmarks/README.md`](./benchmarks/README.md).
+
 ## Table of Contents
 
 - [Install](#install)
 - [Quick Start](#quick-start)
-- [Performance](#performance)
 - [Factories](#factories)
 - [Binding Interfaces](#binding-interfaces)
 - [Compiler-enforced Signatures](#compiler-enforced-signatures)
@@ -45,6 +74,7 @@ Legacy DI is slow, bloated with decorators, and prone to memory leaks. **InferDI
 - [Lazy Injection](#lazy-injection)
 - [Symbol Keys](#symbol-keys)
 - [Modularity with `.use()`](#modularity-with-use)
+- [Test Overrides](#test-overrides)
 - [Typing a Built Container — `Container.Resolve<C>`](#typing-a-built-container--containerresolvec)
 - [Errors](#errors)
 - [Migration](#migration)
@@ -138,36 +168,6 @@ container.get('userRepo').find('42')
 ```
 
 `.get(key)` is the only way to resolve a registration: it is fully typed (`K extends keyof T`), throws synchronously on a missing key, and stays out of the way at runtime — there is no Proxy overhead.
-
-## Performance
-
-InferDI is built for raw engine speed. Static type checking instead of runtime reflection, no `Proxy` traps on resolve, and arity-unrolled constructor calls (0–4 args take a direct `new Ctor(...)` path) translate into measurable wins across every common DI workload.
-
-The repository ships a comprehensive benchmark suite in [`benchmarks/`](./benchmarks) comparing InferDI against the five widely used TypeScript DI containers — **InversifyJS v8, Awilix v13 (both PROXY and CLASSIC modes), TSyringe v4, TypeDI v0.10, and Typed Inject v5**. All numbers below are operations per second on Node 22 — higher is better. Reproduce locally with `cd benchmarks && npm install && npm run bench`.
-
-![benchmarks](assets/benchmarking_results.png)
-
-| Scenario                                              | InferDI    | Typed Inject | Awilix (PROXY) | Awilix (CLASSIC) | InversifyJS | TSyringe | TypeDI |
-|-------------------------------------------------------|------------|--------------|----------------|------------------|-------------|----------|--------|
-| **1. Hot singleton resolve** (warm cache)             | **14.2 M** | 7.0 M        | 7.2 M          | 6.9 M            | 6.3 M       | 6.2 M    | 6.4 M  |
-| **2. Transient resolve** (new instance per call)      | **8.4 M**  | 4.3 M        | 3.4 M          | 2.9 M            | 3.4 M       | 2.4 M    | 1.6 M  |
-| **3. Deep graph** (10 levels, all transient)          | **1.85 M** | 1.28 M       | 701 k          | 739 k            | 750 k       | 601 k    | 214 k  |
-| **4a. Wide graph** (4 deps, root transient)           | **7.3 M**  | 3.2 M        | 2.2 M          | 2.3 M            | 2.3 M       | 1.6 M    | 1.1 M  |
-| **4b. Wide graph** (10 deps, root transient)          | **3.5 M**  | 2.6 M        | 1.2 M          | 1.3 M            | 1.6 M       | 1.0 M    | 437 k  |
-| **5. Container build + first resolve**                | **400 k**  | 228 k        | 10 k           | 8 k              | 13 k        | 202 k    | 272 k  |
-| **6. Scoped lifecycle** (create + resolve + cleanup)  | **2.66 M** | 2.39 M       | 492 k          | 413 k            | 28 k        | 1.08 M   | 637 k  |
-| **7. Lazy resolve** (deferred wrapper)                | **12.1 M** | 7.0 M        | 5.5 M          | 4.7 M            | 4.2 M       | 4.0 M    | 2.8 M  |
-
-### Highlights
-
-- **~2× faster on the hot path** than every competitor. A cached singleton resolve in InferDI effectively reduces to a hot `Map.get()` fast path — no Proxy, no metadata lookup, no parent-chain walk for warm services.
-- **30× faster than InversifyJS and 48× faster than Awilix** at building a fresh container with a 30+ key graph and resolving its first service. Registration is a flat `Map.set` per service — no fluent-builder chains, no AST parsing of constructor signatures, no decorator side-effects to apply.
-- **Wide-graph leadership confirms the arity-unrolling fast path:** for 4 dependencies V8 inlines the direct `new Ctor(a, b, c, d)` call instead of going through `Reflect.construct`. Even at 10 dependencies — where InferDI falls back to `Reflect.construct` — it stays **1.35× ahead** of the next-fastest non-reflection-based competitor (Typed Inject) and up to **3.5× ahead** of reflection-based containers.
-- **Clean sweep across all eight scenarios.** InferDI now leads every workload, including the previously close ones: the deep-graph 10-level chain (**1.44× over Typed Inject**) and the scope lifecycle (Scenario 6, **1.11× over Typed Inject**) — while including a synchronous `Symbol.dispose` on every iteration of the latter and beating InversifyJS by **94×**.
-- **Typed Inject is the strongest non-InferDI baseline.** Its compile-time-known graph and `static inject = [...] as const` design let it close the gap on deep graphs and scoped flows where reflection-based containers fall apart. InferDI still pulls ahead in every scenario, but the proximity is real and worth crediting.
-- **Scenario 5 caveat:** decorator-based libraries (TypeDI, TSyringe) register classes at *import time* via decorator side-effects, so their registration cost is paid during module evaluation — what's measured for them at "build time" is only child-context creation. InferDI still beats them while registering an entire graph from scratch in under 3 μs.
-
-Full methodology, fairness notes, fixture sources, and per-scenario reasoning: see [`benchmarks/README.md`](./benchmarks/README.md).
 
 ## Factories
 
@@ -406,6 +406,40 @@ const fixture = new Container()
 
 > **Why no portable generic modules?** A function like `<T>(c: Container<T>) => c.registerClass('db', ...)` cannot type-check inside the body — `keyof T` collapses to `string` from the `DependenciesMap` upper bound and `Exclude<'db', string>` becomes `never`, blocking the call. This is the cost of the compile-time uniqueness guarantee on registration. Use inline lambdas for one-shot grouping; use `Module<TIn, TOut>` when input shape is known.
 
+## Test Overrides
+
+In tests you almost always need to swap a real dependency for a mock. The `Exclude<K, keyof T>` guard on every `register*` method intentionally prevents re-registering a key in production — but in tests it gets in the way. Use `.override(key, value)`:
+
+```ts
+import { Container } from '@inferdi/inferdi'
+
+function buildAppContainer() {
+  return new Container()
+    .registerClass('logger', ConsoleLogger, [])
+    .registerClass('db', PgDb, [])
+    .registerClass('userRepo', UserRepo, ['logger', 'db'])
+}
+
+// Test setup
+const c = buildAppContainer()
+  .override('logger', new MockLogger())   // ✅ TS verifies MockLogger is assignable to ConsoleLogger
+  .override('db', mockDb)                 // same
+// .override('missing', x)                ❌ TS error — key not registered
+// .override('logger', 42)                ❌ TS error — number is not assignable to ConsoleLogger
+
+c.get('userRepo').save(/* ... */)         // uses the mocks
+```
+
+**Strict guarantees:**
+
+- 🛡️ **Type-safe.** `value` must satisfy the originally registered type (`T[K]`). Mocks have to structurally implement the production interface — no `as any` escape hatch.
+- ⛔ **Fail-fast on late overrides.** `.override()` throws if the key has already been resolved on this container. A late override would leave existing consumers holding the original reference while new resolves see the mock — a split dependency graph. Always override **before** the first `.get()`.
+- 💥 **Disposed-container guard.** Throws on a disposed container.
+- 🧹 **Externally owned.** Like `registerValue`, the override value is **not** added to the container's disposal queue. The test suite owns the mock's lifetime.
+- 🔒 **Scope-local.** `.override()` mutates only the container it was called on. `root.createScope().override('db', mock)` leaves `root` untouched and is invisible to sibling scopes; a parent-level override propagates via the standard parent walk-up.
+
+> ⚠️ **Production code should not call `.override()`.** It exists for tests and hot-reload-style fixtures. Use `.use()` for conditional registration in production builders.
+
 ## Typing a Built Container — `Container.Resolve<C>`
 
 Once you build your container fluently, the resulting type captures every registered key. You usually want to factor this into a builder function and reuse the inferred map elsewhere (DTOs, factories, tests). Use `Container.Resolve<typeof builder>` to extract it:
@@ -447,6 +481,8 @@ The container throws structured errors with actionable messages — surface thes
 | Resolving across a disposed ancestor | `Ancestor container is disposed (key: "k")` |
 | `createScope()` after dispose | `Cannot create scope from a disposed container` |
 | Sync `[Symbol.dispose]` over an async resource | `Sync [Symbol.dispose] called on a resource whose .dispose() returned a Promise. Use \`await using\` / container.dispose() for async teardown.` |
+| `.override()` after first resolve | `Cannot override "k" because it has already been resolved. Overrides must be applied before any .get() calls...` |
+| `.override()` on a disposed container | `Cannot override on a disposed container (key: "k")` |
 
 ## Migration
 
@@ -485,6 +521,10 @@ class Container<T extends DependenciesMap = Record<never, never>> {
     value: V,
   ): Container<T & Record<K, V>>
 
+  // Test-only: replace an existing registration with a static value.
+  // Throws if the container is disposed or if the key was already resolved.
+  override<K extends keyof T>(key: K, value: T[K]): this
+
   use<R extends DependenciesMap>(fn: Module<T, R>): Container<T & R>
 
   // Scopes & resolution
@@ -502,6 +542,18 @@ namespace Container {
   // Extract the registered map from a built container:
   //   type Deps = Container.Resolve<typeof builtContainer>
   type Resolve<C> = C extends Container<infer U> ? U : never
+
+  // Same as Resolve, but unwraps Lazy<T> entries to T — useful for typing mocks.
+  type ResolveUnwrapped<C> = {
+    [K in keyof Resolve<C>]: Resolve<C>[K] extends Lazy<infer V> ? V : Resolve<C>[K]
+  }
+
+  // Look up a single key's unwrapped service type.
+  // For a Lazy<T>-registered key returns T (no wrapper); useful when overriding
+  // a Lazy<T> companion in tests:
+  //   const mock: Container.UnwrappedValue<typeof c, 'clockLazy'> = { now: () => 0 }
+  //   c.override('clockLazy', { get: () => mock })
+  type UnwrappedValue<C, K extends keyof Resolve<C>> = ResolveUnwrapped<C>[K]
 }
 
 // Public types

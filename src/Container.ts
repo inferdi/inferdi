@@ -521,6 +521,88 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   }
 
   /**
+   * Replaces an existing registration with a static value — for **tests only**.
+   *
+   * Unlike `registerValue`, this method does not widen the container type and
+   * is the only registration call that intentionally targets an already-known
+   * key. The replacement value must satisfy the originally registered type
+   * (`T[K]`), so a mock has to structurally implement the production interface
+   * — no `as any` escape hatch is needed.
+   *
+   * **Strict guarantees (Fail Fast):**
+   * - Throws if called on a disposed container.
+   * - Throws if the key has already been resolved on this container. A late
+   *   override would let already-built consumers retain a reference to the
+   *   original instance while new resolves see the mock — a graph-level
+   *   inconsistency. Always `.override()` BEFORE any `.get()`.
+   *
+   * The override is stored as a singleton: every subsequent `.get(key)` on
+   * this container returns the same value. The replacement is treated as
+   * externally owned — it is NOT pushed into the container's disposal queue
+   * (same contract as `registerValue`); the test suite owns its lifetime.
+   *
+   * Scope semantics: `.override()` writes to the current container only. A
+   * child scope's override is invisible to its parent and to sibling scopes;
+   * a parent-level override propagates via the standard parent walk-up.
+   *
+   * **Production code should not call `.override()`.** It exists for tests
+   * and hot-reload-style fixtures. Use `.use()` for conditional registration
+   * in production builders.
+   *
+   * @template K - A key already present in `T`.
+   *
+   * @param key - The registered key to replace.
+   * @param value - The replacement value, strictly typed as `T[K]`.
+   * @returns `this` for fluent chaining.
+   *
+   * @throws If the container is disposed.
+   * @throws If the key has already been resolved on this container.
+   *
+   * @example
+   * ```ts
+   * function buildAppContainer() {
+   *   return new Container()
+   *     .registerClass('logger', ConsoleLogger, [])
+   *     .registerClass('db', PgDb, [])
+   * }
+   *
+   * // Test setup
+   * const c = buildAppContainer()
+   *   .override('logger', new MockLogger())
+   *   .override('db', mockDb)
+   * c.get('logger') // MockLogger
+   * ```
+   */
+  public override<K extends keyof T>(key: K, value: T[K]): this {
+    if (this._disposed) {
+      throw new Error(`Cannot override on a disposed container (key: "${String(key)}")`)
+    }
+    // Strict Runtime Guard: refuse late overrides. If `cache.has(key)` is true,
+    // the original was already resolved (or eagerly seeded by registerValue) on
+    // this container — replacing it now would split the dependency graph
+    // (existing consumers keep the old ref; future resolves see the mock).
+    if (this.cache.has(key)) {
+      throw new Error(
+        `Cannot override "${String(key)}" because it has already been resolved. ` +
+          `Overrides must be applied before any .get() calls to ensure clean dependency graphs and prevent resource leaks.`,
+      )
+    }
+    this.cache.set(key, value === undefined ? UNDEFINED_MARKER : value)
+    // Stored as a singleton with a dead-code factory (cache.set above always
+    // wins the hot-path) — same shape as registerValue for uniformity.
+    this.regs.set(
+      key,
+      /* v8 ignore next */
+      {kind: 'singleton', fn: () => value as unknown as T[keyof T]},
+    )
+    this.regsVersion++
+    if (this.lookupCache !== undefined) {
+      this.lookupCache.clear()
+    }
+    return this
+  }
+
+  /**
    * Applies a registration module (or inline configuration function) on top of
    * the current container.
    *
@@ -999,28 +1081,45 @@ export namespace Container {
   export type Resolve<C> = C extends Container<infer U> ? U : never
 
   /**
-   * Unwraps `Lazy<T>` back to `T` in the extracted dependency map.
-   * Ideal for type-checking mocks in tests without dealing with lazy wrappers.
+   * Like {@link Resolve}, but unwraps `Lazy<T>` companion entries back to `T`.
+   * Useful when you want a "flat" view of the dependency map for typing mocks
+   * or test fixtures, where lazy wrappers only get in the way.
    *
    * @template C - A `Container<T>` type.
+   *
+   * @example
+   * ```ts
+   * const builder = new Container()
+   *   .registerClass('clock', Clock, [], 'transient', 'clockLazy')
+   * type Flat = Container.ResolveUnwrapped<typeof builder>
+   * //   ^? { clock: Clock; clockLazy: Clock }   // Lazy<Clock> → Clock
+   * ```
    */
   export type ResolveUnwrapped<C> = {
     [K in keyof Resolve<C>]: Resolve<C>[K] extends Lazy<infer V> ? V : Resolve<C>[K]
   }
 
   /**
-   * Gets the type of a specific registered service by its key.
+   * Gets the **unwrapped** service type (without the `Lazy<>` envelope) by key.
+   * For non-lazy keys this equals `Resolve<C>[K]`; for keys registered as
+   * `Lazy<T>` it returns `T`.
+   *
+   * Designed for typing the inner mock value when you intend to override a
+   * `Lazy<T>`-registered key in a test — write the mock as the unwrapped
+   * service type, then wrap it once in `{ get: () => mock }` at the call site.
    *
    * @template C - A `Container<T>` type.
    * @template K - The registered key to look up.
-   */
-  export type Value<C, K extends keyof Resolve<C>> = Resolve<C>[K]
-
-  /**
-   * Gets the "unwrapped" service type (without `Lazy`) by its key.
    *
-   * @template C - A `Container<T>` type.
-   * @template K - The registered key to look up.
+   * @example
+   * ```ts
+   * const builder = new Container()
+   *   .registerClass('clock', Clock, [], 'transient', 'clockLazy')
+   * const clockMock: Container.UnwrappedValue<typeof builder, 'clockLazy'> = {
+   *   now: () => 0,
+   * }
+   * builder.override('clockLazy', { get: () => clockMock })
+   * ```
    */
   export type UnwrappedValue<C, K extends keyof Resolve<C>> = ResolveUnwrapped<C>[K]
 }
