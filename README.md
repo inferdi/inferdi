@@ -15,7 +15,7 @@ Build your dependency graph using a fluent API that infers types automatically, 
 Legacy DI is slow, bloated with decorators, and prone to memory leaks. **InferDI is built for 2026:** it’s ruthlessly fast, strictly typed, and built for the modern edge.
 
 - ☁️ **Zero-Weight Edge Native**  
-  Just 1.8KB gzipped. Zero dependencies. The perfect fit for all serverless platforms, including Cloudflare Workers, Vercel Edge, Deno Deploy, and Supabase. While other frameworks trigger cold starts, InferDI is already running.
+  Just 2KB gzipped. Zero dependencies. The perfect fit for all serverless platforms, including Cloudflare Workers, Vercel Edge, Deno Deploy, and Supabase. While other frameworks trigger cold starts, InferDI is already running.
 
 - ⚡ **Raw Engine Speed**  
   Built to outperform the competition. Highly optimized for V8 and JSC inline caching. It doesn't just resolve dependencies — it executes at native engine speed.
@@ -186,7 +186,7 @@ const container = new Container()
   .registerClass('userRepo', UserRepo, ['pgPool'])
 ```
 
-Factories follow the same lifetime rules as classes — pass the kind as the third argument: `registerFactory('cache', factory, 'scoped')`.
+Factories follow the same lifetime rules as classes — pass the kind as the third argument: `registerFactory('cache', factory, 'scoped')`. Inside a **singleton** factory the container parameter is narrowed via `AllowedDeps<T, 'singleton'>`, so `c.get(...)` will only autocomplete (and accept) singleton keys and `Lazy<*>` companions. A `scoped`/`transient` key inside a singleton factory body is a TypeScript error, not a runtime exception.
 
 ## Binding Interfaces
 
@@ -286,12 +286,105 @@ try {
 | `scoped`    | once per scope                                  | the scope                | yes |
 | `transient` | every time requested                            | never                    | no (caller owns it)   |
 
-**The Lifetime Rule:** A singleton cannot directly depend on a scoped or transient service. That would freeze a short-lived value inside a long-lived cache. `InferDI` prevents this design flaw by throwing at resolve time:
+**The Lifetime Rule:** A singleton cannot directly depend on a scoped or transient service. That would freeze a short-lived value inside a long-lived cache. `InferDI` enforces this **at compile time**:
+
+```ts
+new Container()
+  .registerClass('requestCtx', RequestCtx, [], 'scoped')
+  // ❌ TS error: '"requestCtx"' is not assignable to type 'never'.
+  //    AllowedDeps<T, 'singleton'> filters scoped/transient keys out of
+  //    the deps tuple visible to a singleton target.
+  .registerClass('userService', UserService, ['requestCtx'], 'singleton')
+```
+
+Inside a singleton **factory**, the container parameter is structurally narrowed
+so only legal keys autocomplete:
+
+```ts
+new Container()
+  .registerClass('requestCtx', RequestCtx, [], 'scoped')
+  .registerFactory('userService', (c) => {
+    // ❌ TS error: 'requestCtx' is not a key of the narrowed container.
+    const ctx = c.get('requestCtx')
+    return new UserService(ctx)
+  }, 'singleton')
+```
+
+The same check fires at runtime as defense-in-depth — if you bypass the type
+system with an `as`-cast, you still get a clear diagnostic:
 
 ```
 Error: Singleton "userService" cannot depend on scoped "requestCtx".
 Use Lazy<T> (register with a lazyKey companion) to get a fresh instance per access.
 ```
+
+### Fast Mode: `new Container({ strict: false })`
+
+If you fully trust the compile-time guard and want maximum throughput on the
+hot path, opt out of the runtime cycle / lifetime checks:
+
+```ts
+const root = new Container({ strict: false })
+  .registerClass('logger', Logger, [])
+```
+
+In `strict: false` mode `get()` drops the cycle bookkeeping (`resolving`
+push/pop + `Array#includes`), the singleton-stack push/pop, and the
+surrounding `try`/`finally` from the resolve path. Local transient resolves
+collapse to a bare `fn(this)` call — measured ~30% faster on a flat
+transient graph; cached singleton/scoped resolves are unaffected because
+the cache fast-path runs upstream of any guard. The flag is inherited by
+every child created via `createScope()`.
+
+**`strict: true` is a floor under two independent problem classes — not
+just "type-substitution defense".** The compile-time guard covers a strict
+subset of what the runtime guard catches:
+
+| Problem | Compile-time | Runtime (`strict: true`) |
+|---|---|---|
+| Singleton depends on scoped/transient directly via `deps` or the narrowed `c` parameter | ✓ | ✓ |
+| Singleton depends on scoped/transient via a **captured outer container reference** inside a factory body | ✗ | ✓ |
+| Singleton ↔ Singleton cycle | ✗ | ✓ |
+| Transient ↔ Transient cycle | ✗ | ✓ |
+| Lifetime violation introduced via an `as`-cast (`as never`, `as any`, `as Container<...>`) | ✗ | ✓ |
+| Dynamic key construction (`c.get(computedKey as keyof T)`) | ✗ | ✓ |
+
+In particular, **the type system cannot see cycles**. A `Singleton →
+Singleton` cycle compiles cleanly (both ends pass the `AllowedDeps`
+filter); only `strict: true` reports it as `Circular dependency detected:
+a -> b -> a`, while `strict: false` lets V8 recurse until
+`RangeError: Maximum call stack size exceeded`. The same applies to
+`Transient ↔ Transient` cycles, which `AllowedDeps` never filters at all.
+
+The narrowing of `c` inside a factory is also **per-parameter, not
+per-scope**. If you capture an outer container reference in the closure,
+that reference still has its wider type:
+
+```ts
+const root = new Container().registerClass('req', ReqCtx, [], 'scoped')
+root.registerFactory('logger', () => {
+  // `root` here is the wide Container<T>, NOT the narrowed AllowedDeps view.
+  // TypeScript happily compiles this:
+  return new Logger(root.get('req'))   // 💀 leaks scoped into singleton
+}, 'singleton')
+```
+
+`strict: true` catches this at runtime; `strict: false` does not.
+
+**Use `strict: false` only when you're certain that:**
+
+- Your graph has no cycles (including `transient ↔ transient`).
+- Every factory reads dependencies **only** through its own `c` parameter —
+  no captured outer container references.
+- All registrations go through the fluent API without `as`-casts to bypass
+  `AllowedDeps`.
+- Any `Module<TIn, TOut>` declarations honestly describe their input shape.
+
+**Recommended workflow.** Develop and test in `strict: true` (the default).
+Your runtime tests transitively prove the graph is cycle-free and that no
+factory leaks short-lived state through a captured closure. Only after that
+audit, switch to `strict: false` for production builds where the ~30%
+transient-path speed-up matters.
 
 ## Lazy Injection
 
@@ -386,18 +479,23 @@ const appContainer = new Container()
   })
 ```
 
-For named, **fixed-shape** module builders (e.g., test fixtures that always start from a specific base), use the exported `Module<TIn, TOut>` type — `TIn` must match the container's T exactly at the `.use()` call site:
+For named, **fixed-shape** module builders (e.g., test fixtures that always start from a specific base), use the exported `Module<TIn, TOut>` type — `TIn` must match the container's T exactly at the `.use()` call site. Because v3 carries lifetime kind alongside each entry, wrap flat `{ key: ServiceType }` shapes in `SpecMap<...>` (defaults every entry to singleton) or write `Spec<V, 'scoped' | 'transient'>` for mixed-kind modules:
 
 ```ts
-import { Container, type Module } from '@inferdi/inferdi'
+import { Container, type Module, type Spec, type SpecMap } from '@inferdi/inferdi'
 
-// Always invoked on a container whose T is exactly { config: { env: string } }.
-const fixtureMailer: Module<{ config: { env: string } }, { mailer: Mailer }> = (c) => {
+// Always invoked on a container whose T is exactly { config: { env: string } } (singleton).
+const fixtureMailer: Module<SpecMap<{ config: { env: string } }>, SpecMap<{ mailer: Mailer }>> = (c) => {
   const { env } = c.get('config')
   return env === 'test'
     ? c.registerClass('mailer', MockMailer, [])
     : c.registerClass('mailer', RealMailer, [])
 }
+
+// Mixed-kind: TIn requires a scoped `req` and a singleton `cfg`.
+type ReqHandlerIn = SpecMap<{ cfg: Config }> & { req: Spec<ReqCtx, 'scoped'> }
+const reqHandler: Module<ReqHandlerIn, SpecMap<{ handler: Handler }>> = (c) =>
+  c.registerClass('handler', Handler, ['cfg', 'req'])
 
 const fixture = new Container()
   .registerValue('config', { env: 'test' })
@@ -491,45 +589,71 @@ Upgrading from a previous major version? See **[MIGRATION.md](./MIGRATION.md)** 
 ## API Summary
 
 ```ts
-import { Container, type Lazy, type Module, type DependenciesMap } from '@inferdi/inferdi'
+import {
+  Container,
+  type Lazy,
+  type Module,
+  type DependenciesMap,
+  type RegistrationKind,
+  type Spec,
+  type SpecMap,
+  type ContainerOptions,
+} from '@inferdi/inferdi'
 
 class Container<T extends DependenciesMap = Record<never, never>> {
-  constructor(parent?: Container<T>)
+  // Public — use this to construct a root container.
+  constructor(options?: ContainerOptions)
+  // Internal overload used by createScope() to wire the parent chain.
+  constructor(parent: Container<T>)
 
-  // Registration — each call returns a Container with T widened by Record<K, V>.
+  // Registration — each call returns a Container widened by Record<K, Spec<V, Kind>>.
+  // The `deps` tuple and the factory `c` are narrowed via `AllowedDeps<T, Kind>`:
+  // for a singleton target, only singleton entries and Lazy<*> companions are visible.
   registerClass<
     K extends string | symbol,
     V,
     A extends readonly unknown[],
+    Kind extends RegistrationKind = 'singleton',
     LK extends string | symbol = never,
   >(
     key: Exclude<K, keyof T>,
     Ctor: new (...args: A) => V,
-    deps: DepsOf<T, A>,
-    kind?: 'singleton' | 'transient' | 'scoped',     // default: 'singleton'
+    deps: DepsOf<AllowedDeps<T, Kind>, A>,
+    kind?: Kind,                                     // default: 'singleton'
     lazyKey?: Exclude<LK, keyof T | K>,              // optional companion key for `Lazy<V>`
-  ): Container<T & Record<K, V> & ([LK] extends [never] ? {} : Record<LK, Lazy<V>>)>
+  ): Container<
+       T
+       & Record<K, Spec<V, Kind>>
+       & ([LK] extends [never] ? {} : Record<LK, Spec<Lazy<V>, 'transient'>>)
+     >
 
-  registerFactory<K extends string | symbol, V>(
+  registerFactory<
+    K extends string | symbol,
+    V,
+    Kind extends RegistrationKind = 'singleton',
+  >(
     key: Exclude<K, keyof T>,
-    factory: (c: Container<T>) => V,
-    kind?: 'singleton' | 'transient' | 'scoped',     // default: 'singleton'
-  ): Container<T & Record<K, V>>
+    factory: (c: Container<AllowedDeps<T, Kind>>) => V,
+    kind?: Kind,                                     // default: 'singleton'
+  ): Container<T & Record<K, Spec<V, Kind>>>
 
   registerValue<K extends string | symbol, V>(
     key: Exclude<K, keyof T>,
     value: V,
-  ): Container<T & Record<K, V>>
+  ): Container<T & Record<K, Spec<V, 'singleton'>>>
 
   // Test-only: replace an existing registration with a static value.
-  // Throws if the container is disposed or if the key was already resolved.
-  override<K extends keyof T>(key: K, value: T[K]): this
+  // Walks the parent chain to read the original kind and preserves it locally,
+  // so `root.createScope().override('db', mock)` keeps the scoped semantics.
+  // Throws if the container is disposed, the key was already resolved, or
+  // the key is not registered anywhere in the chain.
+  override<K extends keyof T>(key: K, value: T[K]['type']): this
 
   use<R extends DependenciesMap>(fn: Module<T, R>): Container<T & R>
 
   // Scopes & resolution
   createScope(): Container<T>
-  get<K extends keyof T>(key: K): T[K]
+  get<K extends keyof T>(key: K): T[K]['type']
 
   // Lifecycle
   get disposed(): boolean
@@ -539,9 +663,12 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 }
 
 namespace Container {
-  // Extract the registered map from a built container:
-  //   type Deps = Container.Resolve<typeof builtContainer>
-  type Resolve<C> = C extends Container<infer U> ? U : never
+  // Extract the registered map from a built container as a **flat**
+  // `{ key: ServiceType }` view — the Spec wrapper is unwrapped, so consumers
+  // see the same shape they always did pre-v3.
+  type Resolve<C> = C extends Container<infer U>
+    ? { [K in keyof U]: U[K]['type'] }
+    : never
 
   // Same as Resolve, but unwraps Lazy<T> entries to T — useful for typing mocks.
   type ResolveUnwrapped<C> = {
@@ -558,9 +685,30 @@ namespace Container {
 
 // Public types
 type Lazy<T> = { readonly get: () => T }
+type RegistrationKind = 'singleton' | 'transient' | 'scoped'
+
+// Construction options.
+interface ContainerOptions {
+  // Toggle runtime cycle / lifetime guard inside get(). Default true.
+  // Inherited by child scopes spawned via createScope().
+  readonly strict?: boolean
+}
+
+// Single registry entry — service type V plus its lifetime kind. `interface`
+// (not type alias) so TS caches instantiations across long fluent chains.
+interface Spec<V, K extends RegistrationKind = 'singleton'> {
+  readonly type: V
+  readonly kind: K
+}
+
+// Brand a flat `{ key: ServiceType }` map as a SpecMap (defaults to singleton).
+type SpecMap<M, K extends RegistrationKind = 'singleton'> =
+  { [P in keyof M]: Spec<M[P], K> }
+
+type DependenciesMap = Record<string | symbol, Spec<unknown, RegistrationKind>>
+
 type Module<TIn extends DependenciesMap, TOut extends DependenciesMap> =
   (c: Container<TIn>) => Container<TIn & TOut>
-type DependenciesMap = Record<string | symbol, unknown>
 ```
 
 ## License

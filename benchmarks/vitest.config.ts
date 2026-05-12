@@ -23,6 +23,9 @@ export default defineConfig({
     include: ['src/benches/**/*.bench.ts', 'src/precondition/**/*.test.ts'],
     exclude: ['**/node_modules/**', '../**'],
     benchmark: {
+      pool: 'forks',
+      isolate: true,
+
       include: ['src/benches/**/*.bench.ts'],
       reporters: ['default'],
     },

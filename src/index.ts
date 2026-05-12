@@ -1,2 +1,10 @@
 export { Container } from './Container'
-export type { Lazy, DependenciesMap, Module } from './Container'
+export type {
+  Lazy,
+  DependenciesMap,
+  Module,
+  RegistrationKind,
+  Spec,
+  SpecMap,
+  ContainerOptions,
+} from './Container'

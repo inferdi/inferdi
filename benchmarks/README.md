@@ -62,7 +62,7 @@ TypeDI's `Container.of(id).get(GlobalServiceClass)` silently falls back to the g
 
 - **DCE protection** — every `bench(name, fn)` writes the result of `fn()` to a sink variable in `_helpers.ts` → V8 cannot prove the call is side-effect-free → it is not eliminated after warmup.
 - **All callbacks are synchronous** — no `async () => { await ... }` (that introduces event-loop overhead, asymmetrically degrading containers with async APIs).
-- **GC-noise mitigation** — `warmupTime: 1000ms` + `time: 2000ms` per `bench` call (the default 500 ms catches 1–2 random GC pauses for one container).
+- **GC-noise mitigation** — `warmupTime: 1000ms` + `time: 1000ms` per `bench` call (the default 500 ms catches 1–2 random GC pauses for one container).
 - **TypeDI deprecation spam suppressed** — `NODE_OPTIONS="--no-warnings"` in the `bench` script (via `cross-env`). Otherwise `Reflect.metadata` deprecation warnings on Node 22 flood stderr across millions of iterations and crater the ops/sec.
 - **Awilix CLASSIC param-name parsing** — constructor parameter names in `src/fixtures/plain.ts` are kept in sync with registration keys (`logger`, `config`, `repo`, `service`, `dep0..dep9`, `l0..l9`). Mismatch → `ResolutionError`.
 - **TypeDI scope id strategy** — a static id (`'scope-test'` for scenario 6, `'build-test'` for 5) + `Container.reset(id)` at the end of each iteration. Reset makes the next iteration "fresh" without allocating new strings.

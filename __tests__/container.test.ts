@@ -1090,6 +1090,86 @@ describe('Phase 7 — Test Overrides', () => {
     expect(c.get('maybe')).toBeUndefined()
   })
 
+  // ────────────────────────────────────────────────────────────────────────
+  // v3 — override walk-up + kind preservation
+  // ────────────────────────────────────────────────────────────────────────
+
+  it('override preserves kind when the original is local (singleton)', () => {
+    const c = new Container().registerClass('logger', ConsoleLogger, [], 'singleton')
+    const mock = new ConsoleLogger()
+    c.override('logger', mock)
+
+    expect(c.get('logger')).toBe(mock)
+    // Local registration: same kind preserved
+    const reg = (c as unknown as { regs: Map<string, { kind: string }> }).regs.get('logger')
+    expect(reg?.kind).toBe('singleton')
+  })
+
+  it('override preserves kind when the original is local (scoped)', () => {
+    const c = new Container().registerClass('reqCtx', ConsoleLogger, [], 'scoped')
+    const mock = new ConsoleLogger()
+    c.override('reqCtx', mock)
+
+    const reg = (c as unknown as { regs: Map<string, { kind: string }> }).regs.get('reqCtx')
+    expect(reg?.kind).toBe('scoped')
+  })
+
+  it('override on child reads kind from parent registration via walk-up', () => {
+    const root = new Container().registerClass('reqCtx', ConsoleLogger, [], 'scoped')
+    const child = root.createScope()
+    const mock = new ConsoleLogger()
+
+    child.override('reqCtx', mock)
+
+    // Override is local on child; parent untouched
+    expect(child.get('reqCtx')).toBe(mock)
+    expect(root.get('reqCtx')).not.toBe(mock)
+
+    // Child got the kind from parent's registration
+    const childReg = (child as unknown as { regs: Map<string, { kind: string }> }).regs.get('reqCtx')
+    expect(childReg?.kind).toBe('scoped')
+  })
+
+  it('override walks across multiple parent levels (grandparent)', () => {
+    const root = new Container().registerClass('shared', ConsoleLogger, [], 'singleton')
+    const mid = root.createScope()
+    const leaf = mid.createScope()
+    const mock = new ConsoleLogger()
+
+    leaf.override('shared', mock)
+
+    expect(leaf.get('shared')).toBe(mock)
+    const leafReg = (leaf as unknown as { regs: Map<string, { kind: string }> }).regs.get('shared')
+    expect(leafReg?.kind).toBe('singleton')
+  })
+
+  it('override throws when key is not registered anywhere in the chain', () => {
+    const root = new Container().registerClass('logger', ConsoleLogger, [])
+    const child = root.createScope()
+
+    expect(() =>
+      // @ts-expect-error — 'missing' is not in T
+      child.override('missing', new ConsoleLogger())
+    ).toThrowError(/Cannot override "missing": key is not registered/)
+  })
+
+  it('scoped override on child preserves scoped semantics — distinct instances per scope', () => {
+    const root = new Container().registerClass('reqCtx', ConsoleLogger, [], 'scoped')
+    const sibling = root.createScope()
+    const child = root.createScope()
+    const mock = new ConsoleLogger()
+
+    child.override('reqCtx', mock)
+
+    // child uses the mock
+    expect(child.get('reqCtx')).toBe(mock)
+    // sibling untouched by child's override and gets a fresh scoped instance from root
+    expect(sibling.get('reqCtx')).not.toBe(mock)
+    expect(sibling.get('reqCtx')).toBeInstanceOf(ConsoleLogger)
+    // sibling is stable within its own scope
+    expect(sibling.get('reqCtx')).toBe(sibling.get('reqCtx'))
+  })
+
   it('overrides a Lazy<T> companion key — UnwrappedValue types the inner mock', () => {
     class Clock {
       now() { return 0 }
@@ -1106,6 +1186,125 @@ describe('Phase 7 — Test Overrides', () => {
     builder.override('clockLazy', {get: () => clockMock})
 
     expect(builder.get('clockLazy').get().now()).toBe(42)
+  })
+})
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 9 — strict: false (opt-out runtime guards)
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('Phase 9 — strict: false', () => {
+  it('transient resolution skips the cycle bookkeeping (no try/finally)', () => {
+    let calls = 0
+    const c = new Container({strict: false})
+      .registerFactory('counter', () => ({n: ++calls}), 'transient')
+    expect(c.get('counter').n).toBe(1)
+    expect(c.get('counter').n).toBe(2)
+    expect(calls).toBe(2)
+  })
+
+  it('singleton resolution caches and returns the same instance', () => {
+    const c = new Container({strict: false})
+      .registerClass('logger', ConsoleLogger, [])
+    const a = c.get('logger')
+    const b = c.get('logger')
+    expect(a).toBe(b)
+    expect(a).toBeInstanceOf(ConsoleLogger)
+  })
+
+  it('scoped resolution honours scope isolation under strict:false', () => {
+    const root = new Container({strict: false})
+      .registerClass('logger', ConsoleLogger, [], 'scoped')
+    const a = root.createScope()
+    const b = root.createScope()
+    expect(a.get('logger')).toBe(a.get('logger'))
+    expect(a.get('logger')).not.toBe(b.get('logger'))
+  })
+
+  it('singleton delegated from a child scope hits the cached path on owner', () => {
+    const root = new Container({strict: false}).registerClass('logger', ConsoleLogger, [])
+    const child = root.createScope()
+    const fromChild = child.get('logger')
+    expect(fromChild).toBeInstanceOf(ConsoleLogger)
+    // Cached on root — second resolve from child returns the same instance.
+    expect(child.get('logger')).toBe(fromChild)
+    expect(root.get('logger')).toBe(fromChild)
+  })
+
+  it('createScope inherits the strict flag', () => {
+    const root = new Container({strict: false})
+    const child = root.createScope()
+    expect((child as unknown as {strict: boolean}).strict).toBe(false)
+
+    const strictRoot = new Container()
+    const strictChild = strictRoot.createScope()
+    expect((strictChild as unknown as {strict: boolean}).strict).toBe(true)
+  })
+
+  it('skips the lifetime guard — singleton may depend on a scoped service', () => {
+    // Compile-time guard would normally reject this. We bypass via `as never`
+    // to model an `as`-cast escape; in strict mode this would throw at runtime,
+    // in strict:false it silently constructs the singleton with the scoped dep.
+    class Holder {
+      constructor(public readonly cfg: AppConfig) {}
+    }
+    const c = new Container({strict: false})
+      .registerClass('cfg', AppConfig, [], 'scoped')
+      .registerClass('holder', Holder, ['cfg' as never], 'singleton')
+
+    const holder = c.get('holder')
+    expect(holder).toBeInstanceOf(Holder)
+    expect(holder.cfg).toBeInstanceOf(AppConfig)
+  })
+
+  it('skips local-transient lifetime guard inside a singleton', () => {
+    class Trans { public stamp = Math.random() }
+    class Svc { constructor(public readonly dep: Trans) {} }
+    const c = new Container({strict: false})
+      .registerClass('trans', Trans, [], 'transient')
+      .registerClass('svc', Svc, ['trans' as never], 'singleton')
+
+    expect(c.get('svc').dep).toBeInstanceOf(Trans)
+  })
+
+  it('transient self-cycle: stack overflows instead of throwing Circular dependency', () => {
+    class A { constructor(_a: A) {} }
+    const c = new Container({strict: false}) as Container<{a: {type: A; kind: 'transient'}}>
+    c.registerClass('a' as never, A, ['a' as never], 'transient')
+    expect(() => c.get('a')).toThrowError(RangeError)
+  })
+
+  it('factory returning undefined: non-transient caches via UNDEFINED_MARKER under strict:false', () => {
+    let calls = 0
+    const c = new Container({strict: false})
+      .registerFactory('nil', () => { calls++; return undefined }, 'singleton')
+
+    expect(c.get('nil')).toBeUndefined()
+    expect(c.get('nil')).toBeUndefined()
+    expect(calls).toBe(1)
+  })
+
+  it('transient registered on parent, resolved from child — no caching under strict:false', () => {
+    let calls = 0
+    const root = new Container({strict: false})
+      .registerFactory('counter', () => ({n: ++calls}), 'transient')
+    const child = root.createScope()
+    // child has no local registration for 'counter'; the resolve goes through
+    // the parent walk-up into resolveWithOwnerAndReg with reg.kind === 'transient'.
+    // strict:false branch must NOT cache the result.
+    expect(child.get('counter').n).toBe(1)
+    expect(child.get('counter').n).toBe(2)
+    expect(calls).toBe(2)
+  })
+
+  it('owned de-duplication still applies under strict:false', () => {
+    const shared = {dispose: () => {}}
+    const c = new Container({strict: false})
+      .registerFactory('a', () => shared)
+      .registerFactory('b', () => shared)
+    c.get('a')
+    c.get('b')
+    expect((c as unknown as {owned: unknown[]}).owned.length).toBe(1)
   })
 })
 

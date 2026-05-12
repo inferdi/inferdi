@@ -1,5 +1,5 @@
 import {describe, it, expectTypeOf} from 'vitest'
-import {Container, type Lazy, type Module} from '../src/Container'
+import {Container, type Lazy, type Module, type Spec, type SpecMap} from '../src/Container'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Phase 4 — Type-level tests (fluent API)
@@ -293,7 +293,10 @@ describe('Phase 4 — symbol keys', () => {
   it('Module<TIn, TOut> with symbol keys', () => {
     const CFG: unique symbol = Symbol('cfg') as unique symbol
     const MAILER: unique symbol = Symbol('mailer') as unique symbol
-    const m: Module<Record<typeof CFG, {env: string}>, Record<typeof MAILER, L>> =
+    // v3: Module<TIn, TOut> uses the Spec-shaped DependenciesMap directly.
+    // Wrap flat `{ key: ServiceType }` maps in `SpecMap<...>` to default each
+    // entry to singleton.
+    const m: Module<SpecMap<Record<typeof CFG, {env: string}>>, SpecMap<Record<typeof MAILER, L>>> =
       (c) => c.registerClass(MAILER, L, [])
     void m
   })
@@ -350,5 +353,131 @@ describe('Phase 4 — override types', () => {
     class Db {}
     const c = new Container().registerClass(DB, Db, [])
     c.override(DB, new Db())
+  })
+})
+
+// ────────────────────────────────────────────────────────────────────────────
+// v3.0 — Compile-time lifetime guard (Variant C)
+//
+// `AllowedDeps<T, Kind>` filters the visible keyspace inside a registration so
+// that singleton consumers cannot inject scoped/transient deps. The runtime
+// guard in get() still fires for `as`-cast bypasses; these tests cover the
+// TypeScript-level coverage.
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('Phase 8 — compile-time lifetime guard', () => {
+  class Dep {
+    public readonly mark = 'dep'
+  }
+  class Consumer {
+    constructor(public readonly d: Dep) {}
+  }
+
+  it('singleton class can depend on a singleton class', () => {
+    new Container()
+      .registerClass('dep', Dep, [], 'singleton')
+      .registerClass('consumer', Consumer, ['dep'], 'singleton')
+  })
+
+  it('singleton class cannot depend on a scoped class', () => {
+    const c = new Container().registerClass('dep', Dep, [], 'scoped')
+    // @ts-expect-error — 'dep' is scoped; AllowedDeps excludes it from the singleton's deps tuple
+    c.registerClass('consumer', Consumer, ['dep'], 'singleton')
+  })
+
+  it('singleton class cannot depend on a transient class', () => {
+    const c = new Container().registerClass('dep', Dep, [], 'transient')
+    // @ts-expect-error — 'dep' is transient; AllowedDeps excludes it
+    c.registerClass('consumer', Consumer, ['dep'], 'singleton')
+  })
+
+  it('singleton class CAN depend on a Lazy<scoped> companion', () => {
+    // Lazy companions are detected structurally via `Lazy<unknown>`; the runtime
+    // wrapper is `transient`, but the compile-time filter lets it through.
+    class HolderLazy {
+      constructor(public readonly d: Lazy<Dep>) {}
+    }
+    new Container()
+      .registerClass('dep', Dep, [], 'scoped', 'depLazy')
+      .registerClass('holder', HolderLazy, ['depLazy'], 'singleton')
+  })
+
+  it('scoped class can depend on a scoped class', () => {
+    new Container()
+      .registerClass('dep', Dep, [], 'scoped')
+      .registerClass('consumer', Consumer, ['dep'], 'scoped')
+  })
+
+  it('scoped class can depend on a transient class', () => {
+    // Per runtime semantics: scoped/transient targets accept any kind of dep.
+    new Container()
+      .registerClass('dep', Dep, [], 'transient')
+      .registerClass('consumer', Consumer, ['dep'], 'scoped')
+  })
+
+  it('transient class can depend on a scoped class', () => {
+    new Container()
+      .registerClass('dep', Dep, [], 'scoped')
+      .registerClass('consumer', Consumer, ['dep'], 'transient')
+  })
+
+  it('singleton factory `c` is narrowed to AllowedDeps<T, "singleton">', () => {
+    const c = new Container()
+      .registerClass('singletonDep', Dep, [], 'singleton')
+      .registerClass('scopedDep', Dep, [], 'scoped')
+
+    c.registerFactory('built', (c) => {
+      // singletonDep is visible — singleton deps are legal for a singleton target.
+      const ok = c.get('singletonDep')
+      void ok
+      // @ts-expect-error — scopedDep is filtered out of the narrowed container's keys.
+      c.get('scopedDep')
+      return new Dep()
+    }, 'singleton')
+  })
+
+  it('scoped factory `c` is NOT narrowed (any dep is legal)', () => {
+    const c = new Container()
+      .registerClass('singletonDep', Dep, [], 'singleton')
+      .registerClass('scopedDep', Dep, [], 'scoped')
+      .registerClass('transientDep', Dep, [], 'transient')
+
+    c.registerFactory('built', (c) => {
+      const a = c.get('singletonDep')
+      const b = c.get('scopedDep')
+      const x = c.get('transientDep')
+      void a; void b; void x
+      return new Dep()
+    }, 'scoped')
+  })
+
+  it('registerValue values count as singleton — legal in singleton factories', () => {
+    const c = new Container().registerValue('cfg', {port: 8080})
+    c.registerFactory('built', (c) => {
+      const v = c.get('cfg')
+      return v.port
+    }, 'singleton')
+  })
+})
+
+describe('Phase 8 — Spec / SpecMap helpers', () => {
+  it('SpecMap defaults entries to singleton', () => {
+    type M = SpecMap<{logger: L; cfg: {port: number}}>
+    expectTypeOf<M['logger']>().toEqualTypeOf<Spec<L, 'singleton'>>()
+    expectTypeOf<M['cfg']>().toEqualTypeOf<Spec<{port: number}, 'singleton'>>()
+  })
+
+  it('SpecMap with explicit kind sets every entry to that kind', () => {
+    type M = SpecMap<{req: {id: string}}, 'scoped'>
+    expectTypeOf<M['req']>().toEqualTypeOf<Spec<{id: string}, 'scoped'>>()
+  })
+
+  it('Container.Resolve unwraps Spec back to a flat shape', () => {
+    const builder = new Container()
+      .registerValue('cfg', {port: 8080})
+      .registerClass('logger', L, [])
+    type Flat = Container.Resolve<typeof builder>
+    expectTypeOf<Flat['logger']>().toEqualTypeOf<L>()
+    expectTypeOf<Flat['cfg']>().toEqualTypeOf<{port: number}>()
   })
 })
