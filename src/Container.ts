@@ -283,27 +283,29 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * ```
    */
   public registerClass<
-    K extends string | symbol,
+    const K extends string | symbol,
     V,
-    A extends readonly unknown[]
+    A extends readonly unknown[],
+    const D extends DepsOf<T, A>
   >(
-    key: Exclude<K, keyof T>,
-    Ctor: new (...args: A) => NoInfer<V>,
-    deps: NoInfer<DepsOf<T, A>>,
+    key: K & ([K] extends [keyof T] ? never : unknown),
+    Ctor: new (...args: A) => V,
+    deps: D,
     kind?: RegistrationKind
   ): Container<T & Record<K, V>>
 
   public registerClass<
-    K extends string | symbol,
+    const K extends string | symbol,
     V,
     A extends readonly unknown[],
-    LK extends string | symbol
+    const D extends DepsOf<T, A>,
+    const LK extends string | symbol
   >(
-    key: Exclude<K, keyof T>,
-    Ctor: new (...args: A) => NoInfer<V>,
-    deps: NoInfer<DepsOf<T, A>>,
+    key: K & ([K] extends [keyof T] ? never : unknown),
+    Ctor: new (...args: A) => V,
+    deps: D,
     kind: RegistrationKind | undefined,
-    lazyKey: Exclude<LK, keyof T | K>
+    lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
   ): Container<T & Record<K, V> & Record<LK, Lazy<V>>>
 
   public registerClass<V>(
@@ -459,9 +461,9 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    *   })
    * ```
    */
-  public registerFactory<K extends string | symbol, V>(
-    key: Exclude<K, keyof T>,
-    factory: (c: Container<T>) => NoInfer<V>,
+  public registerFactory<const K extends string | symbol, V>(
+    key: K & ([K] extends [keyof T] ? never : unknown),
+    factory: (c: Container<T>) => V,
     kind: RegistrationKind = 'singleton',
   ): Container<T & Record<K, V>> {
     this.regs.set(
@@ -498,8 +500,8 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    *   .registerValue('startedAt', Date.now())
    * ```
    */
-  public registerValue<K extends string | symbol, const V>(
-    key: Exclude<K, keyof T>,
+  public registerValue<const K extends string | symbol, const V>(
+    key: K & ([K] extends [keyof T] ? never : unknown),
     value: V,
   ): Container<T & Record<K, V>> {
     // The value is external — it does not enter `owned`, dispose is not called on it.
