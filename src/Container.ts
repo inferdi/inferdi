@@ -639,6 +639,25 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    *     return new Pool({ connectionString: dsn, max: poolSize })
    *   })
    * ```
+   *
+   * @example
+   * ```ts
+   * // Async factories are first-class. The factory's returned Promise is cached
+   * // verbatim, so `c.get(key)` synchronously returns the same Promise to every
+   * // concurrent caller — the initialization runs exactly once. Callers await it.
+   * // On `dispose()` the container unwraps the Promise and probes the resolved
+   * // instance for [Symbol.asyncDispose] / [Symbol.dispose] / .dispose(). Sync
+   * // teardown (`using`) on an async-cached resource is a misuse and throws —
+   * // use `await using` / `await container.dispose()`.
+   * const c = new Container()
+   *   .registerValue('dsn', 'postgres://localhost/app')
+   *   .registerFactory('db', async (c) => {
+   *     const pool = new Pool({ connectionString: c.get('dsn') })
+   *     await pool.connect()
+   *     return pool
+   *   })
+   * const db = await c.get('db')
+   * ```
    */
   public registerFactory<
     const K extends string | symbol,
@@ -1140,6 +1159,8 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   /**
    * Async teardown. Walks created instances in reverse order (LIFO), trying
    * Symbol.asyncDispose → Symbol.dispose → plain .dispose().
+   * Promises cached by async factories are awaited first, and the probe runs
+   * against the resolved instance; a rejection joins the same error stream.
    * Errors do not break the chain — they are collected and re-thrown as an
    * AggregateError at the end, so a single failing resource does not leave the
    * rest unclosed. Repeated calls are a no-op (idempotent).
@@ -1170,7 +1191,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     const errors: unknown[] = []
 
     for (let i = instances.length - 1; i >= 0; i--) {
-      const inst = instances[i]
+      let inst = instances[i] as DisposableLike | PromiseLike<DisposableLike | null | undefined> | null | undefined
 
       // Defensive: `owned` only ever inserts real instances in
       // get(); a null/undefined element is unreachable in practice. The check
@@ -1182,12 +1203,23 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       }
 
       try {
-        if (typeof inst[Symbol.asyncDispose] === 'function') {
-          await inst[Symbol.asyncDispose]!()
-        } else if (typeof inst[Symbol.dispose] === 'function') {
-          inst[Symbol.dispose]!()
-        } else if (typeof inst.dispose === 'function') {
-          const r = inst.dispose()
+        // Async factories cache a Promise in `owned`. Unwrap it before the
+        // disposer probe so the resolved instance's [Symbol.asyncDispose] /
+        // [Symbol.dispose] / .dispose() actually fires. A rejection here
+        // throws into the same `errors.push(err)` path as a throwing disposer.
+        // Duck-typed `.then` matches any PromiseLike — not bound to the global
+        // Promise so polyfills and custom thenables also unwrap.
+        if (typeof (inst as { then?: unknown }).then === 'function') {
+          inst = await (inst as PromiseLike<DisposableLike | null | undefined>)
+          if (inst == null) continue
+        }
+
+        if (typeof (inst as DisposableLike)[Symbol.asyncDispose] === 'function') {
+          await (inst as DisposableLike)[Symbol.asyncDispose]!()
+        } else if (typeof (inst as DisposableLike)[Symbol.dispose] === 'function') {
+          (inst as DisposableLike)[Symbol.dispose]!()
+        } else if (typeof (inst as DisposableLike).dispose === 'function') {
+          const r = (inst as DisposableLike).dispose!()
           if (r != null && typeof (r as { then?: unknown }).then === 'function') {
             await r
           }
@@ -1227,6 +1259,9 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * Instances with ONLY Symbol.asyncDispose are skipped — they need `await using`.
    * A plain .dispose() is invoked; if it returns a Promise, the rejection is suppressed
    * (otherwise it would surface as an unhandledRejection) but is not awaited.
+   * A Promise cached from an async factory cannot be awaited synchronously: the
+   * misuse is recorded as an Error in the teardown errors and the resource is
+   * left unclosed — use `await using` / `await container.dispose()` instead.
    */
   public [Symbol.dispose](): void {
     if (this._disposed) {
@@ -1259,7 +1294,17 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       }
 
       try {
-        if (typeof inst[Symbol.dispose] === 'function') {
+        // A Promise cached from an async factory cannot be awaited synchronously.
+        // Record the misuse — sync teardown is the wrong protocol here. The resource
+        // will not be closed; correct usage is `await using` / container.dispose().
+        // We deliberately do not fire a background cleanup: that would amount to
+        // "silently fix the misuse", which hides the bug.
+        if (typeof (inst as { then?: unknown }).then === 'function') {
+          errors.push(new Error(
+            `Sync [Symbol.dispose] called on a container that cached a Promise from an ` +
+            `async factory. Use \`await using\` / container.dispose() for async teardown.`,
+          ))
+        } else if (typeof inst[Symbol.dispose] === 'function') {
           inst[Symbol.dispose]!()
         } else if (typeof inst.dispose === 'function') {
           const r = inst.dispose()

@@ -505,6 +505,200 @@ describe('Phase 3 — symbol keys', () => {
   })
 })
 
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 3 — async-factory Promise unwrap
+//
+// Async factories cache a Promise in `owned`. The async dispose() awaits it
+// before probing the resolved instance for the disposer protocol; sync
+// [Symbol.dispose] cannot await and surfaces the misuse as an Error.
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('Phase 3 — async-factory Promise unwrap', () => {
+  let rejections: unknown[] = []
+  let handler: (reason: unknown) => void
+
+  beforeEach(() => {
+    rejections = []
+    handler = (reason) => rejections.push(reason)
+    process.on('unhandledRejection', handler)
+  })
+
+  afterEach(() => {
+    process.off('unhandledRejection', handler)
+  })
+
+  it('async dispose unwraps Promise<TrackableAsync> and calls [Symbol.asyncDispose]', async () => {
+    const inst = new TrackableAsync()
+    const c = new Container().registerFactory('r', async () => inst)
+    c.get('r')
+
+    await c.dispose()
+
+    expect(inst.asyncDisposeCalls).toBe(1)
+  })
+
+  it('async dispose unwraps Promise<TrackableSync> and calls [Symbol.dispose]', async () => {
+    const inst = new TrackableSync()
+    const c = new Container().registerFactory('r', async () => inst)
+    c.get('r')
+
+    await c.dispose()
+
+    expect(inst.disposeCalls).toBe(1)
+  })
+
+  it('async dispose unwraps Promise<TrackablePlain> and calls .dispose()', async () => {
+    const inst = new TrackablePlain()
+    const c = new Container().registerFactory('r', async () => inst)
+    c.get('r')
+
+    await c.dispose()
+
+    expect(inst.disposeCalls).toBe(1)
+  })
+
+  it('async dispose unwraps Promise<TrackableAsyncPlain> and awaits the plain async dispose()', async () => {
+    const inst = new TrackableAsyncPlain()
+    const c = new Container().registerFactory('r', async () => inst)
+    c.get('r')
+
+    await c.dispose()
+
+    expect(inst.disposeCalls).toBe(1)
+    expect(rejections).toHaveLength(0)
+  })
+
+  it('async dispose: Promise<null> from async factory is skipped without error', async () => {
+    const c = new Container().registerFactory('r', async () => null)
+    c.get('r')
+
+    await expect(c.dispose()).resolves.toBeUndefined()
+    expect(c.disposed).toBe(true)
+  })
+
+  it('async dispose: Promise<undefined> from async factory is skipped without error', async () => {
+    const c = new Container().registerFactory('r', async () => undefined)
+    c.get('r')
+
+    await expect(c.dispose()).resolves.toBeUndefined()
+    expect(c.disposed).toBe(true)
+  })
+
+  it('async dispose: rejecting async factory — rejection propagates as the single error', async () => {
+    const c = new Container().registerFactory('r', () =>
+      Promise.reject(new Error('factory-boom')) as Promise<TrackableAsync>,
+    )
+    c.get('r')
+
+    await expect(c.dispose()).rejects.toThrow('factory-boom')
+  })
+
+  it('async dispose: rejecting async factory + throwing sync resource — AggregateError aggregates both', async () => {
+    const c = new Container()
+      .registerFactory('rej', () =>
+        Promise.reject(new Error('factory-boom')) as Promise<TrackableAsync>,
+      )
+      .registerFactory('thr', () => new Throwing('disposer-boom'))
+
+    c.get('rej')
+    c.get('thr')
+
+    let caught: unknown = null
+    try {
+      await c.dispose()
+    } catch (err) {
+      caught = err
+    }
+
+    expect(caught).toBeInstanceOf(AggregateError)
+    const agg = caught as AggregateError
+    expect(agg.errors).toHaveLength(2)
+    expect(agg.errors.map((e: Error) => e.message).sort()).toEqual(['disposer-boom', 'factory-boom'])
+  })
+
+  it('async dispose: LIFO order is preserved across a mix of sync and async-cached resources', async () => {
+    const log: string[] = []
+    const c = new Container()
+      .registerFactory('a', () => new OrderedDisposable('A', log))
+      .registerFactory('b', async () => new OrderedDisposable('B', log))
+      .registerFactory('cc', () => new OrderedDisposable('C', log))
+
+    c.get('a')
+    c.get('b')
+    c.get('cc')
+
+    await c.dispose()
+
+    expect(log).toEqual(['C', 'B', 'A'])
+  })
+
+  it('async dispose: shared Promise reference under two keys — dispose runs exactly once', async () => {
+    const inst = new TrackableAsync()
+    const shared = Promise.resolve(inst)
+    const c = new Container()
+      .registerFactory('a', () => shared)
+      .registerFactory('b', () => shared)
+
+    c.get('a')
+    c.get('b')
+
+    await c.dispose()
+
+    expect(inst.asyncDisposeCalls).toBe(1)
+  })
+
+  it('async dispose: resolved instance throws inside [Symbol.asyncDispose] — error is collected', async () => {
+    const c = new Container().registerFactory('r', async () => new Throwing('post-await-boom'))
+    c.get('r')
+
+    await expect(c.dispose()).rejects.toThrow('post-await-boom')
+  })
+
+  it('[Symbol.dispose] on a container with a Promise-cached resource — throws misuse error', () => {
+    const c = new Container().registerFactory('r', async () => new TrackableAsync())
+    c.get('r')
+
+    expect(() => c[Symbol.dispose]()).toThrow(/await using/i)
+    expect(c.disposed).toBe(true)
+  })
+
+  it('[Symbol.dispose] on a Promise-cached resource leaves a working sync resource closed', () => {
+    const okSync = new TrackableSync()
+    const c = new Container()
+      .registerFactory('async', async () => new TrackableAsync())
+      .registerFactory('sync', () => okSync)
+
+    c.get('async')
+    c.get('sync')
+
+    expect(() => c[Symbol.dispose]()).toThrow(/await using/i)
+    expect(okSync.disposeCalls).toBe(1)
+  })
+
+  it('[Symbol.dispose] on two Promise-cached resources — AggregateError with two misuse errors', () => {
+    const c = new Container()
+      .registerFactory('a', async () => new TrackableAsync())
+      .registerFactory('b', async () => new TrackableAsync())
+
+    c.get('a')
+    c.get('b')
+
+    let caught: unknown = null
+    try {
+      c[Symbol.dispose]()
+    } catch (err) {
+      caught = err
+    }
+
+    expect(caught).toBeInstanceOf(AggregateError)
+    const agg = caught as AggregateError
+    expect(agg.errors).toHaveLength(2)
+    for (const e of agg.errors) {
+      expect((e as Error).message).toMatch(/await using/i)
+    }
+  })
+})
+
 describe('Phase 3 — TC39 using / await using', () => {
   it('await using correctly invokes asyncDispose on block exit', async () => {
     const inst = new TrackableAsync()

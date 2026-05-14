@@ -481,3 +481,12 @@ describe('Phase 8 — Spec / SpecMap helpers', () => {
     expectTypeOf<Flat['cfg']>().toEqualTypeOf<{port: number}>()
   })
 })
+
+describe('Phase 4 — async-factory inference', () => {
+  it('async factory: get() returns Promise<V>; no implicit Awaited unwrap', () => {
+    // The container caches the factory's return value verbatim. An async factory
+    // produces `Promise<V>` — `get()` returns that same Promise, callers await.
+    const c = new Container().registerFactory('db', async () => new L())
+    expectTypeOf(c.get('db')).toEqualTypeOf<Promise<L>>()
+  })
+})

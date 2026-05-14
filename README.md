@@ -278,6 +278,25 @@ try {
 }
 ```
 
+### Async Factories
+
+Factories can be async without any special API. The factory's `Promise` is cached verbatim, so every concurrent `c.get(key)` sees the same in-flight Promise — initialization runs exactly once even under request bursts (Edge functions, serverless cold starts). Callers `await` the value at the use site. On `await container.dispose()` the container unwraps the Promise and probes the resolved instance for the disposer protocol; rejections fold into the same `AggregateError` as any other teardown error. Sync `using` on a container that cached a Promise is a misuse — use `await using` / `await container.dispose()`.
+
+```ts
+const c = new Container()
+  .registerValue('dsn', 'postgres://localhost/app')
+  .registerFactory('db', async (c) => {
+    const pool = new Pool({ connectionString: c.get('dsn') })
+    await pool.connect()
+    return pool
+  })
+
+// Concurrent callers share the same in-flight Promise — no race, one connect.
+const [a, b] = await Promise.all([c.get('db'), c.get('db')])
+
+await c.dispose() // unwraps the cached Promise and closes the pool
+```
+
 ## Strict Lifetime Guards
 
 | Kind        | Created                                         | Cached on                | Disposed by container |
