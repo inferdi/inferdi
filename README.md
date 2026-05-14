@@ -1,6 +1,6 @@
 # InferDI
 
-![npm version](https://img.shields.io/npm/v/@inferdi/inferdi.svg)
+[![npm version](https://img.shields.io/npm/v/@inferdi/inferdi)](https://www.npmjs.com/package/@inferdi/inferdi)
 ![npm package minimized gzipped size](https://img.shields.io/bundlejs/size/%40inferdi%2Finferdi)
 ![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)
 [![codecov](https://codecov.io/gh/inferdi/inferdi/graph/badge.svg?token=IHAXLIFHF3)](https://codecov.io/gh/inferdi/inferdi)
@@ -15,7 +15,7 @@ Build your dependency graph using a fluent API that infers types automatically, 
 Legacy DI is slow, bloated with decorators, and prone to memory leaks. **InferDI is built for 2026:** it’s ruthlessly fast, strictly typed, and built for the modern edge.
 
 - ☁️ **Zero-Weight Edge Native**  
-  Just 2KB gzipped. Zero dependencies. The perfect fit for all serverless platforms, including Cloudflare Workers, Vercel Edge, Deno Deploy, and Supabase. While other frameworks trigger cold starts, InferDI is already running.
+  Just 2.1KB gzipped. Zero dependencies. The perfect fit for all serverless platforms, including Cloudflare Workers, Vercel Edge, Deno Deploy, and Supabase. While other frameworks trigger cold starts, InferDI is already running.
 
 - ⚡ **Raw Engine Speed**  
   Built to outperform the competition. Highly optimized for V8 and JSC inline caching. It doesn't just resolve dependencies — it executes at native engine speed.
@@ -34,7 +34,7 @@ Legacy DI is slow, bloated with decorators, and prone to memory leaks. **InferDI
 
 ## Performance
 
-InferDI is built for raw engine speed. Static type checking instead of runtime reflection, no `Proxy` traps on resolve, and arity-unrolled constructor calls (0–4 args take a direct `new Ctor(...)` path) translate into measurable wins across every common DI workload.
+InferDI is built for raw engine speed. Static type checking instead of runtime reflection, no `Proxy` traps on resolve, and arity-unrolled constructor calls (0–7 args take a direct `new Ctor(...)` path) translate into measurable wins across every common DI workload.
 
 The repository ships a comprehensive benchmark suite in [`benchmarks/`](./benchmarks) comparing InferDI against the five widely used TypeScript DI containers — **InversifyJS v8, Awilix v13 (both PROXY and CLASSIC modes), TSyringe v4, TypeDI v0.10, and Typed Inject v5**. All numbers below are operations per second on Node 22 — higher is better. Reproduce locally with `cd benchmarks && npm install && npm run bench`.
 
@@ -55,7 +55,7 @@ The repository ships a comprehensive benchmark suite in [`benchmarks/`](./benchm
 
 - **~2× faster on the hot path** than every competitor. A cached singleton resolve in InferDI effectively reduces to a hot `Map.get()` fast path — no Proxy, no metadata lookup, no parent-chain walk for warm services.
 - **30× faster than InversifyJS and 48× faster than Awilix** at building a fresh container with a 30+ key graph and resolving its first service. Registration is a flat `Map.set` per service — no fluent-builder chains, no AST parsing of constructor signatures, no decorator side-effects to apply.
-- **Wide-graph leadership confirms the arity-unrolling fast path:** for 4 dependencies V8 inlines the direct `new Ctor(a, b, c, d)` call instead of going through `Reflect.construct`. Even at 10 dependencies — where InferDI falls back to `Reflect.construct` — it stays **1.35× ahead** of the next-fastest non-reflection-based competitor (Typed Inject) and up to **3.5× ahead** of reflection-based containers.
+- **Wide-graph leadership confirms the arity-unrolling fast path:** for up to 7 dependencies V8 inlines the direct `new Ctor(...)` call instead of going through `Reflect.construct`. Even at 10 dependencies — where InferDI falls back to `Reflect.construct` — it stays **1.35× ahead** of the next-fastest non-reflection-based competitor (Typed Inject) and up to **3.5× ahead** of reflection-based containers.
 - **Clean sweep across all eight scenarios.** InferDI now leads every workload, including the previously close ones: the deep-graph 10-level chain (**1.44× over Typed Inject**) and the scope lifecycle (Scenario 6, **1.11× over Typed Inject**) — while including a synchronous `Symbol.dispose` on every iteration of the latter and beating InversifyJS by **94×**.
 - **Typed Inject is the strongest non-InferDI baseline.** Its compile-time-known graph and `static inject = [...] as const` design let it close the gap on deep graphs and scoped flows where reflection-based containers fall apart. InferDI still pulls ahead in every scenario, but the proximity is real and worth crediting.
 - **Scenario 5 caveat:** decorator-based libraries (TypeDI, TSyringe) register classes at *import time* via decorator side-effects, so their registration cost is paid during module evaluation — what's measured for them at "build time" is only child-context creation. InferDI still beats them while registering an entire graph from scratch in under 3 μs.
@@ -74,8 +74,10 @@ Full methodology, fairness notes, fixture sources, and per-scenario reasoning: s
 - [Lazy Injection](#lazy-injection)
 - [Symbol Keys](#symbol-keys)
 - [Modularity with `.use()`](#modularity-with-use)
+- [Querying with `.has()`](#querying-with-has)
 - [Test Overrides](#test-overrides)
 - [Typing a Built Container — `Container.Resolve<C>`](#typing-a-built-container--containerresolvec)
+- [Provider Maps — `Container.Providers<C>`](#provider-maps--containerprovidersc)
 - [Errors](#errors)
 - [Migration](#migration)
 - [API Summary](#api-summary)
@@ -523,6 +525,22 @@ const fixture = new Container()
 
 > **Why no portable generic modules?** A function like `<T>(c: Container<T>) => c.registerClass('db', ...)` cannot type-check inside the body — `keyof T` collapses to `string` from the `DependenciesMap` upper bound and `Exclude<'db', string>` becomes `never`, blocking the call. This is the cost of the compile-time uniqueness guarantee on registration. Use inline lambdas for one-shot grouping; use `Module<TIn, TOut>` when input shape is known.
 
+## Querying with `.has()`
+
+`.has(key)` is a type-guard predicate: it returns `true` if `key` is registered on this container or any ancestor scope, and narrows the key to `keyof T` inside the truthy branch. The walk-up matches `.get()` exactly, but `.has()` is a pure observer — it never resolves the value and never throws. On a disposed container, `.has()` returns `false` for every key (the container's `regs` map is cleared by `dispose()`, so this is the literal truth).
+
+```ts
+declare const c: Container<{ logger: Spec<Logger> }>
+
+if (c.has('logger')) {
+  c.get('logger').log('ok')   // narrowed to Logger inside the branch
+}
+
+c.has('missing')   // false — does not throw
+```
+
+For statically known keys, you don't need `.has()` — TypeScript already rejects unknown keys at compile time, so `.get()` is the direct path. Reach for `.has()` when the key is genuinely dynamic (e.g., constructed from runtime input) and you need a safe probe.
+
 ## Test Overrides
 
 In tests you almost always need to swap a real dependency for a mock. The `Exclude<K, keyof T>` guard on every `register*` method intentionally prevents re-registering a key in production — but in tests it gets in the way. Use `.override(key, value)`:
@@ -584,6 +602,28 @@ function buildHandler(c: AppContainer) {
 ```
 
 This pattern keeps registration (the builder) and consumption (handlers, tests) in separate places without duplicating type information.
+
+## Provider Maps — `Container.Providers<C>`
+
+For tests that build a mock fixture as a record of zero-arg factories, `Container.Providers<C>` flattens the built container into `{ [K in keyof T]: () => T[K] }`. The compiler then enforces that every registered key is covered with a thunk returning the right shape — extraneous keys and missing keys are both surfaced as type errors.
+
+```ts
+import { Container } from '@inferdi/inferdi'
+
+function buildContainer() {
+  return new Container()
+    .registerClass('logger', Logger, [])
+    .registerClass('clock', Clock, [], 'transient', 'clockLazy')
+}
+
+const mocks: Container.Providers<ReturnType<typeof buildContainer>> = {
+  logger:    () => mockLogger,
+  clock:     () => mockClock,
+  clockLazy: () => ({ get: () => mockClock }),   // Lazy<Clock> shape
+}
+```
+
+The lazy companion's entry returns the `Lazy<V>` wrapper (`{ get: () => V }`), not the unwrapped value — this matches the container's actual registration shape.
 
 ## Errors
 
@@ -673,6 +713,9 @@ class Container<T extends DependenciesMap = Record<never, never>> {
   // Scopes & resolution
   createScope(): Container<T>
   get<K extends keyof T>(key: K): T[K]['type']
+  // Type-guard: narrows the key to keyof T inside the truthy branch.
+  // Returns false on a disposed container (regs is empty).
+  has<K extends string | symbol>(key: K): key is K & keyof T
 
   // Lifecycle
   get disposed(): boolean
@@ -700,6 +743,13 @@ namespace Container {
   //   const mock: Container.UnwrappedValue<typeof c, 'clockLazy'> = { now: () => 0 }
   //   c.override('clockLazy', { get: () => mock })
   type UnwrappedValue<C, K extends keyof Resolve<C>> = ResolveUnwrapped<C>[K]
+
+  // Flatten a built container into a record of zero-arg provider thunks,
+  // one per registered key. Lazy<V> companion entries keep the wrapper shape.
+  // Useful for typing mock-factory fixtures in tests.
+  type Providers<C> = C extends Container<infer U>
+    ? { [K in keyof U]: () => U[K]['type'] }
+    : never
 }
 
 // Public types

@@ -372,7 +372,7 @@ describe('deep graph: symbol keys', () => {
 
 // ────────────────────────────────────────────────────────────────────────────
 // Mixed fan-out — string + symbol deps in the same constructor. Targets the
-// arity-tail loop (5+ deps). If V8's `c.get(keys[i])` IC degrades from
+// explicitly unrolled 5-ary branch. If V8's `c.get(keys[i])` IC degrades from
 // monomorphic to polymorphic in mixed key shapes, this bench surfaces it.
 // ────────────────────────────────────────────────────────────────────────────
 

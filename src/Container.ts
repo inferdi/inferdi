@@ -1038,6 +1038,58 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     return this.resolveWithOwnerAndReg(target, reg, key)
   }
 
+  /**
+   * Type-guard predicate: returns `true` if `key` is registered on this
+   * container or any ancestor scope, `false` otherwise. Walks the parent
+   * chain exactly like {@link Container.get}, but does not consult
+   * `lookupCache` — `.has()` is a cold-path query, so the extra read is not
+   * worth populating a cache designed for hot resolves.
+   *
+   * **Behaviour on a disposed container.** A disposed container clears `regs`
+   * and nulls `parent`, so `.has()` returns `false` for every key after
+   * dispose. This is symmetric with the {@link disposed} getter — both are
+   * pure observers, neither throws — and matches the runtime truth: a
+   * disposed container literally no longer knows any key.
+   *
+   * The signature is a TypeScript type-guard: inside `if (c.has('x'))` the
+   * compiler narrows `'x'` to `keyof T`, so a subsequent `c.get('x')` type-
+   * checks even when the static `T` did not statically include `'x'`.
+   *
+   * Note that calling `.has(k)` immediately before `.get(k)` walks the
+   * parent chain twice. For statically-known keys (the common case), prefer
+   * a direct `.get()` — TypeScript already rejects unknown keys at compile
+   * time. The type-guard is intended for genuinely dynamic key construction.
+   *
+   * @template K - Any string-or-symbol key. The guard narrows it to `keyof T`.
+   *
+   * @param key - The candidate key.
+   * @returns `true` if the key is reachable through the scope chain.
+   *
+   * @example
+   * ```ts
+   * declare const c: Container<{ logger: Spec<Logger> }>
+   *
+   * if (c.has('logger')) {
+   *   c.get('logger').log('ok')  // narrowed to Logger inside the branch
+   * }
+   *
+   * c.has('missing')   // false — does not throw
+   * ```
+   */
+  public has<K extends string | symbol>(key: K): key is K & keyof T {
+    if (this.regs.has(key as unknown as keyof T)) {
+      return true
+    }
+    let cur: Container<T> | undefined = this.parent
+    while (cur !== undefined) {
+      if (cur.regs.has(key as unknown as keyof T)) {
+        return true
+      }
+      cur = cur.parent
+    }
+    return false
+  }
+
   // Shared resolution path used both for self-resolves (owner === this) and for
   // delegated singleton resolves (owner !== this). The split avoids the previous
   // `owner.get(key)` re-entry, which paid for a full second walk-up on every
@@ -1417,4 +1469,37 @@ export namespace Container {
    * ```
    */
   export type UnwrappedValue<C, K extends keyof Resolve<C>> = ResolveUnwrapped<C>[K]
+
+  /**
+   * Flattens a built container into a record of zero-argument **provider**
+   * functions, one per registered key. Each provider returns the service type
+   * as exposed by {@link Resolve} — for keys registered with a `lazyKey`
+   * companion the corresponding entry returns the `Lazy<V>` wrapper shape
+   * (`{ get: () => V }`), not the unwrapped service.
+   *
+   * Designed for typing mock-factory fixtures in tests: write the fixture as
+   * `Container.Providers<typeof builder>` and the compiler enforces that every
+   * registered key is covered with a thunk returning the correct shape.
+   *
+   * @template C - A `Container<T>` type, typically obtained as
+   *               `ReturnType<typeof buildContainer>`.
+   *
+   * @example
+   * ```ts
+   * function buildContainer() {
+   *   return new Container()
+   *     .registerClass('logger', Logger, [])
+   *     .registerClass('clock', Clock, [], 'transient', 'clockLazy')
+   * }
+   *
+   * const mocks: Container.Providers<ReturnType<typeof buildContainer>> = {
+   *   logger:    () => mockLogger,
+   *   clock:     () => mockClock,
+   *   clockLazy: () => ({ get: () => mockClock }),  // Lazy<Clock> shape
+   * }
+   * ```
+   */
+  export type Providers<C> = C extends Container<infer U>
+    ? { [K in keyof U]: () => U[K]['type'] }
+    : never
 }

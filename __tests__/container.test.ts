@@ -31,9 +31,9 @@ describe('Phase 1 — Functional', () => {
     })
   })
 
-  // Arity unrolling in Container.registerClass — separate branches for len === 0..4
-  // and the tail (len >= 5) via Reflect.construct. len === 0 and 1 are already
-  // covered above (ConsoleLogger / Service); here we cover 2, 3, 4 and the tail.
+  // Arity unrolling in Container.registerClass — separate branches for len === 0..7
+  // and the tail (len >= 8) via Reflect.construct. len === 0 and 1 are already
+  // covered above (ConsoleLogger / Service); here we cover 2..7 and the tail.
   describe('arity unrolling — all JIT-optimization branches', () => {
     it('len === 2: both args are passed in the right order', () => {
       class Two {
@@ -105,7 +105,7 @@ describe('Phase 1 — Functional', () => {
       expect([inst.a, inst.b, inst.c, inst.d, inst.e]).toEqual([1, 2, 3, 4, 5])
     })
 
-    it('len === 6: tail branch with higher arity (stability)', () => {
+    it('len === 6: explicitly unrolled arity 6', () => {
       class Six {
         constructor(
           public a: number,
@@ -1305,6 +1305,79 @@ describe('Phase 9 — strict: false', () => {
     c.get('a')
     c.get('b')
     expect((c as unknown as {owned: unknown[]}).owned.length).toBe(1)
+  })
+})
+
+// ────────────────────────────────────────────────────────────────────────────
+// Phase 10 — has
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('Phase 10 — has', () => {
+  it('returns true for a locally registered key', () => {
+    const c = new Container().registerValue('x', 1)
+    expect(c.has('x')).toBe(true)
+  })
+
+  it('returns true for a key registered on an ancestor (walk-up)', () => {
+    const root = new Container().registerClass('logger', ConsoleLogger, [])
+    const child = root.createScope()
+    expect(child.has('logger')).toBe(true)
+  })
+
+  it('walks across multiple intermediate scopes to find the key', () => {
+    // root → middle → leaf; key lives on root, both middle and leaf are pass-through.
+    // Exercises the `cur = cur.parent` advance step inside the walk-up loop.
+    const root = new Container().registerClass('logger', ConsoleLogger, [])
+    const middle = root.createScope()
+    const leaf = middle.createScope()
+    expect(leaf.has('logger')).toBe(true)
+  })
+
+  it('returns false when no scope in the chain holds the key', () => {
+    const root = new Container().registerValue('known', 1)
+    const middle = root.createScope()
+    const leaf = middle.createScope()
+    expect(leaf.has('missing')).toBe(false)
+  })
+
+  it('returns false for an unregistered key — does not throw', () => {
+    const c = new Container().registerValue('known', 1)
+    expect(c.has('nope')).toBe(false)
+  })
+
+  it('returns false after the container has been disposed', async () => {
+    const c = new Container().registerValue('x', 1)
+    await c.dispose()
+    expect(c.has('x')).toBe(false)
+  })
+
+  it('returns false on a disposed scope even when root still holds the key', async () => {
+    const root = new Container().registerClass('logger', ConsoleLogger, [])
+    const scope = root.createScope()
+    await scope.dispose()
+    expect(scope.has('logger')).toBe(false)
+    // The root is still live.
+    expect(root.has('logger')).toBe(true)
+  })
+
+  it('does not resolve the key — get() afterwards still cleanly creates the instance', () => {
+    const root = new Container().registerClass('logger', ConsoleLogger, [])
+    const child = root.createScope()
+
+    expect(child.has('logger')).toBe(true)
+    // has() must not populate `owned` on either container.
+    expect((root as unknown as {owned: unknown[]}).owned).toHaveLength(0)
+    expect((child as unknown as {owned: unknown[]}).owned).toHaveLength(0)
+
+    // get() resolves correctly and the instance is owned by the root (singleton).
+    const inst = child.get('logger')
+    expect((root as unknown as {owned: unknown[]}).owned).toContain(inst)
+    expect((child as unknown as {owned: unknown[]}).owned).toHaveLength(0)
+  })
+
+  it('returns true for registerValue with an explicit undefined value', () => {
+    const c = new Container().registerValue('maybe', undefined)
+    expect(c.has('maybe')).toBe(true)
   })
 })
 

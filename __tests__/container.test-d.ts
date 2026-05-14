@@ -490,3 +490,75 @@ describe('Phase 4 — async-factory inference', () => {
     expectTypeOf(c.get('db')).toEqualTypeOf<Promise<L>>()
   })
 })
+
+describe('Phase 4 — has type-guard', () => {
+  it('has() narrows the key type inside the truthy branch', () => {
+    const c = new Container().registerClass('logger', L, [])
+    const k = 'logger' as string
+
+    if (c.has(k)) {
+      // Inside the branch k is narrowed to keyof T, so get() type-checks.
+      expectTypeOf(c.get(k)).toEqualTypeOf<L>()
+    }
+  })
+
+  it('has() accepts arbitrary string | symbol without TS error', () => {
+    const c = new Container().registerClass('logger', L, [])
+    // Dynamic key — no compile error, runtime returns false.
+    const ok: boolean = c.has('anyDynamicKey')
+    void ok
+  })
+
+  it('has() returns boolean (a type-guard, not assignment)', () => {
+    const c = new Container().registerClass('logger', L, [])
+    expectTypeOf(c.has('logger')).toEqualTypeOf<boolean>()
+  })
+})
+
+describe('Phase 4 — Container.Providers', () => {
+  it('Providers<C> maps each registered key to a zero-arg thunk returning the service', () => {
+    const c = new Container()
+      .registerClass('logger', L, [])
+      .registerClass('repo', UserRepoImpl, [])
+    type P = Container.Providers<typeof c>
+
+    expectTypeOf<P['logger']>().toEqualTypeOf<() => L>()
+    expectTypeOf<P['repo']>().toEqualTypeOf<() => UserRepoImpl>()
+  })
+
+  it('Providers<C> preserves Lazy<V> wrapper shape for lazy-companion keys', () => {
+    const c = new Container()
+      .registerClass('clock', L, [], 'transient', 'clockLazy')
+    type P = Container.Providers<typeof c>
+
+    expectTypeOf<P['clock']>().toEqualTypeOf<() => L>()
+    // The companion's provider returns the Lazy<L> wrapper, not L directly —
+    // matches the registered shape.
+    expectTypeOf<P['clockLazy']>().toEqualTypeOf<() => Lazy<L>>()
+  })
+
+  it('Providers<C> rejects an extraneous key', () => {
+    const c = new Container().registerClass('logger', L, [])
+    // @ts-expect-error — 'extra' is not in keyof T
+    const _bad: Container.Providers<typeof c> = {
+      logger: () => new L(),
+      extra: () => new L(),
+    }
+    void _bad
+  })
+
+  it('Providers<C> rejects a missing key', () => {
+    const c = new Container()
+      .registerClass('logger', L, [])
+      .registerClass('repo', UserRepoImpl, [])
+    // @ts-expect-error — 'repo' is required
+    const _bad: Container.Providers<typeof c> = {
+      logger: () => new L(),
+    }
+    void _bad
+  })
+
+  it('Providers<C> resolves to never for non-Container types', () => {
+    expectTypeOf<Container.Providers<string>>().toEqualTypeOf<never>()
+  })
+})
