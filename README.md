@@ -1,5 +1,6 @@
 # InferDI
 
+[![JSR](https://jsr.io/badges/@inferdi/inferdi)](https://jsr.io/@inferdi/inferdi)
 [![npm version](https://img.shields.io/npm/v/@inferdi/inferdi)](https://www.npmjs.com/package/@inferdi/inferdi)
 ![npm package minimized gzipped size](https://img.shields.io/bundlejs/size/%40inferdi%2Finferdi)
 ![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)
@@ -9,6 +10,35 @@
 A zero-dependency, **decorator-free**, strongly typed DI container for modern TypeScript.
 
 Build your dependency graph using a fluent API that infers types automatically, prevents memory leaks with strict lifetime guards, and handles teardown natively via the Explicit Resource Management API (`using` / `await using`).
+
+## Table of Contents
+
+- **Getting Started**
+  - [Install](#install)
+  - [Quick Start](#quick-start)
+  - [Examples](#examples)
+- **Overview**
+  - [Why InferDI?](#why-inferdi)
+  - [Performance](#performance)
+- **Core Concepts**
+  - [Factories](#factories)
+  - [Binding Interfaces](#binding-interfaces)
+  - [Compiler-enforced Signatures](#compiler-enforced-signatures)
+  - [Scopes & Native Teardown](#scopes--native-teardown)
+  - [Strict Lifetime Guards](#strict-lifetime-guards)
+- **Advanced Usage**
+  - [Lazy Injection](#lazy-injection)
+  - [Symbol Keys](#symbol-keys)
+  - [Modularity with `.use()`](#modularity-with-use)
+  - [Querying with `.has()`](#querying-with-has)
+  - [Test Overrides](#test-overrides)
+- **Types & Reference**
+  - [Typing a Built Container — `Container.Resolve<C>`](#typing-a-built-container--containerresolvec)
+  - [Provider Maps — `Container.Providers<C>`](#provider-maps--containerprovidersc)
+  - [Errors](#errors)
+  - [Migration](#migration)
+  - [API Summary](#api-summary)
+  - [License](#license)
 
 ## Why InferDI?
 
@@ -61,27 +91,6 @@ The repository ships a comprehensive benchmark suite in [`benchmarks/`](./benchm
 - **Scenario 5 caveat:** decorator-based libraries (TypeDI, TSyringe) register classes at *import time* via decorator side-effects, so their registration cost is paid during module evaluation — what's measured for them at "build time" is only child-context creation. InferDI still beats them while registering an entire graph from scratch in under 3 μs.
 
 Full methodology, fairness notes, fixture sources, and per-scenario reasoning: see [`benchmarks/README.md`](./benchmarks/README.md).
-
-## Table of Contents
-
-- [Install](#install)
-- [Quick Start](#quick-start)
-- [Factories](#factories)
-- [Binding Interfaces](#binding-interfaces)
-- [Compiler-enforced Signatures](#compiler-enforced-signatures)
-- [Scopes & Native Teardown](#scopes--native-teardown)
-- [Strict Lifetime Guards](#strict-lifetime-guards)
-- [Lazy Injection](#lazy-injection)
-- [Symbol Keys](#symbol-keys)
-- [Modularity with `.use()`](#modularity-with-use)
-- [Querying with `.has()`](#querying-with-has)
-- [Test Overrides](#test-overrides)
-- [Typing a Built Container — `Container.Resolve<C>`](#typing-a-built-container--containerresolvec)
-- [Provider Maps — `Container.Providers<C>`](#provider-maps--containerprovidersc)
-- [Errors](#errors)
-- [Migration](#migration)
-- [API Summary](#api-summary)
-- [License](#license)
 
 ## Install
 
@@ -170,6 +179,46 @@ container.get('userRepo').find('42')
 ```
 
 `.get(key)` is the only way to resolve a registration: it is fully typed (`K extends keyof T`), throws synchronously on a missing key, and stays out of the way at runtime — there is no Proxy overhead.
+
+## Examples
+
+The repository includes framework and runtime examples in [`examples/`](./examples). They are GitHub-only reference snippets: framework dependencies are not installed in this package, and `examples/` is excluded from the npm tarball.
+
+- **Shared foundation** — [`examples/_shared/`](./examples/_shared)
+  - [`container.ts`](./examples/_shared/container.ts) — canonical container builder used by most server examples.
+  - [`testing.ts`](./examples/_shared/testing.ts) — typed test fixtures and `override()` usage.
+- **Backend frameworks** — [`examples/backend/`](./examples/backend)
+  - [`fastify.ts`](./examples/backend/fastify.ts)
+  - [`hono.ts`](./examples/backend/hono.ts)
+  - [`elysia.ts`](./examples/backend/elysia.ts)
+  - [`express.ts`](./examples/backend/express.ts)
+  - [`koa.ts`](./examples/backend/koa.ts)
+- **API layers** — [`examples/api-layers/`](./examples/api-layers)
+  - [`trpc.ts`](./examples/api-layers/trpc.ts)
+  - [`apollo-server.ts`](./examples/api-layers/apollo-server.ts)
+  - [`graphql-yoga.ts`](./examples/api-layers/graphql-yoga.ts)
+- **Full-stack frameworks** — [`examples/fullstack/`](./examples/fullstack)
+  - [`next-app-router.ts`](./examples/fullstack/next-app-router.ts)
+  - [`remix.ts`](./examples/fullstack/remix.ts)
+- **Runtimes and edge platforms** — [`examples/runtimes-edge/`](./examples/runtimes-edge)
+  - [`node-http.ts`](./examples/runtimes-edge/node-http.ts)
+  - [`bun-serve.ts`](./examples/runtimes-edge/bun-serve.ts)
+  - [`deno-http.ts`](./examples/runtimes-edge/deno-http.ts)
+  - [`cloudflare-workers.ts`](./examples/runtimes-edge/cloudflare-workers.ts)
+  - [`vercel-edge.ts`](./examples/runtimes-edge/vercel-edge.ts)
+  - [`deno-deploy.ts`](./examples/runtimes-edge/deno-deploy.ts)
+  - [`supabase-edge-functions.ts`](./examples/runtimes-edge/supabase-edge-functions.ts)
+- **Frontend frameworks** — [`examples/frontend/`](./examples/frontend)
+  - [`react.tsx`](./examples/frontend/react.tsx)
+  - [`react-native.tsx`](./examples/frontend/react-native.tsx)
+  - [`vue.ts`](./examples/frontend/vue.ts)
+  - [`svelte.ts`](./examples/frontend/svelte.ts)
+- **Bots, queues, and CLI** — [`examples/workers-cli/`](./examples/workers-cli)
+  - [`telegraf.ts`](./examples/workers-cli/telegraf.ts)
+  - [`grammy.ts`](./examples/workers-cli/grammy.ts)
+  - [`bullmq.ts`](./examples/workers-cli/bullmq.ts)
+  - [`commander.ts`](./examples/workers-cli/commander.ts)
+  - [`yargs.ts`](./examples/workers-cli/yargs.ts)
 
 ## Factories
 
