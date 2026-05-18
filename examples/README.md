@@ -10,6 +10,7 @@ They are reference snippets for GitHub readers. The root package intentionally d
 
 ## Categories
 
+- [JavaScript usage](./javascript) - Node ESM, Node CommonJS, browser bundlers, and `// @ts-check` with JSDoc.
 - [Backend frameworks](./backend) - Fastify, Hono, Elysia, Express, Koa.
 - [API layers](./api-layers) - tRPC, Apollo Server, GraphQL Yoga.
 - [Full-stack frameworks](./fullstack) - Next.js App Router, Remix.

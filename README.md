@@ -184,6 +184,10 @@ container.get('userRepo').find('42')
 
 The repository includes framework and runtime examples in [`examples/`](./examples). They are GitHub-only reference snippets: framework dependencies are not installed in this package, and `examples/` is excluded from the npm tarball.
 
+- **JavaScript usage** — [`examples/javascript/`](./examples/javascript)
+  - [`node-esm.mjs`](./examples/javascript/node-esm.mjs) — Node ESM `import` with `// @ts-check` and JSDoc constructor types.
+  - [`node-commonjs.cjs`](./examples/javascript/node-commonjs.cjs) — Node CommonJS `require` with the same runtime wiring.
+  - [`browser-vite.js`](./examples/javascript/browser-vite.js) — browser-oriented ESM for Vite or another bundler.
 - **Shared foundation** — [`examples/_shared/`](./examples/_shared)
   - [`container.ts`](./examples/_shared/container.ts) — canonical container builder used by most server examples.
   - [`testing.ts`](./examples/_shared/testing.ts) — typed test fixtures and `override()` usage.
