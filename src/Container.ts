@@ -80,6 +80,36 @@ export interface Spec<V, K extends RegistrationKind = 'singleton'> {
 }
 
 /**
+ * Companion registration produced by the `lazyKey` parameter of `register*`.
+ * Carries the target service's lifetime in `lazyOf` so the type-level
+ * lifetime guard ({@link AllowedDeps}) can permit only `Lazy<singleton>`
+ * inside a singleton consumer — matching the runtime guard.
+ *
+ * The companion itself is always `'transient'` (the `{ get }` wrapper is
+ * cheap and caller-owned). Manual `Spec<Lazy<V>, 'transient'>` registrations
+ * (created by hand via `registerValue`/`registerFactory`) are *not*
+ * `LazySpec` — the type system treats them as plain transient values, not
+ * managed lazy companions.
+ *
+ * @template V          - The wrapped service type (the `T` in `Lazy<T>`).
+ * @template TargetKind - The lifetime kind of the underlying target service.
+ *
+ * @example
+ * ```ts
+ * import { Container, type LazySpec, type Lazy } from '@inferdi/inferdi'
+ *
+ * declare const c: Container<{
+ *   cfg:     { type: { port: number }; kind: 'singleton' }
+ *   cfgLazy: LazySpec<{ port: number }, 'singleton'>
+ * }>
+ * ```
+ */
+export interface LazySpec<V, TargetKind extends RegistrationKind>
+  extends Spec<Lazy<V>, 'transient'> {
+  readonly lazyOf: TargetKind
+}
+
+/**
  * Upper bound for the type-level "registry" carried by a {@link Container} —
  * a string-or-symbol-keyed map of {@link Spec} entries. Used as the constraint
  * on `Container<T>` and on the `TIn` / `TOut` parameters of {@link Module}.
@@ -119,16 +149,22 @@ export type SpecMap<
 
 // Filters T down to the keys that are legal to inject into a target with
 // the given TargetKind, per the runtime lifetime guard:
-//   - singleton target: only singleton entries and Lazy<*> companions are legal.
+//   - singleton target: only singleton entries and `LazySpec<*, 'singleton'>`
+//     companions are legal. `Lazy<scoped>` / `Lazy<transient>` companions
+//     remain available to scoped/transient consumers but are blocked here —
+//     `Lazy` preserves the target's lifetime, it does not lift short-lived
+//     services into singleton scope.
 //   - scoped / transient target: any entry is legal (matches runtime in get()).
-// Lazy companions are detected structurally via `Lazy<unknown>` — no special
-// `'lazy'` kind required.
+// Managed lazy companions are identified by extending {@link LazySpec}, which
+// is produced only via the `lazyKey` parameter of `register*`. A hand-rolled
+// `Spec<Lazy<V>, 'transient'>` registered via registerValue/registerFactory is
+// treated as a plain transient and is *not* singleton-safe.
 type AllowedDeps<T extends DependenciesMap, TargetKind extends RegistrationKind> =
   TargetKind extends 'singleton'
     ? {
         [K in keyof T as
             T[K]['kind'] extends 'singleton' ? K
-          : T[K]['type'] extends Lazy<unknown> ? K
+          : T[K] extends LazySpec<unknown, 'singleton'> ? K
           : never
         ]: T[K]
       }
@@ -222,12 +258,19 @@ export type Module<TIn extends DependenciesMap, TOut extends DependenciesMap> =
 
 interface Registration<T extends DependenciesMap, K extends keyof T> {
   readonly kind: RegistrationKind
-  // Marker for the lazy wrapper. Lazy<T> is registered as transient, but it is safe
-  // to inject into a singleton: fn does NOT call c.get(key) immediately — it returns
-  // a closure { get } that defers the resolve until the actual access. The instance
-  // is not captured.
-  // WARNING: if you ever change the lazy implementation — preserve this invariant,
-  // otherwise the lifetime check below will start letting real leaks slip through.
+  // Marker that excludes the entry from the singleton lifetime guard. Set to
+  // `true` ONLY for lazy companions whose target kind is `'singleton'`:
+  //   - Lazy<singleton> companion: kind='transient', lazy=true → guard skipped,
+  //     singleton consumer may legally inject the wrapper.
+  //   - Lazy<scoped|transient> companion: kind='transient', lazy=false → guard
+  //     fires when a singleton consumer tries to inject it, matching the
+  //     compile-time `AllowedDeps<T, 'singleton'>` filter.
+  //   - Every other registration: lazy=false.
+  // The wrapper's `fn` returns a closure `{ get: () => c.get(targetKey) }` —
+  // it does NOT call `c.get(targetKey)` synchronously. That deferral is what
+  // makes Lazy<singleton> safe to inject into a singleton; if the
+  // implementation is ever "simplified" to a direct c.get(targetKey), the
+  // protection collapses.
   // Always set (false for non-lazy entries) so every Registration object has the
   // same V8 Hidden Class / Shape — `localReg.lazy` reads on the hot path stay in
   // a monomorphic inline cache instead of falling into a PIC bucket lookup.
@@ -284,7 +327,7 @@ interface DisposableLike {
  * **Compile-time lifetime guard.** Each entry in `T` carries its kind via
  * {@link Spec}. The container passed to a `registerFactory((c) => ...)` body
  * is structurally narrowed via `AllowedDeps<T, Kind>` so that the only `.get(...)`
- * keys visible inside a singleton factory are singletons and `Lazy<*>` companions.
+ * keys visible inside a singleton factory are singletons and `Lazy<singleton>` companions.
  * `registerClass(_, _, deps, kind)` enforces the same constraint on its `deps`
  * tuple. The runtime guard in `get()` remains as defense-in-depth against
  * `as`-cast bypasses; its error message names the offending keys.
@@ -411,7 +454,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * container's registry. The compiler strictly checks that the `deps` array
    * precisely matches the constructor's arguments by both type and position,
    * **and** that every dep is a legal lifetime for the target `kind` — a
-   * singleton target only accepts singleton deps or `Lazy<*>` companions.
+   * singleton target only accepts singleton deps or `Lazy<singleton>` companions.
    * Passing a `lazyKey` additionally registers a `Lazy<V>` wrapper under that
    * companion identifier — the user picks the wrapper key explicitly, which
    * lets `string` and `symbol` keys coexist on equal footing.
@@ -472,7 +515,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     deps: D,
     kind: Kind | undefined,
     lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
-  ): Container<T & Record<K, Spec<V, Kind>> & Record<LK, Spec<Lazy<V>, 'transient'>>>
+  ): Container<T & Record<K, Spec<V, Kind>> & Record<LK, LazySpec<V, Kind>>>
 
   public registerClass<V>(
     key: string | symbol,
@@ -571,37 +614,34 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
 
     // Lazy alias: a thin { get } wrapper on top of the eager key. The instance itself
     // is not created until the consumer calls .get(). The wrapper is transient — it
-    // takes the container in which it was requested, so scoped targets work correctly.
+    // takes the container in which it was requested, so scoped targets work correctly
+    // when the wrapper is obtained in the right scope (e.g. a scoped consumer
+    // injecting Lazy<otherScoped>).
     //
     // INVARIANT: fn must NOT call c.get(key) synchronously — only return a closure.
-    // This fact makes the lazy wrapper safe to inject into a singleton and justifies
-    // the `lazy: true` marker on the Registration, which excludes it from the lifetime
-    // check in get(). If this implementation is ever "simplified" to a direct c.get(key)
-    // — the protection against short-lived deps leaking into long-lived ones will break.
+    // The deferral is what makes Lazy<singleton> safe to inject into a singleton: at
+    // the time the singleton factory runs, no resolution against the wrapped target
+    // happens, so no short-lived value can be captured.
+    //
+    // LIFETIME GUARD: `lazy: true` excludes the companion from the singleton lifetime
+    // check (see Registration.lazy and the runtime guards in get() / resolveWithOwnerAndReg).
+    // It is set ONLY when the target kind is `'singleton'`. For non-singleton targets,
+    // the companion stays `lazy: false` and is rejected as a regular transient if a
+    // singleton consumer tries to inject it via an `as`-cast bypass. The compile-time
+    // `AllowedDeps<T, 'singleton'>` filter (via `LazySpec<V, 'singleton'>`) is the
+    // primary protection; this runtime flag is defense-in-depth.
     //
     // NOTE (captured scope): `c` is captured at the moment the lazy wrapper is RESOLVED,
     // not at the moment .get() is called. If you store the wrapper and call .get() later
     // from a different context — the resolve still goes through the original container.
-    // This is predictable, but it is "captured scope", not "dynamic scope" — do not confuse.
-    //
-    // ⚠️ PITFALL: Lazy<Scoped> injected into a Singleton.
-    // When a singleton lives on root and resolves its lazy dependency, the wrapper
-    // captures c = root. On the first wrapper.get(), the scoped instance is cached on
-    // root and effectively becomes a singleton — every subsequent .get() from any scope
-    // returns the same instance. So Lazy<T> legalizes the injection per the lifetime
-    // check, but does NOT make scoped truly scoped if used this way. Lazy<scoped> works
-    // correctly only when the wrapper is obtained in the right scope (a scoped service
-    // injecting Lazy<otherScoped> in the same scope). For request-scoped values inside
-    // singletons, the only correct solution is AsyncLocalStorage; a DI container with
-    // captured scope cannot solve this on its own.
-    // No pitfall for transient: transient is not cached, every .get() creates a new instance.
+    // This is predictable, but it is "captured scope", not "dynamic scope".
     if (lazyKey !== undefined) {
       const targetKey = key as unknown as keyof T
       // Same {kind, lazy, fn} order as the eager registration above — keeps
       // the Shape monomorphic across regular and lazy-companion entries.
       this.regs.set(lazyKey as unknown as keyof T, {
         kind: 'transient',
-        lazy: true,
+        lazy: kind === 'singleton',
         fn: (c) => ({get: () => c.get(targetKey)} as unknown as T[keyof T]['type']),
       })
     }
@@ -615,7 +655,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * The type `V` is inferred from the factory's return value and is automatically
    * added to the container's map. The factory receives the container as its only
    * argument, **structurally narrowed via `AllowedDeps<T, Kind>`** — inside a
-   * singleton factory only singleton keys and `Lazy<*>` companions are visible
+   * singleton factory only singleton keys and `Lazy<singleton>` companions are visible
    * to `.get(...)`, so a leak of scoped/transient state into a singleton is a
    * TypeScript error rather than a runtime exception.
    *
@@ -806,17 +846,26 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
           `Overrides must be applied before any .get() calls to ensure clean dependency graphs and prevent resource leaks.`,
       )
     }
-    // Walk-up the scope chain to find the original kind. The override is written
-    // LOCALLY (in this.regs) with the same kind as the original registration —
-    // preserving the lifetime graph across `root.createScope().override('db', mock)`
-    // and similar patterns. A key not found anywhere is a misconfiguration; surface
-    // it eagerly rather than silently materializing a singleton from nothing.
+    // Walk-up the scope chain to find the original kind and lazy flag. The
+    // override is written LOCALLY (in this.regs) with both fields copied from
+    // the original — preserving the lifetime graph across
+    // `root.createScope().override('db', mock)` and, crucially, the lazy-exempt
+    // marker on `Lazy<singleton>` companions (registered with `lazy: true`).
+    // Without copying `lazy`, an override on a `Lazy<singleton>` companion
+    // would write `lazy: false`, and the next singleton consumer that injects
+    // the companion would trip the strict-mode lifetime guard
+    // (kind='transient', lazy=false → guarded) — i.e. the mock would never
+    // reach the consumer. A key not found anywhere is a misconfiguration;
+    // surface it eagerly rather than silently materializing a singleton from
+    // nothing.
     let cur: Container<T> | undefined = this
     let existingKind: RegistrationKind | undefined
+    let existingLazy = false
     while (cur !== undefined) {
       const existing = cur.regs.get(key)
       if (existing !== undefined) {
         existingKind = existing.kind
+        existingLazy = existing.lazy
         break
       }
       cur = cur.parent
@@ -826,12 +875,13 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     }
 
     this.cache.set(key, value === undefined ? UNDEFINED_MARKER : value)
-    // Stored with the inherited kind plus a dead-code factory (cache.set above
-    // always wins the hot-path) — same shape as registerValue for uniformity.
+    // Stored with the inherited kind and lazy flag plus a dead-code factory
+    // (cache.set above always wins the hot-path) — same shape as registerValue
+    // for uniformity.
     this.regs.set(
       key,
       /* v8 ignore next */
-      {kind: existingKind, lazy: false, fn: () => value as unknown as T[keyof T]['type']},
+      {kind: existingKind, lazy: existingLazy, fn: () => value as unknown as T[keyof T]['type']},
     )
     this.regsVersion++
     if (this.lookupCache !== undefined) {

@@ -5,8 +5,98 @@ For new features and fixes within a major line, see the release notes on the Git
 
 ## Table of Contents
 
+- [Migration to 4.0](#migration-to-40)
 - [Migration to 3.0](#migration-to-30)
 - [Migration to 2.0](#migration-to-20)
+
+## Migration to 4.0
+
+v4 tightens the semantics of `Lazy<T>`. In v3 a `Lazy` companion acted as a
+universal lifetime escape: a singleton consumer could inject `Lazy<scoped>` or
+`Lazy<transient>` because the runtime guard was bypassed by an unconditional
+`lazy: true` flag, and the compile-time `AllowedDeps` filter passed any
+`Lazy<unknown>` through structurally. v4 makes `Lazy<T>` preserve the target's
+lifetime — `Lazy<singleton>` is the only Lazy variant a singleton may take, and
+the rule is enforced at both the type level and the strict-mode runtime.
+Non-singleton consumers are unaffected: a scoped or transient service may still
+inject any `Lazy<*>`.
+
+### What changed
+
+- **`AllowedDeps<T, 'singleton'>` no longer admits arbitrary `Lazy<V>`.** The
+  filter now requires `LazySpec<V, 'singleton'>` (the managed companion shape
+  produced by the `lazyKey` parameter). A hand-rolled
+  `Spec<Lazy<V>, 'transient'>` registered via `registerValue` or
+  `registerFactory` is treated as a plain transient and is no longer
+  singleton-safe.
+- **New exported type `LazySpec<V, TargetKind>`.** Extends
+  `Spec<Lazy<V>, 'transient'>` with a `lazyOf: TargetKind` field so the type
+  system can distinguish managed companions from raw `Lazy<V>` values.
+- **Runtime guard.** The `lazy: true` flag in `Registration` is now set only
+  when the target kind is `'singleton'`. For other targets the companion is
+  rejected by the same strict-mode lifetime guard that catches direct
+  short-lived injections — handy for `as`-cast bypass cases.
+- **Captured-scope footgun is no longer a documented limitation.** Injecting
+  `Lazy<scoped>` into a singleton was previously a known-but-allowed pattern
+  whose first `.get()` froze the scoped instance onto the singleton's owner.
+  That pattern is now a compile error; the captured-scope behaviour persists
+  only inside non-singleton consumers, where it is the intended semantics.
+
+### One-line fixes
+
+1. **Singleton consumer with `Lazy<scoped>` — promote the target to singleton or scope the consumer.**
+   ```ts
+   // v3
+   .registerClass('req', RequestContext, [], 'scoped', 'reqLazy')
+   .registerClass('app', AppService, ['reqLazy'], 'singleton')
+
+   // v4 — either move the target up the lifetime chain:
+   .registerClass('req', RequestContext, [], 'singleton', 'reqLazy')
+   .registerClass('app', AppService, ['reqLazy'], 'singleton')
+
+   // ...or move the consumer down:
+   .registerClass('req', RequestContext, [], 'scoped', 'reqLazy')
+   .registerClass('app', AppService, ['reqLazy'], 'scoped')
+   ```
+   For genuine per-request access inside a long-lived service use
+   `AsyncLocalStorage` — that is the use case the DI container was never able
+   to model honestly.
+
+2. **Explicit `Container<{...}>` annotations for lazy companions — use `LazySpec`.**
+   ```ts
+   // v3
+   type Deps = SpecMap<{ clock: Clock }> & { clockLazy: Spec<Lazy<Clock>, 'transient'> }
+
+   // v4
+   type Deps = SpecMap<{ clock: Clock }> & { clockLazy: LazySpec<Clock, 'singleton'> }
+   ```
+
+### Mismatches
+
+- **Hand-rolled `Spec<Lazy<V>, 'transient'>`** registered via
+  `registerValue`/`registerFactory` is no longer accepted by a singleton
+  consumer. If you relied on that as a manual lazy companion, switch to the
+  `lazyKey` parameter of `registerClass`.
+- **Existing example breakage.** Any snippet that registered the target as
+  `transient` / `scoped` and injected the companion into a singleton (a
+  common pattern in v3 documentation) becomes a TS error. The canonical
+  example in `examples/_shared/container.ts` was updated to use a singleton
+  target.
+- **Strict-mode runtime diagnostic.** For an `as`-cast bypass that lands a
+  `Lazy<scoped|transient>` in a singleton, the message reads
+  `Singleton "<X>" cannot depend on transient "<lazyKey>"` (the wrapper itself
+  is transient). Future versions may refine this to mention the companion's
+  target kind.
+
+### What's new in 4.0
+
+- **`LazySpec<V, TargetKind>` export.** Use it for explicit `Container<...>`
+  annotations and `Module<TIn, TOut>` shapes whenever you previously wrote
+  `Spec<Lazy<V>, 'transient'>` for a managed companion.
+- **`override()` preserves the lazy-exempt flag.** Overriding a
+  `Lazy<singleton>` companion in a test no longer trips the runtime lifetime
+  guard when a singleton consumer injects the mock — the override walk-up now
+  copies both `kind` and `lazy` from the original registration.
 
 ## Migration to 3.0
 

@@ -241,7 +241,7 @@ const container = new Container()
   .registerClass('userRepo', UserRepo, ['pgPool'])
 ```
 
-Factories follow the same lifetime rules as classes — pass the kind as the third argument: `registerFactory('cache', factory, 'scoped')`. Inside a **singleton** factory the container parameter is narrowed via `AllowedDeps<T, 'singleton'>`, so `c.get(...)` will only autocomplete (and accept) singleton keys and `Lazy<*>` companions. A `scoped`/`transient` key inside a singleton factory body is a TypeScript error, not a runtime exception.
+Factories follow the same lifetime rules as classes — pass the kind as the third argument: `registerFactory('cache', factory, 'scoped')`. Inside a **singleton** factory the container parameter is narrowed via `AllowedDeps<T, 'singleton'>`, so `c.get(...)` will only autocomplete (and accept) singleton keys and `Lazy<singleton>` companions. A `scoped`/`transient` key (or `Lazy<scoped>` / `Lazy<transient>`) inside a singleton factory body is a TypeScript error, not a runtime exception.
 
 ## Binding Interfaces
 
@@ -351,6 +351,8 @@ const [a, b] = await Promise.all([c.get('db'), c.get('db')])
 
 await c.dispose() // unwraps the cached Promise and closes the pool
 ```
+
+> ⚠️ **Cycles between async factories are not detected and produce a silent Promise deadlock.** The runtime cycle detector projects the *synchronous* call stack only — the `resolving` set is cleared by the time an `async` factory's `await` continuation runs. If two async factories depend on each other (`a` awaits `c.get('b')`, `b` awaits `c.get('a')`), each one's pending Promise gets cached during the synchronous prelude, and the resumed continuations find that cached Promise on every reentry. `await c.get('a')` then hangs forever with no error, no rejection, no diagnostic. Fixing this in the runtime would require an async-aware cycle tracker on the resolve fast-path, which is incompatible with the 1-`Map.get()` hot-path contract — so the recommendation is architectural: keep one side synchronous (split the cycle, hoist the shared init), or break it with a `Lazy<singleton>` companion if both sides are singletons. If you suspect a cycle in async code, wrap the top-level `await c.get(...)` with a watchdog timeout during development.
 
 ## Strict Lifetime Guards
 
@@ -462,7 +464,7 @@ transient-path speed-up matters.
 
 ## Lazy Injection
 
-When a singleton legitimately needs a fresh per-access view of a short-lived service, pass a `lazyKey` to its registration. The container then registers a companion `Lazy<T>` under that explicit key — the wrapper key is yours to pick (string or symbol):
+`Lazy<T>` is a deferred-resolution primitive — useful when two services would otherwise have to be constructed in a precise order (or when the type system would reject a forward reference). Pass a `lazyKey` to the target registration and the container creates a companion `Lazy<T>` under that explicit key (string or symbol):
 
 ```ts
 import { Container, type Lazy } from '@inferdi/inferdi'
@@ -475,18 +477,26 @@ class Audit {
 }
 
 const c = new Container()
-  .registerClass('clock', Clock, [], 'transient', 'clockLazy')
-  // ^ registers BOTH 'clock' (transient) AND 'clockLazy' (Lazy<Clock>).
+  .registerClass('clock', Clock, [], 'singleton', 'clockLazy')
+  // ^ registers BOTH 'clock' (singleton) AND 'clockLazy' (Lazy<Clock>).
   //   The companion key is passed explicitly — TS infers Lazy<Clock>.
   .registerClass('audit', Audit, ['clockLazy'], 'singleton')
 
-c.get('audit').record('login')   // a fresh Clock instance per .record()
+c.get('audit').record('login')
 ```
 
-> ⚠️ **Pitfall — `Lazy<scoped>` injected into a singleton.**
-> The lazy wrapper captures the container in which it was *resolved*, not in which it is later *called*. A singleton resolves on its owning container (usually root), so its captured `c` is root. The first `lazyWrapper.get()` then resolves the scoped target on root and caches it there — effectively turning it into a singleton. `Lazy<T>` legalizes the injection per the lifetime check, but it does **not** make a scoped target truly per-scope when used from a long-lived consumer. For request-scoped values inside long-lived services, use `AsyncLocalStorage` instead. (Transient is unaffected: it is never cached, every `.get()` creates a new instance.)
+**Lazy preserves the target's lifetime; it is not a lifetime escape hatch.** A singleton consumer may inject only `Lazy<singleton>` companions. `Lazy<scoped>` and `Lazy<transient>` are rejected by the compile-time `AllowedDeps` filter inside a singleton, and the strict-mode runtime guard rejects the same shape if you bypass the type system with an `as`-cast. For scoped or transient consumers, every `Lazy<*>` variant remains legal.
 
-> **Note on circular dependencies.** True mutual recursion (A's constructor needs B, B's constructor needs A) cannot be expressed in fluent registration — both sides would forward-reference each other's keys, which the type system rejects by design. The container's runtime cycle detector exists to catch accidental cycles introduced via factories, not to "break" them automatically. If you have a real A↔B cycle, restructure: extract a shared dependency, switch to event-based communication, or split one of the classes.
+```ts
+new Container()
+  .registerClass('req', RequestContext, [], 'scoped', 'reqLazy')
+  // @ts-expect-error — Lazy<scoped> is not singleton-safe in v4.
+  .registerClass('app', AppService, ['reqLazy'], 'singleton')
+```
+
+Need a fresh per-request view of a short-lived service inside a singleton? Use [`AsyncLocalStorage`](https://nodejs.org/api/async_context.html) — a DI container with captured scope cannot model "dynamic scope" on its own. The runtime diagnostic for a Lazy-companion leak still reads `Singleton "X" cannot depend on transient "<lazyKey>"` because the wrapper itself is transient; treat that as "this Lazy resolves a non-singleton target — not safe here".
+
+> **Note on circular dependencies.** True mutual recursion (A's constructor needs B, B's constructor needs A) cannot be expressed in fluent registration — both sides would forward-reference each other's keys, which the type system rejects by design. Between two singletons, you can break the cycle with `Lazy<singleton>` on one side. For factory-introduced cycles the runtime detector reports them precisely; it never "breaks" cycles automatically.
 
 ## Symbol Keys
 
@@ -686,7 +696,8 @@ The container throws structured errors with actionable messages — surface thes
 |---|---|
 | `.get(k)` on unregistered key | `Key "k" not found` |
 | Singleton depends on scoped/transient | `Singleton "x" cannot depend on scoped "y". Use Lazy<T> ...` |
-| Resolution loop | `Circular dependency detected: a -> b -> a. Consider breaking the cycle with Lazy<T> ...` |
+| Resolution loop (synchronous) | `Circular dependency detected: a -> b -> a. Consider breaking the cycle with Lazy<T> ...` |
+| Resolution loop (between async factories) | _Not detected._ Produces a silent Promise deadlock — see the warning under [Async Factories](#async-factories). |
 | Use of disposed container | `Container is disposed (key: "k")` |
 | Resolving across a disposed ancestor | `Ancestor container is disposed (key: "k")` |
 | `createScope()` after dispose | `Cannot create scope from a disposed container` |
@@ -704,6 +715,7 @@ Upgrading from a previous major version? See **[MIGRATION.md](./MIGRATION.md)** 
 import {
   Container,
   type Lazy,
+  type LazySpec,
   type Module,
   type DependenciesMap,
   type RegistrationKind,
@@ -720,7 +732,8 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 
   // Registration — each call returns a Container widened by Record<K, Spec<V, Kind>>.
   // The `deps` tuple and the factory `c` are narrowed via `AllowedDeps<T, Kind>`:
-  // for a singleton target, only singleton entries and Lazy<*> companions are visible.
+  // for a singleton target, only singleton entries and `LazySpec<*, 'singleton'>`
+  // companions are visible.
   registerClass<
     K extends string | symbol,
     V,
@@ -736,7 +749,7 @@ class Container<T extends DependenciesMap = Record<never, never>> {
   ): Container<
        T
        & Record<K, Spec<V, Kind>>
-       & ([LK] extends [never] ? {} : Record<LK, Spec<Lazy<V>, 'transient'>>)
+       & ([LK] extends [never] ? {} : Record<LK, LazySpec<V, Kind>>)
      >
 
   registerFactory<

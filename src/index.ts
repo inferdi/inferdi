@@ -6,5 +6,6 @@ export type {
   RegistrationKind,
   Spec,
   SpecMap,
+  LazySpec,
   ContainerOptions,
 } from './Container'

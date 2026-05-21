@@ -391,15 +391,47 @@ describe('Phase 8 — compile-time lifetime guard', () => {
     c.registerClass('consumer', Consumer, ['dep'], 'singleton')
   })
 
-  it('singleton class CAN depend on a Lazy<scoped> companion', () => {
-    // Lazy companions are detected structurally via `Lazy<unknown>`; the runtime
-    // wrapper is `transient`, but the compile-time filter lets it through.
+  it('singleton class CAN depend on a Lazy<singleton> companion', () => {
+    // LazySpec<V, 'singleton'> passes the AllowedDeps<T, 'singleton'> filter:
+    // a singleton may legally defer its dependency on another singleton via
+    // a lazy wrapper (useful for breaking init-time cycles between singletons).
+    class HolderLazy {
+      constructor(public readonly d: Lazy<Dep>) {}
+    }
+    new Container()
+      .registerClass('dep', Dep, [], 'singleton', 'depLazy')
+      .registerClass('holder', HolderLazy, ['depLazy'], 'singleton')
+  })
+
+  it('singleton class CANNOT depend on a Lazy<scoped> companion', () => {
+    // v4: Lazy preserves the target's lifetime — Lazy<scoped> is not singleton-safe.
+    class HolderLazy {
+      constructor(public readonly d: Lazy<Dep>) {}
+    }
+    const c = new Container().registerClass('dep', Dep, [], 'scoped', 'depLazy')
+    // @ts-expect-error — LazySpec<Dep, 'scoped'> is excluded by AllowedDeps<T, 'singleton'>.
+    c.registerClass('holder', HolderLazy, ['depLazy'], 'singleton')
+  })
+
+  it('singleton class CANNOT depend on a Lazy<transient> companion', () => {
+    class HolderLazy {
+      constructor(public readonly d: Lazy<Dep>) {}
+    }
+    const c = new Container().registerClass('dep', Dep, [], 'transient', 'depLazy')
+    // @ts-expect-error — LazySpec<Dep, 'transient'> is excluded by AllowedDeps<T, 'singleton'>.
+    c.registerClass('holder', HolderLazy, ['depLazy'], 'singleton')
+  })
+
+  it('scoped class CAN depend on a Lazy<scoped> companion', () => {
+    // Non-singleton consumers are not filtered by AllowedDeps — any companion
+    // (or direct dep) is legal. This preserves the v3 ergonomics for
+    // scoped↔scoped cycle-breaking inside a request scope.
     class HolderLazy {
       constructor(public readonly d: Lazy<Dep>) {}
     }
     new Container()
       .registerClass('dep', Dep, [], 'scoped', 'depLazy')
-      .registerClass('holder', HolderLazy, ['depLazy'], 'singleton')
+      .registerClass('holder', HolderLazy, ['depLazy'], 'scoped')
   })
 
   it('scoped class can depend on a scoped class', () => {

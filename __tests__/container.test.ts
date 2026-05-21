@@ -1,5 +1,5 @@
 import {describe, it, expect} from 'vitest'
-import {Container, type DependenciesMap} from '../src/Container'
+import {Container, type DependenciesMap, type Lazy} from '../src/Container'
 import {
   AppConfig,
   ConsoleLogger,
@@ -592,16 +592,34 @@ describe('Phase 2 — Lifetimes', () => {
       expect(wrapper.get()).toBe(c.get('db'))
     })
 
-    it('lazyKey legalizes injecting short-lived into a singleton', () => {
+    it('Lazy<scoped|transient> companion does NOT legalize injection into a singleton (v4)', () => {
       class Holder {
         constructor(public readonly leakyLazy: { readonly get: () => ConsoleLogger }) {}
       }
+      // The `as never` bypass mimics an `as`-cast escape past the AllowedDeps
+      // compile-time filter; the runtime guard still catches the leak.
       const c = new Container()
         .registerClass('leaky', ConsoleLogger, [], 'scoped', 'leakyLazy')
-        .registerClass('holder', Holder, ['leakyLazy'], 'singleton')
+        .registerClass('holder', Holder, ['leakyLazy' as never], 'singleton')
 
-      // Without the lazy escape this would fail: Singleton "holder" cannot depend on scoped "leaky".
-      expect(() => c.get('holder')).not.toThrow()
+      expect(() => c.get('holder')).toThrow(
+        /Singleton "holder" cannot depend on transient "leakyLazy"/,
+      )
+    })
+
+    it('Lazy<singleton> companion legalizes deferred singleton↔singleton injection', () => {
+      class Holder {
+        constructor(public readonly cfgLazy: { readonly get: () => ConsoleLogger }) {}
+      }
+      const c = new Container()
+        .registerClass('cfg', ConsoleLogger, [], 'singleton', 'cfgLazy')
+        .registerClass('holder', Holder, ['cfgLazy'], 'singleton')
+
+      const holder = c.get('holder')
+
+      // The wrapper resolves to the singleton instance, and the resolution is idempotent.
+      expect(holder.cfgLazy.get()).toBe(c.get('cfg'))
+      expect(holder.cfgLazy.get()).toBe(holder.cfgLazy.get())
     })
 
     // ────────── Captured scope: the key invariant ─────────
@@ -1186,6 +1204,53 @@ describe('Phase 7 — Test Overrides', () => {
     builder.override('clockLazy', {get: () => clockMock})
 
     expect(builder.get('clockLazy').get().now()).toBe(42)
+  })
+
+  it('override on a Lazy<singleton> companion preserves the lazy-exempt flag across scope walk-up', () => {
+    // The override on root pre-seeds root.cache, so a same-container resolve
+    // never reaches the lifetime guard. The walk-up path is what actually
+    // exercises the regs entry: a singleton consumer registered on a child
+    // scope resolves the companion through root.regs (cache miss on scope,
+    // walk-up to root.regs hit). If override stripped `lazy: true`, the
+    // strict-mode lifetime guard would reject the transient lookup inside
+    // an active singleton stack — see `tikets/override-strips-lazy-flag.md`.
+    class Logger { info(_msg: string) {} }
+    class App { constructor(public readonly loggerLazy: Lazy<Logger>) {} }
+    const mock: Logger = {info: () => {}}
+
+    const root = new Container()
+      .registerClass('logger', Logger, [], 'singleton', 'loggerLazy')
+
+    root.override('loggerLazy', {get: () => mock})
+
+    const scope = root
+      .createScope()
+      .registerClass('app', App, ['loggerLazy'], 'singleton')
+
+    expect(() => scope.get('app')).not.toThrow()
+    expect(scope.get('app').loggerLazy.get()).toBe(mock)
+  })
+
+  it('override on a Lazy<scoped> companion preserves the lifetime-guard rejection across scope walk-up', () => {
+    // Symmetric to the previous test: for a Lazy<scoped> companion the
+    // original registration carries `lazy: false`, and override must copy
+    // that — otherwise an `as`-cast bypass plus override would silently let
+    // a scoped target slip into a singleton through the walk-up path.
+    class Req {}
+    class Holder { constructor(public readonly reqLazy: {readonly get: () => Req}) {} }
+
+    const root = new Container()
+      .registerClass('req', Req, [], 'scoped', 'reqLazy')
+
+    root.override('reqLazy', {get: () => new Req()})
+
+    const scope = root
+      .createScope()
+      .registerClass('holder', Holder, ['reqLazy' as never], 'singleton')
+
+    expect(() => scope.get('holder')).toThrow(
+      /Singleton "holder" cannot depend on transient "reqLazy"/,
+    )
   })
 })
 

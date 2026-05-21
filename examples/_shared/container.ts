@@ -8,9 +8,12 @@
 //   1. registerValue('config', ...)  — static config (env-validated).
 //   2. registerFactory('db', async ...) — async resource with LIFO disposal
 //      via Symbol.asyncDispose. `await scope.dispose()` awaits the pool.
-//   3. registerClass with a `Lazy<V>` companion — a singleton can take a
-//      Lazy<transient> per the compile-time lifetime guard; injecting the
-//      bare transient would be a TYPE error (see `// @ts-expect-error` below).
+//   3. registerClass with a `Lazy<V>` companion — singletons can defer
+//      resolution of another singleton dependency via a Lazy wrapper, which
+//      is useful for breaking init-time cycles. The lifetime guard rejects
+//      `Lazy<scoped>` / `Lazy<transient>` in singleton consumers — Lazy
+//      preserves the target's lifetime, it does not lift short-lived
+//      services into singleton scope.
 //   4. Module<TIn, TOut> — reusable registration unit composed via `.use()`.
 //   5. createScope() + hydrate `scope.get('request')` — the recommended way
 //      to thread per-request data through scoped services.
@@ -22,8 +25,8 @@
 import {
   Container,
   type Lazy,
+  type LazySpec,
   type Module,
-  type Spec,
   type SpecMap,
 } from '@inferdi/inferdi'
 
@@ -78,8 +81,12 @@ export class Database {
   }
 }
 
-// Per-call clock. Registered as `transient` because a singleton service that
-// caches the very first `new Date()` is almost always a bug.
+// Stateless clock wrapper around `new Date()`. The wrapper itself holds no
+// per-call state, so registering it as a singleton is fine — `now()` still
+// returns a fresh `Date` on every invocation. (If the class ever grew
+// internal state that had to be fresh per call, switch it to `'transient'`
+// and inject it only into non-singleton consumers — singletons would then
+// reject it at compile time per the lifetime guard.)
 export class Clock {
   now(): Date { return new Date() }
 }
@@ -93,11 +100,13 @@ export class RequestContext {
   ip: string | undefined = undefined
 }
 
-// A long-lived service that needs a fresh `Date` on every call.
-// `Clock` is transient → injecting it directly into a singleton is a TYPE
-// error (see compile-time guard demo at the bottom of this file). The
-// sanctioned escape is `Lazy<Clock>`: the wrapper is transient and safe
-// to inject into a singleton, and `.get()` resolves a fresh Clock per call.
+// A long-lived service that records audit events. It depends on `Clock`
+// through a `Lazy<Clock>` companion: a singleton consumer is allowed to
+// take `Lazy<singleton>` (cycle-breaking), but not `Lazy<scoped>` /
+// `Lazy<transient>` — those would be a TYPE error since v4. The lazy
+// wrapper here is illustrative — `Clock` is a peer singleton, so a direct
+// injection would also work; the companion exists to demonstrate how
+// deferred singleton↔singleton resolution looks.
 export class AuditService {
   constructor(
     private readonly logger: Logger,
@@ -135,10 +144,9 @@ export class UserService {
 
 type CoreIn = SpecMap<{ config: AppConfig }>
 type CoreOut =
-  & SpecMap<{ logger: Logger; db: Database; audit: AuditService }>
+  & SpecMap<{ logger: Logger; clock: Clock; db: Database; audit: AuditService }>
   & {
-      clock: Spec<Clock, 'transient'>
-      clockLazy: Spec<Lazy<Clock>, 'transient'>
+      clockLazy: LazySpec<Clock, 'singleton'>
     }
 
 export const coreModule: Module<CoreIn, CoreOut> = (c) =>
@@ -151,10 +159,13 @@ export const coreModule: Module<CoreIn, CoreOut> = (c) =>
     // is still unwrapped and disposed correctly on `scope.dispose()`. The
     // sync factory keeps consumer signatures simple here.
     .registerFactory('db', (c) => new Database(c.get('config')))
-    // Transient + Lazy companion under 'clockLazy'.
-    .registerClass('clock', Clock, [], 'transient', 'clockLazy')
-    // Singleton `audit` legally takes `clockLazy` (Lazy<Clock>); passing
-    // 'clock' directly here would be a TYPE error — see demo below.
+    // Singleton `clock` + Lazy<singleton> companion under 'clockLazy'.
+    // `clock` is stateless so a singleton is appropriate; the companion lets
+    // `audit` take a deferred reference instead of an eager one.
+    .registerClass('clock', Clock, [], 'singleton', 'clockLazy')
+    // Singleton `audit` injects `clockLazy` (LazySpec<Clock, 'singleton'>).
+    // After v4, only `Lazy<singleton>` companions pass the AllowedDeps filter
+    // for a singleton consumer.
     .registerClass('audit', AuditService, ['logger', 'clockLazy'], 'singleton')
 
 // ---------------------------------------------------------------------------
