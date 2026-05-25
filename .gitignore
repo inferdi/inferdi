@@ -1,12 +1,13 @@
 node_modules/
 dist/
 coverage/
+.vitest-cache/
 
 # Logs
 *.log
 npm-debug.log*
+pnpm-debug.log*
 yarn-debug.log*
-yarn-error.log*
 
 # Env
 .env
@@ -16,6 +17,13 @@ yarn-error.log*
 .DS_Store
 .vscode/
 .idea/
+
+# Lockfiles for non-pnpm package managers
+package-lock.json
+yarn.lock
+
+# Build / type-check incremental output
+*.tsbuildinfo
 
 # npm pack output
 *.tgz

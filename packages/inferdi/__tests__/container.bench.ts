@@ -4,7 +4,7 @@ import {Container} from '../src/Container'
 // ────────────────────────────────────────────────────────────────────────────
 // Phase 6 — Benchmarks
 //
-// Run via `npm run bench` (vitest bench). Not part of the CI run; the goal is
+// Run via `pnpm run bench` (vitest bench). Not part of the CI run; the goal is
 // to track performance regressions across container changes.
 // ────────────────────────────────────────────────────────────────────────────
 

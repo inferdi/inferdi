@@ -13,12 +13,12 @@ Comparative benchmarks of `@inferdi/inferdi` against five other popular DI conta
 
 ```bash
 cd benchmarks
-npm install
-npm run precondition   # smoke test: TypeDI scope is actually isolated
-npm run bench          # runs all 7 scenarios
+pnpm install --frozen-lockfile
+pnpm run precondition   # smoke test: TypeDI scope is actually isolated
+pnpm run bench          # runs all 7 scenarios
 ```
 
-`npm install` puts the DI libraries and tooling **only** into `benchmarks/node_modules` — the parent package is untouched. `InferDI` is wired up via a TS path alias (`benchmarks/tsconfig.json` → `paths`), so `npm run build` in the parent is not required.
+`benchmarks/pnpm-workspace.yaml` intentionally contains `packages: []`, so pnpm stops workspace discovery in this directory and keeps a separate `benchmarks/pnpm-lock.yaml`. `pnpm install` puts the DI libraries and tooling **only** into `benchmarks/node_modules` — the parent workspace is untouched. `InferDI` is wired up via a TS path alias (`benchmarks/tsconfig.json` → `paths`), so `pnpm run build` in the parent is not required.
 
 ## Scenarios
 
@@ -56,7 +56,7 @@ This scenario measures the **full lifecycle** = creation + resolve + cleanup, **
 
 ### TypeDI scope-isolation precondition
 
-TypeDI's `Container.of(id).get(GlobalServiceClass)` silently falls back to the global singleton if the class is decorated with `@Service()`. Scenario 6 for TypeDI would be a fake (just a global cache hit). `ScopedService` is intentionally **not** decorated with `@Service()` (only `@ForceMetadata()` for swc) and is registered manually via `Container.of(id).set(...)`. A **smoke test** (`src/precondition/typedi-scope-isolation.test.ts`) verifies this before the bench runs — `npm run precondition` is mandatory before `npm run bench`.
+TypeDI's `Container.of(id).get(GlobalServiceClass)` silently falls back to the global singleton if the class is decorated with `@Service()`. Scenario 6 for TypeDI would be a fake (just a global cache hit). `ScopedService` is intentionally **not** decorated with `@Service()` (only `@ForceMetadata()` for swc) and is registered manually via `Container.of(id).set(...)`. A **smoke test** (`src/precondition/typedi-scope-isolation.test.ts`) verifies this before the bench runs — `pnpm run precondition` is mandatory before `pnpm run bench`.
 
 ## Defences against typical benchmark artefacts
 

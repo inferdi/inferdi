@@ -22,17 +22,16 @@ export default defineConfig({
     root: fileURLToPath(new URL('.', import.meta.url)),
     include: ['src/benches/**/*.bench.ts', 'src/precondition/**/*.test.ts'],
     exclude: ['**/node_modules/**', '../**'],
+    pool: 'forks',
+    isolate: true,
     benchmark: {
-      pool: 'forks',
-      isolate: true,
-
       include: ['src/benches/**/*.bench.ts'],
       reporters: ['default'],
     },
   },
   resolve: {
     alias: {
-      '@inferdi/inferdi': fileURLToPath(new URL('../src/index.ts', import.meta.url)),
+      '@inferdi/inferdi': fileURLToPath(new URL('../packages/inferdi/src/index.ts', import.meta.url)),
     },
   },
 })

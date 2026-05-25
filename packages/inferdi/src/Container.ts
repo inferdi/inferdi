@@ -1144,20 +1144,6 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   // delegated singleton resolves (owner !== this). The split avoids the previous
   // `owner.get(key)` re-entry, which paid for a full second walk-up on every
   // singleton resolve from a child scope.
-  //
-  // Invariants (see plan in /home/korsox/.claude/plans/jaunty-wibbling-lovelace.md):
-  // - `resolving` and `singletonStack` are shared across the scope tree (initialized
-  //   from parent in the constructor) — manipulating them through `this` is safe
-  //   regardless of whether `target` is `this` or `owner`.
-  // - `resolving.add/delete` is unconditional: cycle detection MUST cover transient↔
-  //   transient cycles, otherwise stack overflow replaces a clean diagnostic.
-  // - `singletonStack.push/pop` is conditional on `kind === 'singleton'`, matching
-  //   the lifetime-guard contract.
-  // - `owned.add` always lands on `owner.owned` so disposing `owner` releases the
-  //   instance even when it was originally requested from a child scope.
-  // - `reg.fn(owner)` is intentional: the factory must observe owner-scope, not the
-  //   caller's scope. Changing this to `reg.fn(this)` would let a child override
-  //   parent-scope dependencies of an owner-scope singleton.
   /** @internal */
   private resolveWithOwnerAndReg<K extends keyof T>(
     target: Container<T>,

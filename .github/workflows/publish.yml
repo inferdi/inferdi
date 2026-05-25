@@ -1,7 +1,7 @@
 name: Publish
 
 # Triggers on a semver tag like v1.0.1. The version embedded in the tag must
-# match both package.json and jsr.json — the `verify` job enforces this.
+# match both packages/inferdi/package.json and packages/inferdi/jsr.json — the `verify` job enforces this.
 on:
   push:
     tags:
@@ -20,15 +20,15 @@ jobs:
         name: Tag must match package.json AND jsr.json
         run: |
           TAG="${GITHUB_REF#refs/tags/v}"
-          PKG=$(node -p "require('./package.json').version")
-          JSR=$(node -p "require('./jsr.json').version")
-          echo "tag=$TAG package.json=$PKG jsr.json=$JSR"
+          PKG=$(node -p "require('./packages/inferdi/package.json').version")
+          JSR=$(node -p "require('./packages/inferdi/jsr.json').version")
+          echo "tag=$TAG packages/inferdi/package.json=$PKG packages/inferdi/jsr.json=$JSR"
           if [ "$TAG" != "$PKG" ]; then
-            echo "::error::Tag v$TAG does not match package.json version $PKG"
+            echo "::error::Tag v$TAG does not match packages/inferdi/package.json version $PKG"
             exit 1
           fi
           if [ "$TAG" != "$JSR" ]; then
-            echo "::error::Tag v$TAG does not match jsr.json version $JSR"
+            echo "::error::Tag v$TAG does not match packages/inferdi/jsr.json version $JSR"
             exit 1
           fi
           echo "version=$TAG" >> "$GITHUB_OUTPUT"
@@ -46,12 +46,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - run: corepack enable
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
 
       - name: Publish ${{ needs.verify.outputs.version }} to JSR
-        run: npx --yes jsr publish
+        run: pnpm dlx jsr publish
+        working-directory: packages/inferdi
 
   publish-npm:
     name: Publish to npm (with provenance)
@@ -66,13 +69,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - run: corepack enable
+
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          cache: 'npm'
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
-      # `prepublishOnly` (defined in package.json) runs clean → typecheck → build.
+      # `prepublishOnly` (defined in packages/inferdi/package.json) runs clean → typecheck → build.
       - name: Publish ${{ needs.verify.outputs.version }} to npm
-        run: npm publish --provenance --access public
+        run: pnpm publish --provenance --access public --no-git-checks
+        working-directory: packages/inferdi

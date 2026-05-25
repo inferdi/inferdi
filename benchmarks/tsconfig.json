@@ -14,7 +14,7 @@
     "types": ["node", "reflect-metadata"],
     "baseUrl": ".",
     "paths": {
-      "@inferdi/inferdi": ["../src/index.ts"]
+      "@inferdi/inferdi": ["../packages/inferdi/src/index.ts"]
     },
     "noEmit": true
   },

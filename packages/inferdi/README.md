@@ -20,10 +20,8 @@ A zero-dependency, **decorator-free**, strongly typed DI container for modern Ty
 - **Getting Started**
   - [Install](#install)
   - [Quick Start](#quick-start)
-  - [Examples](#examples)
 - **Overview**
   - [Why InferDI?](#why-inferdi)
-  - [Performance](#performance)
 - **Core Concepts**
   - [Factories](#factories)
   - [Binding Interfaces](#binding-interfaces)
@@ -65,36 +63,6 @@ Legacy DI is slow, bloated with decorators, and prone to memory leaks. **InferDI
 
 - 🔣 **String *or* Symbol keys**  
   Register services under either a plain string or a `symbol`. Use `Symbol.for('shared')` for cross-module identity without imports, `unique symbol` constants for type-level branding, or local `Symbol()` for collision-free private DI.
-
-## Performance
-
-InferDI is built for raw engine speed. Static type checking instead of runtime reflection, no `Proxy` traps on resolve, and arity-unrolled constructor calls (0–7 args take a direct `new Ctor(...)` path) translate into measurable wins across every common DI workload.
-
-The repository ships a comprehensive benchmark suite in [`benchmarks/`](https://github.com/inferdi/inferdi/tree/main/benchmarks) comparing InferDI against the five widely used TypeScript DI containers — **InversifyJS v8, Awilix v13 (both PROXY and CLASSIC modes), TSyringe v4, TypeDI v0.10, and Typed Inject v5**. All numbers below are operations per second on Node 22 — higher is better. Reproduce locally with `cd benchmarks && pnpm install --frozen-lockfile && pnpm run bench`.
-
-![benchmarks](https://raw.githubusercontent.com/inferdi/inferdi/main/assets/benchmarking_results.png)
-
-| Scenario                                              | InferDI    | Typed Inject | Awilix (PROXY) | Awilix (CLASSIC) | InversifyJS | TSyringe | TypeDI |
-|-------------------------------------------------------|------------|--------------|----------------|------------------|-------------|----------|--------|
-| **1. Hot singleton resolve** (warm cache)             | **14.2 M** | 7.0 M        | 7.2 M          | 6.9 M            | 6.3 M       | 6.2 M    | 6.4 M  |
-| **2. Transient resolve** (new instance per call)      | **8.4 M**  | 4.3 M        | 3.4 M          | 2.9 M            | 3.4 M       | 2.4 M    | 1.6 M  |
-| **3. Deep graph** (10 levels, all transient)          | **1.85 M** | 1.28 M       | 701 k          | 739 k            | 750 k       | 601 k    | 214 k  |
-| **4a. Wide graph** (4 deps, root transient)           | **7.3 M**  | 3.2 M        | 2.2 M          | 2.3 M            | 2.3 M       | 1.6 M    | 1.1 M  |
-| **4b. Wide graph** (10 deps, root transient)          | **3.5 M**  | 2.6 M        | 1.2 M          | 1.3 M            | 1.6 M       | 1.0 M    | 437 k  |
-| **5. Container build + first resolve**                | **400 k**  | 228 k        | 10 k           | 8 k              | 13 k        | 202 k    | 272 k  |
-| **6. Scoped lifecycle** (create + resolve + cleanup)  | **2.66 M** | 2.39 M       | 492 k          | 413 k            | 28 k        | 1.08 M   | 637 k  |
-| **7. Lazy resolve** (deferred wrapper)                | **12.1 M** | 7.0 M        | 5.5 M          | 4.7 M            | 4.2 M       | 4.0 M    | 2.8 M  |
-
-### Highlights
-
-- **~2× faster on the hot path** than every competitor. A cached singleton resolve in InferDI effectively reduces to a hot `Map.get()` fast path — no Proxy, no metadata lookup, no parent-chain walk for warm services.
-- **30× faster than InversifyJS and 48× faster than Awilix** at building a fresh container with a 30+ key graph and resolving its first service. Registration is a flat `Map.set` per service — no fluent-builder chains, no AST parsing of constructor signatures, no decorator side-effects to apply.
-- **Wide-graph leadership confirms the arity-unrolling fast path:** for up to 7 dependencies V8 inlines the direct `new Ctor(...)` call instead of going through `Reflect.construct`. Even at 10 dependencies — where InferDI falls back to `Reflect.construct` — it stays **1.35× ahead** of the next-fastest non-reflection-based competitor (Typed Inject) and up to **3.5× ahead** of reflection-based containers.
-- **Clean sweep across all eight scenarios.** InferDI now leads every workload, including the previously close ones: the deep-graph 10-level chain (**1.44× over Typed Inject**) and the scope lifecycle (Scenario 6, **1.11× over Typed Inject**) — while including a synchronous `Symbol.dispose` on every iteration of the latter and beating InversifyJS by **94×**.
-- **Typed Inject is the strongest non-InferDI baseline.** Its compile-time-known graph and `static inject = [...] as const` design let it close the gap on deep graphs and scoped flows where reflection-based containers fall apart. InferDI still pulls ahead in every scenario, but the proximity is real and worth crediting.
-- **Scenario 5 caveat:** decorator-based libraries (TypeDI, TSyringe) register classes at *import time* via decorator side-effects, so their registration cost is paid during module evaluation — what's measured for them at "build time" is only child-context creation. InferDI still beats them while registering an entire graph from scratch in under 3 μs.
-
-Full methodology, fairness notes, fixture sources, and per-scenario reasoning: see [`benchmarks/README.md`](https://github.com/inferdi/inferdi/blob/main/benchmarks/README.md).
 
 ## Install
 
@@ -184,49 +152,7 @@ container.get('userRepo').find('42')
 
 `.get(key)` is the only way to resolve a registration: it is fully typed (`K extends keyof T`), throws synchronously on a missing key, and stays out of the way at runtime — there is no Proxy overhead.
 
-## Examples
-
-The repository includes framework and runtime examples in [`examples/`](https://github.com/inferdi/inferdi/tree/main/examples). They are GitHub-only reference snippets: framework dependencies are not installed in this package, and `examples/` is excluded from the npm tarball.
-
-- **JavaScript usage** — [`examples/javascript/`](https://github.com/inferdi/inferdi/tree/main/examples/javascript)
-  - [`node-esm.mjs`](https://github.com/inferdi/inferdi/blob/main/examples/javascript/node-esm.mjs) — Node ESM `import` with `// @ts-check` and JSDoc constructor types.
-  - [`node-commonjs.cjs`](https://github.com/inferdi/inferdi/blob/main/examples/javascript/node-commonjs.cjs) — Node CommonJS `require` with the same runtime wiring.
-  - [`browser-vite.js`](https://github.com/inferdi/inferdi/blob/main/examples/javascript/browser-vite.js) — browser-oriented ESM for Vite or another bundler.
-- **Shared foundation** — [`examples/_shared/`](https://github.com/inferdi/inferdi/tree/main/examples/_shared)
-  - [`container.ts`](https://github.com/inferdi/inferdi/blob/main/examples/_shared/container.ts) — canonical container builder used by most server examples.
-  - [`testing.ts`](https://github.com/inferdi/inferdi/blob/main/examples/_shared/testing.ts) — typed test fixtures and `override()` usage.
-- **Backend frameworks** — [`examples/backend/`](https://github.com/inferdi/inferdi/tree/main/examples/backend)
-  - [`fastify.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/fastify.ts)
-  - [`hono.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/hono.ts)
-  - [`elysia.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/elysia.ts)
-  - [`express.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/express.ts)
-  - [`koa.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/koa.ts)
-- **API layers** — [`examples/api-layers/`](https://github.com/inferdi/inferdi/tree/main/examples/api-layers)
-  - [`trpc.ts`](https://github.com/inferdi/inferdi/blob/main/examples/api-layers/trpc.ts)
-  - [`apollo-server.ts`](https://github.com/inferdi/inferdi/blob/main/examples/api-layers/apollo-server.ts)
-  - [`graphql-yoga.ts`](https://github.com/inferdi/inferdi/blob/main/examples/api-layers/graphql-yoga.ts)
-- **Full-stack frameworks** — [`examples/fullstack/`](https://github.com/inferdi/inferdi/tree/main/examples/fullstack)
-  - [`next-app-router.ts`](https://github.com/inferdi/inferdi/blob/main/examples/fullstack/next-app-router.ts)
-  - [`remix.ts`](https://github.com/inferdi/inferdi/blob/main/examples/fullstack/remix.ts)
-- **Runtimes and edge platforms** — [`examples/runtimes-edge/`](https://github.com/inferdi/inferdi/tree/main/examples/runtimes-edge)
-  - [`node-http.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/node-http.ts)
-  - [`bun-serve.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/bun-serve.ts)
-  - [`deno-http.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/deno-http.ts)
-  - [`cloudflare-workers.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/cloudflare-workers.ts)
-  - [`vercel-edge.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/vercel-edge.ts)
-  - [`deno-deploy.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/deno-deploy.ts)
-  - [`supabase-edge-functions.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/supabase-edge-functions.ts)
-- **Frontend frameworks** — [`examples/frontend/`](https://github.com/inferdi/inferdi/tree/main/examples/frontend)
-  - [`react.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react.tsx)
-  - [`react-native.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react-native.tsx)
-  - [`vue.ts`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/vue.ts)
-  - [`svelte.ts`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/svelte.ts)
-- **Bots, queues, and CLI** — [`examples/workers-cli/`](https://github.com/inferdi/inferdi/tree/main/examples/workers-cli)
-  - [`telegraf.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/telegraf.ts)
-  - [`grammy.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/grammy.ts)
-  - [`bullmq.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/bullmq.ts)
-  - [`commander.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/commander.ts)
-  - [`yargs.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/yargs.ts)
+> For framework/runtime examples and comparative benchmarks against other DI containers, see the [project repository on GitHub](https://github.com/inferdi/inferdi#readme).
 
 ## Factories
 
@@ -711,7 +637,7 @@ The container throws structured errors with actionable messages — surface thes
 
 ## Migration
 
-Upgrading from a previous major version? See **[MIGRATION.md](https://github.com/inferdi/inferdi/blob/main/packages/inferdi/MIGRATION.md)** for the full per-version checklist (breaking changes, one-line rewrites, and what's new).
+Upgrading from a previous major version? See **[MIGRATION.md](./MIGRATION.md)** for the full per-version checklist (breaking changes, one-line rewrites, and what's new).
 
 ## API Summary
 
@@ -850,14 +776,6 @@ type Module<TIn extends DependenciesMap, TOut extends DependenciesMap> =
   (c: Container<TIn>) => Container<TIn & TOut>
 ```
 
-## Repository Structure
-
-This repository is a pnpm monorepo:
-
-- [`packages/inferdi/`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) — the published `@inferdi/inferdi` source on npm and JSR.
-- [`benchmarks/`](https://github.com/inferdi/inferdi/tree/main/benchmarks) — private, self-contained comparative benchmarks against InversifyJS, Awilix, TSyringe, TypeDI, and Typed Inject. Isolated workspace with its own lockfile.
-- [`examples/`](https://github.com/inferdi/inferdi/tree/main/examples) — GitHub-only reference snippets for framework and runtime integrations.
-
 ## License
 
-MIT — see [LICENSE](https://github.com/inferdi/inferdi/blob/main/LICENSE).
+MIT — see [LICENSE](./LICENSE).

@@ -1,79 +1,20 @@
 {
-  "name": "@inferdi/inferdi",
-  "version": "4.0.0",
-  "description": "Zero-dependency, decorator-free, strictly typed DI container for TypeScript. Features scopes, lazy injection, lifetime guards, and explicit async teardown.",
-  "keywords": [
-    "typescript",
-    "dependency-injection",
-    "di",
-    "ioc",
-    "container",
-    "inversion-of-control",
-    "scoped",
-    "disposable",
-    "no-decorators",
-    "zero-dependency",
-    "fluent-api"
-  ],
-  "author": {
-    "name": "Viacheslav Kabanov",
-    "email": "vkabanov@inferdi.com",
-    "url": "https://github.com/maxrendel"
-  },
-  "license": "MIT",
-  "homepage": "https://github.com/inferdi/inferdi#readme",
-  "bugs": {
-    "url": "https://github.com/inferdi/inferdi/issues"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/inferdi/inferdi.git"
-  },
+  "name": "inferdi-monorepo",
+  "version": "0.0.0",
+  "private": true,
   "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      },
-      "require": {
-        "types": "./dist/index.d.cts",
-        "default": "./dist/index.cjs"
-      }
-    },
-    "./package.json": "./package.json"
-  },
-  "files": [
-    "dist",
-    "README.md",
-    "MIGRATION.md",
-    "LICENSE"
-  ],
-  "sideEffects": false,
-  "engines": {
-    "node": ">=16.0.0"
-  },
-  "publishConfig": {
-    "access": "public"
-  },
+  "packageManager": "pnpm@11.3.0",
   "scripts": {
-    "build": "tsup",
-    "clean": "rm -rf dist",
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "test:types": "vitest --typecheck.enabled --run",
-    "bench": "vitest bench --run",
-    "prepublishOnly": "npm run clean && npm run typecheck && npm run build"
-  },
-  "devDependencies": {
-    "@vitest/coverage-v8": "^4.1.5",
-    "tsup": "^8.3.0",
-    "typescript": "^5.6.0",
-    "vitest": "^4.1.5"
+    "build": "pnpm --filter @inferdi/inferdi build",
+    "clean": "pnpm --filter @inferdi/inferdi clean",
+    "typecheck": "pnpm --filter @inferdi/inferdi typecheck",
+    "test": "pnpm --filter @inferdi/inferdi test",
+    "test:watch": "pnpm --filter @inferdi/inferdi test:watch",
+    "test:coverage": "pnpm --filter @inferdi/inferdi test:coverage",
+    "test:types": "pnpm --filter @inferdi/inferdi test:types",
+    "bench": "pnpm --filter @inferdi/inferdi bench",
+    "benchmarks:install": "pnpm --dir benchmarks install",
+    "benchmarks:precondition": "pnpm --dir benchmarks run precondition",
+    "benchmarks:bench": "pnpm --dir benchmarks run bench"
   }
 }

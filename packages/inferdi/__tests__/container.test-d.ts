@@ -4,7 +4,7 @@ import {Container, type Lazy, type Module, type Spec, type SpecMap} from '../src
 // ────────────────────────────────────────────────────────────────────────────
 // Phase 4 — Type-level tests (fluent API)
 //
-// Run via `npm run test:types` (vitest --typecheck).
+// Run via `pnpm run test:types` (vitest --typecheck).
 // Vitest enforces @ts-expect-error: if the marked line has NO TS error, the
 // test fails. So these comments simultaneously verify negative cases
 // (must not compile) and positive cases (must compile).
