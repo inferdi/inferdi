@@ -38,7 +38,7 @@ jobs:
         if: matrix.node == '22'
         uses: codecov/codecov-action@v5
         with:
-          files: ./packages/inferdi/coverage/lcov.info
+          files: ./packages/inferdi/coverage/lcov.info,./packages/fastify/coverage/lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
           verbose: true

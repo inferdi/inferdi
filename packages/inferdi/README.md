@@ -156,7 +156,7 @@ container.get('userRepo').find('42')
 
 ## Factories
 
-Use `registerFactory` when construction is more than `new Class(deps)` — for example, when you need to read multiple values from the container, build a config object, or wrap a third-party connection. The factory receives the container; the type `V` is inferred from its return value.
+Use `registerFactory` when construction is more than `new Class(deps)` — for example, when you need to read multiple values from the container, build a config object, or wrap a third-party connection. The factory receives the container, the type `V` is inferred from its return value.
 
 ```ts
 import { Pool } from 'pg'
@@ -265,7 +265,7 @@ try {
 
 ### Async Factories
 
-Factories can be async without any special API. The factory's `Promise` is cached verbatim, so every concurrent `c.get(key)` sees the same in-flight Promise — initialization runs exactly once even under request bursts (Edge functions, serverless cold starts). Callers `await` the value at the use site. On `await container.dispose()` the container unwraps the Promise and probes the resolved instance for the disposer protocol; rejections fold into the same `AggregateError` as any other teardown error. Sync `using` on a container that cached a Promise is a misuse — use `await using` / `await container.dispose()`.
+Factories can be async without any special API. The factory's `Promise` is cached verbatim, so every concurrent `c.get(key)` sees the same in-flight Promise — initialization runs exactly once even under request bursts (Edge functions, serverless cold starts). Callers `await` the value at the use site. On `await container.dispose()` the container unwraps the Promise and probes the resolved instance for the disposer protocol, rejections fold into the same `AggregateError` as any other teardown error. Sync `using` on a container that cached a Promise is a misuse — use `await using` / `await container.dispose()`.
 
 ```ts
 const c = new Container()
@@ -338,7 +338,7 @@ In `strict: false` mode `get()` drops the cycle bookkeeping (`resolving`
 push/pop + `Array#includes`), the singleton-stack push/pop, and the
 surrounding `try`/`finally` from the resolve path. Local transient resolves
 collapse to a bare `fn(this)` call — measured ~30% faster on a flat
-transient graph; cached singleton/scoped resolves are unaffected because
+transient graph, cached singleton/scoped resolves are unaffected because
 the cache fast-path runs upstream of any guard. The flag is inherited by
 every child created via `createScope()`.
 
@@ -357,7 +357,7 @@ subset of what the runtime guard catches:
 
 In particular, **the type system cannot see cycles**. A `Singleton →
 Singleton` cycle compiles cleanly (both ends pass the `AllowedDeps`
-filter); only `strict: true` reports it as `Circular dependency detected:
+filter), only `strict: true` reports it as `Circular dependency detected:
 a -> b -> a`, while `strict: false` lets V8 recurse until
 `RangeError: Maximum call stack size exceeded`. The same applies to
 `Transient ↔ Transient` cycles, which `AllowedDeps` never filters at all.
@@ -375,7 +375,7 @@ root.registerFactory('logger', () => {
 }, 'singleton')
 ```
 
-`strict: true` catches this at runtime; `strict: false` does not.
+`strict: true` catches this at runtime, `strict: false` does not.
 
 **Use `strict: false` only when you're certain that:**
 
@@ -415,7 +415,7 @@ const c = new Container()
 c.get('audit').record('login')
 ```
 
-**Lazy preserves the target's lifetime; it is not a lifetime escape hatch.** A singleton consumer may inject only `Lazy<singleton>` companions. `Lazy<scoped>` and `Lazy<transient>` are rejected by the compile-time `AllowedDeps` filter inside a singleton, and the strict-mode runtime guard rejects the same shape if you bypass the type system with an `as`-cast. For scoped or transient consumers, every `Lazy<*>` variant remains legal.
+**Lazy preserves the target's lifetime, it is not a lifetime escape hatch.** A singleton consumer may inject only `Lazy<singleton>` companions. `Lazy<scoped>` and `Lazy<transient>` are rejected by the compile-time `AllowedDeps` filter inside a singleton, and the strict-mode runtime guard rejects the same shape if you bypass the type system with an `as`-cast. For scoped or transient consumers, every `Lazy<*>` variant remains legal.
 
 ```ts
 new Container()
@@ -424,16 +424,16 @@ new Container()
   .registerClass('app', AppService, ['reqLazy'], 'singleton')
 ```
 
-Need a fresh per-request view of a short-lived service inside a singleton? Use [`AsyncLocalStorage`](https://nodejs.org/api/async_context.html) — a DI container with captured scope cannot model "dynamic scope" on its own. The runtime diagnostic for a Lazy-companion leak still reads `Singleton "X" cannot depend on transient "<lazyKey>"` because the wrapper itself is transient; treat that as "this Lazy resolves a non-singleton target — not safe here".
+Need a fresh per-request view of a short-lived service inside a singleton? Use [`AsyncLocalStorage`](https://nodejs.org/api/async_context.html) — a DI container with captured scope cannot model "dynamic scope" on its own. The runtime diagnostic for a Lazy-companion leak still reads `Singleton "X" cannot depend on transient "<lazyKey>"` because the wrapper itself is transient, treat that as "this Lazy resolves a non-singleton target — not safe here".
 
-> **Note on circular dependencies.** True mutual recursion (A's constructor needs B, B's constructor needs A) cannot be expressed in fluent registration — both sides would forward-reference each other's keys, which the type system rejects by design. Between two singletons, you can break the cycle with `Lazy<singleton>` on one side. For factory-introduced cycles the runtime detector reports them precisely; it never "breaks" cycles automatically.
+> **Note on circular dependencies.** True mutual recursion (A's constructor needs B, B's constructor needs A) cannot be expressed in fluent registration — both sides would forward-reference each other's keys, which the type system rejects by design. Between two singletons, you can break the cycle with `Lazy<singleton>` on one side. For factory-introduced cycles the runtime detector reports them precisely, it never "breaks" cycles automatically.
 
 ## Symbol Keys
 
 Every `register*` method also accepts a `symbol` for the key. String and symbol keys mix freely in the same container — `deps` arrays, the `lazyKey` companion, factory bodies and `Module<TIn, TOut>` all accept both interchangeably. Using symbols unlocks three patterns that string keys cannot express:
 
 - **Collision-free private DI.** A local `Symbol(desc)` exists only inside the module that created it. Registering under it makes the service unreachable from outside without explicitly exporting the token.
-- **Cross-module sharing via `Symbol.for(name)`.** Two parts of the codebase agree on a name; `Symbol.for` returns the same token everywhere, so they share identity without importing each other.
+- **Cross-module sharing via `Symbol.for(name)`.** Two parts of the codebase agree on a name, `Symbol.for` returns the same token everywhere, so they share identity without importing each other.
 - **Type-level branding.** A symbol token is nominally typed: two structurally identical services keyed by distinct symbols are no longer interchangeable in `DepsOf`. (For maximum nominal precision, annotate as `unique symbol` — but ordinary `const` declarations are enough for runtime identity and most type checking.)
 
 ```ts
@@ -516,7 +516,7 @@ const fixture = new Container()
   .use(fixtureMailer)
 ```
 
-> **Why no portable generic modules?** A function like `<T>(c: Container<T>) => c.registerClass('db', ...)` cannot type-check inside the body — `keyof T` collapses to `string` from the `DependenciesMap` upper bound and `Exclude<'db', string>` becomes `never`, blocking the call. This is the cost of the compile-time uniqueness guarantee on registration. Use inline lambdas for one-shot grouping; use `Module<TIn, TOut>` when input shape is known.
+> **Why no portable generic modules?** A function like `<T>(c: Container<T>) => c.registerClass('db', ...)` cannot type-check inside the body — `keyof T` collapses to `string` from the `DependenciesMap` upper bound and `Exclude<'db', string>` becomes `never`, blocking the call. This is the cost of the compile-time uniqueness guarantee on registration. Use inline lambdas for one-shot grouping, use `Module<TIn, TOut>` when input shape is known.
 
 ## Querying with `.has()`
 
@@ -564,7 +564,7 @@ c.get('userRepo').save(/* ... */)         // uses the mocks
 - ⛔ **Fail-fast on late overrides.** `.override()` throws if the key has already been resolved on this container. A late override would leave existing consumers holding the original reference while new resolves see the mock — a split dependency graph. Always override **before** the first `.get()`.
 - 💥 **Disposed-container guard.** Throws on a disposed container.
 - 🧹 **Externally owned.** Like `registerValue`, the override value is **not** added to the container's disposal queue. The test suite owns the mock's lifetime.
-- 🔒 **Scope-local.** `.override()` mutates only the container it was called on. `root.createScope().override('db', mock)` leaves `root` untouched and is invisible to sibling scopes; a parent-level override propagates via the standard parent walk-up.
+- 🔒 **Scope-local.** `.override()` mutates only the container it was called on. `root.createScope().override('db', mock)` leaves `root` untouched and is invisible to sibling scopes, a parent-level override propagates via the standard parent walk-up.
 
 > ⚠️ **Production code should not call `.override()`.** It exists for tests and hot-reload-style fixtures. Use `.use()` for conditional registration in production builders.
 

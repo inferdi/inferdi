@@ -1,13 +1,16 @@
 {
-  "name": "@inferdi/inferdi",
+  "name": "@inferdi/fastify",
   "version": "4.0.2",
   "license": "MIT",
   "exports": "./src/index.ts",
+  "imports": {
+    "fastify": "npm:fastify@^5.0.0",
+    "fastify-plugin": "npm:fastify-plugin@^5.1.0"
+  },
   "publish": {
     "include": [
       "src/**/*.ts",
       "README.md",
-      "MIGRATION.md",
       "LICENSE",
       "jsr.json"
     ],

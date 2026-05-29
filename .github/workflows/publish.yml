@@ -1,7 +1,7 @@
 name: Publish
 
 # Triggers on a semver tag like v1.0.1. The version embedded in the tag must
-# match both packages/inferdi/package.json and packages/inferdi/jsr.json — the `verify` job enforces this.
+# match every published package manifest — the `verify` job enforces this.
 on:
   push:
     tags:
@@ -17,20 +17,22 @@ jobs:
       - uses: actions/checkout@v4
 
       - id: check
-        name: Tag must match package.json AND jsr.json
+        name: Tag must match all package.json and jsr.json versions
         run: |
           TAG="${GITHUB_REF#refs/tags/v}"
-          PKG=$(node -p "require('./packages/inferdi/package.json').version")
-          JSR=$(node -p "require('./packages/inferdi/jsr.json').version")
-          echo "tag=$TAG packages/inferdi/package.json=$PKG packages/inferdi/jsr.json=$JSR"
-          if [ "$TAG" != "$PKG" ]; then
-            echo "::error::Tag v$TAG does not match packages/inferdi/package.json version $PKG"
-            exit 1
-          fi
-          if [ "$TAG" != "$JSR" ]; then
-            echo "::error::Tag v$TAG does not match packages/inferdi/jsr.json version $JSR"
-            exit 1
-          fi
+          for MANIFEST in \
+            packages/inferdi/package.json \
+            packages/inferdi/jsr.json \
+            packages/fastify/package.json \
+            packages/fastify/jsr.json
+          do
+            VERSION=$(node -p "require('./$MANIFEST').version")
+            echo "tag=$TAG $MANIFEST=$VERSION"
+            if [ "$TAG" != "$VERSION" ]; then
+              echo "::error::Tag v$TAG does not match $MANIFEST version $VERSION"
+              exit 1
+            fi
+          done
           echo "version=$TAG" >> "$GITHUB_OUTPUT"
 
   publish-jsr:
@@ -51,10 +53,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Publish ${{ needs.verify.outputs.version }} to JSR
+      - run: pnpm install --frozen-lockfile
+
+      - name: Publish @inferdi/inferdi ${{ needs.verify.outputs.version }} to JSR
         run: pnpm dlx jsr publish
         working-directory: packages/inferdi
+
+      - name: Publish @inferdi/fastify ${{ needs.verify.outputs.version }} to JSR
+        run: pnpm dlx jsr publish
+        working-directory: packages/fastify
 
   publish-npm:
     name: Publish to npm (with provenance)
@@ -79,7 +89,11 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # `prepublishOnly` (defined in packages/inferdi/package.json) runs clean → typecheck → build.
-      - name: Publish ${{ needs.verify.outputs.version }} to npm
+      # `prepublishOnly` runs clean → typecheck → build for each package.
+      - name: Publish @inferdi/inferdi ${{ needs.verify.outputs.version }} to npm
         run: pnpm publish --provenance --access public --no-git-checks
         working-directory: packages/inferdi
+
+      - name: Publish @inferdi/fastify ${{ needs.verify.outputs.version }} to npm
+        run: pnpm publish --provenance --access public --no-git-checks
+        working-directory: packages/fastify
