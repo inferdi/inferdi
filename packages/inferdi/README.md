@@ -27,7 +27,9 @@ A zero-dependency, **decorator-free**, strongly typed DI container for modern Ty
   - [Binding Interfaces](#binding-interfaces)
   - [Compiler-enforced Signatures](#compiler-enforced-signatures)
   - [Scopes & Native Teardown](#scopes--native-teardown)
+    - [Async Factories](#async-factories)
   - [Strict Lifetime Guards](#strict-lifetime-guards)
+    - [Fast Mode: `new Container({ strict: false })`](#fast-mode-new-container-strict-false)
 - **Advanced Usage**
   - [Lazy Injection](#lazy-injection)
   - [Symbol Keys](#symbol-keys)
@@ -473,7 +475,12 @@ c.get(DB_LAZY).get()      // typed as Lazy<PgPool>
 c.get('clockLazy').get()  // typed as Lazy<Clock>
 ```
 
-> **⚡ Performance tip — prefer symbol keys for the absolute limit.**
+> **⚡ Performance tip — symbol keys on the hottest paths.** The internal
+> registry is a `Map` keyed by your raw keys. Symbols compare by identity (a
+> pointer check), while string keys go through hashing and, on a hash collision,
+> character comparison. In almost every app the difference is unmeasurable —
+> reach for symbols here only when a profiler points at a tight resolve loop, and
+> benchmark the swap before relying on it.
 
 ## Modularity with `.use()`
 
