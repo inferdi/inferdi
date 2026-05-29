@@ -59,12 +59,26 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - name: Publish @inferdi/inferdi ${{ needs.verify.outputs.version }} to JSR
-        run: pnpm dlx jsr publish
         working-directory: packages/inferdi
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          if curl -fsSL "https://jsr.io/@inferdi/inferdi/meta.json" | grep -q "\"$VERSION\""; then
+            echo "::notice::@inferdi/inferdi@$VERSION already on JSR, skipping"
+          else
+            pnpm dlx jsr publish
+          fi
 
       - name: Publish @inferdi/fastify ${{ needs.verify.outputs.version }} to JSR
-        run: pnpm dlx jsr publish
         working-directory: packages/fastify
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          if curl -fsSL "https://jsr.io/@inferdi/fastify/meta.json" | grep -q "\"$VERSION\""; then
+            echo "::notice::@inferdi/fastify@$VERSION already on JSR, skipping"
+          else
+            pnpm dlx jsr publish
+          fi
 
   publish-npm:
     name: Publish to npm (with provenance)
@@ -91,9 +105,23 @@ jobs:
 
       # `prepublishOnly` runs clean → typecheck → build for each package.
       - name: Publish @inferdi/inferdi ${{ needs.verify.outputs.version }} to npm
-        run: pnpm publish --provenance --access public --no-git-checks
         working-directory: packages/inferdi
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          if npm view "@inferdi/inferdi@$VERSION" version > /dev/null 2>&1; then
+            echo "::notice::@inferdi/inferdi@$VERSION already on npm, skipping"
+          else
+            pnpm publish --provenance --access public --no-git-checks
+          fi
 
       - name: Publish @inferdi/fastify ${{ needs.verify.outputs.version }} to npm
-        run: pnpm publish --provenance --access public --no-git-checks
         working-directory: packages/fastify
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          if npm view "@inferdi/fastify@$VERSION" version > /dev/null 2>&1; then
+            echo "::notice::@inferdi/fastify@$VERSION already on npm, skipping"
+          else
+            pnpm publish --provenance --access public --no-git-checks
+          fi
