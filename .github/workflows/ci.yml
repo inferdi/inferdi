@@ -61,6 +61,8 @@ jobs:
         with:
           node-version: '22'
 
+      - run: pnpm install --frozen-lockfile
+
       - name: Dry-run jsr publish (validates jsr.json + slow-types)
         run: pnpm dlx jsr publish --dry-run --allow-dirty
         working-directory: packages/${{ matrix.package }}
