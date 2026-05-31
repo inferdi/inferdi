@@ -1,40 +1,23 @@
 import { Hono } from 'hono'
+import { inferdiHono, type InferdiHonoEnv } from '@inferdi/hono'
 
-import {
-  buildRootContainer,
-  createRequestScope,
-  type RequestContainer,
-} from '../_shared/container.js'
+import { buildRootContainer } from '../_shared/container.js'
 
 const root = buildRootContainer()
+type AppEnv = InferdiHonoEnv<typeof root>
 
-type Bindings = {
-  Variables: {
-    container: RequestContainer
-  }
-}
+export const app = new Hono<AppEnv>()
 
-export const app = new Hono<Bindings>()
-
-app.use(async (c, next) => {
-  const scope = await createRequestScope(root, {
-    requestId: crypto.randomUUID(),
-    userId: c.req.header('x-user-id'),
-  })
-  c.set('container', scope)
-
-  // This try/finally is correct for bounded, non-streaming Hono responses.
-  // For c.stream() / ReadableStream responses, the Response can be returned
-  // before the stream is consumed. In that case, wrap the stream's lifecycle
-  // or schedule cleanup with c.executionCtx.waitUntil(...) after stream work.
-  try {
-    await next()
-  } finally {
-    await scope.dispose()
-  }
-})
+app.use('*', inferdiHono({
+  container: root,
+  setupScope: (scope, c) => {
+    const request = scope.get('request')
+    request.requestId = crypto.randomUUID()
+    request.userId = c.req.header('x-user-id')
+  },
+}))
 
 app.get('/users/:id', async (c) => {
-  const user = await c.get('container').get('users').profile(c.req.param('id'))
+  const user = await c.var.di.get('users').profile(c.req.param('id'))
   return c.json(user)
 })

@@ -14,7 +14,7 @@ jobs:
     outputs:
       version: ${{ steps.check.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - id: check
         name: Tag must match all package.json and jsr.json versions
@@ -24,7 +24,9 @@ jobs:
             packages/inferdi/package.json \
             packages/inferdi/jsr.json \
             packages/fastify/package.json \
-            packages/fastify/jsr.json
+            packages/fastify/jsr.json \
+            packages/hono/package.json \
+            packages/hono/jsr.json
           do
             VERSION=$(node -p "require('./$MANIFEST').version")
             echo "tag=$TAG $MANIFEST=$VERSION"
@@ -46,15 +48,13 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - run: corepack enable
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: '22'
-          cache: 'pnpm'
-          cache-dependency-path: pnpm-lock.yaml
 
       - run: pnpm install --frozen-lockfile
 
@@ -80,6 +80,17 @@ jobs:
             pnpm dlx jsr publish
           fi
 
+      - name: Publish @inferdi/hono ${{ needs.verify.outputs.version }} to JSR
+        working-directory: packages/hono
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          if curl -fsSL "https://jsr.io/@inferdi/hono/meta.json" | grep -q "\"$VERSION\""; then
+            echo "::notice::@inferdi/hono@$VERSION already on JSR, skipping"
+          else
+            pnpm dlx jsr publish
+          fi
+
   publish-npm:
     name: Publish to npm (with provenance)
     needs: verify
@@ -91,15 +102,13 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - run: corepack enable
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: '24'
-          cache: 'pnpm'
-          cache-dependency-path: pnpm-lock.yaml
 
       - run: pnpm install --frozen-lockfile
 
@@ -122,6 +131,17 @@ jobs:
         run: |
           if npm view "@inferdi/fastify@$VERSION" version > /dev/null 2>&1; then
             echo "::notice::@inferdi/fastify@$VERSION already on npm, skipping"
+          else
+            pnpm publish --provenance --access public --no-git-checks
+          fi
+
+      - name: Publish @inferdi/hono ${{ needs.verify.outputs.version }} to npm
+        working-directory: packages/hono
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          if npm view "@inferdi/hono@$VERSION" version > /dev/null 2>&1; then
+            echo "::notice::@inferdi/hono@$VERSION already on npm, skipping"
           else
             pnpm publish --provenance --access public --no-git-checks
           fi

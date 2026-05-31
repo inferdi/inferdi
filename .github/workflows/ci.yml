@@ -17,13 +17,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node: ['22', '24']
+        node: ['20.19', '22', '24']
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - run: corepack enable
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: ${{ matrix.node }}
           cache: 'pnpm'
@@ -36,9 +36,9 @@ jobs:
 
       - name: Upload coverage to Codecov
         if: matrix.node == '22'
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
         with:
-          files: ./packages/inferdi/coverage/lcov.info,./packages/fastify/coverage/lcov.info
+          files: ./packages/inferdi/coverage/lcov.info,./packages/fastify/coverage/lcov.info,./packages/hono/coverage/lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
           verbose: true
@@ -48,15 +48,19 @@ jobs:
   jsr-validation:
     name: JSR slow-types check
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [inferdi, fastify, hono]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - run: corepack enable
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: '22'
 
       - name: Dry-run jsr publish (validates jsr.json + slow-types)
         run: pnpm dlx jsr publish --dry-run --allow-dirty
-        working-directory: packages/inferdi
+        working-directory: packages/${{ matrix.package }}

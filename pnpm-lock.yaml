@@ -33,6 +33,27 @@ importers:
         specifier: ^4.1.5
         version: 4.1.5(@vitest/coverage-v8@4.1.5)(vite@8.0.11(esbuild@0.27.7))
 
+  packages/hono:
+    devDependencies:
+      '@inferdi/inferdi':
+        specifier: workspace:*
+        version: link:../inferdi
+      '@vitest/coverage-v8':
+        specifier: ^4.1.5
+        version: 4.1.5(vitest@4.1.5)
+      hono:
+        specifier: ^4.0.0
+        version: 4.12.23
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.1(postcss@8.5.14)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.5
+        version: 4.1.5(@vitest/coverage-v8@4.1.5)(vite@8.0.11(esbuild@0.27.7))
+
   packages/inferdi:
     devDependencies:
       '@vitest/coverage-v8':
@@ -723,6 +744,10 @@ packages:
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
+
+  hono@4.12.23:
+    resolution: {integrity: sha512-eIaZ9qDgu7XV0pxOCrg7/WhnQ6Ivm22UcxhXx/A3dcbqbbYgBEkc6e/J/s7j2tS96zoB0S9VBdLwQNCWwUo4LA==}
+    engines: {node: '>=16.9.0'}
 
   html-escaper@2.0.2:
     resolution: {integrity: sha512-H2iMtd0I4Mt5eYiapRdIDjp+XzelXQ0tFE4JS7YFwFevXXMmOp9myNrUvCg0D6ws8iqkRPBfKHgbwig1SmlLfg==}
@@ -1709,6 +1734,8 @@ snapshots:
     optional: true
 
   has-flag@4.0.0: {}
+
+  hono@4.12.23: {}
 
   html-escaper@2.0.2: {}
 

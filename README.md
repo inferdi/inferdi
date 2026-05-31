@@ -22,6 +22,7 @@ A zero-dependency, **decorator-free**, strongly typed DI container for modern Ty
   - [Quick Start](#quick-start)
   - [Examples](#examples)
   - [Fastify Adapter](#fastify-adapter)
+  - [Hono Adapter](#hono-adapter)
 - **Overview**
   - [Why InferDI?](#why-inferdi)
   - [Performance](#performance)
@@ -201,7 +202,7 @@ The repository includes framework and runtime examples in [`examples/`](https://
   - [`testing.ts`](https://github.com/inferdi/inferdi/blob/main/examples/_shared/testing.ts) — typed test fixtures and `override()` usage.
 - **Backend frameworks** — [`examples/backend/`](https://github.com/inferdi/inferdi/tree/main/examples/backend)
   - [`fastify.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/fastify.ts) — uses `@inferdi/fastify` for request scopes.
-  - [`hono.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/hono.ts)
+  - [`hono.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/hono.ts) — uses `@inferdi/hono` for request scopes.
   - [`elysia.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/elysia.ts)
   - [`express.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/express.ts)
   - [`koa.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/koa.ts)
@@ -279,6 +280,40 @@ app.get('/users/:id', async (request) => {
 ```
 
 Set `scopePerRequest: false` for root-only Fastify apps. In that mode the plugin exposes only `app.di` / `request.server.di` and installs no request lifecycle hooks.
+
+## Hono Adapter
+
+Hono applications can use the separate [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) package to create and dispose one InferDI scope per request. It is published to npm and JSR with the same version as `@inferdi/inferdi`.
+
+```bash
+pnpm add @inferdi/inferdi @inferdi/hono hono
+```
+
+```ts
+import { Hono } from 'hono'
+import { inferdiHono, type InferdiHonoEnv } from '@inferdi/hono'
+import { buildRootContainer } from './container.js'
+
+const root = buildRootContainer()
+type AppEnv = InferdiHonoEnv<typeof root>
+
+const app = new Hono<AppEnv>()
+
+app.use('*', inferdiHono({
+  container: root,
+  setupScope: (scope, c) => {
+    const ctx = scope.get('request')
+    ctx.requestId = crypto.randomUUID()
+    ctx.userId = c.req.header('x-user-id')
+  },
+}))
+
+app.get('/users/:id', async (c) => {
+  return c.json(await c.var.di.get('users').profile(c.req.param('id')))
+})
+```
+
+Streaming Hono routes should call `skipInferdiDispose(c)` and dispose the scope inside the stream lifecycle, because Hono can return the `Response` before the stream callback finishes.
 
 ## Factories
 
@@ -913,6 +948,7 @@ This repository is a pnpm monorepo:
 
 - [`packages/inferdi/`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) — the published `@inferdi/inferdi` source on npm and JSR.
 - [`packages/fastify/`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) — the published `@inferdi/fastify` Fastify v5 request-scope adapter for npm and JSR.
+- [`packages/hono/`](https://github.com/inferdi/inferdi/tree/main/packages/hono) — the published `@inferdi/hono` Hono request-scope middleware for npm and JSR.
 - [`benchmarks/`](https://github.com/inferdi/inferdi/tree/main/benchmarks) — private, self-contained comparative benchmarks against InversifyJS, Awilix, TSyringe, TypeDI, and Typed Inject. Isolated workspace with its own lockfile.
 - [`examples/`](https://github.com/inferdi/inferdi/tree/main/examples) — GitHub-only reference snippets for framework and runtime integrations.
 
