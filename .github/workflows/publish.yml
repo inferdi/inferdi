@@ -26,7 +26,9 @@ jobs:
             packages/fastify/package.json \
             packages/fastify/jsr.json \
             packages/hono/package.json \
-            packages/hono/jsr.json
+            packages/hono/jsr.json \
+            packages/elysia/package.json \
+            packages/elysia/jsr.json
           do
             VERSION=$(node -p "require('./$MANIFEST').version")
             echo "tag=$TAG $MANIFEST=$VERSION"
@@ -91,6 +93,17 @@ jobs:
             pnpm dlx jsr publish
           fi
 
+      - name: Publish @inferdi/elysia ${{ needs.verify.outputs.version }} to JSR
+        working-directory: packages/elysia
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          if curl -fsSL "https://jsr.io/@inferdi/elysia/meta.json" | grep -q "\"$VERSION\""; then
+            echo "::notice::@inferdi/elysia@$VERSION already on JSR, skipping"
+          else
+            pnpm dlx jsr publish
+          fi
+
   publish-npm:
     name: Publish to npm (with provenance)
     needs: verify
@@ -142,6 +155,17 @@ jobs:
         run: |
           if npm view "@inferdi/hono@$VERSION" version > /dev/null 2>&1; then
             echo "::notice::@inferdi/hono@$VERSION already on npm, skipping"
+          else
+            pnpm publish --provenance --access public --no-git-checks
+          fi
+
+      - name: Publish @inferdi/elysia ${{ needs.verify.outputs.version }} to npm
+        working-directory: packages/elysia
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          if npm view "@inferdi/elysia@$VERSION" version > /dev/null 2>&1; then
+            echo "::notice::@inferdi/elysia@$VERSION already on npm, skipping"
           else
             pnpm publish --provenance --access public --no-git-checks
           fi
