@@ -1,6 +1,6 @@
 {
   "name": "@inferdi/fastify",
-  "version": "4.0.7",
+  "version": "4.0.8",
   "description": "Fastify request-scope adapter for InferDI.",
   "keywords": [
     "typescript",

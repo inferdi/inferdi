@@ -1,6 +1,6 @@
 {
   "name": "@inferdi/inferdi",
-  "version": "4.0.7",
+  "version": "4.0.8",
   "description": "Zero-dependency, decorator-free, strictly typed DI container for TypeScript. Features scopes, lazy injection, lifetime guards, and explicit async teardown.",
   "keywords": [
     "typescript",

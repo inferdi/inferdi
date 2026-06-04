@@ -1,10 +1,10 @@
 {
-  "name": "@inferdi/elysia",
+  "name": "@inferdi/koa",
   "version": "4.0.8",
   "license": "MIT",
   "exports": "./src/index.ts",
   "imports": {
-    "elysia": "npm:elysia@^1.4.0"
+    "koa": "npm:koa@^3.0.0"
   },
   "publish": {
     "include": [

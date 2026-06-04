@@ -27,6 +27,8 @@ jobs:
             packages/fastify/jsr.json \
             packages/hono/package.json \
             packages/hono/jsr.json \
+            packages/koa/package.json \
+            packages/koa/jsr.json \
             packages/elysia/package.json \
             packages/elysia/jsr.json
           do
@@ -93,6 +95,17 @@ jobs:
             pnpm dlx jsr publish
           fi
 
+      - name: Publish @inferdi/koa ${{ needs.verify.outputs.version }} to JSR
+        working-directory: packages/koa
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          if curl -fsSL "https://jsr.io/@inferdi/koa/meta.json" | grep -q "\"$VERSION\""; then
+            echo "::notice::@inferdi/koa@$VERSION already on JSR, skipping"
+          else
+            pnpm dlx jsr publish
+          fi
+
       - name: Publish @inferdi/elysia ${{ needs.verify.outputs.version }} to JSR
         working-directory: packages/elysia
         env:
@@ -155,6 +168,17 @@ jobs:
         run: |
           if npm view "@inferdi/hono@$VERSION" version > /dev/null 2>&1; then
             echo "::notice::@inferdi/hono@$VERSION already on npm, skipping"
+          else
+            pnpm publish --provenance --access public --no-git-checks
+          fi
+
+      - name: Publish @inferdi/koa ${{ needs.verify.outputs.version }} to npm
+        working-directory: packages/koa
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          if npm view "@inferdi/koa@$VERSION" version > /dev/null 2>&1; then
+            echo "::notice::@inferdi/koa@$VERSION already on npm, skipping"
           else
             pnpm publish --provenance --access public --no-git-checks
           fi

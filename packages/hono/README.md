@@ -194,7 +194,12 @@ export function skipInferdiDispose(context: Context): void
 
 ## Related
 
-- [InferDI](https://github.com/inferdi/inferdi) — the project repository.
-- [`@inferdi/inferdi`](https://www.npmjs.com/package/@inferdi/inferdi) — the core
-  DI container ([JSR](https://jsr.io/@inferdi/inferdi)).
-- [Hono](https://hono.dev) — the web framework this adapter targets.
+| Package | JSR | npm | Description |
+| --- | --- | --- | --- |
+| [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) | [JSR](https://jsr.io/@inferdi/inferdi) | [npm](https://www.npmjs.com/package/@inferdi/inferdi) | Core DI container — zero-dependency, decorator-free, strongly typed |
+| [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | [JSR](https://jsr.io/@inferdi/fastify) | [npm](https://www.npmjs.com/package/@inferdi/fastify) | Fastify v5 request-scope adapter |
+| [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) | [JSR](https://jsr.io/@inferdi/hono) | [npm](https://www.npmjs.com/package/@inferdi/hono) | Hono request-scope middleware |
+| [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) | [JSR](https://jsr.io/@inferdi/koa) | [npm](https://www.npmjs.com/package/@inferdi/koa) | Koa v3 request-scope middleware |
+| [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) | [JSR](https://jsr.io/@inferdi/elysia) | [npm](https://www.npmjs.com/package/@inferdi/elysia) | Elysia request-scope plugin |
+
+The project repository lives at [inferdi/inferdi](https://github.com/inferdi/inferdi). This adapter targets [Hono](https://hono.dev).

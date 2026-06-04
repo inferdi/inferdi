@@ -1,6 +1,6 @@
 {
   "name": "@inferdi/hono",
-  "version": "4.0.7",
+  "version": "4.0.8",
   "license": "MIT",
   "exports": "./src/index.ts",
   "imports": {

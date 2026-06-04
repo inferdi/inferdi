@@ -20,8 +20,14 @@ A zero-dependency, **decorator-free**, strongly typed DI container for modern Ty
 - **Getting Started**
   - [Install](#install)
   - [Quick Start](#quick-start)
+  - [Examples](#examples)
+  - [Fastify Adapter](#fastify-adapter)
+  - [Hono Adapter](#hono-adapter)
+  - [Koa Adapter](#koa-adapter)
+  - [Elysia Adapter](#elysia-adapter)
 - **Overview**
   - [Why InferDI?](#why-inferdi)
+  - [Performance](#performance)
 - **Core Concepts**
   - [Factories](#factories)
   - [Binding Interfaces](#binding-interfaces)
@@ -42,6 +48,7 @@ A zero-dependency, **decorator-free**, strongly typed DI container for modern Ty
   - [Errors](#errors)
   - [Migration](#migration)
   - [API Summary](#api-summary)
+  - [Repository Structure](#repository-structure)
   - [License](#license)
 
 ## Why InferDI?
@@ -65,6 +72,36 @@ Legacy DI is slow, bloated with decorators, and prone to memory leaks. **InferDI
 
 - 🔣 **String *or* Symbol keys**  
   Register services under either a plain string or a `symbol`. Use `Symbol.for('shared')` for cross-module identity without imports, `unique symbol` constants for type-level branding, or local `Symbol()` for collision-free private DI.
+
+## Performance
+
+InferDI is built for raw engine speed. Static type checking instead of runtime reflection, no `Proxy` traps on resolve, and arity-unrolled constructor calls (0–7 args take a direct `new Ctor(...)` path) translate into measurable wins across every common DI workload.
+
+The repository ships a comprehensive benchmark suite in [`benchmarks/`](https://github.com/inferdi/inferdi/tree/main/benchmarks) comparing InferDI against the five widely used TypeScript DI containers — **InversifyJS v8, Awilix v13 (both PROXY and CLASSIC modes), TSyringe v4, TypeDI v0.10, and Typed Inject v5**. All numbers below are operations per second on Node 22 — higher is better. Reproduce locally with `cd benchmarks && pnpm install --frozen-lockfile && pnpm run bench`.
+
+![benchmarks](https://raw.githubusercontent.com/inferdi/inferdi/main/assets/benchmarking_results.png)
+
+| Scenario                                              | InferDI    | Typed Inject | Awilix (PROXY) | Awilix (CLASSIC) | InversifyJS | TSyringe | TypeDI |
+|-------------------------------------------------------|------------|--------------|----------------|------------------|-------------|----------|--------|
+| **1. Hot singleton resolve** (warm cache)             | **14.2 M** | 7.0 M        | 7.2 M          | 6.9 M            | 6.3 M       | 6.2 M    | 6.4 M  |
+| **2. Transient resolve** (new instance per call)      | **8.4 M**  | 4.3 M        | 3.4 M          | 2.9 M            | 3.4 M       | 2.4 M    | 1.6 M  |
+| **3. Deep graph** (10 levels, all transient)          | **1.85 M** | 1.28 M       | 701 k          | 739 k            | 750 k       | 601 k    | 214 k  |
+| **4a. Wide graph** (4 deps, root transient)           | **7.3 M**  | 3.2 M        | 2.2 M          | 2.3 M            | 2.3 M       | 1.6 M    | 1.1 M  |
+| **4b. Wide graph** (10 deps, root transient)          | **3.5 M**  | 2.6 M        | 1.2 M          | 1.3 M            | 1.6 M       | 1.0 M    | 437 k  |
+| **5. Container build + first resolve**                | **400 k**  | 228 k        | 10 k           | 8 k              | 13 k        | 202 k    | 272 k  |
+| **6. Scoped lifecycle** (create + resolve + cleanup)  | **2.66 M** | 2.39 M       | 492 k          | 413 k            | 28 k        | 1.08 M   | 637 k  |
+| **7. Lazy resolve** (deferred wrapper)                | **12.1 M** | 7.0 M        | 5.5 M          | 4.7 M            | 4.2 M       | 4.0 M    | 2.8 M  |
+
+### Highlights
+
+- **~2× faster on the hot path** than every competitor. A cached singleton resolve in InferDI effectively reduces to a hot `Map.get()` fast path — no Proxy, no metadata lookup, no parent-chain walk for warm services.
+- **30× faster than InversifyJS and 48× faster than Awilix** at building a fresh container with a 30+ key graph and resolving its first service. Registration is a flat `Map.set` per service — no fluent-builder chains, no AST parsing of constructor signatures, no decorator side-effects to apply.
+- **Wide-graph leadership confirms the arity-unrolling fast path:** for up to 7 dependencies V8 inlines the direct `new Ctor(...)` call instead of going through `Reflect.construct`. Even at 10 dependencies — where InferDI falls back to `Reflect.construct` — it stays **1.35× ahead** of the next-fastest non-reflection-based competitor (Typed Inject) and up to **3.5× ahead** of reflection-based containers.
+- **Clean sweep across all eight scenarios.** InferDI now leads every workload, including the previously close ones: the deep-graph 10-level chain (**1.44× over Typed Inject**) and the scope lifecycle (Scenario 6, **1.11× over Typed Inject**) — while including a synchronous `Symbol.dispose` on every iteration of the latter and beating InversifyJS by **94×**.
+- **Typed Inject is the strongest non-InferDI baseline.** Its compile-time-known graph and `static inject = [...] as const` design let it close the gap on deep graphs and scoped flows where reflection-based containers fall apart. InferDI still pulls ahead in every scenario, but the proximity is real and worth crediting.
+- **Scenario 5 caveat:** decorator-based libraries (TypeDI, TSyringe) register classes at *import time* via decorator side-effects, so their registration cost is paid during module evaluation — what's measured for them at "build time" is only child-context creation. InferDI still beats them while registering an entire graph from scratch in under 3 μs.
+
+Full methodology, fairness notes, fixture sources, and per-scenario reasoning: see [`benchmarks/README.md`](https://github.com/inferdi/inferdi/blob/main/benchmarks/README.md).
 
 ## Install
 
@@ -154,11 +191,210 @@ container.get('userRepo').find('42')
 
 `.get(key)` is the only way to resolve a registration: it is fully typed (`K extends keyof T`), throws synchronously on a missing key, and stays out of the way at runtime — there is no Proxy overhead.
 
-> For framework/runtime examples and comparative benchmarks against other DI containers, see the [project repository on GitHub](https://github.com/inferdi/inferdi#readme).
+## Examples
+
+The repository includes framework and runtime examples in [`examples/`](https://github.com/inferdi/inferdi/tree/main/examples). They are GitHub-only reference snippets: framework dependencies are not installed in this package, and `examples/` is excluded from the npm tarball.
+
+- **JavaScript usage** — [`examples/javascript/`](https://github.com/inferdi/inferdi/tree/main/examples/javascript)
+  - [`node-esm.mjs`](https://github.com/inferdi/inferdi/blob/main/examples/javascript/node-esm.mjs) — Node ESM `import` with `// @ts-check` and JSDoc constructor types.
+  - [`node-commonjs.cjs`](https://github.com/inferdi/inferdi/blob/main/examples/javascript/node-commonjs.cjs) — Node CommonJS `require` with the same runtime wiring.
+  - [`browser-vite.js`](https://github.com/inferdi/inferdi/blob/main/examples/javascript/browser-vite.js) — browser-oriented ESM for Vite or another bundler.
+- **Shared foundation** — [`examples/_shared/`](https://github.com/inferdi/inferdi/tree/main/examples/_shared)
+  - [`container.ts`](https://github.com/inferdi/inferdi/blob/main/examples/_shared/container.ts) — canonical container builder used by most server examples.
+  - [`testing.ts`](https://github.com/inferdi/inferdi/blob/main/examples/_shared/testing.ts) — typed test fixtures and `override()` usage.
+- **Backend frameworks** — [`examples/backend/`](https://github.com/inferdi/inferdi/tree/main/examples/backend)
+  - [`fastify.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/fastify.ts) — uses `@inferdi/fastify` for request scopes.
+  - [`hono.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/hono.ts) — uses `@inferdi/hono` for request scopes.
+  - [`koa.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/koa.ts) — uses `@inferdi/koa` for request scopes.
+  - [`elysia.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/elysia.ts) — uses `@inferdi/elysia` for request scopes.
+  - [`express.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/express.ts)
+- **API layers** — [`examples/api-layers/`](https://github.com/inferdi/inferdi/tree/main/examples/api-layers)
+  - [`trpc.ts`](https://github.com/inferdi/inferdi/blob/main/examples/api-layers/trpc.ts)
+  - [`apollo-server.ts`](https://github.com/inferdi/inferdi/blob/main/examples/api-layers/apollo-server.ts)
+  - [`graphql-yoga.ts`](https://github.com/inferdi/inferdi/blob/main/examples/api-layers/graphql-yoga.ts)
+- **Full-stack frameworks** — [`examples/fullstack/`](https://github.com/inferdi/inferdi/tree/main/examples/fullstack)
+  - [`next-app-router.ts`](https://github.com/inferdi/inferdi/blob/main/examples/fullstack/next-app-router.ts)
+  - [`remix.ts`](https://github.com/inferdi/inferdi/blob/main/examples/fullstack/remix.ts)
+- **Runtimes and edge platforms** — [`examples/runtimes-edge/`](https://github.com/inferdi/inferdi/tree/main/examples/runtimes-edge)
+  - [`node-http.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/node-http.ts)
+  - [`bun-serve.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/bun-serve.ts)
+  - [`deno-http.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/deno-http.ts)
+  - [`cloudflare-workers.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/cloudflare-workers.ts)
+  - [`vercel-edge.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/vercel-edge.ts)
+  - [`deno-deploy.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/deno-deploy.ts)
+  - [`supabase-edge-functions.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/supabase-edge-functions.ts)
+- **Frontend frameworks** — [`examples/frontend/`](https://github.com/inferdi/inferdi/tree/main/examples/frontend)
+  - [`react.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react.tsx)
+  - [`react-native.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react-native.tsx)
+  - [`vue.ts`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/vue.ts)
+  - [`svelte.ts`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/svelte.ts)
+- **Bots, queues, and CLI** — [`examples/workers-cli/`](https://github.com/inferdi/inferdi/tree/main/examples/workers-cli)
+  - [`telegraf.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/telegraf.ts)
+  - [`grammy.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/grammy.ts)
+  - [`bullmq.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/bullmq.ts)
+  - [`commander.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/commander.ts)
+  - [`yargs.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/yargs.ts)
+
+## Fastify Adapter
+
+Fastify v5 applications can use the separate [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) package to create and dispose one InferDI scope per request. It is published to npm and JSR with the same version as `@inferdi/inferdi`.
+
+```bash
+pnpm add @inferdi/inferdi @inferdi/fastify fastify
+```
+
+```ts
+import Fastify from 'fastify'
+import { inferdiFastify } from '@inferdi/fastify'
+import {
+  buildRootContainer,
+  createRequestScope,
+  type RequestContainer,
+  type RootContainer,
+} from './container.js'
+
+const root = buildRootContainer()
+const app = Fastify()
+
+declare module 'fastify' {
+  interface FastifyInstance {
+    di: RootContainer
+  }
+
+  interface FastifyRequest {
+    di: RequestContainer
+  }
+}
+
+await app.register(inferdiFastify, {
+  container: root,
+  createScope: (root, request) =>
+    createRequestScope(root, {
+      requestId: request.id,
+      ip: request.ip,
+    }),
+})
+
+app.get('/users/:id', async (request) => {
+  const { id } = request.params as { id: string }
+  return request.di.get('users').profile(id)
+})
+```
+
+Set `scopePerRequest: false` for root-only Fastify apps. In that mode the plugin exposes only `app.di` / `request.server.di` and installs no request lifecycle hooks.
+
+## Hono Adapter
+
+Hono applications can use the separate [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) package to create and dispose one InferDI scope per request. It is published to npm and JSR with the same version as `@inferdi/inferdi`.
+
+```bash
+pnpm add @inferdi/inferdi @inferdi/hono hono
+```
+
+```ts
+import { Hono } from 'hono'
+import { inferdiHono, type InferdiHonoEnv } from '@inferdi/hono'
+import { buildRootContainer } from './container.js'
+
+const root = buildRootContainer()
+type AppEnv = InferdiHonoEnv<typeof root>
+
+const app = new Hono<AppEnv>()
+
+app.use('*', inferdiHono({
+  container: root,
+  setupScope: (scope, c) => {
+    const ctx = scope.get('request')
+    ctx.requestId = crypto.randomUUID()
+    ctx.userId = c.req.header('x-user-id')
+  },
+}))
+
+app.get('/users/:id', async (c) => {
+  return c.json(await c.var.di.get('users').profile(c.req.param('id')))
+})
+```
+
+Streaming Hono routes should call `skipInferdiDispose(c)` and dispose the scope inside the stream lifecycle, because Hono can return the `Response` before the stream callback finishes.
+
+## Koa Adapter
+
+Koa v3 applications can use the separate [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) package to create and dispose one InferDI scope per request. It is published to npm and JSR with the same version as `@inferdi/inferdi`.
+
+```bash
+pnpm add @inferdi/inferdi @inferdi/koa koa
+pnpm add -D @types/koa
+```
+
+```ts
+import Koa from 'koa'
+import { inferdiKoa, type InferdiScopeOf } from '@inferdi/koa'
+import { buildRootContainer } from './container.js'
+
+const root = buildRootContainer()
+const app = new Koa()
+
+declare module 'koa' {
+  interface DefaultState {
+    di: InferdiScopeOf<typeof root>
+  }
+}
+
+app.use(inferdiKoa({
+  container: root,
+  setupScope: (scope, ctx) => {
+    const request = scope.get('request')
+    request.requestId = crypto.randomUUID()
+    request.userId = ctx.get('x-user-id') || undefined
+    request.ip = ctx.ip
+  },
+}))
+
+app.use(async (ctx) => {
+  const id = ctx.path.split('/').pop() ?? ''
+  ctx.body = await ctx.state.di.get('users').profile(id)
+})
+```
+
+Koa stream bodies normally do not need manual disposal handling: the adapter waits for the underlying Node response `finish` or `close` event. Call `skipInferdiDispose(ctx)` only when application code intentionally keeps the scope beyond the HTTP response boundary, such as background work that disposes the scope later.
+
+## Elysia Adapter
+
+Elysia applications can use the separate [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) package to create and dispose one InferDI scope per request. It is published to npm and JSR with the same version as `@inferdi/inferdi`.
+
+```bash
+pnpm add @inferdi/inferdi @inferdi/elysia elysia
+```
+
+```ts
+import { Elysia } from 'elysia'
+import { inferdiElysia } from '@inferdi/elysia'
+import {
+  buildRootContainer,
+  createRequestScope,
+} from './container.js'
+
+const root = buildRootContainer()
+
+const app = new Elysia()
+  .use(inferdiElysia({
+    container: root,
+    createScope: (root, { request }) =>
+      createRequestScope(root, {
+        requestId: crypto.randomUUID(),
+        userId: request.headers.get('x-user-id') ?? undefined,
+      }),
+  }))
+  .get('/users/:id', ({ di, params }) =>
+    di.get('users').profile(params.id),
+  )
+```
+
+Elysia streaming routes should call `skipInferdiDispose(context)` and dispose the scope when stream or background work ends. The adapter uses both `onError` and `onAfterResponse` so validation failures after `derive` do not leak request scopes.
 
 ## Factories
 
-Use `registerFactory` when construction is more than `new Class(deps)` — for example, when you need to read multiple values from the container, build a config object, or wrap a third-party connection. The factory receives the container, the type `V` is inferred from its return value.
+Use `registerFactory` when construction is more than `new Class(deps)` — for example, when you need to read multiple values from the container, build a config object, or wrap a third-party connection. The factory receives the container; the type `V` is inferred from its return value.
 
 ```ts
 import { Pool } from 'pg'
@@ -267,7 +503,7 @@ try {
 
 ### Async Factories
 
-Factories can be async without any special API. The factory's `Promise` is cached verbatim, so every concurrent `c.get(key)` sees the same in-flight Promise — initialization runs exactly once even under request bursts (Edge functions, serverless cold starts). Callers `await` the value at the use site. On `await container.dispose()` the container unwraps the Promise and probes the resolved instance for the disposer protocol, rejections fold into the same `AggregateError` as any other teardown error. Sync `using` on a container that cached a Promise is a misuse — use `await using` / `await container.dispose()`.
+Factories can be async without any special API. The factory's `Promise` is cached verbatim, so every concurrent `c.get(key)` sees the same in-flight Promise — initialization runs exactly once even under request bursts (Edge functions, serverless cold starts). Callers `await` the value at the use site. On `await container.dispose()` the container unwraps the Promise and probes the resolved instance for the disposer protocol; rejections fold into the same `AggregateError` as any other teardown error. Sync `using` on a container that cached a Promise is a misuse — use `await using` / `await container.dispose()`.
 
 ```ts
 const c = new Container()
@@ -340,7 +576,7 @@ In `strict: false` mode `get()` drops the cycle bookkeeping (`resolving`
 push/pop + `Array#includes`), the singleton-stack push/pop, and the
 surrounding `try`/`finally` from the resolve path. Local transient resolves
 collapse to a bare `fn(this)` call — measured ~30% faster on a flat
-transient graph, cached singleton/scoped resolves are unaffected because
+transient graph; cached singleton/scoped resolves are unaffected because
 the cache fast-path runs upstream of any guard. The flag is inherited by
 every child created via `createScope()`.
 
@@ -359,7 +595,7 @@ subset of what the runtime guard catches:
 
 In particular, **the type system cannot see cycles**. A `Singleton →
 Singleton` cycle compiles cleanly (both ends pass the `AllowedDeps`
-filter), only `strict: true` reports it as `Circular dependency detected:
+filter); only `strict: true` reports it as `Circular dependency detected:
 a -> b -> a`, while `strict: false` lets V8 recurse until
 `RangeError: Maximum call stack size exceeded`. The same applies to
 `Transient ↔ Transient` cycles, which `AllowedDeps` never filters at all.
@@ -377,7 +613,7 @@ root.registerFactory('logger', () => {
 }, 'singleton')
 ```
 
-`strict: true` catches this at runtime, `strict: false` does not.
+`strict: true` catches this at runtime; `strict: false` does not.
 
 **Use `strict: false` only when you're certain that:**
 
@@ -417,7 +653,7 @@ const c = new Container()
 c.get('audit').record('login')
 ```
 
-**Lazy preserves the target's lifetime, it is not a lifetime escape hatch.** A singleton consumer may inject only `Lazy<singleton>` companions. `Lazy<scoped>` and `Lazy<transient>` are rejected by the compile-time `AllowedDeps` filter inside a singleton, and the strict-mode runtime guard rejects the same shape if you bypass the type system with an `as`-cast. For scoped or transient consumers, every `Lazy<*>` variant remains legal.
+**Lazy preserves the target's lifetime; it is not a lifetime escape hatch.** A singleton consumer may inject only `Lazy<singleton>` companions. `Lazy<scoped>` and `Lazy<transient>` are rejected by the compile-time `AllowedDeps` filter inside a singleton, and the strict-mode runtime guard rejects the same shape if you bypass the type system with an `as`-cast. For scoped or transient consumers, every `Lazy<*>` variant remains legal.
 
 ```ts
 new Container()
@@ -426,16 +662,16 @@ new Container()
   .registerClass('app', AppService, ['reqLazy'], 'singleton')
 ```
 
-Need a fresh per-request view of a short-lived service inside a singleton? Use [`AsyncLocalStorage`](https://nodejs.org/api/async_context.html) — a DI container with captured scope cannot model "dynamic scope" on its own. The runtime diagnostic for a Lazy-companion leak still reads `Singleton "X" cannot depend on transient "<lazyKey>"` because the wrapper itself is transient, treat that as "this Lazy resolves a non-singleton target — not safe here".
+Need a fresh per-request view of a short-lived service inside a singleton? Use [`AsyncLocalStorage`](https://nodejs.org/api/async_context.html) — a DI container with captured scope cannot model "dynamic scope" on its own. The runtime diagnostic for a Lazy-companion leak still reads `Singleton "X" cannot depend on transient "<lazyKey>"` because the wrapper itself is transient; treat that as "this Lazy resolves a non-singleton target — not safe here".
 
-> **Note on circular dependencies.** True mutual recursion (A's constructor needs B, B's constructor needs A) cannot be expressed in fluent registration — both sides would forward-reference each other's keys, which the type system rejects by design. Between two singletons, you can break the cycle with `Lazy<singleton>` on one side. For factory-introduced cycles the runtime detector reports them precisely, it never "breaks" cycles automatically.
+> **Note on circular dependencies.** True mutual recursion (A's constructor needs B, B's constructor needs A) cannot be expressed in fluent registration — both sides would forward-reference each other's keys, which the type system rejects by design. Between two singletons, you can break the cycle with `Lazy<singleton>` on one side. For factory-introduced cycles the runtime detector reports them precisely; it never "breaks" cycles automatically.
 
 ## Symbol Keys
 
 Every `register*` method also accepts a `symbol` for the key. String and symbol keys mix freely in the same container — `deps` arrays, the `lazyKey` companion, factory bodies and `Module<TIn, TOut>` all accept both interchangeably. Using symbols unlocks three patterns that string keys cannot express:
 
 - **Collision-free private DI.** A local `Symbol(desc)` exists only inside the module that created it. Registering under it makes the service unreachable from outside without explicitly exporting the token.
-- **Cross-module sharing via `Symbol.for(name)`.** Two parts of the codebase agree on a name, `Symbol.for` returns the same token everywhere, so they share identity without importing each other.
+- **Cross-module sharing via `Symbol.for(name)`.** Two parts of the codebase agree on a name; `Symbol.for` returns the same token everywhere, so they share identity without importing each other.
 - **Type-level branding.** A symbol token is nominally typed: two structurally identical services keyed by distinct symbols are no longer interchangeable in `DepsOf`. (For maximum nominal precision, annotate as `unique symbol` — but ordinary `const` declarations are enough for runtime identity and most type checking.)
 
 ```ts
@@ -523,7 +759,7 @@ const fixture = new Container()
   .use(fixtureMailer)
 ```
 
-> **Why no portable generic modules?** A function like `<T>(c: Container<T>) => c.registerClass('db', ...)` cannot type-check inside the body — `keyof T` collapses to `string` from the `DependenciesMap` upper bound and `Exclude<'db', string>` becomes `never`, blocking the call. This is the cost of the compile-time uniqueness guarantee on registration. Use inline lambdas for one-shot grouping, use `Module<TIn, TOut>` when input shape is known.
+> **Why no portable generic modules?** A function like `<T>(c: Container<T>) => c.registerClass('db', ...)` cannot type-check inside the body — `keyof T` collapses to `string` from the `DependenciesMap` upper bound and `Exclude<'db', string>` becomes `never`, blocking the call. This is the cost of the compile-time uniqueness guarantee on registration. Use inline lambdas for one-shot grouping; use `Module<TIn, TOut>` when input shape is known.
 
 ## Querying with `.has()`
 
@@ -571,7 +807,7 @@ c.get('userRepo').save(/* ... */)         // uses the mocks
 - ⛔ **Fail-fast on late overrides.** `.override()` throws if the key has already been resolved on this container. A late override would leave existing consumers holding the original reference while new resolves see the mock — a split dependency graph. Always override **before** the first `.get()`.
 - 💥 **Disposed-container guard.** Throws on a disposed container.
 - 🧹 **Externally owned.** Like `registerValue`, the override value is **not** added to the container's disposal queue. The test suite owns the mock's lifetime.
-- 🔒 **Scope-local.** `.override()` mutates only the container it was called on. `root.createScope().override('db', mock)` leaves `root` untouched and is invisible to sibling scopes, a parent-level override propagates via the standard parent walk-up.
+- 🔒 **Scope-local.** `.override()` mutates only the container it was called on. `root.createScope().override('db', mock)` leaves `root` untouched and is invisible to sibling scopes; a parent-level override propagates via the standard parent walk-up.
 
 > ⚠️ **Production code should not call `.override()`.** It exists for tests and hot-reload-style fixtures. Use `.use()` for conditional registration in production builders.
 
@@ -644,7 +880,7 @@ The container throws structured errors with actionable messages — surface thes
 
 ## Migration
 
-Upgrading from a previous major version? See **[MIGRATION.md](./MIGRATION.md)** for the full per-version checklist (breaking changes, one-line rewrites, and what's new).
+Upgrading from a previous major version? See **[MIGRATION.md](https://github.com/inferdi/inferdi/blob/main/packages/inferdi/MIGRATION.md)** for the full per-version checklist (breaking changes, one-line rewrites, and what's new).
 
 ## API Summary
 
@@ -783,6 +1019,23 @@ type Module<TIn extends DependenciesMap, TOut extends DependenciesMap> =
   (c: Container<TIn>) => Container<TIn & TOut>
 ```
 
+## Repository Structure
+
+This repository is a pnpm monorepo. The published packages:
+
+| Package | JSR | npm | Description |
+| --- | --- | --- | --- |
+| [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) | [JSR](https://jsr.io/@inferdi/inferdi) | [npm](https://www.npmjs.com/package/@inferdi/inferdi) | Core DI container — zero-dependency, decorator-free, strongly typed |
+| [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | [JSR](https://jsr.io/@inferdi/fastify) | [npm](https://www.npmjs.com/package/@inferdi/fastify) | Fastify v5 request-scope adapter |
+| [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) | [JSR](https://jsr.io/@inferdi/hono) | [npm](https://www.npmjs.com/package/@inferdi/hono) | Hono request-scope middleware |
+| [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) | [JSR](https://jsr.io/@inferdi/koa) | [npm](https://www.npmjs.com/package/@inferdi/koa) | Koa v3 request-scope middleware |
+| [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) | [JSR](https://jsr.io/@inferdi/elysia) | [npm](https://www.npmjs.com/package/@inferdi/elysia) | Elysia request-scope plugin |
+
+Repository-only workspaces (not published):
+
+- [`benchmarks/`](https://github.com/inferdi/inferdi/tree/main/benchmarks) — private, self-contained comparative benchmarks against InversifyJS, Awilix, TSyringe, TypeDI, and Typed Inject. Isolated workspace with its own lockfile.
+- [`examples/`](https://github.com/inferdi/inferdi/tree/main/examples) — GitHub-only reference snippets for framework and runtime integrations.
+
 ## License
 
-MIT — see [LICENSE](./LICENSE).
+MIT — see [LICENSE](https://github.com/inferdi/inferdi/blob/main/LICENSE).
