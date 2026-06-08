@@ -193,17 +193,20 @@ function cleanupError(errors: unknown[]): unknown {
   return new AggregateError(errors, 'InferDI Koa request cleanup failed')
 }
 
-function throwCollected(errors: unknown[]): never {
-  if (errors.length === 1) {
-    throw errors[0]
+function normalizeError(error: unknown): Error {
+  if (
+    Object.prototype.toString.call(error) === '[object Error]' ||
+    error instanceof Error
+  ) {
+    return error as Error
   }
 
-  throw new AggregateError(errors, 'InferDI Koa request lifecycle failed')
+  return new Error(`non-error thrown: ${String(error)}`)
 }
 
 function emitAppError(error: unknown, context: Context): void {
   try {
-    context.app.emit('error', error, context)
+    context.app.emit('error', normalizeError(error), context)
   } catch {
     // Response cleanup must not fail because application error reporting failed.
   }
@@ -218,7 +221,7 @@ function emitUnhandledCleanupErrors(
   emitAppError(cleanupError(errors), context)
 }
 
-function handleCleanupError<
+function handleDisposeError<
   StateT,
   ContextT,
   Scope extends InferdiScope,
@@ -278,7 +281,7 @@ function disposeWithErrors<
     if (isPromiseLike(disposing)) {
       return disposing.then(
         undefined,
-        (error) => handleCleanupError(
+        (error) => handleDisposeError(
           error,
           context,
           onDisposeError,
@@ -287,7 +290,7 @@ function disposeWithErrors<
       )
     }
   } catch (error) {
-    return handleCleanupError(error, context, onDisposeError, errors)
+    return handleDisposeError(error, context, onDisposeError, errors)
   }
 }
 
@@ -310,8 +313,12 @@ async function disposeAfterSetupFailure<
         context: TypedContext<StateT, ContextT, Scope, Key>,
       ) => MaybePromise<void>)
     | undefined,
+  clearScope: () => void,
 ): Promise<never> {
-  const errors = [setupError]
+  // Finding 2: surface only the original setup error. Cleanup failures during
+  // teardown go to `onDisposeError`, else are emitted through the app sink —
+  // never aggregated into the thrown error.
+  const errors: unknown[] = []
   const disposing = disposeWithErrors(
     scope,
     context,
@@ -320,8 +327,13 @@ async function disposeAfterSetupFailure<
     errors,
   )
 
-  await disposing
-  throwCollected(errors)
+  try {
+    await disposing
+  } finally {
+    clearScope()
+  }
+  emitUnhandledCleanupErrors(errors, context)
+  throw setupError
 }
 
 /**
@@ -375,7 +387,10 @@ export function inferdiKoa<
   Root extends InferdiRoot,
   StateT = DefaultState,
   ContextT = DefaultContext,
-  Key extends string = string,
+  // `const Key` makes an inferred custom key behave like a literal here. Without
+  // it, `StateT & InferdiKoaState<Scope, Key>` does not survive Koa's `.use()`
+  // state inference for a non-default key, collapsing `ctx.state[key]` to `any`.
+  const Key extends string = string,
   Scope extends InferdiScope = InferdiScopeOf<Root>,
 >(
   options: InferdiKoaOptions<Root, StateT, ContextT, Key, Scope> & {
@@ -394,9 +409,7 @@ export function inferdiKoa<
 ): Middleware<StateT & InferdiKoaState<Scope, Key>, ContextT> {
   const root = options.container
   const key = (options.key ?? 'di') as Key
-  const createScope =
-    options.createScope ??
-    ((root: Root) => root.createScope() as Scope)
+  const createScope = options.createScope
   const setupScope = options.setupScope
   const disposeScope =
     options.disposeScope ??
@@ -412,16 +425,44 @@ export function inferdiKoa<
       Scope,
       Key
     >
-    const scopeResult = createScope(root, setupContext)
-    const scope = isPromiseLike(scopeResult)
-      ? await scopeResult
-      : scopeResult
+    // No-hook fast path: the default scope factory is synchronous, so skip the
+    // wrapper indirection and the `isPromiseLike` probe a custom factory needs.
+    let scope: Scope
+    if (createScope === undefined) {
+      scope = root.createScope() as Scope
+    } else {
+      const scopeResult = createScope(root, setupContext)
+      scope = isPromiseLike(scopeResult) ? await scopeResult : scopeResult
+    }
+    const state = typedContext.state as Record<Key, unknown>
+    const hadStateKey = Object.prototype.hasOwnProperty.call(state, key)
+    const previousStateValue = state[key]
+    const clearScope = () => {
+      if (hadStateKey) {
+        state[key] = previousStateValue
+        return
+      }
+
+      Reflect.deleteProperty(state, key)
+    }
 
     // Expose the scope before `setupScope` so the setup-failure disposal hooks
     // (`disposeScope` / `onDisposeError`) see the same `ctx.state[key]` their
     // typed context promises. Nothing downstream runs until `next()`, so a
     // half-built scope is never observable outside cleanup.
-    ;(typedContext.state as InferdiKoaState<Scope, Key>)[key] = scope
+    try {
+      state[key] = scope
+    } catch (error) {
+      skippedContexts.delete(context)
+      await disposeAfterSetupFailure(
+        scope,
+        typedContext,
+        error,
+        disposeScope,
+        onDisposeError,
+        clearScope,
+      )
+    }
 
     if (setupScope !== undefined) {
       try {
@@ -437,24 +478,35 @@ export function inferdiKoa<
           error,
           disposeScope,
           onDisposeError,
+          clearScope,
         )
       }
     }
 
+    if (autoDispose === false && !context.res.destroyed) {
+      await next()
+      return
+    }
+
     let disposed = false
+    // Finding 3: set when downstream throws so the completion cleanup disposes
+    // even if `skipInferdiDispose` was called — skip suppresses only successful
+    // cleanup. `autoDispose` is still honored (an explicit `false` keeps the
+    // app's ownership even on error, matching the other adapters).
+    let routeFailed = false
     const response = context.res
 
-    const runCleanup = async () => {
+    const runCleanup = async (force: boolean) => {
       if (disposed) return
 
       disposed = true
       const skipped = skippedContexts.delete(context)
-      if (skipped) return
+      if (!force && !routeFailed && skipped) return
 
       const errors: unknown[] = []
-      let shouldDispose = autoDispose !== false
+      let shouldDispose = force || autoDispose !== false
 
-      if (typeof autoDispose === 'function') {
+      if (!force && typeof autoDispose === 'function') {
         try {
           const autoDisposeResult = autoDispose(typedContext)
           shouldDispose = isPromiseLike(autoDisposeResult)
@@ -462,7 +514,7 @@ export function inferdiKoa<
             : autoDisposeResult !== false
         } catch (error) {
           shouldDispose = true
-          const handling = handleCleanupError(
+          const handling = handleDisposeError(
             error,
             typedContext,
             onDisposeError,
@@ -500,20 +552,49 @@ export function inferdiKoa<
       response.removeListener('close', onComplete)
       // `runCleanup` handles lifecycle errors itself; this is a final bug guard.
       /* v8 ignore next 3 */
-      void runCleanup().then(undefined, (error) => {
+      void runCleanup(false).then(undefined, (error) => {
         emitAppError(error, context)
       })
     }
 
-    response.on('finish', onComplete)
-    response.on('close', onComplete)
+    try {
+      response.on('finish', onComplete)
+      response.on('close', onComplete)
+    } catch (error) {
+      response.removeListener('finish', onComplete)
+      response.removeListener('close', onComplete)
+      skippedContexts.delete(context)
+      await disposeAfterSetupFailure(
+        scope,
+        typedContext,
+        error,
+        disposeScope,
+        onDisposeError,
+        clearScope,
+      )
+    }
 
     // An async `createScope` / `setupScope` can yield the event loop long enough
     // for the client to disconnect. If `close` already fired during that await,
     // the listeners above missed it; `destroyed` is true iff that already
     // happened, so dispose now instead of leaking the scope.
-    if (response.destroyed) onComplete()
+    if (response.destroyed) {
+      response.removeListener('finish', onComplete)
+      response.removeListener('close', onComplete)
+      try {
+        await runCleanup(true)
+      } catch (error) {
+        /* v8 ignore next -- runCleanup sinks its own errors; final bug guard */
+        emitAppError(error, context)
+      }
+      return
+    }
 
-    await next()
+    try {
+      await next()
+    } catch (error) {
+      routeFailed = true
+      throw error
+    }
   }
 }

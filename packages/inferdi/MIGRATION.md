@@ -5,9 +5,117 @@ For new features and fixes within a major line, see the release notes on the Git
 
 ## Table of Contents
 
+- [Migration to 5.0](#migration-to-50)
 - [Migration to 4.0](#migration-to-40)
 - [Migration to 3.0](#migration-to-30)
 - [Migration to 2.0](#migration-to-20)
+
+## Migration to 5.0
+
+v5 is an **adapter-only** release. `@inferdi/inferdi` core is unchanged — the
+version bump exists only to keep the published packages in lockstep. It
+harmonizes the five framework adapters (`@inferdi/fastify`, `@inferdi/express`,
+`@inferdi/hono`, `@inferdi/koa`, `@inferdi/elysia`) onto one contract: the same
+option vocabulary (`createScope`, `setupScope`, `disposeScope`, `autoDispose`,
+`onDisposeError`), the same exported types (`MaybePromise`, `InferdiScope`,
+`InferdiRoot`, `InferdiScopeOf`), and one cleanup-ownership model — a disposal
+failure after the response is produced is observed/logged and never corrupts the
+response.
+
+Three contracts are now identical across the adapters:
+
+- **Setup-failure errors.** When `setupScope` fails, only the original setup
+  error is surfaced. A disposal failure during that teardown goes to
+  `onDisposeError`, else to the adapter's sink (`console.error`, `request.log`, or
+  `ctx.app.emit('error')`) — it is **never** aggregated into the surfaced error.
+- **Failed requests always dispose.** `skipInferdiDispose` suppresses cleanup only
+  for a **successful** response; a request that fails with an error disposes its
+  scope regardless of the marker. (`autoDispose: false` still keeps app ownership.)
+  Express is the documented exception — see below.
+- **Cleanup hooks see the public scope handle.** `disposeScope` / `autoDispose` /
+  `onDisposeError` observe the scope under the framework-native slot (`request.di`,
+  `ctx.state[key]`, `c.var[key]`, Elysia context key) during cleanup.
+
+If you use only the core container, no changes are required. Adapter changes:
+
+### `@inferdi/fastify`
+
+- **`logDisposeError` → `onDisposeError`.** Rename the option. Semantics widen to
+  the family sink: returning normally marks the error handled; if omitted (or if
+  the handler itself throws) the failure is logged via `request.log.error(...)`.
+  The handler signature gains `reply`: `(error, request, reply)`.
+- **`InferdiScope.dispose()` is now `MaybePromise<void>`** (was `Promise<void>`).
+  A synchronous `dispose()` now resolves the response in the same tick without
+  scheduling a microtask. Async `dispose()` keeps working unchanged.
+- **New options:** `disposeScope` (override disposal) and `autoDispose`
+  (`boolean | (request, reply) => MaybePromise<boolean>`).
+- **New exports:** `skipInferdiDispose(request)` for routes that own disposal past
+  the response, and the `InferdiScopeOf<Root>` type helper.
+- Setup-failure semantics are unchanged: the original `setupScope` error is always
+  the thrown error; a disposal failure during that teardown goes to the sink and
+  is never aggregated into the thrown error.
+- **`request.di` now stays assigned while cleanup hooks run.** `disposeScope` /
+  `autoDispose` / `onDisposeError` observe `request.di === scope` (it is cleared
+  only after cleanup finishes), matching the other adapters. Setup-failure cleanup
+  hooks see it too, but it is cleared before Fastify's error handler runs. If you
+  relied on `request.di` being `null` inside these hooks, read the scope from the
+  first hook argument instead.
+- **A failed request disposes even when `skipInferdiDispose` was called.** An
+  `onError` hook marks the request failed, so the marker now suppresses cleanup
+  only for a successful response. Client aborts still honor the marker (manual
+  ownership).
+
+### `@inferdi/hono`
+
+- **Disposal failures after `next()` no longer replace the response.** Previously a
+  `disposeScope` or `autoDispose`-predicate failure on a successful request could
+  reach `app.onError` and turn a 200 into a 500. They are now logged via
+  `console.error` (or routed to `onDisposeError`) and the produced response is
+  preserved. A route error thrown by the handler still propagates to `onError`
+  exactly as before.
+- `onDisposeError`'s default sink is `console.error`.
+- **Setup failure surfaces only the original error.** Previously a setup failure
+  whose teardown also failed threw an `AggregateError`; now it rethrows just the
+  setup error and routes the cleanup failure to `onDisposeError` / `console.error`.
+- A route that fails still disposes its scope even after `skipInferdiDispose(c)`
+  (unchanged — Hono already forced disposal on `routeFailed`).
+
+### `@inferdi/express`
+
+- Response-completion disposal was realigned to the Node `finish` / `close` model
+  shared with `@inferdi/koa`. Existing behavior — manual-ownership fast path
+  (`autoDispose: false`), destroyed-response force-clean, `req.di` assignment
+  guard, and `next(err)` for setup/activation failures — is preserved.
+- **`onDisposeError` is now a per-error sink** and is consulted in **both** the
+  setup-teardown and response-completion phases (previously setup-cleanup
+  failures bypassed it). When both an `autoDispose` predicate and disposal fail,
+  it is called once per error (matching the other adapters) instead of once with
+  a pre-built `AggregateError`.
+- **Setup failure surfaces only the original error** via `next(err)`; a cleanup
+  failure during teardown goes to `onDisposeError` / `console.error` and is never
+  aggregated into the error passed to `next`.
+- **Documented limitation:** Express cannot force-dispose on a handled route
+  error. Its callback middleware never observes a downstream exception, and
+  cleanup runs from the Node `finish` / `close` event where a handled error is
+  indistinguishable from a normal response. So if a route calls
+  `skipInferdiDispose(req)` and then fails, the scope stays application-owned —
+  dispose it from your own error path.
+
+### `@inferdi/koa`
+
+- **Setup failure surfaces only the original error.** A teardown failure during a
+  failed `setupScope` now goes to `onDisposeError` / `ctx.app.emit('error')`
+  instead of being aggregated into the thrown error.
+- **A downstream error disposes even after `skipInferdiDispose(ctx)`.** The
+  middleware now catches a rejected `await next()` and marks the request failed,
+  so the marker suppresses cleanup only for a successful response.
+
+### `@inferdi/elysia`
+
+- **Setup failure surfaces only the original error.** A teardown failure during a
+  failed `setupScope` now goes to `onDisposeError` / `console.error` instead of
+  being aggregated into the thrown error. (Failed requests already disposed via
+  the `error` lifecycle phase.)
 
 ## Migration to 4.0
 

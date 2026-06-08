@@ -119,8 +119,9 @@ new Elysia().use(inferdiElysia({
 | `onDisposeError` | `console.error` fallback | Optional sink for cleanup failures. Returning normally marks the error as handled. |
 
 If `setupScope` fails after a scope has been created, the plugin disposes that
-scope and rethrows the setup error. If both setup and cleanup fail, it throws an
-`AggregateError`.
+scope and rethrows **only** the original setup error. A disposal failure during
+that teardown is routed to `onDisposeError`, or logged with `console.error` when
+no handler is set — it is never aggregated into the rethrown setup error.
 
 Use `setupScope` for values that must exist before validation or other early
 hooks. Use `setupValidatedScope` for values derived from validated body, query,
@@ -273,6 +274,7 @@ export function skipInferdiDispose(context: { request: Request }): void
 | [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | [JSR](https://jsr.io/@inferdi/fastify) | [npm](https://www.npmjs.com/package/@inferdi/fastify) | Fastify v5 request-scope adapter |
 | [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) | [JSR](https://jsr.io/@inferdi/hono) | [npm](https://www.npmjs.com/package/@inferdi/hono) | Hono request-scope middleware |
 | [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) | [JSR](https://jsr.io/@inferdi/koa) | [npm](https://www.npmjs.com/package/@inferdi/koa) | Koa v3 request-scope middleware |
+| [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | [JSR](https://jsr.io/@inferdi/express) | [npm](https://www.npmjs.com/package/@inferdi/express) | Express 5 request-scope middleware |
 | [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) | [JSR](https://jsr.io/@inferdi/elysia) | [npm](https://www.npmjs.com/package/@inferdi/elysia) | Elysia request-scope plugin |
 
 The project repository lives at [inferdi/inferdi](https://github.com/inferdi/inferdi). This adapter targets [Elysia](https://elysiajs.com).

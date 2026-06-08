@@ -1,6 +1,6 @@
 {
   "name": "@inferdi/koa",
-  "version": "4.0.8",
+  "version": "5.0.0",
   "license": "MIT",
   "exports": "./src/index.ts",
   "imports": {

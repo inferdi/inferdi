@@ -1,6 +1,6 @@
 {
   "name": "@inferdi/hono",
-  "version": "4.0.8",
+  "version": "5.0.0",
   "description": "Hono request-scope middleware for InferDI.",
   "keywords": [
     "typescript",
@@ -54,7 +54,7 @@
     "node": ">=16.0.0"
   },
   "peerDependencies": {
-    "@inferdi/inferdi": "^4.0.0",
+    "@inferdi/inferdi": "^5.0.0",
     "hono": "^4.0.0"
   },
   "devDependencies": {

@@ -1,4 +1,4 @@
-import Fastify, { type FastifyInstance } from 'fastify'
+import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify'
 import { inferdiFastify } from '@inferdi/fastify'
 
 import {
@@ -29,7 +29,8 @@ export function buildServer(): FastifyInstance {
 
   app.register(inferdiFastify, {
     container: root,
-    createScope: (root, request) =>
+    // Annotate hook params: `app.register` cannot infer the plugin's generics.
+    createScope: (root: RootContainer, request: FastifyRequest) =>
       createRequestScope(root, {
         requestId: request.id,
         ip: request.ip,

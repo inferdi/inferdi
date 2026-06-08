@@ -199,50 +199,54 @@ describe('@inferdi/elysia types', () => {
     }
     void validRootOnly
 
+    // The forbidden property makes the object incompatible with the discriminated
+    // union, and TS attributes that error to the assignment, so `@ts-expect-error`
+    // goes on the `const` line rather than the property line.
+
+    // @ts-expect-error — createScope is scoped-mode behavior.
     const invalidCreateScope: InferdiElysiaOptions<RootContainer, 'di'> = {
       container: root,
       scopePerRequest: false,
-      // @ts-expect-error — createScope is scoped-mode behavior.
       createScope: () => root.createScope(),
     }
     void invalidCreateScope
 
+    // @ts-expect-error — setupScope is scoped-mode behavior.
     const invalidSetupScope: InferdiElysiaOptions<RootContainer, 'di'> = {
       container: root,
       scopePerRequest: false,
-      // @ts-expect-error — setupScope is scoped-mode behavior.
       setupScope: () => {},
     }
     void invalidSetupScope
 
+    // @ts-expect-error — setupValidatedScope is scoped-mode behavior.
     const invalidSetupValidatedScope: InferdiElysiaOptions<RootContainer, 'di'> = {
       container: root,
       scopePerRequest: false,
-      // @ts-expect-error — setupValidatedScope is scoped-mode behavior.
       setupValidatedScope: () => {},
     }
     void invalidSetupValidatedScope
 
+    // @ts-expect-error — disposeScope is scoped-mode behavior.
     const invalidDisposeScope: InferdiElysiaOptions<RootContainer, 'di'> = {
       container: root,
       scopePerRequest: false,
-      // @ts-expect-error — disposeScope is scoped-mode behavior.
       disposeScope: () => {},
     }
     void invalidDisposeScope
 
+    // @ts-expect-error — autoDispose is scoped-mode behavior.
     const invalidAutoDispose: InferdiElysiaOptions<RootContainer, 'di'> = {
       container: root,
       scopePerRequest: false,
-      // @ts-expect-error — autoDispose is scoped-mode behavior.
       autoDispose: false,
     }
     void invalidAutoDispose
 
+    // @ts-expect-error — onDisposeError is scoped-mode behavior.
     const invalidDisposeHandler: InferdiElysiaOptions<RootContainer, 'di'> = {
       container: root,
       scopePerRequest: false,
-      // @ts-expect-error — onDisposeError is scoped-mode behavior.
       onDisposeError: () => {},
     }
     void invalidDisposeHandler

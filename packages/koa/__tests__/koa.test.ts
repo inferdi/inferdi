@@ -7,7 +7,7 @@ import {
 import type { AddressInfo } from 'node:net'
 import { PassThrough } from 'node:stream'
 import Koa, { type Context } from 'koa'
-import {describe, expect, it} from 'vitest'
+import {describe, expect, it, vi} from 'vitest'
 import {
   inferdiKoa,
   skipInferdiDispose,
@@ -249,6 +249,30 @@ describe('@inferdi/koa', () => {
     expect(await disposed.promise).toBe(customScope)
   })
 
+  it('uses a synchronous custom createScope hook', async () => {
+    const root = new TestRoot()
+    const customScope = new TestScope()
+    const app = new Koa()
+      .use(inferdiKoa({
+        container: root,
+        createScope: (receivedRoot, ctx) => {
+          expect(receivedRoot).toBe(root)
+          expect(ctx.path).toBe('/users/9')
+          return customScope
+        },
+      }))
+      .use((ctx) => {
+        ctx.body = ctx.state.di.get('users').profile('9')
+      })
+
+    const response = await requestJson(app, '/users/9')
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({ id: '9', requestId: '' })
+    expect(root.createScopeCalls).toBe(0)
+    expect(customScope.disposeCalls).toBe(1)
+  })
+
   it('forwards createScope failures without disposing', async () => {
     const root = new TestRoot()
     const createError = new Error('create failed')
@@ -365,7 +389,7 @@ describe('@inferdi/koa', () => {
     expect(root.scopes[0]?.disposeCalls).toBe(1)
   })
 
-  it('aggregates setup and setup-cleanup failures by default', async () => {
+  it('surfaces the setup error and emits the setup-cleanup failure separately', async () => {
     const root = new TestRoot()
     const setupError = new Error('setup failed')
     const disposeError = new Error('setup cleanup failed')
@@ -387,11 +411,11 @@ describe('@inferdi/koa', () => {
     })
 
     const response = await requestText(app, '/ok')
-    const aggregate = emitted[0] as AggregateError
 
     expect(response.status).toBe(500)
-    expect(aggregate).toBeInstanceOf(AggregateError)
-    expect(aggregate.errors).toEqual([setupError, disposeError])
+    // The cleanup failure is emitted through the app sink first; the setup
+    // error is the request error Koa surfaces. They are never aggregated.
+    expect(emitted).toEqual([disposeError, setupError])
     expect(root.scopes[0]?.disposeCalls).toBe(1)
   })
 
@@ -424,7 +448,7 @@ describe('@inferdi/koa', () => {
     expect(handled).toEqual([[disposeError, '/ok']])
   })
 
-  it('aggregates setup cleanup failures when onDisposeError fails', async () => {
+  it('emits cleanup and onDisposeError failures separately from the setup error', async () => {
     const root = new TestRoot()
     const setupError = new Error('setup failed')
     const disposeError = new Error('setup cleanup failed')
@@ -451,14 +475,11 @@ describe('@inferdi/koa', () => {
 
     expect(response.status).toBe(500)
     expect(aggregate).toBeInstanceOf(AggregateError)
-    expect(aggregate.errors).toEqual([
-      setupError,
-      disposeError,
-      handlerError,
-    ])
+    expect(aggregate.errors).toEqual([disposeError, handlerError])
+    expect(emitted[1]).toBe(setupError)
   })
 
-  it('aggregates synchronous setup cleanup and onDisposeError failures', async () => {
+  it('emits synchronous cleanup and onDisposeError failures separately from the setup error', async () => {
     const root = new TestRoot()
     const setupError = new Error('setup failed')
     const disposeError = new Error('setup cleanup failed')
@@ -487,11 +508,8 @@ describe('@inferdi/koa', () => {
 
     expect(response.status).toBe(500)
     expect(aggregate).toBeInstanceOf(AggregateError)
-    expect(aggregate.errors).toEqual([
-      setupError,
-      disposeError,
-      handlerError,
-    ])
+    expect(aggregate.errors).toEqual([disposeError, handlerError])
+    expect(emitted[1]).toBe(setupError)
   })
 
   it('registers cleanup before downstream middleware runs', async () => {
@@ -537,6 +555,209 @@ describe('@inferdi/koa', () => {
 
     expect(res.listenerCount('close')).toBe(0)
     expect(root.scopes[0]?.disposeCalls).toBe(1)
+  })
+
+  it('does not attach response cleanup listeners when autoDispose is false', async () => {
+    const root = new TestRoot()
+    const app = inferdiKoa({
+      container: root,
+      autoDispose: false,
+    })
+    const res = Object.assign(new EventEmitter(), {
+      destroyed: false,
+    }) as Context['res']
+    const context = {
+      app: new EventEmitter() as Context['app'],
+      res,
+      state: {},
+    } as Context
+    const next = vi.fn(async () => {})
+
+    await app(context, next)
+
+    expect(next).toHaveBeenCalledTimes(1)
+    expect(res.listenerCount('finish')).toBe(0)
+    expect(res.listenerCount('close')).toBe(0)
+    expect(root.scopes[0]?.disposeCalls).toBe(0)
+  })
+
+  it('force-cleans and stops downstream when the response is already destroyed', async () => {
+    const root = new TestRoot()
+    const app = inferdiKoa({
+      container: root,
+      autoDispose: false,
+      setupScope: async (_scope, ctx) => {
+        skipInferdiDispose(ctx)
+        await delay(1)
+      },
+    })
+    const res = Object.assign(new EventEmitter(), {
+      destroyed: true,
+    }) as Context['res']
+    const context = {
+      app: new EventEmitter() as Context['app'],
+      res,
+      state: {},
+    } as Context
+    const next = vi.fn(async () => {})
+
+    await app(context, next)
+
+    expect(next).not.toHaveBeenCalled()
+    expect(res.listenerCount('finish')).toBe(0)
+    expect(res.listenerCount('close')).toBe(0)
+    expect(root.scopes[0]?.disposeCalls).toBe(1)
+  })
+
+  it('force-cleans when the response is destroyed immediately after listeners attach', async () => {
+    const root = new TestRoot()
+    const app = inferdiKoa({ container: root })
+    const res = Object.assign(new EventEmitter(), {
+      destroyed: false,
+    }) as Context['res']
+    const originalOn = res.on.bind(res)
+    const context = {
+      app: new EventEmitter() as Context['app'],
+      res,
+      state: {},
+    } as Context
+    const next = vi.fn(async () => {})
+
+    res.on = ((event: string | symbol, listener: (...args: any[]) => void) => {
+      const result = originalOn(event, listener)
+      if (event === 'close') {
+        res.destroyed = true
+      }
+      return result
+    }) as Context['res']['on']
+
+    await app(context, next)
+
+    expect(next).not.toHaveBeenCalled()
+    expect(res.listenerCount('finish')).toBe(0)
+    expect(res.listenerCount('close')).toBe(0)
+    expect(root.scopes[0]?.disposeCalls).toBe(1)
+  })
+
+  it('clears ctx.state after setup-failure cleanup', async () => {
+    const root = new TestRoot()
+    const setupError = new Error('setup failed')
+    const app = inferdiKoa({
+      container: root,
+      setupScope: () => {
+        throw setupError
+      },
+    })
+    const context = {
+      app: new EventEmitter() as Context['app'],
+      res: new EventEmitter() as Context['res'],
+      state: {},
+    } as Context
+    const next = vi.fn(async () => {})
+
+    await expect(app(context, next)).rejects.toBe(setupError)
+
+    expect(next).not.toHaveBeenCalled()
+    expect(Object.prototype.hasOwnProperty.call(context.state, 'di')).toBe(false)
+    expect(root.scopes[0]?.disposeCalls).toBe(1)
+  })
+
+  it('restores an existing ctx.state key after setup-failure cleanup', async () => {
+    const root = new TestRoot()
+    const setupError = new Error('setup failed')
+    const previous = { existing: true }
+    const app = inferdiKoa({
+      container: root,
+      setupScope: () => {
+        throw setupError
+      },
+    })
+    const context = {
+      app: new EventEmitter() as Context['app'],
+      res: new EventEmitter() as Context['res'],
+      state: { di: previous },
+    } as Context
+    const next = vi.fn(async () => {})
+
+    await expect(app(context, next)).rejects.toBe(setupError)
+
+    expect(next).not.toHaveBeenCalled()
+    expect(context.state.di).toBe(previous)
+    expect(root.scopes[0]?.disposeCalls).toBe(1)
+  })
+
+  it('disposes the scope when exposing it through ctx.state fails', async () => {
+    const root = new TestRoot()
+    const app = inferdiKoa({ container: root })
+    const context = {
+      app: new EventEmitter() as Context['app'],
+      res: new EventEmitter() as Context['res'],
+      state: Object.freeze({}),
+    } as Context
+    const next = vi.fn(async () => {})
+
+    await expect(app(context, next)).rejects.toBeInstanceOf(TypeError)
+
+    expect(next).not.toHaveBeenCalled()
+    expect(root.scopes[0]?.disposeCalls).toBe(1)
+  })
+
+  it('disposes the scope when response listener activation fails', async () => {
+    const root = new TestRoot()
+    const activationError = new Error('activation failed')
+    const app = inferdiKoa({ container: root })
+    const res = Object.assign(new EventEmitter(), {
+      destroyed: false,
+    }) as Context['res']
+    const context = {
+      app: new EventEmitter() as Context['app'],
+      res,
+      state: {},
+    } as Context
+    const next = vi.fn(async () => {})
+
+    res.on = (() => {
+      throw activationError
+    }) as Context['res']['on']
+
+    await expect(app(context, next)).rejects.toBe(activationError)
+
+    expect(next).not.toHaveBeenCalled()
+    expect(Object.prototype.hasOwnProperty.call(context.state, 'di')).toBe(false)
+    expect(root.scopes[0]?.disposeCalls).toBe(1)
+  })
+
+  it('normalizes non-Error cleanup failures before emitting them through Koa', async () => {
+    const root = new TestRoot()
+    const emitted: unknown[] = []
+    const app = inferdiKoa({
+      container: root,
+      disposeScope: () => {
+        throw 'dispose failed'
+      },
+    })
+    const res = Object.assign(new EventEmitter(), {
+      destroyed: false,
+    }) as Context['res']
+    const koaApp = new EventEmitter() as Context['app']
+    const context = {
+      app: koaApp,
+      res,
+      state: {},
+    } as Context
+
+    koaApp.on('error', (error) => {
+      emitted.push(error)
+    })
+
+    await app(context, async () => {})
+    res.emit('finish')
+    await tick()
+
+    expect(emitted[0]).toBeInstanceOf(Error)
+    expect((emitted[0] as Error).message).toBe(
+      'non-error thrown: dispose failed',
+    )
   })
 
   it('supports synchronous response disposal hooks', async () => {
@@ -655,6 +876,35 @@ describe('@inferdi/koa', () => {
     expect(response.status).toBe(409)
     expect(response.body).toEqual({ message: 'route failed' })
     expect(emitted).toEqual([routeError])
+    expect(root.scopes[0]?.disposeCalls).toBe(1)
+  })
+
+  it('disposes on a downstream error even when skipInferdiDispose was called', async () => {
+    const root = new TestRoot()
+    const routeError = new Error('route failed')
+    const app = new Koa()
+
+    app.on('error', () => {})
+    app.use(async (ctx, next) => {
+      try {
+        await next()
+      } catch (error) {
+        ctx.status = 409
+        ctx.body = { message: (error as Error).message }
+        ctx.app.emit('error', error, ctx)
+      }
+    })
+    app.use(inferdiKoa({ container: root }))
+    app.use((ctx) => {
+      skipInferdiDispose(ctx)
+      throw routeError
+    })
+
+    const response = await requestJson(app, '/boom')
+
+    expect(response.status).toBe(409)
+    // Finding 3: skipInferdiDispose only suppresses successful cleanup; a failed
+    // request disposes regardless of the skip marker.
     expect(root.scopes[0]?.disposeCalls).toBe(1)
   })
 

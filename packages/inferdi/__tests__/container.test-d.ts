@@ -42,7 +42,7 @@ describe('Phase 4 — fluent: T accumulation while chaining', () => {
       .registerValue('config', {port: 8080})
       .registerClass('logger', L, [])
 
-    expectTypeOf(c.get('config')).toEqualTypeOf<{port: number}>()
+    expectTypeOf(c.get('config')).toEqualTypeOf<{readonly port: 8080}>()
     expectTypeOf(c.get('logger')).toEqualTypeOf<L>()
   })
 
@@ -66,7 +66,7 @@ describe('Phase 4 — Container.Resolve', () => {
       .registerClass('logger', L, [])
     type Deps = Container.Resolve<typeof c>
 
-    expectTypeOf<Deps['a']>().toEqualTypeOf<number>()
+    expectTypeOf<Deps['a']>().toEqualTypeOf<1>()
     expectTypeOf<Deps['logger']>().toEqualTypeOf<L>()
   })
 })
@@ -262,13 +262,13 @@ describe('Phase 4 — dispose types', () => {
 
 describe('Phase 4 — symbol keys', () => {
   it('registerValue with a symbol — get returns precise type', () => {
-    const SYM: unique symbol = Symbol('x') as unique symbol
+    const SYM = Symbol('x')
     const c = new Container().registerValue(SYM, 42 as const)
     expectTypeOf(c.get(SYM)).toEqualTypeOf<42>()
   })
 
   it('mixing string and symbol keys — both reachable with precise types', () => {
-    const SYM: unique symbol = Symbol('s') as unique symbol
+    const SYM = Symbol('s')
     const c = new Container()
       .registerValue('a', 1 as const)
       .registerValue(SYM, 'x' as const)
@@ -277,22 +277,22 @@ describe('Phase 4 — symbol keys', () => {
   })
 
   it('re-registering the same unique symbol — TS error via Exclude<K, keyof T>', () => {
-    const SYM: unique symbol = Symbol('s') as unique symbol
+    const SYM = Symbol('s')
     const c = new Container().registerValue(SYM, 1)
     // @ts-expect-error — duplicate symbol key
     c.registerValue(SYM, 2)
   })
 
   it('lazyKey: symbol — companion appears in T with the right type', () => {
-    const SVC: unique symbol = Symbol('svc') as unique symbol
-    const SVC_LAZY: unique symbol = Symbol('svcLazy') as unique symbol
+    const SVC = Symbol('svc')
+    const SVC_LAZY = Symbol('svcLazy')
     const c = new Container().registerClass(SVC, L, [], 'singleton', SVC_LAZY)
     expectTypeOf(c.get(SVC_LAZY)).toEqualTypeOf<Lazy<L>>()
   })
 
   it('Module<TIn, TOut> with symbol keys', () => {
-    const CFG: unique symbol = Symbol('cfg') as unique symbol
-    const MAILER: unique symbol = Symbol('mailer') as unique symbol
+    const CFG = Symbol('cfg')
+    const MAILER = Symbol('mailer')
     // v3: Module<TIn, TOut> uses the Spec-shaped DependenciesMap directly.
     // Wrap flat `{ key: ServiceType }` maps in `SpecMap<...>` to default each
     // entry to singleton.
@@ -302,7 +302,7 @@ describe('Phase 4 — symbol keys', () => {
   })
 
   it('DepsOf accepts symbol-typed deps and validates order', () => {
-    const LOG: unique symbol = Symbol('logger') as unique symbol
+    const LOG = Symbol('logger')
     class R {}
     class S { constructor(_r: R, _l: L) {} }
     const c = new Container()
@@ -349,7 +349,7 @@ describe('Phase 4 — override types', () => {
   })
 
   it('positive: symbol key', () => {
-    const DB: unique symbol = Symbol('db') as unique symbol
+    const DB = Symbol('db')
     class Db {}
     const c = new Container().registerClass(DB, Db, [])
     c.override(DB, new Db())
@@ -510,7 +510,7 @@ describe('Phase 8 — Spec / SpecMap helpers', () => {
       .registerClass('logger', L, [])
     type Flat = Container.Resolve<typeof builder>
     expectTypeOf<Flat['logger']>().toEqualTypeOf<L>()
-    expectTypeOf<Flat['cfg']>().toEqualTypeOf<{port: number}>()
+    expectTypeOf<Flat['cfg']>().toEqualTypeOf<{readonly port: 8080}>()
   })
 })
 
@@ -571,9 +571,9 @@ describe('Phase 4 — Container.Providers', () => {
 
   it('Providers<C> rejects an extraneous key', () => {
     const c = new Container().registerClass('logger', L, [])
-    // @ts-expect-error — 'extra' is not in keyof T
     const _bad: Container.Providers<typeof c> = {
       logger: () => new L(),
+      // @ts-expect-error — 'extra' is not in keyof T
       extra: () => new L(),
     }
     void _bad

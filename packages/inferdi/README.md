@@ -24,6 +24,7 @@ A zero-dependency, **decorator-free**, strongly typed DI container for modern Ty
   - [Fastify Adapter](#fastify-adapter)
   - [Hono Adapter](#hono-adapter)
   - [Koa Adapter](#koa-adapter)
+  - [Express Adapter](#express-adapter)
   - [Elysia Adapter](#elysia-adapter)
 - **Overview**
   - [Why InferDI?](#why-inferdi)
@@ -206,8 +207,8 @@ The repository includes framework and runtime examples in [`examples/`](https://
   - [`fastify.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/fastify.ts) — uses `@inferdi/fastify` for request scopes.
   - [`hono.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/hono.ts) — uses `@inferdi/hono` for request scopes.
   - [`koa.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/koa.ts) — uses `@inferdi/koa` for request scopes.
+  - [`express.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/express.ts) — uses `@inferdi/express` for request scopes.
   - [`elysia.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/elysia.ts) — uses `@inferdi/elysia` for request scopes.
-  - [`express.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/express.ts)
 - **API layers** — [`examples/api-layers/`](https://github.com/inferdi/inferdi/tree/main/examples/api-layers)
   - [`trpc.ts`](https://github.com/inferdi/inferdi/blob/main/examples/api-layers/trpc.ts)
   - [`apollo-server.ts`](https://github.com/inferdi/inferdi/blob/main/examples/api-layers/apollo-server.ts)
@@ -244,7 +245,7 @@ pnpm add @inferdi/inferdi @inferdi/fastify fastify
 ```
 
 ```ts
-import Fastify from 'fastify'
+import Fastify, { type FastifyRequest } from 'fastify'
 import { inferdiFastify } from '@inferdi/fastify'
 import {
   buildRootContainer,
@@ -268,7 +269,8 @@ declare module 'fastify' {
 
 await app.register(inferdiFastify, {
   container: root,
-  createScope: (root, request) =>
+  // Annotate hook params: `app.register` cannot infer the plugin's generics.
+  createScope: (root: RootContainer, request: FastifyRequest) =>
     createRequestScope(root, {
       requestId: request.id,
       ip: request.ip,
@@ -356,7 +358,58 @@ app.use(async (ctx) => {
 })
 ```
 
-Koa stream bodies normally do not need manual disposal handling: the adapter waits for the underlying Node response `finish` or `close` event. Call `skipInferdiDispose(ctx)` only when application code intentionally keeps the scope beyond the HTTP response boundary, such as background work that disposes the scope later.
+Koa stream bodies normally do not need manual disposal handling: the adapter waits for the underlying Node response `finish` or `close` event. Call `skipInferdiDispose(ctx)` only when application code intentionally keeps the scope beyond the HTTP response boundary, such as background work that disposes the scope later. The skip suppresses cleanup only for a successful response — a downstream error still disposes the scope.
+
+## Express Adapter
+
+Express 5 applications can use the separate [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) package to create and dispose one InferDI scope per request. It is published to npm and JSR with the same version as `@inferdi/inferdi`.
+
+```bash
+pnpm add @inferdi/inferdi @inferdi/express express
+pnpm add -D @types/express
+```
+
+```ts
+import express from 'express'
+import { inferdiExpress, type InferdiScopeOf } from '@inferdi/express'
+import {
+  buildRootContainer,
+  createRequestScope,
+} from './container.js'
+
+const root = buildRootContainer()
+const app = express()
+
+declare global {
+  namespace Express {
+    interface Request {
+      di: InferdiScopeOf<typeof root>
+    }
+  }
+}
+
+app.use(inferdiExpress({
+  container: root,
+  createScope: (root, req) =>
+    createRequestScope(root, {
+      requestId: crypto.randomUUID(),
+      userId: Array.isArray(req.headers['x-user-id'])
+        ? req.headers['x-user-id'][0]
+        : req.headers['x-user-id'],
+      ip: req.ip,
+    }),
+}))
+
+app.get('/users/:id', async (req, res, next) => {
+  try {
+    res.json(await req.di.get('users').profile(req.params.id))
+  } catch (error) {
+    next(error)
+  }
+})
+```
+
+Express stream bodies normally do not need manual disposal handling: the adapter waits for the underlying Node response `finish` or `close` event. Call `skipInferdiDispose(req)` only when application code intentionally keeps the scope beyond the HTTP response boundary. Unlike the other adapters, Express cannot force-dispose on a handled route error — its callback middleware never observes a downstream exception — so a skipped scope on a failed request stays application-owned; see the package README.
 
 ## Elysia Adapter
 
@@ -1029,6 +1082,7 @@ This repository is a pnpm monorepo. The published packages:
 | [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | [JSR](https://jsr.io/@inferdi/fastify) | [npm](https://www.npmjs.com/package/@inferdi/fastify) | Fastify v5 request-scope adapter |
 | [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) | [JSR](https://jsr.io/@inferdi/hono) | [npm](https://www.npmjs.com/package/@inferdi/hono) | Hono request-scope middleware |
 | [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) | [JSR](https://jsr.io/@inferdi/koa) | [npm](https://www.npmjs.com/package/@inferdi/koa) | Koa v3 request-scope middleware |
+| [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | [JSR](https://jsr.io/@inferdi/express) | [npm](https://www.npmjs.com/package/@inferdi/express) | Express 5 request-scope middleware |
 | [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) | [JSR](https://jsr.io/@inferdi/elysia) | [npm](https://www.npmjs.com/package/@inferdi/elysia) | Elysia request-scope plugin |
 
 Repository-only workspaces (not published):

@@ -327,11 +327,14 @@ describe('@inferdi/elysia', () => {
     expect(root.scopes[0]?.disposeCalls).toBe(1)
   })
 
-  it('aggregates setup and cleanup failures', async () => {
+  it('surfaces only the setup error and logs the cleanup failure', async () => {
     const root = new TestRoot()
     const setupError = new Error('setup failed')
     const disposeError = new Error('setup cleanup failed')
     const handled: { value?: unknown } = {}
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {})
     root.nextScope = new TestScope({ disposeError })
     const app = new Elysia()
       .use(inferdiElysia({
@@ -346,11 +349,13 @@ describe('@inferdi/elysia', () => {
     const response = await app.handle(request('/ok'))
 
     expect(response.status).toBe(500)
-    expect(handled.value).toBeInstanceOf(AggregateError)
-    expect((handled.value as AggregateError).errors).toEqual([
-      setupError,
-      disposeError,
-    ])
+    expect(handled.value).toBe(setupError)
+    expect(consoleError).toHaveBeenCalledOnce()
+    const [, payload] = consoleError.mock.calls[0] ?? []
+    expect(payload).toMatchObject({ phase: 'setup' })
+    expect((payload as { err?: unknown }).err).toBe(disposeError)
+
+    consoleError.mockRestore()
   })
 
   it('keeps setup errors when onDisposeError handles setup cleanup failures', async () => {
@@ -381,12 +386,15 @@ describe('@inferdi/elysia', () => {
     expect(logged).toEqual([[disposeError, 'setup']])
   })
 
-  it('aggregates setup errors with synchronous onDisposeError failures', async () => {
+  it('surfaces the setup error and logs synchronous onDisposeError failures', async () => {
     const root = new TestRoot()
     const setupError = new Error('setup failed')
     const disposeError = new Error('setup cleanup failed')
     const handlerError = new Error('logger failed')
     const handled: { value?: unknown } = {}
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {})
     root.nextScope = new TestScope({ disposeError })
     const app = new Elysia()
       .use(inferdiElysia({
@@ -404,21 +412,29 @@ describe('@inferdi/elysia', () => {
     const response = await app.handle(request('/ok'))
 
     expect(response.status).toBe(500)
-    expect(handled.value).toBeInstanceOf(AggregateError)
-    expect((handled.value as AggregateError).errors).toEqual([
-      setupError,
+    expect(handled.value).toBe(setupError)
+    expect(consoleError).toHaveBeenCalledOnce()
+    const [, payload] = consoleError.mock.calls[0] ?? []
+    expect(payload).toMatchObject({ phase: 'setup' })
+    expect((payload as { err?: unknown }).err).toBeInstanceOf(AggregateError)
+    expect(((payload as { err: AggregateError }).err).errors).toEqual([
       disposeError,
       handlerError,
     ])
     expect(root.scopes[0]?.disposeCalls).toBe(1)
+
+    consoleError.mockRestore()
   })
 
-  it('aggregates setup errors with rejected onDisposeError failures', async () => {
+  it('surfaces the setup error and logs rejected onDisposeError failures', async () => {
     const root = new TestRoot()
     const setupError = new Error('setup failed')
     const disposeError = new Error('setup cleanup failed')
     const handlerError = new Error('async logger failed')
     const handled: { value?: unknown } = {}
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {})
     root.nextScope = new TestScope({ disposeError })
     const app = new Elysia()
       .use(inferdiElysia({
@@ -436,12 +452,17 @@ describe('@inferdi/elysia', () => {
     const response = await app.handle(request('/ok'))
 
     expect(response.status).toBe(500)
-    expect(handled.value).toBeInstanceOf(AggregateError)
-    expect((handled.value as AggregateError).errors).toEqual([
-      setupError,
+    expect(handled.value).toBe(setupError)
+    expect(consoleError).toHaveBeenCalledOnce()
+    const [, payload] = consoleError.mock.calls[0] ?? []
+    expect(payload).toMatchObject({ phase: 'setup' })
+    expect((payload as { err?: unknown }).err).toBeInstanceOf(AggregateError)
+    expect(((payload as { err: AggregateError }).err).errors).toEqual([
       disposeError,
       handlerError,
     ])
+
+    consoleError.mockRestore()
   })
 
   it('disposes after handled route errors without replacing the response', async () => {
@@ -1006,6 +1027,32 @@ describe('@inferdi/elysia', () => {
     expect(root.scopes[0]?.disposeCalls).toBe(0)
   })
 
+  it('skipInferdiDispose short-circuits the custom disposal path on success', async () => {
+    const root = new TestRoot()
+    let autoDisposeCalls = 0
+    const app = new Elysia()
+      .use(inferdiElysia({
+        container: root,
+        // A predicate forces the custom `disposeOnce` path; skip must
+        // short-circuit before the predicate is ever evaluated.
+        autoDispose: () => {
+          autoDisposeCalls += 1
+          return true
+        },
+      }))
+      .get('/stream', (context) => {
+        skipInferdiDispose(context)
+        return { skipped: true }
+      })
+
+    const response = await app.handle(request('/stream'))
+    await waitForAfterResponse()
+
+    expect(response.status).toBe(200)
+    expect(root.scopes[0]?.disposeCalls).toBe(0)
+    expect(autoDisposeCalls).toBe(0)
+  })
+
   it('skipInferdiDispose does not skip disposal when the request fails', async () => {
     const root = new TestRoot()
     const routeError = new Error('stream setup failed')
@@ -1104,5 +1151,31 @@ describe('@inferdi/elysia', () => {
     expect(secondRoot.createScopeCalls).toBe(1)
     expect(firstRoot.scopes[0]?.disposeCalls).toBe(1)
     expect(secondRoot.scopes[0]?.disposeCalls).toBe(1)
+  })
+
+  it('adds no request-time parsing inference to routes in scope', async () => {
+    // Elysia's Sucrose statically analyzes every lifecycle handler; the moment
+    // one passes the whole `context` to another function it marks body/query/
+    // cookie/header parsing as needed for every request in scope. The plugin's
+    // hooks must touch only `request`, so they add no parsing a route did not
+    // ask for. Assert the plugin leaves Elysia's inference identical to a bare
+    // app with the same no-op route (robust against Elysia changing defaults).
+    const readInference = (app: unknown) =>
+      (app as { inference: Record<string, boolean> }).inference
+    const buildApp = (plugin?: Elysia) => {
+      const base = new Elysia()
+      return (plugin ? base.use(plugin) : base).get('/noop', () => 'ok')
+    }
+
+    const bare = buildApp()
+    await bare.modules
+    const withPlugin = buildApp(inferdiElysia({ container: new TestRoot() }))
+    await withPlugin.modules
+
+    const bareInference = readInference(bare)
+    const pluginInference = readInference(withPlugin)
+    for (const field of ['body', 'query', 'cookie', 'headers'] as const) {
+      expect(pluginInference[field]).toBe(bareInference[field])
+    }
   })
 })

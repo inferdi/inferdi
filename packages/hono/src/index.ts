@@ -144,7 +144,8 @@ export interface InferdiHonoOptions<
       ) => MaybePromise<boolean>)
   /**
    * Optional sink for disposal failures. If it returns normally, the disposal
-   * error is considered handled; if omitted, disposal errors propagate.
+   * error is considered handled; omitted post-response cleanup failures are
+   * logged.
    */
   readonly onDisposeError?: (
     error: unknown,
@@ -158,7 +159,7 @@ type TypedContext<
   Key extends string,
 > = Context<E & InferdiHonoScopeEnv<Scope, Key>>
 
-const skippedContexts = new WeakSet<any>()
+const skippedContexts = new WeakSet<Context>()
 
 function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
   return (
@@ -168,22 +169,28 @@ function isPromiseLike<T>(value: T | PromiseLike<T>): value is PromiseLike<T> {
   )
 }
 
-function throwCollected(errors: unknown[]): void {
+function logCleanupErrors(errors: unknown[]): void {
   if (errors.length === 0) return
 
-  if (errors.length === 1) {
-    throw errors[0]
-  }
+  const err = errors.length === 1
+    ? errors[0]
+    : new AggregateError(errors, 'InferDI Hono request cleanup failed')
 
-  throw new AggregateError(errors, 'InferDI Hono request lifecycle failed')
+  try {
+    console.error('Failed to dispose InferDI Hono request scope', err)
+  } catch {
+    // Response cleanup must not fail because the fallback logger failed.
+  }
 }
 
-function prependContextError(errors: unknown[], context: Context): void {
-  if (errors.length === 0) return
-
-  const error = context.error
-  if (error !== undefined && !errors.includes(error)) {
-    errors.unshift(error)
+function disposeDefault(scope: InferdiScope): void | PromiseLike<void> {
+  try {
+    const disposing = scope.dispose()
+    if (isPromiseLike(disposing)) {
+      return disposing.then(undefined, (error) => logCleanupErrors([error]))
+    }
+  } catch (error) {
+    logCleanupErrors([error])
   }
 }
 
@@ -243,10 +250,12 @@ function handleDisposeError<
     const handling = onDisposeError(error, context)
     if (isPromiseLike(handling)) {
       return handling.then(undefined, (handlerError) => {
+        errors.push(error)
         errors.push(handlerError)
       })
     }
   } catch (handlerError) {
+    errors.push(error)
     errors.push(handlerError)
   }
 }
@@ -292,7 +301,7 @@ export function inferdiHono<
 export function inferdiHono<
   Root extends InferdiRoot,
   E extends Env = Env,
-  Key extends string = string,
+  const Key extends string = string,
   Scope extends InferdiScope = InferdiScopeOf<Root>,
 >(
   options: InferdiHonoOptions<Root, E, Key, Scope> & {
@@ -319,80 +328,128 @@ export function inferdiHono<
   const setupScope = options.setupScope
   const autoDispose = options.autoDispose
   const onDisposeError = options.onDisposeError
+  const useDefaultDisposePath =
+    options.disposeScope === undefined &&
+    (options.autoDispose === undefined || options.autoDispose === true) &&
+    options.onDisposeError === undefined
 
   return async (context, next) => {
     const typedContext = context as TypedContext<E, Scope, Key>
+    const setVar = typedContext.set as unknown as (
+      key: Key,
+      value: Scope | undefined,
+    ) => void
     const scopeOrPromise = createScope(root, context as Context<E>)
     const scope = isPromiseLike(scopeOrPromise)
       ? await scopeOrPromise
       : scopeOrPromise
 
-    try {
-      if (setupScope !== undefined) {
+    // Expose the scope before setupScope so setup-failure cleanup hooks
+    // (`disposeScope` / `onDisposeError`) see the same `c.var[key]` as the
+    // success path. Route handlers never observe a half-built scope because
+    // `next()` has not run yet.
+    setVar(key, scope)
+
+    if (setupScope !== undefined) {
+      try {
         const setupResult = setupScope(scope, context as Context<E>)
         if (isPromiseLike(setupResult)) {
           await setupResult
         }
-      }
-      ;(typedContext.set as unknown as (key: Key, value: Scope) => void)(
-        key,
-        scope,
-      )
-    } catch (error) {
-      const errors = [error]
-      const disposing = disposeWithErrors(
-        scope,
-        typedContext,
-        disposeScope,
-        onDisposeError,
-        errors,
-      )
-      if (isPromiseLike(disposing)) {
-        await disposing
-      }
-      throwCollected(errors)
-    }
-
-    const errors: unknown[] = []
-
-    try {
-      await next()
-    } catch (error) {
-      errors.push(error)
-    }
-
-    const skipped = skippedContexts.delete(context)
-
-    if (!skipped) {
-      let shouldDispose = autoDispose !== false
-
-      if (typeof autoDispose === 'function') {
-        try {
-          const autoDisposeResult = autoDispose(typedContext)
-          shouldDispose = isPromiseLike(autoDisposeResult)
-            ? await autoDisposeResult !== false
-            : autoDisposeResult !== false
-        } catch (error) {
-          errors.push(error)
-          shouldDispose = true
-        }
-      }
-
-      if (shouldDispose) {
+      } catch (error) {
+        // Setup runs before the response is produced, so the error is surfaced
+        // (Hono routes it to `app.onError()`). Finding 2: surface only the setup
+        // error; cleanup failures go to `onDisposeError`, else are logged —
+        // never aggregated into the thrown error. Clear the exposed scope first
+        // so the error handler never observes a disposed scope.
+        const cleanupErrors: unknown[] = []
         const disposing = disposeWithErrors(
           scope,
           typedContext,
           disposeScope,
           onDisposeError,
-          errors,
+          cleanupErrors,
         )
         if (isPromiseLike(disposing)) {
           await disposing
         }
+        skippedContexts.delete(context)
+        setVar(key, undefined)
+        logCleanupErrors(cleanupErrors)
+        throw error
       }
     }
 
-    prependContextError(errors, context)
-    throwCollected(errors)
+    let routeError: unknown
+    let hasRouteError = false
+
+    try {
+      await next()
+    } catch (error) {
+      routeError = error
+      hasRouteError = true
+    }
+
+    const routeFailed = hasRouteError || typedContext.error !== undefined
+    const skipped = !routeFailed && skippedContexts.has(context)
+
+    if (routeFailed) {
+      skippedContexts.delete(context)
+    }
+
+    if (!skipped) {
+      if (useDefaultDisposePath) {
+        const disposing = disposeDefault(scope)
+        if (isPromiseLike(disposing)) {
+          await disposing
+        }
+      } else {
+        const cleanupErrors: unknown[] = []
+        let shouldDispose = autoDispose !== false
+
+        if (typeof autoDispose === 'function') {
+          try {
+            const autoDisposeResult = autoDispose(typedContext)
+            shouldDispose = isPromiseLike(autoDisposeResult)
+              ? await autoDisposeResult !== false
+              : autoDisposeResult !== false
+          } catch (error) {
+            shouldDispose = true
+            const handling = handleDisposeError(
+              error,
+              typedContext,
+              onDisposeError,
+              cleanupErrors,
+            )
+            if (isPromiseLike(handling)) {
+              await handling
+            }
+          }
+        }
+
+        if (shouldDispose) {
+          const disposing = disposeWithErrors(
+            scope,
+            typedContext,
+            disposeScope,
+            onDisposeError,
+            cleanupErrors,
+          )
+          if (isPromiseLike(disposing)) {
+            await disposing
+          }
+        }
+
+        // Cleanup runs after `next()`: a failure here must never replace an
+        // already-produced response, so it is observed via `onDisposeError` or
+        // logged — never thrown.
+        logCleanupErrors(cleanupErrors)
+      }
+    }
+
+    // The route error keeps flowing through Hono's normal error handling.
+    if (hasRouteError) {
+      throw routeError
+    }
   }
 }

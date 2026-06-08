@@ -1,6 +1,6 @@
 {
   "name": "@inferdi/fastify",
-  "version": "4.0.8",
+  "version": "5.0.0",
   "description": "Fastify request-scope adapter for InferDI.",
   "keywords": [
     "typescript",
@@ -54,7 +54,7 @@
     "node": ">=20.0.0"
   },
   "peerDependencies": {
-    "@inferdi/inferdi": "^4.0.0",
+    "@inferdi/inferdi": "^5.0.0",
     "fastify": "^5.0.0"
   },
   "dependencies": {

@@ -1,13 +1,15 @@
 {
-  "name": "@inferdi/inferdi",
+  "name": "@inferdi/express",
   "version": "5.0.0",
   "license": "MIT",
   "exports": "./src/index.ts",
+  "imports": {
+    "express": "npm:express@^5.0.0"
+  },
   "publish": {
     "include": [
       "src/**/*.ts",
       "README.md",
-      "MIGRATION.md",
       "LICENSE",
       "jsr.json"
     ],

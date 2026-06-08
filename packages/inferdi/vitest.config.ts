@@ -23,7 +23,13 @@ export default defineConfig({
     typecheck: {
       enabled: false,
       include: ['__tests__/**/*.test-d.ts'],
-      tsconfig: './tsconfig.json',
+      tsconfig: './tsconfig.test.json',
+      // The base tsconfig scopes the program to `src`, so the type tests in
+      // `__tests__` were never actually checked. `tsconfig.test.json` widens the
+      // program to the test files; `ignoreSourceErrors` drops `src` diagnostics
+      // (already covered by the `typecheck` script) so a test file's global
+      // module augmentation cannot fail the run.
+      ignoreSourceErrors: true,
     },
   },
 })

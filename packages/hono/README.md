@@ -111,11 +111,20 @@ app.use('*', inferdiHono({
 | `setupScope` | — | Hydrates the scope before it is exposed to route handlers. May be async. |
 | `disposeScope` | `scope.dispose()` | Overrides request-scope disposal. May be async. |
 | `autoDispose` | `true` | Set to `false`, or return `false`, when application code owns disposal. |
-| `onDisposeError` | — | Optional sink for disposal failures. Returning normally swallows the cleanup error. |
+| `onDisposeError` | `console.error(...)` | Optional sink for post-response disposal failures. Returning normally marks the error handled; omitted failures are logged. |
 
 If `setupScope` fails after a scope has been created, the middleware disposes
-that scope and rethrows the setup error. If both setup and cleanup fail, it
-throws an `AggregateError`.
+that scope and rethrows **only** the original setup error (the response has not
+been produced yet, so Hono routes it to `onError`). A disposal failure during
+that teardown is routed to `onDisposeError`, or logged via `console.error` when
+no handler is set — it is never aggregated into the rethrown error.
+
+After `next()`, the response has already been produced. A `disposeScope` or
+`autoDispose` failure at that point is logged via `console.error` (or routed to
+`onDisposeError`) and **never replaces the response** — it cannot turn a
+successful response into an error one. A route error from the handler still flows
+through Hono's normal `onError` handling, and it always disposes the scope:
+`skipInferdiDispose` only suppresses cleanup for a **successful** response.
 
 ## Streaming
 
@@ -200,6 +209,7 @@ export function skipInferdiDispose(context: Context): void
 | [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | [JSR](https://jsr.io/@inferdi/fastify) | [npm](https://www.npmjs.com/package/@inferdi/fastify) | Fastify v5 request-scope adapter |
 | [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) | [JSR](https://jsr.io/@inferdi/hono) | [npm](https://www.npmjs.com/package/@inferdi/hono) | Hono request-scope middleware |
 | [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) | [JSR](https://jsr.io/@inferdi/koa) | [npm](https://www.npmjs.com/package/@inferdi/koa) | Koa v3 request-scope middleware |
+| [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | [JSR](https://jsr.io/@inferdi/express) | [npm](https://www.npmjs.com/package/@inferdi/express) | Express 5 request-scope middleware |
 | [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) | [JSR](https://jsr.io/@inferdi/elysia) | [npm](https://www.npmjs.com/package/@inferdi/elysia) | Elysia request-scope plugin |
 
 The project repository lives at [inferdi/inferdi](https://github.com/inferdi/inferdi). This adapter targets [Hono](https://hono.dev).

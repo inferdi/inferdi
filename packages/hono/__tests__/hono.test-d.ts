@@ -56,10 +56,11 @@ describe('@inferdi/hono types', () => {
     type Env = InferdiHonoEnv<RootContainer>
     expectTypeOf<keyof Env['Variables']>().toEqualTypeOf<'di'>()
 
+    // An explicit `key: 'di'` produces the same middleware type as omitting the
+    // key entirely (both take the default-key overload).
     const explicit = inferdiHono({ container: root, key: 'di' })
-    expectTypeOf(explicit).toMatchTypeOf<
-      ReturnType<typeof inferdiHono<RootContainer>>
-    >()
+    const implicit = inferdiHono({ container: root })
+    expectTypeOf(explicit).toEqualTypeOf<typeof implicit>()
   })
 
   it('supports custom context variable keys', () => {
