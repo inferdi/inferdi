@@ -8,6 +8,7 @@ on:
   pull_request:
     paths:
       - 'apps/docs/**'
+  workflow_dispatch:
 
 concurrency:
   group: docs-${{ github.workflow }}-${{ github.ref }}
@@ -35,7 +36,7 @@ jobs:
 
       - run: pnpm run docs:build
         env:
-          DOCS_BASE: /inferdi/
+          DOCS_BASE: /
 
       - name: Setup Pages
         if: github.event_name == 'push'
