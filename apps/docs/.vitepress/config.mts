@@ -378,6 +378,14 @@ export default defineConfig({
   cacheDir: './.vitepress/cache',
   lastUpdated: true,
   cleanUrls: true,
+  vite: {
+    build: {
+      target: 'esnext',
+    },
+    esbuild: {
+      target: 'esnext',
+    },
+  },
   head: [
     ['link', { rel: 'icon', href: withBase('/logo.png') }],
     ['meta', { name: 'theme-color', content: '#5b5ff5' }],
