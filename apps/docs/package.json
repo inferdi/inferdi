@@ -1,0 +1,16 @@
+{
+  "name": "inferdi-docs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "view": "vitepress preview --port 4173 --strictPort",
+    "preview": "vitepress preview --port 4173 --strictPort",
+    "stop": "node scripts/stop-preview.mjs"
+  },
+  "devDependencies": {
+    "vitepress": "1.6.4"
+  }
+}

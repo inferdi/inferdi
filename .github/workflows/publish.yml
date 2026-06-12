@@ -2,14 +2,58 @@ name: Publish
 
 # Triggers on a semver tag like v1.0.1. The version embedded in the tag must
 # match every published package manifest — the `verify` job enforces this.
+# GitHub does not evaluate `paths` filters for tag pushes, so `package-changes`
+# gates the publish jobs by comparing the current release tag with the previous
+# semver tag.
 on:
   push:
     tags:
       - 'v*.*.*'
 
 jobs:
+  package-changes:
+    name: Detect package changes
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - id: diff
+        name: Check packages directory changes
+        run: |
+          set -euo pipefail
+
+          CURRENT_TAG="${GITHUB_REF_NAME}"
+          CURRENT_COMMIT="$(git rev-list -n 1 "$CURRENT_TAG")"
+          PREVIOUS_TAG=""
+
+          if git rev-parse --verify --quiet "$CURRENT_COMMIT^" > /dev/null; then
+            PREVIOUS_TAG="$(git describe --tags --match 'v[0-9]*.[0-9]*.[0-9]*' --abbrev=0 "$CURRENT_COMMIT^" 2> /dev/null || true)"
+          fi
+
+          if [ -z "$PREVIOUS_TAG" ]; then
+            echo "::notice::No previous semver tag found; publishing package release"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CHANGED_FILES="$(git diff --name-only "$PREVIOUS_TAG" "$CURRENT_COMMIT" -- packages)"
+          if [ -n "$CHANGED_FILES" ]; then
+            echo "::notice::Package changes detected between $PREVIOUS_TAG and $CURRENT_TAG"
+            printf '%s\n' "$CHANGED_FILES"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::No package changes between $PREVIOUS_TAG and $CURRENT_TAG; skipping publish"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
   verify:
     name: Verify versions
+    needs: package-changes
+    if: needs.package-changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.check.outputs.version }}
@@ -45,7 +89,8 @@ jobs:
 
   publish-jsr:
     name: Publish to JSR
-    needs: verify
+    needs: [package-changes, verify]
+    if: needs.package-changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
     # `id-token: write` is the OIDC permission JSR uses to bind this run to the
     # publish event in its public transparency log — this is what earns the
@@ -132,7 +177,8 @@ jobs:
 
   publish-npm:
     name: Publish to npm (with provenance)
-    needs: verify
+    needs: [package-changes, verify]
+    if: needs.package-changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
     # OIDC token request — npm Trusted Publishing exchanges this for a short-lived
     # scoped publish token, no NPM_TOKEN required. Same permission also drives

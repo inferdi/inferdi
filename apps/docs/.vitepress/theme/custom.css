@@ -1,0 +1,48 @@
+:root {
+  --vp-c-brand-1: #4f46e5;
+  --vp-c-brand-2: #2563eb;
+  --vp-c-brand-3: #06b6d4;
+  --vp-c-brand-soft: rgba(79, 70, 229, 0.14);
+  --vp-c-bg-alt: #f7f8fb;
+  --vp-home-hero-name-color: #4f46e5;
+  --vp-font-family-base: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --vp-font-family-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.dark {
+  --vp-c-brand-1: #7dd3fc;
+  --vp-c-brand-2: #818cf8;
+  --vp-c-brand-3: #22d3ee;
+  --vp-c-brand-soft: rgba(125, 211, 252, 0.16);
+  --vp-c-bg-alt: #111827;
+  --vp-home-hero-name-color: #7dd3fc;
+}
+
+.VPNavBarTitle .logo {
+  border-radius: 6px;
+}
+
+.VPHero .image-src {
+  max-width: 220px;
+  max-height: 220px;
+}
+
+.VPFeature {
+  border-radius: 8px;
+}
+
+.vp-doc table {
+  display: table;
+  width: 100%;
+}
+
+.vp-doc th,
+.vp-doc td {
+  vertical-align: top;
+}
+
+.vp-doc img[src$="benchmarking_results.png"] {
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 8px;
+  background: var(--vp-c-bg);
+}
