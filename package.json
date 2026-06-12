@@ -21,5 +21,11 @@
     "benchmarks:install": "pnpm --dir benchmarks install",
     "benchmarks:precondition": "pnpm --dir benchmarks run precondition",
     "benchmarks:bench": "pnpm --dir benchmarks run bench"
+  },
+  "pnpm": {
+    "overrides": {
+      "vite": "6.4.2",
+      "esbuild": "^0.25.0"
+    }
   }
 }
