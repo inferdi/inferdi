@@ -1,0 +1,4 @@
+Contact: mailto:support@inferdi.com
+Expires: 2027-06-12T00:00:00Z
+Preferred-Languages: en, ru
+Canonical: https://inferdi.com/.well-known/security.txt
