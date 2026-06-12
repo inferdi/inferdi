@@ -9,10 +9,22 @@
 ![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen.svg)
 [![codecov](https://codecov.io/gh/inferdi/inferdi/graph/badge.svg?token=IHAXLIFHF3)](https://codecov.io/gh/inferdi/inferdi)
 ![License](https://img.shields.io/npm/l/@inferdi/inferdi.svg)
+[![Docs](https://img.shields.io/badge/docs-inferdi.com-5b5ff5)](https://inferdi.com/guide/quick-start)
 
 A zero-dependency, **decorator-free**, strongly typed DI container for modern TypeScript.
 
-<p><em>Build your dependency graph using a fluent API that infers types automatically, prevents memory leaks with strict lifetime guards, and handles teardown natively via the Explicit Resource Management API (`using` / `await using`).</em></p>
+<br>
+<p>
+  🌐 <strong>Multilingual documentation:</strong>
+  <a href="https://inferdi.com/guide/quick-start">English</a> ·
+  <a href="https://inferdi.com/zh/guide/quick-start">中文</a> ·
+  <a href="https://inferdi.com/ja/guide/quick-start">日本語</a> ·
+  <a href="https://inferdi.com/es/guide/quick-start">Español</a> ·
+  <a href="https://inferdi.com/ru/guide/quick-start">Русский</a>
+</p>
+<br>
+
+<p><em>Build apps with next-gen DI for any modern runtime with ultra-fast architecture, clean domain logic, and first-class testability.</em></p>
 </div>
 
 ## Table of Contents
@@ -105,6 +117,8 @@ The repository ships a comprehensive benchmark suite in [`benchmarks/`](https://
 Full methodology, fairness notes, fixture sources, and per-scenario reasoning: see [`benchmarks/README.md`](https://github.com/inferdi/inferdi/blob/main/benchmarks/README.md).
 
 ## Install
+
+For the full multilingual guide, adapter docs, API reference, and migration notes, see [inferdi.com](https://inferdi.com).
 
 InferDI is published to **two registries** with identical contents:
 

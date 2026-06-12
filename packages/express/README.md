@@ -6,6 +6,7 @@
 [![JSR](https://jsr.io/badges/@inferdi/express)](https://jsr.io/@inferdi/express)
 [![npm version](https://img.shields.io/npm/v/@inferdi/express)](https://www.npmjs.com/package/@inferdi/express)
 ![License](https://img.shields.io/npm/l/@inferdi/express.svg)
+[![Docs](https://img.shields.io/badge/docs-inferdi.com-5b5ff5)](https://inferdi.com/adapters/express)
 
 Express request-scope middleware for [InferDI](https://github.com/inferdi/inferdi).
 </div>
@@ -30,6 +31,8 @@ services with `.get(key)` — the adapter only manages the per-request scope.
 - [Related](#related)
 
 ## Install
+
+For the full multilingual guide, adapter docs, API reference, and migration notes, see [inferdi.com](https://inferdi.com).
 
 ```bash
 pnpm add @inferdi/inferdi @inferdi/express express

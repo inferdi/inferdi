@@ -1,6 +1,6 @@
 {
   "name": "@inferdi/fastify",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "description": "Fastify request-scope adapter for InferDI.",
   "keywords": [
     "typescript",
@@ -18,7 +18,7 @@
     "url": "https://github.com/maxrendel"
   },
   "license": "MIT",
-  "homepage": "https://github.com/inferdi/inferdi/tree/main/packages/fastify#readme",
+  "homepage": "https://inferdi.com/adapters/fastify",
   "bugs": {
     "url": "https://github.com/inferdi/inferdi/issues"
   },

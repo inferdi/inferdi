@@ -6,6 +6,7 @@
 [![JSR](https://jsr.io/badges/@inferdi/hono)](https://jsr.io/@inferdi/hono)
 [![npm version](https://img.shields.io/npm/v/@inferdi/hono)](https://www.npmjs.com/package/@inferdi/hono)
 ![License](https://img.shields.io/npm/l/@inferdi/hono.svg)
+[![Docs](https://img.shields.io/badge/docs-inferdi.com-5b5ff5)](https://inferdi.com/adapters/hono)
 
 Hono request-scope middleware for [InferDI](https://github.com/inferdi/inferdi).
 </div>
@@ -30,6 +31,8 @@ with `.get(key)` — the adapter only manages the per-request scope.
 - [Related](#related)
 
 ## Install
+
+For the full multilingual guide, adapter docs, API reference, and migration notes, see [inferdi.com](https://inferdi.com).
 
 ```bash
 pnpm add @inferdi/inferdi @inferdi/hono hono

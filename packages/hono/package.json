@@ -1,6 +1,6 @@
 {
   "name": "@inferdi/hono",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "description": "Hono request-scope middleware for InferDI.",
   "keywords": [
     "typescript",
@@ -18,7 +18,7 @@
     "url": "https://github.com/maxrendel"
   },
   "license": "MIT",
-  "homepage": "https://github.com/inferdi/inferdi/tree/main/packages/hono#readme",
+  "homepage": "https://inferdi.com/adapters/hono",
   "bugs": {
     "url": "https://github.com/inferdi/inferdi/issues"
   },

@@ -6,6 +6,7 @@
 [![JSR](https://jsr.io/badges/@inferdi/koa)](https://jsr.io/@inferdi/koa)
 [![npm version](https://img.shields.io/npm/v/@inferdi/koa)](https://www.npmjs.com/package/@inferdi/koa)
 ![License](https://img.shields.io/npm/l/@inferdi/koa.svg)
+[![Docs](https://img.shields.io/badge/docs-inferdi.com-5b5ff5)](https://inferdi.com/adapters/koa)
 
 Koa request-scope middleware for [InferDI](https://github.com/inferdi/inferdi).
 </div>
@@ -31,6 +32,8 @@ scope.
 - [Related](#related)
 
 ## Install
+
+For the full multilingual guide, adapter docs, API reference, and migration notes, see [inferdi.com](https://inferdi.com).
 
 ```bash
 pnpm add @inferdi/inferdi @inferdi/koa koa
