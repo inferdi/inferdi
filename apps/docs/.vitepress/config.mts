@@ -1,9 +1,17 @@
 import { defineConfig, type DefaultTheme } from 'vitepress'
 
 const repo = 'https://github.com/inferdi/inferdi'
+const siteUrl = 'https://inferdi.com'
 const base = process.env.DOCS_BASE ?? '/'
 const basePath = base.endsWith('/') ? base.slice(0, -1) : base
 const withBase = (path: `/${string}`) => `${basePath}${path}`
+const canonicalUrl = (relativePath: string) => {
+  const path = relativePath
+    .replace(/(^|\/)index\.md$/, '$1')
+    .replace(/\.md$/, '')
+
+  return new URL(path, `${siteUrl}/`).toString()
+}
 
 const enNav: DefaultTheme.NavItem[] = [
   { text: 'Guide', link: '/guide/quick-start' },
@@ -378,6 +386,9 @@ export default defineConfig({
   cacheDir: './.vitepress/cache',
   lastUpdated: true,
   cleanUrls: true,
+  sitemap: {
+    hostname: siteUrl,
+  },
   vite: {
     build: {
       target: 'esnext',
@@ -393,6 +404,18 @@ export default defineConfig({
     ['meta', { property: 'og:title', content: 'InferDI — The only ultra-fast DI for modern TypeScript' }],
     ['meta', { property: 'og:description', content: 'Build apps with next-gen dependency injection for modern runtimes — clean domain logic, compiler-validated graphs, safe lifetimes, and first-class testability without decorators or runtime bloat.' }],
   ],
+  transformPageData(pageData) {
+    if (pageData.relativePath === '404.md') return
+
+    pageData.frontmatter.head ??= []
+    pageData.frontmatter.head.push([
+      'link',
+      {
+        rel: 'canonical',
+        href: canonicalUrl(pageData.relativePath),
+      },
+    ])
+  },
   themeConfig: {
     logo: '/logo.png',
     siteTitle: 'InferDI',
