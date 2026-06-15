@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/core/testing#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "核心概念"
+          "item": "https://inferdi.com/zh/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "测试与覆盖"
+          "item": "https://inferdi.com/zh/core/testing"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/zh/core/testing#article"
+      "headline": "InferDI 中的测试与覆盖 —— .override()"
+      "name": "测试与覆盖"
+      "description": "在测试中使用 .override() 将现有注册替换为 mock，在不触碰生产接线或带类型图谱其余部分的情况下替换实现。"
+      "url": "https://inferdi.com/zh/core/testing"
+      "mainEntityOfPage": "https://inferdi.com/zh/core/testing"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, 测试, override, mock, 测试替身, 替换实现, 依赖注入"
+      "articleSection": "核心概念"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # 测试与覆盖
 
 当测试需要用 mock 替换现有注册时，请使用 `.override()`。

@@ -1,3 +1,62 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ja/reference/api#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "ホーム"
+          "item": "https://inferdi.com/ja/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "リファレンス"
+          "item": "https://inferdi.com/ja/reference/api"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "API サマリー"
+          "item": "https://inferdi.com/ja/reference/api"
+    - "@type": "APIReference"
+      "@id": "https://inferdi.com/ja/reference/api#article"
+      "headline": "InferDI コア API サマリー"
+      "name": "API サマリー"
+      "description": "@inferdi/inferdi コアの公開 API のまとめです。Container クラス、register、registerFactory、registerValue、get、has、スコープ、override、dispose、そして Lazy・DependenciesMap・Module の各型を解説します。"
+      "url": "https://inferdi.com/ja/reference/api"
+      "mainEntityOfPage": "https://inferdi.com/ja/reference/api"
+      "inLanguage": "ja-JP"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "executableLibraryName": "@inferdi/inferdi"
+      "programmingModel": "明示的な登録、フルエントビルダー"
+      "targetPlatform": "Node.js, Bun, Deno, Browser"
+      "keywords": "InferDI, API, Container, register, registerFactory, get, scope, override, dispose, Lazy, Module"
+      "articleSection": "リファレンス"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # API サマリー
 
 このページでは、公開されているコア API をまとめています。正確なジェネリック定義については、パッケージの README と TypeScript の型宣言を参照してください。

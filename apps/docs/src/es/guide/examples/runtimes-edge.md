@@ -1,3 +1,63 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/es/guide/examples/runtimes-edge#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Inicio"
+          "item": "https://inferdi.com/es/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Guía"
+          "item": "https://inferdi.com/es/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Ejemplos"
+          "item": "https://inferdi.com/es/guide/examples"
+        - "@type": "ListItem"
+          "position": 4
+          "name": "Runtimes y plataformas edge"
+          "item": "https://inferdi.com/es/guide/examples/runtimes-edge"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/es/guide/examples/runtimes-edge#article"
+      "headline": "InferDI en Node, Bun, Deno y runtimes edge"
+      "name": "Runtimes y plataformas edge"
+      "description": "Una raíz a nivel de módulo y un scope por petición en HTTP de bajo nivel de Node, Bun serve, HTTP de Deno y funciones edge — usando await using para manejadores acotados y liberación explícita para trabajo en streaming o en segundo plano."
+      "url": "https://inferdi.com/es/guide/examples/runtimes-edge"
+      "mainEntityOfPage": "https://inferdi.com/es/guide/examples/runtimes-edge"
+      "inLanguage": "es-ES"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Node.js, Bun, Deno, Supabase Edge Functions, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, runtimes, edge, Node HTTP, Bun, Deno, Supabase Edge Functions, await using, scope de petición"
+      "articleSection": "Ejemplos"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Runtimes y plataformas edge
 
 Los ejemplos de runtime usan una raíz a nivel de módulo y crean un scope por petición. Los manejadores acotados pueden usar `await using`; el trabajo en streaming o en segundo plano debe liberarse una vez que ese trabajo termine.

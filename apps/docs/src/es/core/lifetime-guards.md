@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/es/core/lifetime-guards#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Inicio"
+          "item": "https://inferdi.com/es/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Conceptos básicos"
+          "item": "https://inferdi.com/es/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Guards de tiempo de vida"
+          "item": "https://inferdi.com/es/core/lifetime-guards"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/es/core/lifetime-guards#article"
+      "headline": "Guards de tiempo de vida en InferDI — singleton, scoped y transient"
+      "name": "Guards de tiempo de vida"
+      "description": "Los tres tiempos de vida de InferDI — singleton, scoped y transient — y los guards de compilación y de runtime que impiden que un servicio de vida más larga capture a uno de vida más corta y filtre estado entre peticiones."
+      "url": "https://inferdi.com/es/core/lifetime-guards"
+      "mainEntityOfPage": "https://inferdi.com/es/core/lifetime-guards"
+      "inLanguage": "es-ES"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Expert"
+      "keywords": "InferDI, tiempos de vida, singleton, scoped, transient, guard de tiempo de vida, dependencia cautiva, inyección de dependencias"
+      "articleSection": "Conceptos básicos"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Guards de tiempo de vida
 
 InferDI tiene tres tiempos de vida:

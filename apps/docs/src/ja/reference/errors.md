@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ja/reference/errors#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "ホーム"
+          "item": "https://inferdi.com/ja/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "リファレンス"
+          "item": "https://inferdi.com/ja/reference/api"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "エラー"
+          "item": "https://inferdi.com/ja/reference/errors"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ja/reference/errors#article"
+      "headline": "InferDI エラーリファレンス"
+      "name": "エラー"
+      "description": "グラフやライフサイクルの誤用に対して InferDI が明示的にスローするすべてのエラー（未知のキー、循環検出、ライフタイム違反、破棄済みコンテナ）と、そのメッセージ形式を解説します。登録ミスをテストで早期に検出できます。"
+      "url": "https://inferdi.com/ja/reference/errors"
+      "mainEntityOfPage": "https://inferdi.com/ja/reference/errors"
+      "inLanguage": "ja-JP"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, エラー, 例外, 未知のキー, 循環検出, ライフタイム違反, 破棄済みコンテナ, 依存性注入"
+      "articleSection": "リファレンス"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # エラー
 
 InferDI は、依存グラフやライフサイクルの誤用に対して明示的なエラーをスローします。登録ミスを早期に失敗させるため、これらのメッセージをテストで可視のまま保ちましょう。

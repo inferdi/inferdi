@@ -1,3 +1,55 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/adapters/#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Home"
+          "item": "https://inferdi.com/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Adapters"
+          "item": "https://inferdi.com/adapters/"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/adapters/#article"
+      "headline": "InferDI Framework Adapters — overview"
+      "name": "Framework Adapters"
+      "description": "Each InferDI adapter creates one request scope per request, exposes it at the framework-native location, and disposes it at the framework's safe completion point — while preserving the concrete, fully typed container your application owns. Thin lifecycle glue, never an IoC framework."
+      "url": "https://inferdi.com/adapters/"
+      "mainEntityOfPage": "https://inferdi.com/adapters/"
+      "inLanguage": "en-US"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, @inferdi/inferdi, Fastify, Hono, Koa, Express, Elysia"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, adapters, request scope, Fastify, Hono, Koa, Express, Elysia, middleware, dependency injection"
+      "articleSection": "Adapters"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Framework Adapters
 
 Each adapter creates exactly one request scope per request, exposes it at the framework-native location, and disposes it at the framework's safe completion point — while preserving the concrete container type your application owns, so `request.di` is fully typed, not `any` or a base container.

@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ru/core/scopes#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Главная"
+          "item": "https://inferdi.com/ru/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Базовые принципы"
+          "item": "https://inferdi.com/ru/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Скоупы и очистка"
+          "item": "https://inferdi.com/ru/core/scopes"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ru/core/scopes#article"
+      "headline": "Скоупы и очистка в InferDI"
+      "name": "Скоупы и очистка"
+      "description": "Scope ограничивает request-local-сервисы одной единицей работы: дочерний scope наследует все регистрации родителя, но кеширует собственные экземпляры и владеет их очисткой, с LIFO-очисткой и поддержкой using и await using."
+      "url": "https://inferdi.com/ru/core/scopes"
+      "mainEntityOfPage": "https://inferdi.com/ru/core/scopes"
+      "inLanguage": "ru-RU"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, скоупы, очистка, освобождение ресурсов, дочерний scope, using, await using, LIFO, внедрение зависимостей"
+      "articleSection": "Базовые принципы"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Скоупы и очистка
 
 Scope ограничивает время жизни request-local-сервисов одной единицей работы. Дочерний scope наследует все регистрации родителя, но кеширует собственные scoped-экземпляры и владеет их очисткой. Поэтому scope, созданный для одного запроса, не делит состояние с другим запросом и не переживает его.

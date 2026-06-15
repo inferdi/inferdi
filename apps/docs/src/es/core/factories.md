@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/es/core/factories#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Inicio"
+          "item": "https://inferdi.com/es/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Conceptos básicos"
+          "item": "https://inferdi.com/es/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Factorías"
+          "item": "https://inferdi.com/es/core/factories"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/es/core/factories#article"
+      "headline": "Factorías en InferDI — registerFactory"
+      "name": "Factorías"
+      "description": "Usa registerFactory cuando la construcción necesita más que new Ctor(...deps): leer varios valores, adaptar clientes de terceros, crear objetos de configuración o devolver una promesa que InferDI cachea sin modificar."
+      "url": "https://inferdi.com/es/core/factories"
+      "mainEntityOfPage": "https://inferdi.com/es/core/factories"
+      "inLanguage": "es-ES"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, factorías, registerFactory, factoría asíncrona, configuración, clientes de terceros, inyección de dependencias"
+      "articleSection": "Conceptos básicos"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Factorías
 
 Usa `registerFactory` cuando la construcción necesita más que `new Ctor(...deps)`: leer varios valores, adaptar clientes de terceros, crear objetos de configuración o devolver una promesa.

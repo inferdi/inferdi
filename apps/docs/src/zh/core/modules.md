@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/core/modules#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "核心概念"
+          "item": "https://inferdi.com/zh/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "模块"
+          "item": "https://inferdi.com/zh/core/modules"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/zh/core/modules#article"
+      "headline": "InferDI 中的模块 —— 用 .use() 组合构建器"
+      "name": "模块"
+      "description": "使用 .use() 将庞大的容器构建器拆分成更小的部分，同时在整个流式链路上保持完整的类型推断，并理解为什么泛型模块需要已知的输入形态。"
+      "url": "https://inferdi.com/zh/core/modules"
+      "mainEntityOfPage": "https://inferdi.com/zh/core/modules"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, 模块, use, 容器组合, 类型推断, Module 类型, 依赖注入"
+      "articleSection": "核心概念"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # 模块
 
 使用 `.use()` 可以把一个庞大的容器构建器拆分成更小的部分，同时在整个流式链路上保持类型推断。

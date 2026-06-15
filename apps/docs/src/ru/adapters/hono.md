@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ru/adapters/hono#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Главная"
+          "item": "https://inferdi.com/ru/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Адаптеры"
+          "item": "https://inferdi.com/ru/adapters/"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Адаптер Hono"
+          "item": "https://inferdi.com/ru/adapters/hono"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ru/adapters/hono#article"
+      "headline": "Адаптер Hono для InferDI — @inferdi/hono"
+      "name": "Адаптер Hono"
+      "description": "@inferdi/hono — это middleware для Hono v4: оно создаёт один scope запроса на каждый вызов, выставляет его через переменные контекста Hono и освобождает после завершения ограниченного pipeline маршрута — подходит для Cloudflare Workers и Bun на edge."
+      "url": "https://inferdi.com/ru/adapters/hono"
+      "mainEntityOfPage": "https://inferdi.com/ru/adapters/hono"
+      "inLanguage": "ru-RU"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Hono v4, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, Hono, Hono v4, middleware, переменные контекста, edge, Cloudflare Workers, Bun, dependency injection"
+      "articleSection": "Адаптеры"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "@inferdi/hono"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js >=16, Bun, Cloudflare Workers"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Адаптер Hono
 
 [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) - это middleware для Hono v4. Он создаёт один scope запроса на вызов middleware, выставляет его через переменные контекста Hono и очищает после завершения ограниченного pipeline маршрута.

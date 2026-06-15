@@ -1,3 +1,62 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ru/reference/api#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Главная"
+          "item": "https://inferdi.com/ru/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Справочник"
+          "item": "https://inferdi.com/ru/reference/api"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Справочник API"
+          "item": "https://inferdi.com/ru/reference/api"
+    - "@type": "APIReference"
+      "@id": "https://inferdi.com/ru/reference/api#article"
+      "headline": "Краткий справочник по API ядра InferDI"
+      "name": "Справочник API"
+      "description": "Краткое описание публичного API ядра @inferdi/inferdi: класс Container, register, registerFactory, registerValue, get, has, scopes, override, dispose, а также типы Lazy, DependenciesMap и Module."
+      "url": "https://inferdi.com/ru/reference/api"
+      "mainEntityOfPage": "https://inferdi.com/ru/reference/api"
+      "inLanguage": "ru-RU"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "executableLibraryName": "@inferdi/inferdi"
+      "programmingModel": "Явная регистрация, текучий builder"
+      "targetPlatform": "Node.js, Bun, Deno, Browser"
+      "keywords": "InferDI, API, Container, register, registerFactory, get, scope, override, dispose, Lazy, Module"
+      "articleSection": "Справочник"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Справочник API
 
 Эта страница кратко описывает публичный API core. Точные generic definitions смотрите в README пакета и TypeScript declarations.

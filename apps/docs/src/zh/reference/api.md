@@ -1,3 +1,62 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/reference/api#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "参考"
+          "item": "https://inferdi.com/zh/reference/api"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "API 概览"
+          "item": "https://inferdi.com/zh/reference/api"
+    - "@type": "APIReference"
+      "@id": "https://inferdi.com/zh/reference/api#article"
+      "headline": "InferDI 核心 API 概览"
+      "name": "API 概览"
+      "description": "公开的 @inferdi/inferdi 核心 API 概览：Container 类、register、registerFactory、registerValue、get、has、作用域、override、dispose，以及 Lazy、DependenciesMap 和 Module 类型。"
+      "url": "https://inferdi.com/zh/reference/api"
+      "mainEntityOfPage": "https://inferdi.com/zh/reference/api"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "executableLibraryName": "@inferdi/inferdi"
+      "programmingModel": "显式注册，流式构建器"
+      "targetPlatform": "Node.js, Bun, Deno, Browser"
+      "keywords": "InferDI, API, Container, register, registerFactory, get, 作用域, override, dispose, Lazy, Module"
+      "articleSection": "参考"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # API 概览
 
 本页总结了公开的核心 API。准确的泛型定义请参阅软件包 README 和 TypeScript 声明文件。

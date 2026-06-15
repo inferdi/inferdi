@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ru/guide/quick-start#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Главная"
+          "item": "https://inferdi.com/ru/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Руководство"
+          "item": "https://inferdi.com/ru/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Быстрый старт"
+          "item": "https://inferdi.com/ru/guide/quick-start"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ru/guide/quick-start#article"
+      "headline": "Быстрый старт InferDI — постройте свой первый типизированный граф зависимостей"
+      "name": "Быстрый старт"
+      "description": "Постройте граф зависимостей с помощью fluent API InferDI, пока TypeScript проверяет каждый аргумент конструктора по ходу связывания. Без декораторов @Injectable и без reflect-metadata — только обычный код, который читает компилятор, с разрешением в один Map.get() на горячем пути."
+      "url": "https://inferdi.com/ru/guide/quick-start"
+      "mainEntityOfPage": "https://inferdi.com/ru/guide/quick-start"
+      "inLanguage": "ru-RU"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Beginner"
+      "keywords": "InferDI, быстрый старт, внедрение зависимостей, DI в TypeScript, container, fluent API, типобезопасность"
+      "articleSection": "Руководство"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Быстрый старт
 
 Граф зависимостей строится через fluent API, а TypeScript проверяет его по ходу: каждый кортеж зависимостей сопоставляется с параметрами конструктора, поэтому перепутанный или пропущенный аргумент становится ошибкой компиляции, а не сюрпризом во время выполнения. Здесь нет декораторов `@Injectable()` и `reflect-metadata` - связывание описано обычным кодом, который понимает компилятор.

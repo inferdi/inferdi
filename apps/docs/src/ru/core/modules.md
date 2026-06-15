@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ru/core/modules#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Главная"
+          "item": "https://inferdi.com/ru/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Базовые принципы"
+          "item": "https://inferdi.com/ru/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Модули"
+          "item": "https://inferdi.com/ru/core/modules"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ru/core/modules#article"
+      "headline": "Модули в InferDI — композиция сборщиков через .use()"
+      "name": "Модули"
+      "description": "Разбейте большой сборщик контейнера на меньшие части через .use(), сохраняя полный вывод типов по всей fluent chain, и поймите, почему дженерик-модулям нужна известная форма входных данных."
+      "url": "https://inferdi.com/ru/core/modules"
+      "mainEntityOfPage": "https://inferdi.com/ru/core/modules"
+      "inLanguage": "ru-RU"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, модули, use, композиция контейнера, вывод типов, тип Module, внедрение зависимостей"
+      "articleSection": "Базовые принципы"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Модули
 
 Используйте `.use()`, чтобы разбить большой сборщик контейнера на части и сохранить вывод типов по fluent chain.

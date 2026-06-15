@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ru/guide/installation#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Главная"
+          "item": "https://inferdi.com/ru/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Руководство"
+          "item": "https://inferdi.com/ru/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Установка"
+          "item": "https://inferdi.com/ru/guide/installation"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ru/guide/installation#article"
+      "headline": "Установка InferDI из npm или JSR"
+      "name": "Установка"
+      "description": "Установка @inferdi/inferdi и его адаптеров для фреймворков из npm или JSR в Node.js, Bun и Deno. Совпадающие имена пакетов и версии, ноль рантайм-зависимостей, без шага сборки и без reflect-metadata."
+      "url": "https://inferdi.com/ru/guide/installation"
+      "mainEntityOfPage": "https://inferdi.com/ru/guide/installation"
+      "inLanguage": "ru-RU"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16, Bun, Deno"
+      "proficiencyLevel": "Beginner"
+      "keywords": "InferDI, установка, npm, JSR, Node.js, Bun, Deno, внедрение зависимостей в TypeScript"
+      "articleSection": "Руководство"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Установка
 
 InferDI публикуется в npm и JSR с одинаковыми именами пакетов и версиями. Для Node и Bun используйте npm-совместимую установку, для Deno и сред, которым удобнее исходники TypeScript, используйте JSR.

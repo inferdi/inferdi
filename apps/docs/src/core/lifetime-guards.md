@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/core/lifetime-guards#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Home"
+          "item": "https://inferdi.com/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Core Concepts"
+          "item": "https://inferdi.com/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Lifetime Guards"
+          "item": "https://inferdi.com/core/lifetime-guards"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/core/lifetime-guards#article"
+      "headline": "Lifetime Guards in InferDI — singleton, scoped, and transient"
+      "name": "Lifetime Guards"
+      "description": "InferDI's three lifetimes — singleton, scoped, and transient — and the compile-time and runtime guards that stop a longer-lived service from capturing a shorter-lived one and leaking state across requests."
+      "url": "https://inferdi.com/core/lifetime-guards"
+      "mainEntityOfPage": "https://inferdi.com/core/lifetime-guards"
+      "inLanguage": "en-US"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Expert"
+      "keywords": "InferDI, lifetimes, singleton, scoped, transient, lifetime guard, captive dependency, dependency injection"
+      "articleSection": "Core Concepts"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Lifetime Guards
 
 InferDI has three lifetimes:

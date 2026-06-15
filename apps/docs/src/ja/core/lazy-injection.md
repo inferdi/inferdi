@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ja/core/lazy-injection#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "ホーム"
+          "item": "https://inferdi.com/ja/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "コアコンセプト"
+          "item": "https://inferdi.com/ja/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "遅延注入"
+          "item": "https://inferdi.com/ja/core/lazy-injection"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ja/core/lazy-injection#article"
+      "headline": "InferDI の遅延注入 — Lazy<T>"
+      "name": "遅延注入"
+      "description": "Lazy<T> は解決を遅延させるラッパーで、構築の順序を遅らせたり、2 つのシングルトンがコンストラクター内で両方を解決することなく互いを参照したりするために使用します — ライフタイムガードを壊すこともありません。"
+      "url": "https://inferdi.com/ja/core/lazy-injection"
+      "mainEntityOfPage": "https://inferdi.com/ja/core/lazy-injection"
+      "inLanguage": "ja-JP"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Expert"
+      "keywords": "InferDI, 遅延注入, Lazy, 遅延解決, 循環依存, シングルトン, 依存性注入"
+      "articleSection": "コアコンセプト"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # 遅延注入
 
 `Lazy<T>` は、解決を遅延させる小さなラッパーです。構築の順序を遅らせる必要がある場合や、2 つのシングルトンサービスが互いを参照する必要があるが両方をコンストラクター内で解決したくない場合に役立ちます。

@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/reference/migration#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "参考"
+          "item": "https://inferdi.com/zh/reference/api"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "迁移"
+          "item": "https://inferdi.com/zh/reference/migration"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/zh/reference/migration#article"
+      "headline": "InferDI 迁移指南"
+      "name": "迁移"
+      "description": "按主版本划分的破坏性变更，以及迁移到 InferDI 5.0 的当前路径，以 packages/inferdi/MIGRATION.md 作为权威来源进行镜像。"
+      "url": "https://inferdi.com/zh/reference/migration"
+      "mainEntityOfPage": "https://inferdi.com/zh/reference/migration"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, 迁移, 破坏性变更, 升级, 5.0, 主版本, 依赖注入"
+      "articleSection": "参考"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # 迁移
 
 InferDI 按主版本记录破坏性变更。权威来源仍然是 [`packages/inferdi/MIGRATION.md`](https://github.com/inferdi/inferdi/blob/main/packages/inferdi/MIGRATION.md)，但当前的迁移路径在此处进行了汇总。

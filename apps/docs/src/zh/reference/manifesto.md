@@ -1,3 +1,57 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/reference/manifesto#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "参考"
+          "item": "https://inferdi.com/zh/reference/api"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "InferDI 核心架构宣言"
+          "item": "https://inferdi.com/zh/reference/manifesto"
+    - "@type": "Article"
+      "@id": "https://inferdi.com/zh/reference/manifesto#article"
+      "headline": "InferDI 核心架构宣言"
+      "name": "InferDI 核心架构宣言"
+      "description": "InferDI 背后的架构宣言：凡是编译器能够静态验证的，都必须静态验证，做到零运行时开销、零依赖、零装饰器，以及由此带来的有意识的权衡取舍。"
+      "url": "https://inferdi.com/zh/reference/manifesto"
+      "mainEntityOfPage": "https://inferdi.com/zh/reference/manifesto"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "keywords": "InferDI, 宣言, 架构, 设计原则, 类型安全, 零开销, 零依赖, 依赖注入"
+      "articleSection": "参考"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # InferDI 核心架构宣言
 
 本文档规约 `packages/inferdi` 中的 `@inferdi/inferdi`。在评审任何触及公开 API、类型系统、`get()` 解析路径、注册形态、作用域语义或清理行为的 PR 之前，请先阅读本文档。

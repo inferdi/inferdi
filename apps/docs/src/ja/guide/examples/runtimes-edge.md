@@ -1,3 +1,63 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ja/guide/examples/runtimes-edge#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "ホーム"
+          "item": "https://inferdi.com/ja/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "ガイド"
+          "item": "https://inferdi.com/ja/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "例"
+          "item": "https://inferdi.com/ja/guide/examples"
+        - "@type": "ListItem"
+          "position": 4
+          "name": "ランタイムとエッジプラットフォーム"
+          "item": "https://inferdi.com/ja/guide/examples/runtimes-edge"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ja/guide/examples/runtimes-edge#article"
+      "headline": "Node、Bun、Deno、エッジランタイムでの InferDI"
+      "name": "ランタイムとエッジプラットフォーム"
+      "description": "低レベルの Node HTTP、Bun serve、Deno HTTP、エッジ関数にわたってモジュールレベルのルートとリクエストごとに 1 つのスコープを使用します。境界が定まったハンドラーには await using を、ストリーミングやバックグラウンド処理には明示的な破棄を使います。"
+      "url": "https://inferdi.com/ja/guide/examples/runtimes-edge"
+      "mainEntityOfPage": "https://inferdi.com/ja/guide/examples/runtimes-edge"
+      "inLanguage": "ja-JP"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Node.js, Bun, Deno, Supabase Edge Functions, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, ランタイム, エッジ, Node HTTP, Bun, Deno, Supabase Edge Functions, await using, リクエストスコープ"
+      "articleSection": "例"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # ランタイムとエッジプラットフォーム
 
 ランタイムの例では、モジュールレベルのルートを使用し、リクエストごとに 1 つのスコープを作成します。境界が明確なハンドラーでは `await using` を使用できます。ストリーミングやバックグラウンドの処理では、その処理が完了した後に破棄すべきです。

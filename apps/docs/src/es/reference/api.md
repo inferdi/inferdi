@@ -1,3 +1,62 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/es/reference/api#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Inicio"
+          "item": "https://inferdi.com/es/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Referencia"
+          "item": "https://inferdi.com/es/reference/api"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Resumen de la API"
+          "item": "https://inferdi.com/es/reference/api"
+    - "@type": "APIReference"
+      "@id": "https://inferdi.com/es/reference/api#article"
+      "headline": "Resumen de la API del core de InferDI"
+      "name": "Resumen de la API"
+      "description": "Un resumen de la API pública del core de @inferdi/inferdi: la clase Container, register, registerFactory, registerValue, get, has, scopes, override, dispose, y los tipos Lazy, DependenciesMap y Module."
+      "url": "https://inferdi.com/es/reference/api"
+      "mainEntityOfPage": "https://inferdi.com/es/reference/api"
+      "inLanguage": "es-ES"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "executableLibraryName": "@inferdi/inferdi"
+      "programmingModel": "Registro explícito, builder fluido"
+      "targetPlatform": "Node.js, Bun, Deno, Browser"
+      "keywords": "InferDI, API, Container, register, registerFactory, get, scope, override, dispose, Lazy, Module"
+      "articleSection": "Referencia"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Resumen de la API
 
 Esta página resume la API pública del core. Consulta el README del paquete y las declaraciones de TypeScript para ver las definiciones genéricas exactas.

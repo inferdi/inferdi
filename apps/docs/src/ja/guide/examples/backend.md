@@ -1,3 +1,63 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ja/guide/examples/backend#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "ホーム"
+          "item": "https://inferdi.com/ja/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "ガイド"
+          "item": "https://inferdi.com/ja/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "例"
+          "item": "https://inferdi.com/ja/guide/examples"
+        - "@type": "ListItem"
+          "position": 4
+          "name": "バックエンドフレームワーク"
+          "item": "https://inferdi.com/ja/guide/examples/backend"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ja/guide/examples/backend#article"
+      "headline": "バックエンドフレームワークにおける InferDI のリクエストスコープ"
+      "name": "バックエンドフレームワーク"
+      "description": "ルートコンテナを一度だけ構築し、HTTP リクエストごとに 1 つのリクエストスコープを作成し、フレームワークネイティブなリクエストオブジェクトを通じて公開し、レスポンスのライフサイクルから破棄します — Fastify、Hono、Koa、Express、Elysia にわたって比較します。"
+      "url": "https://inferdi.com/ja/guide/examples/backend"
+      "mainEntityOfPage": "https://inferdi.com/ja/guide/examples/backend"
+      "inLanguage": "ja-JP"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Fastify, Hono, Koa, Express, Elysia, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, バックエンド, リクエストスコープ, Fastify, Hono, Koa, Express, Elysia, 依存性注入"
+      "articleSection": "例"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # バックエンドフレームワーク
 
 各バックエンドの例では、ルートコンテナを一度だけ構築し、HTTP リクエストごとに 1 つのリクエストスコープを作成し、フレームワークネイティブなリクエストオブジェクトを通じてスコープを公開し、レスポンスのライフサイクルの中でそれを破棄します。

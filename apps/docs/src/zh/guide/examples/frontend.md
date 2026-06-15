@@ -1,3 +1,63 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/guide/examples/frontend#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "指南"
+          "item": "https://inferdi.com/zh/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "示例"
+          "item": "https://inferdi.com/zh/guide/examples"
+        - "@type": "ListItem"
+          "position": 4
+          "name": "前端框架"
+          "item": "https://inferdi.com/zh/guide/examples/frontend"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/zh/guide/examples/frontend#article"
+      "headline": "React、React Native 和 Vue 中的 InferDI 作用域"
+      "name": "前端框架"
+      "description": "在 React、React Native 和 Vue 3 中于页面、路由、屏幕或功能边界处创建 InferDI 作用域 —— 将作用域提供给子组件，并在卸载时执行清理。"
+      "url": "https://inferdi.com/zh/guide/examples/frontend"
+      "mainEntityOfPage": "https://inferdi.com/zh/guide/examples/frontend"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, React, React Native, Vue 3, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, React, React Native, Vue 3, provide inject, 功能作用域, 依赖注入"
+      "articleSection": "示例"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # 前端框架
 
 前端示例在页面、路由、屏幕或功能边界处创建作用域。它们各自保留小型的构建器，而不是导入服务端的共享模块。

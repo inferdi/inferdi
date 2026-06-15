@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ru/core/factories#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Главная"
+          "item": "https://inferdi.com/ru/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Базовые принципы"
+          "item": "https://inferdi.com/ru/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Фабрики"
+          "item": "https://inferdi.com/ru/core/factories"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ru/core/factories#article"
+      "headline": "Фабрики в InferDI — registerFactory"
+      "name": "Фабрики"
+      "description": "Используйте registerFactory, когда создание требует большего, чем new Ctor(...deps): чтение нескольких значений, адаптация сторонних клиентов, сборка объектов конфигурации или возврат promise, который InferDI кеширует как есть."
+      "url": "https://inferdi.com/ru/core/factories"
+      "mainEntityOfPage": "https://inferdi.com/ru/core/factories"
+      "inLanguage": "ru-RU"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, фабрики, registerFactory, асинхронная фабрика, конфигурация, сторонние клиенты, внедрение зависимостей"
+      "articleSection": "Базовые принципы"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Фабрики
 
 Используйте `registerFactory`, когда создание сложнее, чем `new Ctor(...deps)`: нужно прочитать несколько значений, адаптировать сторонний клиент, собрать объект конфигурации или вернуть promise.

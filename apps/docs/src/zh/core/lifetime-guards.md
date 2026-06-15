@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/core/lifetime-guards#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "核心概念"
+          "item": "https://inferdi.com/zh/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "生命周期守卫"
+          "item": "https://inferdi.com/zh/core/lifetime-guards"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/zh/core/lifetime-guards#article"
+      "headline": "InferDI 中的生命周期守卫——单例、作用域级与瞬态"
+      "name": "生命周期守卫"
+      "description": "InferDI 的三种生命周期——单例、作用域级与瞬态——以及那些阻止生命周期更长的服务捕获生命周期更短的服务、并在请求之间泄漏状态的编译期与运行时守卫。"
+      "url": "https://inferdi.com/zh/core/lifetime-guards"
+      "mainEntityOfPage": "https://inferdi.com/zh/core/lifetime-guards"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Expert"
+      "keywords": "InferDI, 生命周期, 单例, 作用域级, 瞬态, 生命周期守卫, 受困依赖, 依赖注入"
+      "articleSection": "核心概念"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # 生命周期守卫
 
 InferDI 提供三种生命周期：

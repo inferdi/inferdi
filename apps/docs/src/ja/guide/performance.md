@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ja/guide/performance#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "ホーム"
+          "item": "https://inferdi.com/ja/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "ガイド"
+          "item": "https://inferdi.com/ja/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "パフォーマンス"
+          "item": "https://inferdi.com/ja/guide/performance"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ja/guide/performance#article"
+      "headline": "InferDI パフォーマンス — ウォームな解決が 1 回の Map.get() である理由"
+      "name": "パフォーマンス"
+      "description": "InferDI が依存解決をほぼゼロオーバーヘッドに保つ仕組み — 明示的な登録、キャッシュされたシングルトンとスコープ付きサービス、0〜7 個の依存に対する直接のコンストラクター呼び出し、そして Promise キャッシュされた非同期ファクトリー。リフレクション、メタデータテーブル、プロキシは介在しません。"
+      "url": "https://inferdi.com/ja/guide/performance"
+      "mainEntityOfPage": "https://inferdi.com/ja/guide/performance"
+      "inLanguage": "ja-JP"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Expert"
+      "keywords": "InferDI, パフォーマンス, ベンチマーク, ゼロオーバーヘッド, ホットパス, 依存性注入, V8, Map.get"
+      "articleSection": "ガイド"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # パフォーマンス
 
 ウォームな解決は、1 回の `Map.get(key)` に続く直接的な `new Ctor(...)` です — リフレクションも、メタデータテーブルも、間に挟まるプロキシもありません。以下のベンチマーク数値は、オプトインで有効にする特別な高速モードからではなく、いくつかの具体的なランタイム上の選択から導かれたものです。

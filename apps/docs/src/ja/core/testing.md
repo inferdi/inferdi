@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ja/core/testing#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "ホーム"
+          "item": "https://inferdi.com/ja/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "コアコンセプト"
+          "item": "https://inferdi.com/ja/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "テストとオーバーライド"
+          "item": "https://inferdi.com/ja/core/testing"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ja/core/testing#article"
+      "headline": "InferDI のテストとオーバーライド — .override()"
+      "name": "テストとオーバーライド"
+      "description": "テストで既存の登録をモックに置き換えるには .override() を使用します。プロダクションの配線や型付けされたグラフの残りに手を加えることなく、実装を差し替えられます。"
+      "url": "https://inferdi.com/ja/core/testing"
+      "mainEntityOfPage": "https://inferdi.com/ja/core/testing"
+      "inLanguage": "ja-JP"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, テスト, override, モック, テストダブル, 実装の差し替え, 依存性注入"
+      "articleSection": "コアコンセプト"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # テストとオーバーライド
 
 テストで既存の登録をモックに置き換える必要がある場合は、`.override()` を使用します。

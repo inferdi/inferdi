@@ -64,4 +64,44 @@ features:
     details: "InferDI no tiene dependencias y se ejecuta en cualquier lugar: Node, Bun, Deno, navegadores, workers. Los adaptadores son pegamento opcional para el scope de petición, nunca un requisito."
     link: /es/adapters/
     linkText: Cómo funcionan los adaptadores
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "WebSite"
+      "@id": "https://inferdi.com/#website"
+      "url": "https://inferdi.com/es/"
+      "name": "InferDI"
+      "description": "Inyección de dependencias ultrarrápida, sin decoradores y fuertemente tipada para el TypeScript moderno."
+      "inLanguage": "es-ES"
+      "publisher":
+        "@id": "https://inferdi.com/#organization"
+      "potentialAction":
+        "@type": "SearchAction"
+        "target":
+          "@type": "EntryPoint"
+          "urlTemplate": "https://inferdi.com/?q={search_term_string}"
+        "query-input": "required name=search_term_string"
+    - "@type": "Organization"
+      "@id": "https://inferdi.com/#organization"
+      "name": "InferDI"
+      "url": "https://inferdi.com/"
+      "logo":
+        "@type": "ImageObject"
+        "url": "https://inferdi.com/logo.png"
+      "sameAs":
+        - "https://github.com/inferdi/inferdi"
+        - "https://twitter.com/inferdi_ts"
+    - "@type": "SoftwareApplication"
+      "@id": "https://inferdi.com/#software"
+      "name": "InferDI"
+      "applicationCategory": "DeveloperApplication"
+      "operatingSystem": "Node.js, Bun, Deno, Browser, Edge runtimes"
+      "softwareVersion": "5.0.1"
+      "programmingLanguage": "TypeScript"
+      "url": "https://inferdi.com/"
+      "downloadUrl": "https://www.npmjs.com/package/@inferdi/inferdi"
+      "description": "Contenedor de DI para TypeScript sin dependencias, sin decoradores y fuertemente tipado. El grafo de dependencias es el tipo: los argumentos en orden incorrecto, las claves ausentes y las fugas de tiempo de vida son errores de compilación, no excepciones en runtime."
+      "license": "https://github.com/inferdi/inferdi/blob/main/LICENSE"
+      "author":
+        "@id": "https://inferdi.com/#organization"
 ---

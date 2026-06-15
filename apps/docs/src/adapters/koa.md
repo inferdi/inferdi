@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/adapters/koa#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Home"
+          "item": "https://inferdi.com/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Adapters"
+          "item": "https://inferdi.com/adapters/"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Koa"
+          "item": "https://inferdi.com/adapters/koa"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/adapters/koa#article"
+      "headline": "InferDI Koa Adapter — @inferdi/koa"
+      "name": "Koa Adapter"
+      "description": "@inferdi/koa is Koa v3 middleware: it creates one request scope, exposes it as ctx.state.di, and disposes it after the Node response finishes or closes — with typed state keys and cleanup hooks."
+      "url": "https://inferdi.com/adapters/koa"
+      "mainEntityOfPage": "https://inferdi.com/adapters/koa"
+      "inLanguage": "en-US"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Koa v3, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, Koa, Koa v3, middleware, ctx.state.di, response lifecycle, dependency injection"
+      "articleSection": "Adapters"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "@inferdi/koa"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js >=18"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Koa Adapter
 
 [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) is Koa v3 middleware. It creates one request scope, exposes it as `ctx.state.di`, and disposes it after the Node response finishes or closes.

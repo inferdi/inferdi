@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/guide/quick-start#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "指南"
+          "item": "https://inferdi.com/zh/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "快速开始"
+          "item": "https://inferdi.com/zh/guide/quick-start"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/zh/guide/quick-start#article"
+      "headline": "InferDI 快速开始——构建你的第一个类型化依赖图"
+      "name": "快速开始"
+      "description": "使用 InferDI 的流式 API 构建依赖图，TypeScript 会在你接线时检查每一个构造函数参数。没有 @Injectable 装饰器，也没有 reflect-metadata——只有编译器能读懂的普通代码，热路径上仅需一次 Map.get() 解析。"
+      "url": "https://inferdi.com/zh/guide/quick-start"
+      "mainEntityOfPage": "https://inferdi.com/zh/guide/quick-start"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Beginner"
+      "keywords": "InferDI, 快速开始, 依赖注入, TypeScript DI, container, 流式 API, 类型安全"
+      "articleSection": "指南"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # 快速开始
 
 你通过流式 API 构建依赖图，TypeScript 会随着你的编写实时校验：每个依赖元组都会与目标构造函数的参数位置进行匹配，因此交换或缺失的参数是编译错误，而不是运行时的意外。这里没有 `@Injectable()` 装饰器，也没有 `reflect-metadata` —— 接线就是编译器能读懂的普通代码。

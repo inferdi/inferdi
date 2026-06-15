@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/es/guide/performance#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Inicio"
+          "item": "https://inferdi.com/es/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Guía"
+          "item": "https://inferdi.com/es/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Rendimiento"
+          "item": "https://inferdi.com/es/guide/performance"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/es/guide/performance#article"
+      "headline": "Rendimiento de InferDI — por qué una resolución caliente es un único Map.get()"
+      "name": "Rendimiento"
+      "description": "Cómo InferDI mantiene la resolución de dependencias cerca de cero sobrecarga: registros explícitos, servicios singleton y con ámbito en caché, llamadas directas al constructor para 0-7 dependencias y fábricas asíncronas con Promesas en caché, sin reflexión, tablas de metadatos ni proxies de por medio."
+      "url": "https://inferdi.com/es/guide/performance"
+      "mainEntityOfPage": "https://inferdi.com/es/guide/performance"
+      "inLanguage": "es-ES"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Expert"
+      "keywords": "InferDI, rendimiento, benchmark, cero sobrecarga, ruta caliente, inyección de dependencias, V8, Map.get"
+      "articleSection": "Guía"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Rendimiento
 
 Una resolución en caliente es un `Map.get(key)` seguido de un `new Ctor(...)` directo: no hay reflexión, ni tabla de metadatos, ni proxy de por medio. Las cifras de los benchmarks que aparecen a continuación se derivan de unas pocas decisiones concretas en runtime, no de un modo rápido especial al que tengas que adherirte:

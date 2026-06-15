@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/es/guide/examples#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Inicio"
+          "item": "https://inferdi.com/es/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Guía"
+          "item": "https://inferdi.com/es/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Ejemplos"
+          "item": "https://inferdi.com/es/guide/examples"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/es/guide/examples#article"
+      "headline": "Ejemplos de InferDI — patrones de frameworks y runtimes"
+      "name": "Ejemplos"
+      "description": "Un mapa de los ejemplos de referencia de InferDI en backends, capas de API, frameworks full-stack, runtimes, frontends y workers. Cada grupo muestra dónde construir la raíz, crear un ámbito de petición y desecharlo."
+      "url": "https://inferdi.com/es/guide/examples"
+      "mainEntityOfPage": "https://inferdi.com/es/guide/examples"
+      "inLanguage": "es-ES"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, ejemplos, patrones, inyección de dependencias, ámbito de petición, frameworks, runtimes"
+      "articleSection": "Guía"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Ejemplos
 
 El repositorio mantiene los ejemplos como fragmentos de referencia exclusivos de GitHub. El paquete raíz no instala sus dependencias de framework, no comprueba los tipos del directorio `examples/` y no lo publica en npm.

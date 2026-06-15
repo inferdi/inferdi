@@ -1,3 +1,55 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/adapters/#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "适配器"
+          "item": "https://inferdi.com/zh/adapters/"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/zh/adapters/#article"
+      "headline": "InferDI 框架适配器 —— 概览"
+      "name": "框架适配器"
+      "description": "每个 InferDI 适配器都会为每个请求创建一个请求作用域，将其暴露在框架原生的位置，并在框架安全的完成时机释放它 —— 同时保留应用所拥有的具体且完全带类型的容器。它们只是轻量的生命周期粘合层，绝不是 IoC 框架。"
+      "url": "https://inferdi.com/zh/adapters/"
+      "mainEntityOfPage": "https://inferdi.com/zh/adapters/"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, @inferdi/inferdi, Fastify, Hono, Koa, Express, Elysia"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, 适配器, 请求作用域, Fastify, Hono, Koa, Express, Elysia, 中间件, 依赖注入"
+      "articleSection": "适配器"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # 框架适配器
 
 每个适配器都会为每个请求创建恰好一个请求作用域，将其暴露在框架原生的位置，并在框架安全的完成时机释放它 —— 同时保留应用所拥有的具体容器类型，因此 `request.di` 是完全带类型的，而不是 `any` 或某个基类容器。

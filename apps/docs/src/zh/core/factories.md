@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/core/factories#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "核心概念"
+          "item": "https://inferdi.com/zh/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "工厂"
+          "item": "https://inferdi.com/zh/core/factories"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/zh/core/factories#article"
+      "headline": "InferDI 中的工厂——registerFactory"
+      "name": "工厂"
+      "description": "当构造过程不止于 new Ctor(...deps) 时使用 registerFactory：读取多个值、适配第三方客户端、构建配置对象，或返回一个会被 InferDI 原样缓存的 promise。"
+      "url": "https://inferdi.com/zh/core/factories"
+      "mainEntityOfPage": "https://inferdi.com/zh/core/factories"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, 工厂, registerFactory, 异步工厂, 配置, 第三方客户端, 依赖注入"
+      "articleSection": "核心概念"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # 工厂
 
 当构造过程不止于 `new Ctor(...deps)` 时——比如读取多个值、适配第三方客户端、创建配置对象或返回一个 promise——请使用 `registerFactory`。

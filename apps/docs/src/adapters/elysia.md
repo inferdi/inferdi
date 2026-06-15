@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/adapters/elysia#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Home"
+          "item": "https://inferdi.com/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Adapters"
+          "item": "https://inferdi.com/adapters/"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Elysia"
+          "item": "https://inferdi.com/adapters/elysia"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/adapters/elysia#article"
+      "headline": "InferDI Elysia Adapter — @inferdi/elysia"
+      "name": "Elysia Adapter"
+      "description": "@inferdi/elysia is an Elysia v1 plugin: in scoped mode it creates one request scope, exposes it on Elysia context, keeps it available for error handlers, and disposes it from onAfterResponse — with a root-only mode for Bun apps."
+      "url": "https://inferdi.com/adapters/elysia"
+      "mainEntityOfPage": "https://inferdi.com/adapters/elysia"
+      "inLanguage": "en-US"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Elysia v1, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, Elysia, Elysia v1, plugin, Bun, scoped derive, onAfterResponse, root-only, dependency injection"
+      "articleSection": "Adapters"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "@inferdi/elysia"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js >=20, Bun"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Elysia Adapter
 
 [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) is an Elysia v1 plugin. In scoped mode it creates one request scope, exposes it on Elysia context, keeps it available for user error handlers, and disposes it from `onAfterResponse`.

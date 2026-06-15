@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/adapters/fastify#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Home"
+          "item": "https://inferdi.com/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Adapters"
+          "item": "https://inferdi.com/adapters/"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Fastify"
+          "item": "https://inferdi.com/adapters/fastify"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/adapters/fastify#article"
+      "headline": "InferDI Fastify Adapter — @inferdi/fastify"
+      "name": "Fastify Adapter"
+      "description": "@inferdi/fastify is a Fastify v5 plugin: in scoped mode it exposes the root as app.di, creates one request scope in onRequest, exposes it as request.di, and disposes it in onResponse — with typed cleanup hooks and client-abort handling."
+      "url": "https://inferdi.com/adapters/fastify"
+      "mainEntityOfPage": "https://inferdi.com/adapters/fastify"
+      "inLanguage": "en-US"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Fastify v5, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, Fastify, Fastify v5, plugin, request scope, request.di, onRequest, onResponse, dependency injection"
+      "articleSection": "Adapters"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "@inferdi/fastify"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js >=20"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Fastify Adapter
 
 [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) is a Fastify v5 plugin. In scoped mode it exposes the root as `app.di`, creates one request scope in `onRequest`, exposes it as `request.di`, and disposes it in `onResponse`.

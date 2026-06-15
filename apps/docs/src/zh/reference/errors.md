@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/reference/errors#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "参考"
+          "item": "https://inferdi.com/zh/reference/api"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "错误"
+          "item": "https://inferdi.com/zh/reference/errors"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/zh/reference/errors#article"
+      "headline": "InferDI 错误参考"
+      "name": "错误"
+      "description": "InferDI 针对依赖图和生命周期误用抛出的每一个明确错误——未知的键、检测到循环、生命周期违规、已释放的容器——附带消息形态，让注册错误在测试中尽早暴露。"
+      "url": "https://inferdi.com/zh/reference/errors"
+      "mainEntityOfPage": "https://inferdi.com/zh/reference/errors"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, 错误, 异常, 未知的键, 检测到循环, 生命周期违规, 已释放的容器, 依赖注入"
+      "articleSection": "参考"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # 错误
 
 InferDI 会针对依赖图和生命周期的误用抛出明确的错误。请让这些消息在测试中保持可见，以便注册错误能尽早暴露。

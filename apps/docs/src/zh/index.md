@@ -64,4 +64,44 @@ features:
     details: "InferDI 零依赖，可在任何地方运行 —— Node、Bun、Deno、浏览器、workers。适配器只是可选的请求作用域胶水代码，从来都不是必需品。"
     link: /zh/adapters/
     linkText: 适配器如何工作
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "WebSite"
+      "@id": "https://inferdi.com/#website"
+      "url": "https://inferdi.com/zh/"
+      "name": "InferDI"
+      "description": "面向现代 TypeScript 的极速、无装饰器、强类型依赖注入。"
+      "inLanguage": "zh-CN"
+      "publisher":
+        "@id": "https://inferdi.com/#organization"
+      "potentialAction":
+        "@type": "SearchAction"
+        "target":
+          "@type": "EntryPoint"
+          "urlTemplate": "https://inferdi.com/?q={search_term_string}"
+        "query-input": "required name=search_term_string"
+    - "@type": "Organization"
+      "@id": "https://inferdi.com/#organization"
+      "name": "InferDI"
+      "url": "https://inferdi.com/"
+      "logo":
+        "@type": "ImageObject"
+        "url": "https://inferdi.com/logo.png"
+      "sameAs":
+        - "https://github.com/inferdi/inferdi"
+        - "https://twitter.com/inferdi_ts"
+    - "@type": "SoftwareApplication"
+      "@id": "https://inferdi.com/#software"
+      "name": "InferDI"
+      "applicationCategory": "DeveloperApplication"
+      "operatingSystem": "Node.js, Bun, Deno, Browser, Edge runtimes"
+      "softwareVersion": "5.0.1"
+      "programmingLanguage": "TypeScript"
+      "url": "https://inferdi.com/"
+      "downloadUrl": "https://www.npmjs.com/package/@inferdi/inferdi"
+      "description": "面向 TypeScript 的零依赖、无装饰器、强类型 DI 容器。依赖图即类型：参数顺序错误、缺失键和生命周期泄漏都是编译错误，而非运行时异常。"
+      "license": "https://github.com/inferdi/inferdi/blob/main/LICENSE"
+      "author":
+        "@id": "https://inferdi.com/#organization"
 ---

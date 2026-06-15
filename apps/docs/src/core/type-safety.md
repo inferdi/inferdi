@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/core/type-safety#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Home"
+          "item": "https://inferdi.com/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Core Concepts"
+          "item": "https://inferdi.com/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Type Safety"
+          "item": "https://inferdi.com/core/type-safety"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/core/type-safety#article"
+      "headline": "Type Safety in InferDI — the graph is the type"
+      "name": "Type Safety"
+      "description": "InferDI keeps the dependency graph in the type system: a wrong argument order, an unregistered key, or a singleton reaching for scoped state is a compile error in your editor, not a runtime stack trace you find under load."
+      "url": "https://inferdi.com/core/type-safety"
+      "mainEntityOfPage": "https://inferdi.com/core/type-safety"
+      "inLanguage": "en-US"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, type safety, TypeScript, type inference, constructor signatures, compile-time, dependency injection"
+      "articleSection": "Core Concepts"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Type Safety
 
 InferDI's central rule: the dependency graph lives in the type system. An invalid graph — a wrong argument order, a key that was never registered, a singleton reaching for scoped state — is a type error you see in your editor, not a stack trace you discover under load. Anything the compiler can prove statically is checked statically; runtime guards exist only to catch what `as` casts and dynamic keys slip past.

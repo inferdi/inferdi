@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/es/core/modules#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Inicio"
+          "item": "https://inferdi.com/es/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Conceptos básicos"
+          "item": "https://inferdi.com/es/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Módulos"
+          "item": "https://inferdi.com/es/core/modules"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/es/core/modules#article"
+      "headline": "Módulos en InferDI — componiendo constructores con .use()"
+      "name": "Módulos"
+      "description": "Divide un constructor de contenedor grande en piezas más pequeñas con .use() manteniendo la inferencia de tipos completa a lo largo de la cadena fluida, y comprende por qué los módulos genéricos necesitan una forma de entrada conocida."
+      "url": "https://inferdi.com/es/core/modules"
+      "mainEntityOfPage": "https://inferdi.com/es/core/modules"
+      "inLanguage": "es-ES"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, módulos, use, composición de contenedor, inferencia de tipos, tipo Module, inyección de dependencias"
+      "articleSection": "Conceptos básicos"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Módulos
 
 Usa `.use()` para dividir un constructor de contenedor grande en piezas más pequeñas, manteniendo la inferencia de tipos a lo largo de la cadena fluida.

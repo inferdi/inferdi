@@ -1,3 +1,55 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ru/adapters/#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Главная"
+          "item": "https://inferdi.com/ru/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Адаптеры"
+          "item": "https://inferdi.com/ru/adapters/"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ru/adapters/#article"
+      "headline": "Адаптеры фреймворков InferDI — обзор"
+      "name": "Адаптеры фреймворков"
+      "description": "Каждый адаптер InferDI создаёт один scope на запрос, кладёт его в нативное для фреймворка место и освобождает в безопасной точке завершения фреймворка — сохраняя конкретный, полностью типизированный контейнер, которым владеет ваше приложение. Тонкая обвязка жизненного цикла, а не IoC-фреймворк."
+      "url": "https://inferdi.com/ru/adapters/"
+      "mainEntityOfPage": "https://inferdi.com/ru/adapters/"
+      "inLanguage": "ru-RU"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, @inferdi/inferdi, Fastify, Hono, Koa, Express, Elysia"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, адаптеры, scope запроса, Fastify, Hono, Koa, Express, Elysia, middleware, dependency injection"
+      "articleSection": "Адаптеры"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Адаптеры фреймворков
 
 Каждый адаптер создаёт ровно один scope на запрос, кладёт его в нативное для фреймворка место и освобождает в безопасной точке жизненного цикла. При этом сохраняется конкретный тип контейнера, которым владеет приложение: `request.di` остаётся полностью типизированным, а не `any` и не базовым контейнером.

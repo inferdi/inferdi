@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/adapters/express#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Home"
+          "item": "https://inferdi.com/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Adapters"
+          "item": "https://inferdi.com/adapters/"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Express"
+          "item": "https://inferdi.com/adapters/express"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/adapters/express#article"
+      "headline": "InferDI Express Adapter — @inferdi/express"
+      "name": "Express Adapter"
+      "description": "@inferdi/express is Express 5 middleware: it creates one request scope, exposes it as req.di, and disposes it after the Node response finishes or closes — with declaration merging for a fully typed req.di."
+      "url": "https://inferdi.com/adapters/express"
+      "mainEntityOfPage": "https://inferdi.com/adapters/express"
+      "inLanguage": "en-US"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Express 5, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, Express, Express 5, middleware, req.di, declaration merging, response lifecycle, dependency injection"
+      "articleSection": "Adapters"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "@inferdi/express"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js >=18"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Express Adapter
 
 [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) is Express 5 middleware. It creates one request scope, exposes it as `req.di`, and disposes it after the Node response finishes or closes.

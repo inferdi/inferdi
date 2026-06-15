@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/es/guide/quick-start#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Inicio"
+          "item": "https://inferdi.com/es/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Guía"
+          "item": "https://inferdi.com/es/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Inicio rápido"
+          "item": "https://inferdi.com/es/guide/quick-start"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/es/guide/quick-start#article"
+      "headline": "Inicio rápido de InferDI — construye tu primer grafo de dependencias tipado"
+      "name": "Inicio rápido"
+      "description": "Construye un grafo de dependencias con la API fluida de InferDI mientras TypeScript verifica cada argumento del constructor a medida que lo conectas. Sin decoradores @Injectable ni reflect-metadata, solo código plano que el compilador lee, con una resolución de un único Map.get() en la ruta caliente."
+      "url": "https://inferdi.com/es/guide/quick-start"
+      "mainEntityOfPage": "https://inferdi.com/es/guide/quick-start"
+      "inLanguage": "es-ES"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Beginner"
+      "keywords": "InferDI, inicio rápido, inyección de dependencias, DI con TypeScript, contenedor, API fluida, type-safe"
+      "articleSection": "Guía"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Inicio rápido
 
 Construyes el grafo de dependencias mediante una API fluida, y TypeScript lo comprueba a medida que avanzas: cada tupla de dependencias se contrasta con las posiciones del constructor del objetivo, de modo que un argumento intercambiado o ausente es un error de compilación, no una sorpresa en runtime. No hay decoradores `@Injectable()` ni `reflect-metadata`: el cableado es código corriente que el compilador puede leer.

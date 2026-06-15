@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/reference/migration#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Home"
+          "item": "https://inferdi.com/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Reference"
+          "item": "https://inferdi.com/reference/api"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Migration"
+          "item": "https://inferdi.com/reference/migration"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/reference/migration#article"
+      "headline": "InferDI Migration guide"
+      "name": "Migration"
+      "description": "Breaking changes by major version and the current migration path to InferDI 5.0, mirroring packages/inferdi/MIGRATION.md as the source of truth."
+      "url": "https://inferdi.com/reference/migration"
+      "mainEntityOfPage": "https://inferdi.com/reference/migration"
+      "inLanguage": "en-US"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, migration, breaking changes, upgrade, 5.0, major version, dependency injection"
+      "articleSection": "Reference"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Migration
 
 InferDI records breaking changes by major version. The source of truth remains [`packages/inferdi/MIGRATION.md`](https://github.com/inferdi/inferdi/blob/main/packages/inferdi/MIGRATION.md), but the current migration path is summarized here.

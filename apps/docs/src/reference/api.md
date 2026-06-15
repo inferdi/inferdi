@@ -1,3 +1,62 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/reference/api#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Home"
+          "item": "https://inferdi.com/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Reference"
+          "item": "https://inferdi.com/reference/api"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "API Summary"
+          "item": "https://inferdi.com/reference/api"
+    - "@type": "APIReference"
+      "@id": "https://inferdi.com/reference/api#article"
+      "headline": "InferDI Core API Summary"
+      "name": "API Summary"
+      "description": "A summary of the public @inferdi/inferdi core API: the Container class, register, registerFactory, registerValue, get, has, scopes, override, dispose, and the Lazy, DependenciesMap, and Module types."
+      "url": "https://inferdi.com/reference/api"
+      "mainEntityOfPage": "https://inferdi.com/reference/api"
+      "inLanguage": "en-US"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "executableLibraryName": "@inferdi/inferdi"
+      "programmingModel": "Explicit registration, fluent builder"
+      "targetPlatform": "Node.js, Bun, Deno, Browser"
+      "keywords": "InferDI, API, Container, register, registerFactory, get, scope, override, dispose, Lazy, Module"
+      "articleSection": "Reference"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # API Summary
 
 This page summarizes the public core API. See the package README and TypeScript declarations for exact generic definitions.

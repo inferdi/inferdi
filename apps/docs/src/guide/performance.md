@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/guide/performance#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Home"
+          "item": "https://inferdi.com/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Guide"
+          "item": "https://inferdi.com/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Performance"
+          "item": "https://inferdi.com/guide/performance"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/guide/performance#article"
+      "headline": "InferDI Performance — why a warm resolve is one Map.get()"
+      "name": "Performance"
+      "description": "How InferDI keeps dependency resolution near zero overhead: explicit registrations, cached singleton and scoped services, direct constructor calls for 0-7 dependencies, and Promise-cached async factories — no reflection, metadata tables, or proxies in the way."
+      "url": "https://inferdi.com/guide/performance"
+      "mainEntityOfPage": "https://inferdi.com/guide/performance"
+      "inLanguage": "en-US"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Expert"
+      "keywords": "InferDI, performance, benchmark, zero overhead, hot path, dependency injection, V8, Map.get"
+      "articleSection": "Guide"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Performance
 
 A warm resolve is one `Map.get(key)` followed by a direct `new Ctor(...)` — there is no reflection, no metadata table, and no proxy in the way. The benchmark numbers below follow from a few concrete runtime choices, not from a special fast mode you have to opt into:

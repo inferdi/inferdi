@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/es/reference/migration#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Inicio"
+          "item": "https://inferdi.com/es/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Referencia"
+          "item": "https://inferdi.com/es/reference/api"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Migración"
+          "item": "https://inferdi.com/es/reference/migration"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/es/reference/migration#article"
+      "headline": "Guía de migración de InferDI"
+      "name": "Migración"
+      "description": "Cambios incompatibles por versión major y la ruta de migración actual a InferDI 5.0, reflejando packages/inferdi/MIGRATION.md como fuente de verdad."
+      "url": "https://inferdi.com/es/reference/migration"
+      "mainEntityOfPage": "https://inferdi.com/es/reference/migration"
+      "inLanguage": "es-ES"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, migración, cambios incompatibles, actualización, 5.0, versión major, inyección de dependencias"
+      "articleSection": "Referencia"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Migración
 
 InferDI registra los cambios incompatibles por versión major. La fuente de verdad sigue siendo [`packages/inferdi/MIGRATION.md`](https://github.com/inferdi/inferdi/blob/main/packages/inferdi/MIGRATION.md), pero aquí se resume la ruta de migración actual.

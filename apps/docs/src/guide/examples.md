@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/guide/examples#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Home"
+          "item": "https://inferdi.com/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Guide"
+          "item": "https://inferdi.com/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Examples"
+          "item": "https://inferdi.com/guide/examples"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/guide/examples#article"
+      "headline": "InferDI Examples — framework and runtime patterns"
+      "name": "Examples"
+      "description": "A map of InferDI reference examples across backends, API layers, full-stack frameworks, runtimes, frontends, and workers. Each group shows where to build the root, create a request scope, and dispose it."
+      "url": "https://inferdi.com/guide/examples"
+      "mainEntityOfPage": "https://inferdi.com/guide/examples"
+      "inLanguage": "en-US"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, examples, patterns, dependency injection, request scope, frameworks, runtimes"
+      "articleSection": "Guide"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Examples
 
 The repository keeps examples as GitHub-only reference snippets. The root package does not install their framework dependencies, does not typecheck the `examples/` directory, and does not publish it to npm.

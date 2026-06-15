@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/core/lazy-injection#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "核心概念"
+          "item": "https://inferdi.com/zh/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "惰性注入"
+          "item": "https://inferdi.com/zh/core/lazy-injection"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/zh/core/lazy-injection#article"
+      "headline": "InferDI 中的惰性注入 —— Lazy<T>"
+      "name": "惰性注入"
+      "description": "Lazy<T> 是一个延迟解析包装器，用于推迟构造顺序，或让两个单例相互引用而无需在各自的构造函数中同时解析二者 —— 同时不破坏生命周期保护。"
+      "url": "https://inferdi.com/zh/core/lazy-injection"
+      "mainEntityOfPage": "https://inferdi.com/zh/core/lazy-injection"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Expert"
+      "keywords": "InferDI, 惰性注入, Lazy, 延迟解析, 循环依赖, 单例, 依赖注入"
+      "articleSection": "核心概念"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # 惰性注入
 
 `Lazy<T>` 是一个小巧的延迟解析包装器。当构造顺序需要被延迟时，或者当两个单例服务需要相互引用而又不想在构造函数中同时解析二者时，它会很有用。

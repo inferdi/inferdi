@@ -1,3 +1,57 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ja/reference/manifesto#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "ホーム"
+          "item": "https://inferdi.com/ja/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "リファレンス"
+          "item": "https://inferdi.com/ja/reference/api"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "InferDI コアアーキテクチャ宣言"
+          "item": "https://inferdi.com/ja/reference/manifesto"
+    - "@type": "Article"
+      "@id": "https://inferdi.com/ja/reference/manifesto#article"
+      "headline": "InferDI コアアーキテクチャ宣言"
+      "name": "InferDI コアアーキテクチャ宣言"
+      "description": "InferDI を支えるアーキテクチャ宣言。コンパイラが静的に検証できるものはすべて静的に検証すべきであり、ランタイムオーバーヘッドゼロ、依存ゼロ、デコレーターゼロを掲げ、それに伴う意識的なトレードオフを示します。"
+      "url": "https://inferdi.com/ja/reference/manifesto"
+      "mainEntityOfPage": "https://inferdi.com/ja/reference/manifesto"
+      "inLanguage": "ja-JP"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "keywords": "InferDI, 宣言, アーキテクチャ, 設計原則, 型安全性, ゼロオーバーヘッド, 依存ゼロ, 依存性注入"
+      "articleSection": "リファレンス"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # InferDI コアアーキテクチャ宣言
 
 この文書は `packages/inferdi` 内の `@inferdi/inferdi` を規定します。公開 API、型システム、`get()` の解決パス、登録の形、スコープのセマンティクス、クリーンアップの動作に触れる PR をレビューする前に、本書を読んでください。

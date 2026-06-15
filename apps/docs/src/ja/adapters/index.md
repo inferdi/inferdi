@@ -1,3 +1,55 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ja/adapters/#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "ホーム"
+          "item": "https://inferdi.com/ja/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "アダプター"
+          "item": "https://inferdi.com/ja/adapters/"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ja/adapters/#article"
+      "headline": "InferDI フレームワークアダプター — 概要"
+      "name": "フレームワークアダプター"
+      "description": "各 InferDI アダプターはリクエストごとに 1 つのリクエストスコープを作成し、それをフレームワークネイティブの場所で公開し、フレームワークの安全な完了ポイントで破棄します — その間、アプリケーションが所有する具体的で完全に型付けされたコンテナを保持します。薄いライフサイクルのグルーであって、IoC フレームワークではありません。"
+      "url": "https://inferdi.com/ja/adapters/"
+      "mainEntityOfPage": "https://inferdi.com/ja/adapters/"
+      "inLanguage": "ja-JP"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, @inferdi/inferdi, Fastify, Hono, Koa, Express, Elysia"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, アダプター, リクエストスコープ, Fastify, Hono, Koa, Express, Elysia, ミドルウェア, 依存性注入"
+      "articleSection": "アダプター"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # フレームワークアダプター
 
 各アダプターはリクエストごとに正確に 1 つのリクエストスコープを作成し、それをフレームワークネイティブの場所で公開し、フレームワークの安全な完了ポイントで破棄します。その間、アプリケーションが所有する具体的なコンテナ型を保持するため、`request.di` は `any` やベースコンテナではなく、完全に型付けされます。

@@ -1,3 +1,57 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ru/reference/manifesto#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Главная"
+          "item": "https://inferdi.com/ru/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Справочник"
+          "item": "https://inferdi.com/ru/reference/api"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Архитектурный манифест ядра InferDI"
+          "item": "https://inferdi.com/ru/reference/manifesto"
+    - "@type": "Article"
+      "@id": "https://inferdi.com/ru/reference/manifesto#article"
+      "headline": "Архитектурный манифест ядра InferDI"
+      "name": "Архитектурный манифест ядра InferDI"
+      "description": "Архитектурный манифест, стоящий за InferDI: всё, что компилятор может проверить статически, должно проверяться статически, при нулевых накладных расходах во время выполнения, нуле зависимостей, нуле декораторов и сознательных компромиссах, которые из этого следуют."
+      "url": "https://inferdi.com/ru/reference/manifesto"
+      "mainEntityOfPage": "https://inferdi.com/ru/reference/manifesto"
+      "inLanguage": "ru-RU"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "keywords": "InferDI, манифест, архитектура, принципы проектирования, безопасность типов, нулевые накладные расходы, нуль зависимостей, внедрение зависимостей"
+      "articleSection": "Справочник"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Архитектурный манифест ядра InferDI
 
 Этот документ задаёт правила для `@inferdi/inferdi` в `packages/inferdi`. Читайте его перед ревью PR, который меняет публичный API, систему типов, путь resolve в `get()`, форму регистрации, семантику scope или поведение очистки.

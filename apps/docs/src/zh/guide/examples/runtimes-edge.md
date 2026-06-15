@@ -1,3 +1,63 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/guide/examples/runtimes-edge#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "指南"
+          "item": "https://inferdi.com/zh/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "示例"
+          "item": "https://inferdi.com/zh/guide/examples"
+        - "@type": "ListItem"
+          "position": 4
+          "name": "运行时与边缘平台"
+          "item": "https://inferdi.com/zh/guide/examples/runtimes-edge"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/zh/guide/examples/runtimes-edge#article"
+      "headline": "在 Node、Bun、Deno 和边缘运行时上使用 InferDI"
+      "name": "运行时与边缘平台"
+      "description": "在底层 Node HTTP、Bun serve、Deno HTTP 和边缘函数中使用模块级的根容器并为每个请求创建一个作用域 —— 有界限的处理函数使用 await using，流式或后台工作则显式释放。"
+      "url": "https://inferdi.com/zh/guide/examples/runtimes-edge"
+      "mainEntityOfPage": "https://inferdi.com/zh/guide/examples/runtimes-edge"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Node.js, Bun, Deno, Supabase Edge Functions, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, 运行时, 边缘, Node HTTP, Bun, Deno, Supabase Edge Functions, await using, 请求作用域"
+      "articleSection": "示例"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # 运行时与边缘平台
 
 运行时示例使用模块级的根容器，并为每个请求创建一个作用域。有界限的处理函数可以使用 `await using`；流式或后台工作应在该工作完成后再释放。

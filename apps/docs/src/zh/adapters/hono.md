@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/adapters/hono#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "适配器"
+          "item": "https://inferdi.com/zh/adapters/"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Hono 适配器"
+          "item": "https://inferdi.com/zh/adapters/hono"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/zh/adapters/hono#article"
+      "headline": "InferDI Hono 适配器 —— @inferdi/hono"
+      "name": "Hono 适配器"
+      "description": "@inferdi/hono 是 Hono v4 中间件：它在每次调用时创建一个请求作用域，通过 Hono 上下文变量暴露它，并在受限的路由管线完成之后释放它 —— 适用于边缘环境中的 Cloudflare Workers 和 Bun。"
+      "url": "https://inferdi.com/zh/adapters/hono"
+      "mainEntityOfPage": "https://inferdi.com/zh/adapters/hono"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Hono v4, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, Hono, Hono v4, 中间件, 上下文变量, 边缘, Cloudflare Workers, Bun, 依赖注入"
+      "articleSection": "适配器"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "@inferdi/hono"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js >=16, Bun, Cloudflare Workers"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Hono 适配器
 
 [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) 是 Hono v4 中间件。它在每次中间件调用时创建一个请求作用域，通过 Hono 上下文变量暴露它，并在受限的路由管线完成之后释放它。

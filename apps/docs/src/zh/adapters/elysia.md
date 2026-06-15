@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/adapters/elysia#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "适配器"
+          "item": "https://inferdi.com/zh/adapters/"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Elysia 适配器"
+          "item": "https://inferdi.com/zh/adapters/elysia"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/zh/adapters/elysia#article"
+      "headline": "InferDI Elysia 适配器 — @inferdi/elysia"
+      "name": "Elysia 适配器"
+      "description": "@inferdi/elysia 是 Elysia v1 插件：在作用域模式下，它创建一个请求作用域，将其暴露在 Elysia 上下文中，使其对错误处理器保持可用，并在 onAfterResponse 中释放它——同时为 Bun 应用提供仅根模式。"
+      "url": "https://inferdi.com/zh/adapters/elysia"
+      "mainEntityOfPage": "https://inferdi.com/zh/adapters/elysia"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Elysia v1, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, Elysia, Elysia v1, 插件, Bun, scoped derive, onAfterResponse, 仅根模式, 依赖注入"
+      "articleSection": "适配器"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "@inferdi/elysia"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js >=20, Bun"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Elysia 适配器
 
 [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) 是一个 Elysia v1 插件。在作用域模式下，它创建一个请求作用域，将其暴露在 Elysia 上下文上，使其对用户的错误处理器保持可用，并从 `onAfterResponse` 中释放它。

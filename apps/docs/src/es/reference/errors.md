@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/es/reference/errors#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Inicio"
+          "item": "https://inferdi.com/es/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Referencia"
+          "item": "https://inferdi.com/es/reference/api"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Errores"
+          "item": "https://inferdi.com/es/reference/errors"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/es/reference/errors#article"
+      "headline": "Referencia de errores de InferDI"
+      "name": "Errores"
+      "description": "Todos los errores explícitos que lanza InferDI ante un uso indebido del grafo y del ciclo de vida: clave desconocida, ciclo detectado, violación de tiempo de vida, contenedor liberado, con la forma del mensaje para que los errores de registro fallen pronto en las pruebas."
+      "url": "https://inferdi.com/es/reference/errors"
+      "mainEntityOfPage": "https://inferdi.com/es/reference/errors"
+      "inLanguage": "es-ES"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, errores, excepciones, clave desconocida, ciclo detectado, violación de tiempo de vida, contenedor liberado, inyección de dependencias"
+      "articleSection": "Referencia"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Errores
 
 InferDI lanza errores explícitos ante el uso indebido del grafo y del ciclo de vida. Mantén estos mensajes visibles en las pruebas para que los errores de registro fallen pronto.

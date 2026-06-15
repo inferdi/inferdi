@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ja/adapters/elysia#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "ホーム"
+          "item": "https://inferdi.com/ja/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "アダプター"
+          "item": "https://inferdi.com/ja/adapters/"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Elysia アダプター"
+          "item": "https://inferdi.com/ja/adapters/elysia"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ja/adapters/elysia#article"
+      "headline": "InferDI Elysia アダプター — @inferdi/elysia"
+      "name": "Elysia アダプター"
+      "description": "@inferdi/elysia は Elysia v1 のプラグインです。スコープモードでは 1 つのリクエストスコープを作成し、Elysia のコンテキスト上に公開し、エラーハンドラーからも利用できるようにして、onAfterResponse で破棄します。Bun アプリ向けの root-only モードも備えています。"
+      "url": "https://inferdi.com/ja/adapters/elysia"
+      "mainEntityOfPage": "https://inferdi.com/ja/adapters/elysia"
+      "inLanguage": "ja-JP"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Elysia v1, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, Elysia, Elysia v1, プラグイン, Bun, scoped derive, onAfterResponse, root-only, 依存性注入"
+      "articleSection": "アダプター"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "@inferdi/elysia"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js >=20, Bun"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Elysia アダプター
 
 [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) は Elysia v1 のプラグインです。スコープドモードでは、1 つのリクエストスコープを作成し、それを Elysia コンテキスト上で公開し、ユーザーのエラーハンドラーが利用できるように保持し、`onAfterResponse` から破棄します。

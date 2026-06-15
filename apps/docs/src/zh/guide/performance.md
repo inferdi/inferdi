@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/guide/performance#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "指南"
+          "item": "https://inferdi.com/zh/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "性能"
+          "item": "https://inferdi.com/zh/guide/performance"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/zh/guide/performance#article"
+      "headline": "InferDI 性能——为什么一次热路径解析只是一次 Map.get()"
+      "name": "性能"
+      "description": "InferDI 如何让依赖解析的开销接近于零：显式注册、缓存的单例与作用域级服务、对 0-7 个依赖的直接构造函数调用，以及 Promise 缓存的异步工厂——中间没有反射、元数据表或代理。"
+      "url": "https://inferdi.com/zh/guide/performance"
+      "mainEntityOfPage": "https://inferdi.com/zh/guide/performance"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Expert"
+      "keywords": "InferDI, 性能, 基准测试, 零开销, 热路径, 依赖注入, V8, Map.get"
+      "articleSection": "指南"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # 性能
 
 一次热路径解析就是一次 `Map.get(key)`，紧接着一次直接的 `new Ctor(...)` —— 中间没有反射、没有元数据表、也没有代理。下面的基准测试数字源自几个具体的运行时选择，而不是你必须主动开启的某种特殊快速模式：

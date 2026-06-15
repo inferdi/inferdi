@@ -1,3 +1,63 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ja/guide/examples/workers-cli#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "ホーム"
+          "item": "https://inferdi.com/ja/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "ガイド"
+          "item": "https://inferdi.com/ja/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "例"
+          "item": "https://inferdi.com/ja/guide/examples"
+        - "@type": "ListItem"
+          "position": 4
+          "name": "ボット、キュー、CLI"
+          "item": "https://inferdi.com/ja/guide/examples/workers-cli"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ja/guide/examples/workers-cli#article"
+      "headline": "ボット、キュー、CLI コマンドのための InferDI スコープ"
+      "name": "ボット、キュー、CLI"
+      "description": "ボットの更新、キューのジョブ、CLI コマンドごとに 1 つの InferDI スコープを作成し、await using で破棄を管理します。Telegraf、grammY、BullMQ で比較します。"
+      "url": "https://inferdi.com/ja/guide/examples/workers-cli"
+      "mainEntityOfPage": "https://inferdi.com/ja/guide/examples/workers-cli"
+      "inLanguage": "ja-JP"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Telegraf, grammY, BullMQ, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, ボット, キュー, CLI, Telegraf, grammY, BullMQ, await using, 依存性注入"
+      "articleSection": "例"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # ボット、キュー、CLI
 
 ボットの更新、キューのジョブ、CLI コマンドは、境界が明確な非同期処理です。これらの例では、更新、ジョブ、コマンドごとに 1 つのスコープを作成し、関数が処理全体を所有する場合は `await using` を使用します。

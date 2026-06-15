@@ -1,3 +1,63 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/guide/examples/workers-cli#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Home"
+          "item": "https://inferdi.com/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Guide"
+          "item": "https://inferdi.com/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Examples"
+          "item": "https://inferdi.com/guide/examples"
+        - "@type": "ListItem"
+          "position": 4
+          "name": "Bots, Queues, and CLI"
+          "item": "https://inferdi.com/guide/examples/workers-cli"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/guide/examples/workers-cli#article"
+      "headline": "InferDI scopes for bots, queues, and CLI commands"
+      "name": "Bots, Queues, and CLI"
+      "description": "Create one InferDI scope per bot update, queue job, or CLI command and own disposal with await using — compared across Telegraf, grammY, and BullMQ."
+      "url": "https://inferdi.com/guide/examples/workers-cli"
+      "mainEntityOfPage": "https://inferdi.com/guide/examples/workers-cli"
+      "inLanguage": "en-US"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Telegraf, grammY, BullMQ, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, bots, queues, CLI, Telegraf, grammY, BullMQ, await using, dependency injection"
+      "articleSection": "Examples"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Bots, Queues, and CLI
 
 Bot updates, queue jobs, and CLI commands are bounded async operations. The examples create one scope per update, job, or command and use `await using` where the function owns the whole operation.

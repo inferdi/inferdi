@@ -1,3 +1,55 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/es/adapters/#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Inicio"
+          "item": "https://inferdi.com/es/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Adaptadores"
+          "item": "https://inferdi.com/es/adapters/"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/es/adapters/#article"
+      "headline": "Adaptadores de frameworks de InferDI — visión general"
+      "name": "Adaptadores de frameworks"
+      "description": "Cada adaptador de InferDI crea un scope de petición por petición, lo expone en la ubicación nativa del framework y lo libera en el punto de finalización seguro del framework, conservando el contenedor concreto y totalmente tipado que tu aplicación posee. Una fina capa de pegamento del ciclo de vida, nunca un framework de IoC."
+      "url": "https://inferdi.com/es/adapters/"
+      "mainEntityOfPage": "https://inferdi.com/es/adapters/"
+      "inLanguage": "es-ES"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, @inferdi/inferdi, Fastify, Hono, Koa, Express, Elysia"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, adaptadores, scope de petición, Fastify, Hono, Koa, Express, Elysia, middleware, inyección de dependencias"
+      "articleSection": "Adaptadores"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Adaptadores de frameworks
 
 Cada adaptador crea exactamente un scope de petición por petición, lo expone en la ubicación nativa del framework y lo libera en el punto de finalización seguro del framework, conservando al mismo tiempo el tipo concreto de contenedor que tu aplicación posee, de modo que `request.di` queda totalmente tipado, no `any` ni un contenedor base.

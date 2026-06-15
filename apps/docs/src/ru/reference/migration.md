@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ru/reference/migration#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Главная"
+          "item": "https://inferdi.com/ru/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Справочник"
+          "item": "https://inferdi.com/ru/reference/api"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Миграция"
+          "item": "https://inferdi.com/ru/reference/migration"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ru/reference/migration#article"
+      "headline": "Руководство по миграции InferDI"
+      "name": "Миграция"
+      "description": "Breaking changes по major versions и текущий путь миграции на InferDI 5.0, повторяющий packages/inferdi/MIGRATION.md как источник истины."
+      "url": "https://inferdi.com/ru/reference/migration"
+      "mainEntityOfPage": "https://inferdi.com/ru/reference/migration"
+      "inLanguage": "ru-RU"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, миграция, breaking changes, обновление, 5.0, major version, внедрение зависимостей"
+      "articleSection": "Справочник"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Миграция
 
 InferDI документирует breaking changes по major versions. Источник истины остаётся в [`packages/inferdi/MIGRATION.md`](https://github.com/inferdi/inferdi/blob/main/packages/inferdi/MIGRATION.md), а текущий путь миграции собран здесь.

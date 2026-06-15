@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/adapters/hono#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Home"
+          "item": "https://inferdi.com/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Adapters"
+          "item": "https://inferdi.com/adapters/"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Hono"
+          "item": "https://inferdi.com/adapters/hono"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/adapters/hono#article"
+      "headline": "InferDI Hono Adapter — @inferdi/hono"
+      "name": "Hono Adapter"
+      "description": "@inferdi/hono is Hono v4 middleware: it creates one request scope per invocation, exposes it through Hono context variables, and disposes it after the bounded route pipeline completes — fit for Cloudflare Workers and Bun at the edge."
+      "url": "https://inferdi.com/adapters/hono"
+      "mainEntityOfPage": "https://inferdi.com/adapters/hono"
+      "inLanguage": "en-US"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Hono v4, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, Hono, Hono v4, middleware, context variables, edge, Cloudflare Workers, Bun, dependency injection"
+      "articleSection": "Adapters"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "@inferdi/hono"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js >=16, Bun, Cloudflare Workers"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Hono Adapter
 
 [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) is Hono v4 middleware. It creates one request scope per middleware invocation, exposes it through Hono context variables, and disposes it after the bounded route pipeline completes.

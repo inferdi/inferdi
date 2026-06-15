@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/es/adapters/elysia#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Inicio"
+          "item": "https://inferdi.com/es/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Adaptadores"
+          "item": "https://inferdi.com/es/adapters/"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Adaptador de Elysia"
+          "item": "https://inferdi.com/es/adapters/elysia"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/es/adapters/elysia#article"
+      "headline": "Adaptador de Elysia de InferDI — @inferdi/elysia"
+      "name": "Adaptador de Elysia"
+      "description": "@inferdi/elysia es un plugin de Elysia v1: en modo con scope crea un scope de petición, lo expone en el contexto de Elysia, lo mantiene disponible para los manejadores de errores y lo libera desde onAfterResponse, con un modo solo raíz para aplicaciones Bun."
+      "url": "https://inferdi.com/es/adapters/elysia"
+      "mainEntityOfPage": "https://inferdi.com/es/adapters/elysia"
+      "inLanguage": "es-ES"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Elysia v1, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, Elysia, Elysia v1, plugin, Bun, derive con scope, onAfterResponse, solo raíz, inyección de dependencias"
+      "articleSection": "Adaptadores"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "@inferdi/elysia"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js >=20, Bun"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Adaptador de Elysia
 
 [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) es un plugin de Elysia v1. En modo con scope, crea un scope de petición, lo expone en el contexto de Elysia, lo mantiene disponible para los manejadores de errores del usuario y lo libera desde `onAfterResponse`.

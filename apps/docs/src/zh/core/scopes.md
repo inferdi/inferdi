@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/core/scopes#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "核心概念"
+          "item": "https://inferdi.com/zh/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "作用域与清理"
+          "item": "https://inferdi.com/zh/core/scopes"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/zh/core/scopes#article"
+      "headline": "InferDI 中的作用域与清理"
+      "name": "作用域与清理"
+      "description": "作用域将请求本地服务限定在单个工作单元内：子作用域继承父级的每一项注册，但缓存它自己的实例并拥有它们的清理职责，采用 LIFO 清理顺序并支持 using 与 await using。"
+      "url": "https://inferdi.com/zh/core/scopes"
+      "mainEntityOfPage": "https://inferdi.com/zh/core/scopes"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, 作用域, 清理, 销毁, 子作用域, using, await using, LIFO, 依赖注入"
+      "articleSection": "核心概念"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # 作用域与清理
 
 作用域将请求本地服务的生命周期限定在单个工作单元内。子作用域继承父级的每一项注册，但会缓存它自己的作用域级实例并拥有它们的清理职责——因此为某个请求创建的作用域永远不会与另一个请求共享状态，也不会比它存活得更久。

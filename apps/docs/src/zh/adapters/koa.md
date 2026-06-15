@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/adapters/koa#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "适配器"
+          "item": "https://inferdi.com/zh/adapters/"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Koa 适配器"
+          "item": "https://inferdi.com/zh/adapters/koa"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/zh/adapters/koa#article"
+      "headline": "InferDI Koa 适配器 — @inferdi/koa"
+      "name": "Koa 适配器"
+      "description": "@inferdi/koa 是 Koa v3 中间件：它创建一个请求作用域，将其暴露为 ctx.state.di，并在 Node 响应 finish 或 close 之后释放它——带有类型化的状态键和清理钩子。"
+      "url": "https://inferdi.com/zh/adapters/koa"
+      "mainEntityOfPage": "https://inferdi.com/zh/adapters/koa"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Koa v3, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, Koa, Koa v3, 中间件, ctx.state.di, 响应生命周期, 依赖注入"
+      "articleSection": "适配器"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "@inferdi/koa"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js >=18"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Koa 适配器
 
 [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) 是 Koa v3 中间件。它创建一个请求作用域，将其暴露为 `ctx.state.di`，并在 Node 响应 finish 或 close 之后释放它。

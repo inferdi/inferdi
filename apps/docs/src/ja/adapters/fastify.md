@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ja/adapters/fastify#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "ホーム"
+          "item": "https://inferdi.com/ja/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "アダプター"
+          "item": "https://inferdi.com/ja/adapters/"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Fastify アダプター"
+          "item": "https://inferdi.com/ja/adapters/fastify"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ja/adapters/fastify#article"
+      "headline": "InferDI Fastify アダプター — @inferdi/fastify"
+      "name": "Fastify アダプター"
+      "description": "@inferdi/fastify は Fastify v5 のプラグインです。スコープドモードではルートを app.di として公開し、onRequest で 1 つのリクエストスコープを作成し、それを request.di として公開し、onResponse で破棄します — 型付けされたクリーンアップフックとクライアント中断の処理を備えています。"
+      "url": "https://inferdi.com/ja/adapters/fastify"
+      "mainEntityOfPage": "https://inferdi.com/ja/adapters/fastify"
+      "inLanguage": "ja-JP"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Fastify v5, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, Fastify, Fastify v5, プラグイン, リクエストスコープ, request.di, onRequest, onResponse, 依存性注入"
+      "articleSection": "アダプター"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "@inferdi/fastify"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js >=20"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Fastify アダプター
 
 [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) は Fastify v5 のプラグインです。スコープドモードでは、ルートを `app.di` として公開し、`onRequest` で 1 つのリクエストスコープを作成し、それを `request.di` として公開し、`onResponse` で破棄します。

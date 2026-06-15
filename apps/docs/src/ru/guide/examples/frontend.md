@@ -1,3 +1,63 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ru/guide/examples/frontend#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Главная"
+          "item": "https://inferdi.com/ru/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Руководство"
+          "item": "https://inferdi.com/ru/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Примеры"
+          "item": "https://inferdi.com/ru/guide/examples"
+        - "@type": "ListItem"
+          "position": 4
+          "name": "Фронтенд-фреймворки"
+          "item": "https://inferdi.com/ru/guide/examples/frontend"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ru/guide/examples/frontend#article"
+      "headline": "Scope InferDI в React, React Native и Vue"
+      "name": "Фронтенд-фреймворки"
+      "description": "Создавайте scope InferDI на границах страницы, маршрута, экрана или фичи в React, React Native и Vue 3 — передавая scope потомкам и запуская очистку при размонтировании."
+      "url": "https://inferdi.com/ru/guide/examples/frontend"
+      "mainEntityOfPage": "https://inferdi.com/ru/guide/examples/frontend"
+      "inLanguage": "ru-RU"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, React, React Native, Vue 3, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, React, React Native, Vue 3, provide inject, scope фичи, внедрение зависимостей"
+      "articleSection": "Примеры"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Фронтенд-фреймворки
 
 Фронтенд-примеры создают scope на границе страницы, маршрута, экрана или фичи. Они используют свои небольшие сборщики, а не общий серверный модуль.

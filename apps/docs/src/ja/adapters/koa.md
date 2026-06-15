@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ja/adapters/koa#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "ホーム"
+          "item": "https://inferdi.com/ja/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "アダプター"
+          "item": "https://inferdi.com/ja/adapters/"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Koa アダプター"
+          "item": "https://inferdi.com/ja/adapters/koa"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ja/adapters/koa#article"
+      "headline": "InferDI Koa アダプター — @inferdi/koa"
+      "name": "Koa アダプター"
+      "description": "@inferdi/koa は Koa v3 のミドルウェアです。1 つのリクエストスコープを作成し、ctx.state.di として公開し、Node のレスポンスが finish または close した後に破棄します。型付きの state キーとクリーンアップフックを備えています。"
+      "url": "https://inferdi.com/ja/adapters/koa"
+      "mainEntityOfPage": "https://inferdi.com/ja/adapters/koa"
+      "inLanguage": "ja-JP"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Koa v3, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, Koa, Koa v3, ミドルウェア, ctx.state.di, レスポンスライフサイクル, 依存性注入"
+      "articleSection": "アダプター"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "@inferdi/koa"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js >=18"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Koa アダプター
 
 [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) は Koa v3 のミドルウェアです。1 つのリクエストスコープを作成し、それを `ctx.state.di` として公開し、Node レスポンスが finish または close した後に破棄します。

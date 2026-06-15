@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ru/core/symbol-keys#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Главная"
+          "item": "https://inferdi.com/ru/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Базовые принципы"
+          "item": "https://inferdi.com/ru/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Символьные ключи"
+          "item": "https://inferdi.com/ru/core/symbol-keys"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ru/core/symbol-keys#article"
+      "headline": "Символьные ключи в InferDI"
+      "name": "Символьные ключи"
+      "description": "Любой ключ регистрации может быть строкой или символом. Строки подходят для публичных сервисов уровня приложения; символы дают идентичность без коллизий, а локальные ключи Symbol() остаются доступными для сборки мусора вместе с контейнером."
+      "url": "https://inferdi.com/ru/core/symbol-keys"
+      "mainEntityOfPage": "https://inferdi.com/ru/core/symbol-keys"
+      "inLanguage": "ru-RU"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Expert"
+      "keywords": "InferDI, символьные ключи, Symbol, строковые ключи, идентичность, сборка мусора, внедрение зависимостей"
+      "articleSection": "Базовые принципы"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Символьные ключи
 
 Любой ключ регистрации может быть `string` или `symbol`. Строки удобны для публичных сервисов уровня приложения. Symbol-ключи полезны, когда важна идентичность.

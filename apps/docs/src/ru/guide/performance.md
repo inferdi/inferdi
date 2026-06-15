@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ru/guide/performance#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Главная"
+          "item": "https://inferdi.com/ru/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Руководство"
+          "item": "https://inferdi.com/ru/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Производительность"
+          "item": "https://inferdi.com/ru/guide/performance"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ru/guide/performance#article"
+      "headline": "Производительность InferDI — почему тёплое разрешение — это один Map.get()"
+      "name": "Производительность"
+      "description": "Как InferDI держит разрешение зависимостей около нулевых накладных расходов: явные регистрации, закешированные singleton- и scoped-сервисы, прямые вызовы конструкторов для 0-7 зависимостей и асинхронные фабрики с кешированием Promise — без reflection, таблиц метаданных и proxy на пути."
+      "url": "https://inferdi.com/ru/guide/performance"
+      "mainEntityOfPage": "https://inferdi.com/ru/guide/performance"
+      "inLanguage": "ru-RU"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Expert"
+      "keywords": "InferDI, производительность, бенчмарк, нулевые накладные расходы, горячий путь, внедрение зависимостей, V8, Map.get"
+      "articleSection": "Руководство"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Производительность
 
 Тёплый вызов `.get()` - это один `Map.get(key)` и прямой `new Ctor(...)`: без reflection, таблиц метаданных и proxy на пути. Цифры в бенчмарке ниже появляются из конкретных решений в рантайме, а не из отдельного fast mode, который нужно включать вручную:

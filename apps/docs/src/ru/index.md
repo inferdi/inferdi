@@ -64,4 +64,44 @@ features:
     details: "InferDI не имеет зависимостей и работает где угодно — Node, Bun, Deno, браузеры, воркеры. Адаптеры опциональны, а не обязательны."
     link: /ru/adapters/
     linkText: Как работают адаптеры
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "WebSite"
+      "@id": "https://inferdi.com/#website"
+      "url": "https://inferdi.com/ru/"
+      "name": "InferDI"
+      "description": "Ультрабыстрый, строго типизированный DI без декораторов для современного TypeScript."
+      "inLanguage": "ru-RU"
+      "publisher":
+        "@id": "https://inferdi.com/#organization"
+      "potentialAction":
+        "@type": "SearchAction"
+        "target":
+          "@type": "EntryPoint"
+          "urlTemplate": "https://inferdi.com/?q={search_term_string}"
+        "query-input": "required name=search_term_string"
+    - "@type": "Organization"
+      "@id": "https://inferdi.com/#organization"
+      "name": "InferDI"
+      "url": "https://inferdi.com/"
+      "logo":
+        "@type": "ImageObject"
+        "url": "https://inferdi.com/logo.png"
+      "sameAs":
+        - "https://github.com/inferdi/inferdi"
+        - "https://twitter.com/inferdi_ts"
+    - "@type": "SoftwareApplication"
+      "@id": "https://inferdi.com/#software"
+      "name": "InferDI"
+      "applicationCategory": "DeveloperApplication"
+      "operatingSystem": "Node.js, Bun, Deno, Browser, Edge runtimes"
+      "softwareVersion": "5.0.1"
+      "programmingLanguage": "TypeScript"
+      "url": "https://inferdi.com/"
+      "downloadUrl": "https://www.npmjs.com/package/@inferdi/inferdi"
+      "description": "DI-контейнер для TypeScript без зависимостей и декораторов, со строгой типизацией. Граф зависимостей — это тип: перепутанные аргументы, отсутствующие ключи и утечки времени жизни становятся ошибками компиляции, а не исключениями во время выполнения."
+      "license": "https://github.com/inferdi/inferdi/blob/main/LICENSE"
+      "author":
+        "@id": "https://inferdi.com/#organization"
 ---

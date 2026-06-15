@@ -1,3 +1,57 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/es/reference/manifesto#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Inicio"
+          "item": "https://inferdi.com/es/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Referencia"
+          "item": "https://inferdi.com/es/reference/api"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Manifiesto arquitectónico del core de InferDI"
+          "item": "https://inferdi.com/es/reference/manifesto"
+    - "@type": "Article"
+      "@id": "https://inferdi.com/es/reference/manifesto#article"
+      "headline": "Manifiesto arquitectónico del core de InferDI"
+      "name": "Manifiesto arquitectónico del core de InferDI"
+      "description": "El manifiesto arquitectónico que sustenta a InferDI: todo lo que el compilador pueda verificar de forma estática debe verificarse de forma estática, con cero sobrecarga en tiempo de ejecución, cero dependencias, cero decoradores y las decisiones de compromiso conscientes que de ello se derivan."
+      "url": "https://inferdi.com/es/reference/manifesto"
+      "mainEntityOfPage": "https://inferdi.com/es/reference/manifesto"
+      "inLanguage": "es-ES"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "keywords": "InferDI, manifiesto, arquitectura, principios de diseño, seguridad de tipos, cero sobrecarga, cero dependencias, inyección de dependencias"
+      "articleSection": "Referencia"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Manifiesto arquitectónico del core de InferDI
 
 Este documento rige `@inferdi/inferdi` en `packages/inferdi`. Léelo antes de

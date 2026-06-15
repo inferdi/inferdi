@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/es/core/testing#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Inicio"
+          "item": "https://inferdi.com/es/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Conceptos básicos"
+          "item": "https://inferdi.com/es/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Pruebas y overrides"
+          "item": "https://inferdi.com/es/core/testing"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/es/core/testing#article"
+      "headline": "Pruebas y overrides en InferDI — .override()"
+      "name": "Pruebas y overrides"
+      "description": "Usa .override() para reemplazar un registro existente por un mock en las pruebas, intercambiando implementaciones sin tocar el cableado de producción ni el resto del grafo tipado."
+      "url": "https://inferdi.com/es/core/testing"
+      "mainEntityOfPage": "https://inferdi.com/es/core/testing"
+      "inLanguage": "es-ES"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, pruebas, override, mocks, dobles de prueba, intercambiar implementación, inyección de dependencias"
+      "articleSection": "Conceptos básicos"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Pruebas y overrides
 
 Usa `.override()` cuando las pruebas necesitan reemplazar un registro existente por un mock.

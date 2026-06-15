@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ja/reference/migration#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "ホーム"
+          "item": "https://inferdi.com/ja/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "リファレンス"
+          "item": "https://inferdi.com/ja/reference/api"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "マイグレーション"
+          "item": "https://inferdi.com/ja/reference/migration"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ja/reference/migration#article"
+      "headline": "InferDI マイグレーションガイド"
+      "name": "マイグレーション"
+      "description": "メジャーバージョンごとの破壊的変更と、InferDI 5.0 への現在のマイグレーション手順をまとめています。信頼できる情報源として packages/inferdi/MIGRATION.md を反映しています。"
+      "url": "https://inferdi.com/ja/reference/migration"
+      "mainEntityOfPage": "https://inferdi.com/ja/reference/migration"
+      "inLanguage": "ja-JP"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, マイグレーション, 破壊的変更, アップグレード, 5.0, メジャーバージョン, 依存性注入"
+      "articleSection": "リファレンス"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # マイグレーション
 
 InferDI は破壊的変更をメジャーバージョンごとに記録しています。信頼できる情報源は引き続き [`packages/inferdi/MIGRATION.md`](https://github.com/inferdi/inferdi/blob/main/packages/inferdi/MIGRATION.md) ですが、現在のマイグレーションパスをここに要約します。

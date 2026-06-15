@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/core/lazy-injection#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Home"
+          "item": "https://inferdi.com/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Core Concepts"
+          "item": "https://inferdi.com/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Lazy Injection"
+          "item": "https://inferdi.com/core/lazy-injection"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/core/lazy-injection#article"
+      "headline": "Lazy Injection in InferDI — Lazy<T>"
+      "name": "Lazy Injection"
+      "description": "Lazy<T> is a deferred-resolution wrapper for delaying construction order or letting two singletons refer to each other without resolving both in their constructors — without breaking the lifetime guard."
+      "url": "https://inferdi.com/core/lazy-injection"
+      "mainEntityOfPage": "https://inferdi.com/core/lazy-injection"
+      "inLanguage": "en-US"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Expert"
+      "keywords": "InferDI, lazy injection, Lazy, deferred resolution, circular dependency, singleton, dependency injection"
+      "articleSection": "Core Concepts"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Lazy Injection
 
 `Lazy<T>` is a small deferred-resolution wrapper. It is useful when construction order needs to be delayed, or when two singleton services need to refer to each other without resolving both in constructors.

@@ -1,3 +1,63 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ru/guide/examples/runtimes-edge#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Главная"
+          "item": "https://inferdi.com/ru/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Руководство"
+          "item": "https://inferdi.com/ru/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Примеры"
+          "item": "https://inferdi.com/ru/guide/examples"
+        - "@type": "ListItem"
+          "position": 4
+          "name": "Рантаймы и edge-платформы"
+          "item": "https://inferdi.com/ru/guide/examples/runtimes-edge"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ru/guide/examples/runtimes-edge#article"
+      "headline": "InferDI на Node, Bun, Deno и edge-рантаймах"
+      "name": "Рантаймы и edge-платформы"
+      "description": "Корневой контейнер на уровне модуля и один scope на запрос в низкоуровневом Node HTTP, Bun serve, Deno HTTP и edge-функциях — с await using для ограниченных обработчиков и явным dispose для стриминга или фоновой работы."
+      "url": "https://inferdi.com/ru/guide/examples/runtimes-edge"
+      "mainEntityOfPage": "https://inferdi.com/ru/guide/examples/runtimes-edge"
+      "inLanguage": "ru-RU"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Node.js, Bun, Deno, Supabase Edge Functions, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, рантаймы, edge, Node HTTP, Bun, Deno, Supabase Edge Functions, await using, scope запроса"
+      "articleSection": "Примеры"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Рантаймы и edge-платформы
 
 Примеры для рантаймов держат корневой контейнер на уровне модуля и создают один scope на запрос. Ограниченные по времени обработчики могут использовать `await using`; стриминг и фоновая работа должны очищать scope после своего завершения.

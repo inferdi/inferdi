@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/guide/examples#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "指南"
+          "item": "https://inferdi.com/zh/guide/quick-start"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "示例"
+          "item": "https://inferdi.com/zh/guide/examples"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/zh/guide/examples#article"
+      "headline": "InferDI 示例 — 框架与运行时模式"
+      "name": "示例"
+      "description": "涵盖后端、API 层、全栈框架、运行时、前端和 worker 的 InferDI 参考示例索引。每个分组都展示了在何处构建根容器、创建请求作用域以及释放它。"
+      "url": "https://inferdi.com/zh/guide/examples"
+      "mainEntityOfPage": "https://inferdi.com/zh/guide/examples"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, 示例, 模式, 依赖注入, 请求作用域, 框架, 运行时"
+      "articleSection": "指南"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # 示例
 
 仓库将示例保留为仅在 GitHub 上提供的参考片段。根包不会安装它们的框架依赖，不会对 `examples/` 目录进行类型检查，也不会将其发布到 npm。

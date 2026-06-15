@@ -390,10 +390,15 @@ export default defineConfig({
     hostname: siteUrl,
   },
   vite: {
-    build: {
+    esbuild: {
       target: 'esnext',
     },
-    esbuild: {
+    optimizeDeps: {
+      esbuildOptions: {
+        target: 'esnext',
+      },
+    },
+    build: {
       target: 'esnext',
     },
   },
@@ -422,8 +427,29 @@ export default defineConfig({
       },
     ])
   },
+  async transformHead({ pageData }) {
+    const { schema } = pageData.frontmatter
+    if (schema) {
+      return [
+        [
+          'script',
+          { type: 'application/ld+json' },
+          JSON.stringify(schema)
+        ]
+      ]
+    }
+  },
+  markdown: {
+    externalLinks: {
+      target: '_blank',
+      rel: 'nofollow noopener noreferrer'
+    }
+  },
   themeConfig: {
-    logo: '/logo.png',
+    logo: {
+      src: '/logo.png',
+      alt: 'InferDI',
+    },
     siteTitle: 'InferDI',
     search: {
       provider: 'local',

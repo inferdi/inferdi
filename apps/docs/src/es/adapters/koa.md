@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/es/adapters/koa#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Inicio"
+          "item": "https://inferdi.com/es/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Adaptadores"
+          "item": "https://inferdi.com/es/adapters/"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Adaptador de Koa"
+          "item": "https://inferdi.com/es/adapters/koa"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/es/adapters/koa#article"
+      "headline": "Adaptador de Koa de InferDI — @inferdi/koa"
+      "name": "Adaptador de Koa"
+      "description": "@inferdi/koa es middleware de Koa v3: crea un scope de petición, lo expone como ctx.state.di y lo libera después de que la respuesta de Node finaliza o se cierra, con claves de estado tipadas y hooks de limpieza."
+      "url": "https://inferdi.com/es/adapters/koa"
+      "mainEntityOfPage": "https://inferdi.com/es/adapters/koa"
+      "inLanguage": "es-ES"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Koa v3, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, Koa, Koa v3, middleware, ctx.state.di, ciclo de vida de la respuesta, inyección de dependencias"
+      "articleSection": "Adaptadores"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "@inferdi/koa"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js >=18"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Adaptador de Koa
 
 [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) es middleware de Koa v3. Crea un scope de petición, lo expone como `ctx.state.di` y lo libera después de que la respuesta de Node finaliza o se cierra.

@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ru/core/lifetime-guards#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Главная"
+          "item": "https://inferdi.com/ru/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Базовые принципы"
+          "item": "https://inferdi.com/ru/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Контроль времени жизни"
+          "item": "https://inferdi.com/ru/core/lifetime-guards"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ru/core/lifetime-guards#article"
+      "headline": "Контроль времени жизни в InferDI — singleton, scoped и transient"
+      "name": "Контроль времени жизни"
+      "description": "Три вида времени жизни в InferDI — singleton, scoped и transient — и защита на этапе компиляции и во время выполнения, которая не даёт долгоживущему сервису захватить короткоживущий и протечь состоянием между запросами."
+      "url": "https://inferdi.com/ru/core/lifetime-guards"
+      "mainEntityOfPage": "https://inferdi.com/ru/core/lifetime-guards"
+      "inLanguage": "ru-RU"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "proficiencyLevel": "Expert"
+      "keywords": "InferDI, время жизни, singleton, scoped, transient, контроль времени жизни, захваченная зависимость, внедрение зависимостей"
+      "articleSection": "Базовые принципы"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Контроль времени жизни
 
 В InferDI есть три вида времени жизни:

@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/adapters/fastify#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "适配器"
+          "item": "https://inferdi.com/zh/adapters/"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Fastify 适配器"
+          "item": "https://inferdi.com/zh/adapters/fastify"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/zh/adapters/fastify#article"
+      "headline": "InferDI Fastify 适配器 —— @inferdi/fastify"
+      "name": "Fastify 适配器"
+      "description": "@inferdi/fastify 是一个 Fastify v5 插件：在作用域模式下，它将根容器暴露为 app.di，在 onRequest 中创建一个请求作用域，将其暴露为 request.di，并在 onResponse 中释放它 —— 配有带类型的清理钩子和客户端中止处理。"
+      "url": "https://inferdi.com/zh/adapters/fastify"
+      "mainEntityOfPage": "https://inferdi.com/zh/adapters/fastify"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Fastify v5, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, Fastify, Fastify v5, 插件, 请求作用域, request.di, onRequest, onResponse, 依赖注入"
+      "articleSection": "适配器"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "@inferdi/fastify"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js >=20"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Fastify 适配器
 
 [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) 是一个 Fastify v5 插件。在作用域模式下，它将根容器暴露为 `app.di`，在 `onRequest` 中创建一个请求作用域，将其暴露为 `request.di`，并在 `onResponse` 中释放它。

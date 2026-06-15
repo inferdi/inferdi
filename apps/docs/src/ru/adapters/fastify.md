@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ru/adapters/fastify#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "Главная"
+          "item": "https://inferdi.com/ru/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "Адаптеры"
+          "item": "https://inferdi.com/ru/adapters/"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Адаптер Fastify"
+          "item": "https://inferdi.com/ru/adapters/fastify"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ru/adapters/fastify#article"
+      "headline": "Адаптер Fastify для InferDI — @inferdi/fastify"
+      "name": "Адаптер Fastify"
+      "description": "@inferdi/fastify — это плагин для Fastify v5: в режиме со scope он выставляет root как app.di, создаёт один scope запроса в onRequest, выставляет его как request.di и освобождает в onResponse — с типизированными cleanup-хуками и обработкой отмены запроса клиентом."
+      "url": "https://inferdi.com/ru/adapters/fastify"
+      "mainEntityOfPage": "https://inferdi.com/ru/adapters/fastify"
+      "inLanguage": "ru-RU"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Fastify v5, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, Fastify, Fastify v5, плагин, scope запроса, request.di, onRequest, onResponse, dependency injection"
+      "articleSection": "Адаптеры"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "@inferdi/fastify"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js >=20"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Адаптер Fastify
 
 [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) - это плагин для Fastify v5. В режиме со scope он выставляет root как `app.di`, создаёт scope запроса в `onRequest`, выставляет его как `request.di` и очищает в `onResponse`.

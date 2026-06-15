@@ -1,3 +1,59 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/zh/adapters/express#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "首页"
+          "item": "https://inferdi.com/zh/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "适配器"
+          "item": "https://inferdi.com/zh/adapters/"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "Express 适配器"
+          "item": "https://inferdi.com/zh/adapters/express"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/zh/adapters/express#article"
+      "headline": "InferDI Express 适配器 — @inferdi/express"
+      "name": "Express 适配器"
+      "description": "@inferdi/express 是 Express 5 中间件：它创建一个请求作用域，将其暴露为 req.di，并在 Node 响应 finish 或 close 之后释放它——通过声明合并实现完整类型化的 req.di。"
+      "url": "https://inferdi.com/zh/adapters/express"
+      "mainEntityOfPage": "https://inferdi.com/zh/adapters/express"
+      "inLanguage": "zh-CN"
+      "datePublished": "2026-06-12"
+      "dateModified": "2026-06-15"
+      "dependencies": "TypeScript, Express 5, @inferdi/inferdi"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, Express, Express 5, 中间件, req.di, 声明合并, 响应生命周期, 依赖注入"
+      "articleSection": "适配器"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "@inferdi/express"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js >=18"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
 # Express 适配器
 
 [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) 是 Express 5 中间件。它创建一个请求作用域，将其暴露为 `req.di`，并在 Node 响应 finish 或 close 之后释放它。
