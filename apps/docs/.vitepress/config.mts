@@ -400,9 +400,15 @@ export default defineConfig({
   head: [
     ['link', { rel: 'icon', href: withBase('/logo.png') }],
     ['meta', { name: 'theme-color', content: '#5b5ff5' }],
+    ['meta', { property: 'og:url', content: 'https://inferdi.com/' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:title', content: 'InferDI — The only ultra-fast DI for modern TypeScript' }],
+    ['meta', { property: 'og:image', content: 'https://inferdi.com/logo-twitter.png' }],
     ['meta', { property: 'og:description', content: 'Build apps with next-gen dependency injection for modern runtimes — clean domain logic, compiler-validated graphs, safe lifetimes, and first-class testability without decorators or runtime bloat.' }],
+    ['meta', { property: 'twitter:card', content: 'summary_large_image' }],
+    ['meta', { property: 'twitter:site', content: '@inferdi_ts' }],
+    ['meta', { property: 'twitter:title', content: 'InferDI — The only ultra-fast DI for modern TypeScript' }],
+    ['meta', { property: 'twitter:image', content: 'https://inferdi.com/logo-twitter.png' }],
   ],
   transformPageData(pageData) {
     if (pageData.relativePath === '404.md') return
