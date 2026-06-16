@@ -1285,10 +1285,11 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       // get(); a null/undefined element is unreachable in practice. The check
       // is kept as a runtime safety net but excluded from coverage so the
       // ceiling is not dragged down by a path no test can legitimately exercise.
-      /* v8 ignore next 3 */
+      /* v8 ignore start */
       if (inst == null) {
         continue
       }
+      /* v8 ignore stop */
 
       try {
         // Async factories cache a Promise in `owned`. Unwrap it before the
@@ -1376,10 +1377,11 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       // get(); a null/undefined element is unreachable in practice. The check
       // is kept as a runtime safety net but excluded from coverage so the
       // ceiling is not dragged down by a path no test can legitimately exercise.
-      /* v8 ignore next 3 */
+      /* v8 ignore start */
       if (inst == null) {
         continue
       }
+      /* v8 ignore stop */
 
       try {
         // A Promise cached from an async factory cannot be awaited synchronously.

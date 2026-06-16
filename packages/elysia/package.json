@@ -1,6 +1,6 @@
 {
   "name": "@inferdi/elysia",
-  "version": "5.0.1",
+  "version": "5.0.2",
   "description": "Elysia request-scope plugin for InferDI.",
   "keywords": [
     "typescript",

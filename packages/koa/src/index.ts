@@ -551,10 +551,11 @@ export function inferdiKoa<
       response.removeListener('finish', onComplete)
       response.removeListener('close', onComplete)
       // `runCleanup` handles lifecycle errors itself; this is a final bug guard.
-      /* v8 ignore next 3 */
+      /* v8 ignore start */
       void runCleanup(false).then(undefined, (error) => {
         emitAppError(error, context)
       })
+      /* v8 ignore stop */
     }
 
     try {
@@ -584,8 +585,9 @@ export function inferdiKoa<
       try {
         await runCleanup(true)
       } catch (error) {
-        /* v8 ignore next -- runCleanup sinks its own errors; final bug guard */
+        /* v8 ignore start -- runCleanup sinks its own errors; final bug guard */
         emitAppError(error, context)
+        /* v8 ignore stop */
       }
       return
     }

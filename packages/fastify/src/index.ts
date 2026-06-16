@@ -741,12 +741,13 @@ async function inferdiFastifyPlugin(
   // unexposed scope before completing the hook.
   fastify.addHook('onRequestAbort', (request, done) => {
     const state = requestStates.get(request)
-    /* v8 ignore next 4 -- Fastify runs onRequest before onRequestAbort, so the
+    /* v8 ignore start -- Fastify runs onRequest before onRequestAbort, so the
        state is absent only if the framework violates hook ordering */
     if (state === undefined) {
       done()
       return
     }
+    /* v8 ignore stop */
 
     if (state.scope === null) {
       state.aborted = true
