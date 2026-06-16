@@ -1,6 +1,6 @@
 {
   "name": "@inferdi/express",
-  "version": "5.0.2",
+  "version": "5.0.3",
   "license": "MIT",
   "exports": "./src/index.ts",
   "imports": {

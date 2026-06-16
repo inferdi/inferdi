@@ -17,7 +17,7 @@ const enNav: DefaultTheme.NavItem[] = [
   { text: 'Guide', link: '/guide/quick-start' },
   { text: 'Performance', link: '/guide/performance' },
   { text: 'Adapters', link: '/adapters/' },
-  { text: '5.0.2', items: [
+  { text: '5.0.3', items: [
       { text: 'Migration', link: '/reference/migration' },
     ],
   },
@@ -27,7 +27,7 @@ const ruNav: DefaultTheme.NavItem[] = [
   { text: 'Руководство', link: '/ru/guide/quick-start' },
   { text: 'Производительность', link: '/ru/guide/performance' },
   { text: 'Адаптеры', link: '/ru/adapters/' },
-  { text: '5.0.2', items: [
+  { text: '5.0.3', items: [
       { text: 'Миграция', link: '/ru/reference/migration' },
     ],
   },
@@ -37,7 +37,7 @@ const zhNav: DefaultTheme.NavItem[] = [
   { text: '指南', link: '/zh/guide/quick-start' },
   { text: '性能', link: '/zh/guide/performance' },
   { text: '适配器', link: '/zh/adapters/' },
-  { text: '5.0.2', items: [
+  { text: '5.0.3', items: [
       { text: '迁移', link: '/zh/reference/migration' },
     ],
   },
@@ -47,7 +47,7 @@ const jaNav: DefaultTheme.NavItem[] = [
   { text: 'ガイド', link: '/ja/guide/quick-start' },
   { text: 'パフォーマンス', link: '/ja/guide/performance' },
   { text: 'アダプター', link: '/ja/adapters/' },
-  { text: '5.0.2', items: [
+  { text: '5.0.3', items: [
       { text: '移行', link: '/ja/reference/migration' },
     ],
   },
@@ -57,7 +57,7 @@ const esNav: DefaultTheme.NavItem[] = [
   { text: 'Guía', link: '/es/guide/quick-start' },
   { text: 'Rendimiento', link: '/es/guide/performance' },
   { text: 'Adaptadores', link: '/es/adapters/' },
-  { text: '5.0.2', items: [
+  { text: '5.0.3', items: [
       { text: 'Migración', link: '/es/reference/migration' },
     ],
   },
