@@ -101,6 +101,7 @@ InferDI 是面向 ES2022 的普通 TypeScript。不要添加装饰器、`reflect
 - 单例不得直接依赖作用域级或瞬态服务。`AllowedDeps<T, Kind>` 在编译期强制执行这一点；`strict: true` 在运行时针对强制转换和动态注册强制执行这一点。
 - `Lazy<V>` 会保留目标生命周期。单例消费者只能注入 `LazySpec<V, 'singleton'>`。`Lazy<scoped>` 和 `Lazy<transient>` 对作用域级和瞬态消费者仍然合法，但对单例消费者仍然非法。
 - 运行时的 `Registration.lazy` 标志只能在目标种类为 `'singleton'` 的惰性伴生项上为 `true`。
+- 运行时的 `Registration.owned` 标志只会在创建值归容器所有的类或工厂注册上为 `true`；在 `registerValue`、`.override()` 和惰性伴生项上为 `false`。
 - `registerValue` 和 `.override()` 的值由外部拥有。它们不会进入清理队列。
 - `.override()` 是一个测试逃逸口。它必须保留原始的 `kind` 和 `lazy` 标志，保持作用域局部，拒绝未知的键，拒绝已释放的容器，并拒绝已在同一容器上被解析过的键。
 - `dispose()` 只触及该容器所拥有的实例。父容器与子容器不会相互释放。
@@ -149,7 +150,7 @@ if (cached !== undefined) return ...
 
 - [ ] 在 `get()` 中的 `cache.get(key)` 之前添加了工作？
 - [ ] `UNDEFINED_MARKER`、`cache`、`regs`、`lookupCache` 或 `Registration` 的形态发生了变化？
-- [ ] `Registration` 的属性顺序从 `{kind, lazy, fn}` 发生了改变？
+- [ ] `Registration` 的属性顺序从 `{kind, lazy, fn, owned}` 发生了改变？
 - [ ] 本地注册表查找被移到了父级查找之后？
 - [ ] 在解析过程中添加了 `Proxy`、`Reflect.get`、`Object.defineProperty` 或元数据查找？
 - [ ] `get()` 被改为 `async`？
@@ -201,6 +202,7 @@ if (cached !== undefined) return ...
 | 对相同结构的依赖不做名义区分 | TypeScript 使用结构可赋值性。如果两个键暴露相同的形态，`DepsOf` 无法得知用户的语义意图。当相同形态的服务之间顺序重要时，请使用带品牌的类型或 `unique symbol` 键。 |
 | 没有异步 `get()` | 当前的循环与生命周期守卫使用共享的同步调用栈状态。异步解析 API 将需要独立的逐次解析记账。 |
 | 不检测异步工厂之间的循环 | 在一次 `await` 之后，同步解析栈已不复存在，待定的 promise 可能满足后续的 `c.get()` 调用。检测这一点会向解析引入异步追踪。请拆分循环、提升共享初始化逻辑，或在合法的地方使用 `Lazy<singleton>`。 |
+| 不在异步边界后进行运行时生命周期检测 | `AllowedDeps` 仍会阻止无效的类型化工厂，但 `await` 后通过 `as` 强制转换或捕获的外部容器会在 `singletonStack` 清理后运行。完整防护需要异步上下文跟踪。请在同步阶段读取依赖项。 |
 | 没有自动断环 | 循环属于架构缺陷，除非其中一端是显式的惰性单例伴生项。InferDI 会检测受支持的运行时循环并报告它们；它不会臆造 proxy 或部分构造的实例。 |
 | 不支持泛型 `<T>(c: Container<T>) => ...` 模块 | 在泛型函数体内部，`keyof T` 会坍缩为 `DependenciesMap` 的上界。请使用内联的 `.use()` lambda，或带有已知输入形态的 `Module<TIn, TOut>`。 |
 | 没有动态 DI 解析器 API | `.has(key)` 是被认可的动态探测方式。静态键应直接使用 `.get()`。 |

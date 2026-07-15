@@ -69,7 +69,7 @@ A zero-dependency, **decorator-free**, strongly typed DI container for modern Ty
 Legacy DI is slow, bloated with decorators, and prone to memory leaks. **InferDI is built for 2026:** it’s ruthlessly fast, strictly typed, and built for the modern edge.
 
 - ☁️ **Zero-Weight Edge Native**  
-  Just 2.1KB gzipped. Zero dependencies. The perfect fit for all serverless platforms, including Cloudflare Workers, Vercel Edge, Deno Deploy, and Supabase. While other frameworks trigger cold starts, InferDI is already running.
+  Zero dependencies. The perfect fit for all serverless platforms, including Cloudflare Workers, Vercel Edge, Deno Deploy, and Supabase. While other frameworks trigger cold starts, InferDI is already running.
 
 - ⚡ **Raw Engine Speed**  
   Built to outperform the competition. Highly optimized for V8 and JSC inline caching. It doesn't just resolve dependencies — it executes at native engine speed.
@@ -589,6 +589,8 @@ await c.dispose() // unwraps the cached Promise and closes the pool
 
 > ⚠️ **Cycles between async factories are not detected and produce a silent Promise deadlock.** The runtime cycle detector projects the *synchronous* call stack only — the `resolving` set is cleared by the time an `async` factory's `await` continuation runs. If two async factories depend on each other (`a` awaits `c.get('b')`, `b` awaits `c.get('a')`), each one's pending Promise gets cached during the synchronous prelude, and the resumed continuations find that cached Promise on every reentry. `await c.get('a')` then hangs forever with no error, no rejection, no diagnostic. Fixing this in the runtime would require an async-aware cycle tracker on the resolve fast-path, which is incompatible with the 1-`Map.get()` hot-path contract — so the recommendation is architectural: keep one side synchronous (split the cycle, hoist the shared init), or break it with a `Lazy<singleton>` companion if both sides are singletons. If you suspect a cycle in async code, wrap the top-level `await c.get(...)` with a watchdog timeout during development.
 
+> The same synchronous boundary applies to the strict runtime lifetime guard. `AllowedDeps` still rejects scoped/transient reads in a typed singleton factory, but an `as`-cast or captured outer container used after `await` is outside the runtime `singletonStack`. Keep dependency reads in the synchronous factory prelude; code that deliberately bypasses the type system after an async boundary is not runtime-guarded.
+
 ## Strict Lifetime Guards
 
 | Kind        | Created                                         | Cached on                | Disposed by container |
@@ -941,6 +943,7 @@ The container throws structured errors with actionable messages — surface thes
 | Use of disposed container | `Container is disposed (key: "k")` |
 | Resolving across a disposed ancestor | `Ancestor container is disposed (key: "k")` |
 | `createScope()` after dispose | `Cannot create scope from a disposed container` |
+| `register*()` after dispose | `Cannot register on a disposed container (key: "k")` |
 | Sync `[Symbol.dispose]` over an async resource | `Sync [Symbol.dispose] called on a resource whose .dispose() returned a Promise. Use \`await using\` / container.dispose() for async teardown.` |
 | `.override()` after first resolve | `Cannot override "k" because it has already been resolved. Overrides must be applied before any .get() calls...` |
 | `.override()` on a disposed container | `Cannot override on a disposed container (key: "k")` |
@@ -978,28 +981,36 @@ class Container<T extends DependenciesMap = Record<never, never>> {
     K extends string | symbol,
     V,
     A extends readonly unknown[],
-    Kind extends RegistrationKind = 'singleton',
-    LK extends string | symbol = never,
   >(
     key: Exclude<K, keyof T>,
     Ctor: new (...args: A) => V,
+    deps: DepsOf<AllowedDeps<T, 'singleton'>, A>,
+    kind?: undefined,
+  ): Container<T & Record<K, Spec<V, 'singleton'>>>
+
+  registerClass<K, V, A, Kind extends RegistrationKind>(
+    key: Exclude<K, keyof T>,
+    Ctor: new (...args: A) => V,
     deps: DepsOf<AllowedDeps<T, Kind>, A>,
-    kind?: Kind,                                     // default: 'singleton'
-    lazyKey?: Exclude<LK, keyof T | K>,              // optional companion key for `Lazy<V>`
-  ): Container<
-       T
-       & Record<K, Spec<V, Kind>>
-       & ([LK] extends [never] ? {} : Record<LK, LazySpec<V, Kind>>)
-     >
+    kind: Kind,
+  ): Container<T & Record<K, Spec<V, Kind>>>
+
+  // Both overloads also have a five-argument lazyKey form. Passing undefined
+  // as kind produces Spec<V, 'singleton'> and LazySpec<V, 'singleton'>.
 
   registerFactory<
     K extends string | symbol,
     V,
-    Kind extends RegistrationKind = 'singleton',
   >(
     key: Exclude<K, keyof T>,
+    factory: (c: Container<AllowedDeps<T, 'singleton'>>) => V,
+    kind?: undefined,
+  ): Container<T & Record<K, Spec<V, 'singleton'>>>
+
+  registerFactory<K, V, Kind extends RegistrationKind>(
+    key: Exclude<K, keyof T>,
     factory: (c: Container<AllowedDeps<T, Kind>>) => V,
-    kind?: Kind,                                     // default: 'singleton'
+    kind: Kind,
   ): Container<T & Record<K, Spec<V, Kind>>>
 
   registerValue<K extends string | symbol, V>(
@@ -1038,10 +1049,11 @@ namespace Container {
     ? { [K in keyof U]: U[K]['type'] }
     : never
 
-  // Same as Resolve, but unwraps Lazy<T> entries to T — useful for typing mocks.
-  type ResolveUnwrapped<C> = {
-    [K in keyof Resolve<C>]: Resolve<C>[K] extends Lazy<infer V> ? V : Resolve<C>[K]
-  }
+  // Same as Resolve, but unwraps only managed LazySpec companion entries.
+  // Ordinary services that happen to expose get(): T remain unchanged.
+  type ResolveUnwrapped<C> = C extends Container<infer U>
+    ? { [K in keyof U]: U[K] extends LazySpec<infer V, infer _Kind> ? V : U[K]['type'] }
+    : never
 
   // Look up a single key's unwrapped service type.
   // For a Lazy<T>-registered key returns T (no wrapper); useful when overriding

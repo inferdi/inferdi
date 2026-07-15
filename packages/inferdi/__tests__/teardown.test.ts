@@ -256,6 +256,50 @@ describe('Phase 3 — idempotency and blocking', () => {
     expect(c.disposed).toBe(true)
   })
 
+  it('concurrent dispose() calls share completion of the same teardown', async () => {
+    let release!: () => void
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const inst = {
+      calls: 0,
+      async [Symbol.asyncDispose](): Promise<void> {
+        this.calls++
+        await gate
+      },
+    }
+    const c = new Container().registerFactory('r', () => inst)
+    c.get('r')
+
+    const first = c.dispose()
+    const second = c.dispose()
+    let secondSettled = false
+    void second.then(() => {
+      secondSettled = true
+    })
+
+    expect(second).toBe(first)
+    await Promise.resolve()
+    expect(secondSettled).toBe(false)
+
+    release()
+    await first
+
+    expect(secondSettled).toBe(true)
+    expect(inst.calls).toBe(1)
+  })
+
+  it('register* methods reject a disposed container', async () => {
+    class Service {}
+    const c = new Container()
+    await c.dispose()
+
+    expect(() => c.registerClass('class', Service, [])).toThrow(/Cannot register on a disposed container/)
+    expect(() => c.registerFactory('factory', () => new Service())).toThrow(/Cannot register on a disposed container/)
+    expect(() => c.registerValue('value', 1)).toThrow(/Cannot register on a disposed container/)
+    expect(c.has('value')).toBe(false)
+  })
+
   it('get() after dispose — throws', async () => {
     const c = new Container().registerFactory('r', () => new TrackableAsync())
     await c.dispose()
@@ -645,6 +689,34 @@ describe('Phase 3 — async-factory Promise unwrap', () => {
     await c.dispose()
 
     expect(inst.asyncDisposeCalls).toBe(1)
+  })
+
+  it('async dispose: distinct Promises resolving to one instance dispose it once', async () => {
+    const inst = new TrackableAsync()
+    const c = new Container()
+      .registerFactory('a', async () => inst)
+      .registerFactory('b', async () => inst)
+
+    c.get('a')
+    c.get('b')
+
+    await c.dispose()
+
+    expect(inst.asyncDisposeCalls).toBe(1)
+  })
+
+  it('async dispose skips a direct null factory result', async () => {
+    const c = new Container().registerFactory('nil', () => null)
+    c.get('nil')
+
+    await expect(c.dispose()).resolves.toBeUndefined()
+  })
+
+  it('sync dispose skips a direct undefined factory result', () => {
+    const c = new Container().registerFactory('nil', () => undefined)
+    c.get('nil')
+
+    expect(() => c[Symbol.dispose]()).not.toThrow()
   })
 
   it('async dispose: resolved instance throws inside [Symbol.asyncDispose] — error is collected', async () => {

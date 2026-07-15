@@ -124,7 +124,7 @@ namespace Container {
 | 类型 | 用途 |
 | --- | --- |
 | `Container.Resolve<C>` | 从已构建的容器中提取一个扁平的 `{ key: Value }` 映射。 |
-| `Container.ResolveUnwrapped<C>` | 类似 `Resolve`，但会将 `Lazy<T>` 项解包为 `T`。 |
+| `Container.ResolveUnwrapped<C>` | 类似 `Resolve`，但只将受管理的 `LazySpec` 伴随项解包为 `T`；带有普通 `.get()` 方法的服务保持不变。 |
 | `Container.UnwrappedValue<C, K>` | 查询单个已解包的服务类型。 |
 | `Container.Providers<C>` | 为测试创建一组 provider thunk 的映射。 |
 

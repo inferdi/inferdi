@@ -124,7 +124,7 @@ namespace Container {
 | Type | Use |
 | --- | --- |
 | `Container.Resolve<C>` | Extract a flat `{ key: Value }` map from a built container. |
-| `Container.ResolveUnwrapped<C>` | Like `Resolve`, but unwraps `Lazy<T>` entries to `T`. |
+| `Container.ResolveUnwrapped<C>` | Like `Resolve`, but unwraps managed `LazySpec` companion entries to `T`; ordinary services with a `.get()` method stay unchanged. |
 | `Container.UnwrappedValue<C, K>` | Look up one unwrapped service type. |
 | `Container.Providers<C>` | Create a map of provider thunks for tests. |
 

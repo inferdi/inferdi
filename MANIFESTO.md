@@ -81,6 +81,9 @@ Each registration carries its lifetime through `Spec<V, Kind>`.
   consumers.
 - The runtime `Registration.lazy` flag must be `true` only for lazy companions
   whose target kind is `'singleton'`.
+- The runtime `Registration.owned` flag is `true` only for class/factory
+  registrations whose created value belongs to the container. It is `false`
+  for `registerValue`, `.override()`, and lazy companions.
 - `registerValue` and `.override()` values are externally owned. They do not
   enter the teardown queue.
 - `.override()` is a test escape hatch. It must preserve the original `kind` and
@@ -153,7 +156,7 @@ Any change matching an item below needs explicit PR justification.
 - [ ] Work added before `cache.get(key)` in `get()`?
 - [ ] `UNDEFINED_MARKER`, `cache`, `regs`, `lookupCache`, or `Registration`
       shape changed?
-- [ ] `Registration` property order changed from `{kind, lazy, fn}`?
+- [ ] `Registration` property order changed from `{kind, lazy, fn, owned}`?
 - [ ] Local-registry lookup moved after parent lookup?
 - [ ] `Proxy`, `Reflect.get`, `Object.defineProperty`, or metadata lookup added
       to resolve?
@@ -209,6 +212,7 @@ Document these choices instead of "fixing" them.
 | No nominal distinction for identical structural deps | TypeScript uses structural assignability. If two keys expose the same shape, `DepsOf` cannot know the user's semantic intent. Use branded types or `unique symbol` keys when order matters between same-shape services. |
 | No async `get()` | The current cycle and lifetime guards use shared synchronous call-stack state. An async resolve API would need separate per-resolve bookkeeping. |
 | No detection of cycles between async factories | After an `await`, the synchronous resolve stack is gone and pending promises may satisfy later `c.get()` calls. Detecting this would add async tracking to resolve. Split the cycle, hoist shared initialization, or use `Lazy<singleton>` where legal. |
+| No runtime lifetime detection after an async boundary | `AllowedDeps` still blocks invalid typed factories, but `as`-casts and captured outer containers used after `await` run after `singletonStack` has been cleared. Full defense-in-depth would require async-context tracking. Keep dependency reads in the synchronous factory prelude. |
 | No auto-cycle-breaking | Cycles are architectural defects unless one side is an explicit lazy singleton companion. InferDI detects supported runtime cycles and reports them; it does not invent proxies or partial instances. |
 | No generic `<T>(c: Container<T>) => ...` modules | `keyof T` collapses to the `DependenciesMap` upper bound inside the generic body. Use inline `.use()` lambdas or `Module<TIn, TOut>` with a known input shape. |
 | No dynamic DI resolver API | `.has(key)` is the sanctioned dynamic probe. Static keys should use `.get()` directly. |

@@ -64,6 +64,7 @@ InferDI throws explicit errors for graph and lifecycle misuse. Keep these messag
 | Disposed container resolve | `Container is disposed (key: "k")` |
 | Disposed ancestor resolve | `Ancestor container is disposed (key: "k")` |
 | `createScope()` after dispose | `Cannot create scope from a disposed container` |
+| Registration after dispose | `Cannot register on a disposed container (key: "k")` |
 | Singleton lifetime violation | `Singleton "x" cannot depend on scoped "y"...` |
 | Synchronous cycle | `Circular dependency detected: a -> b -> a...` |
 | Sync dispose over async resource | `Sync [Symbol.dispose] called on a resource whose .dispose() returned a Promise...` |

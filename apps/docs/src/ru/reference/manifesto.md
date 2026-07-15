@@ -101,6 +101,7 @@ InferDI - это обычный TypeScript с таргетом ES2022. Не до
 - Singleton не должен напрямую зависеть от scoped- или transient-сервиса. `AllowedDeps<T, Kind>` обеспечивает это на этапе компиляции, а `strict: true` - во время выполнения для кастов и динамических регистраций.
 - `Lazy<V>` сохраняет время жизни цели. Singleton-потребитель может инжектить только `LazySpec<V, 'singleton'>`. `Lazy<scoped>` и `Lazy<transient>` легальны для scoped- и transient-потребителей и нелегальны для singleton-потребителей.
 - Runtime-флаг `Registration.lazy` должен быть `true` только для lazy companion-регистраций, у которых target kind равен `'singleton'`.
+- Runtime-флаг `Registration.owned` равен `true` только для class/factory-регистраций, созданное значение которых принадлежит контейнеру. Для `registerValue`, `.override()` и lazy companion он равен `false`.
 - Значения из `registerValue` и `.override()` принадлежат внешнему коду. Они не попадают в очередь teardown.
 - `.override()` - тестовая лазейка. Он должен сохранять исходные `kind` и `lazy`, оставаться локальным для scope, отклонять неизвестные ключи, очищенные контейнеры и ключи, уже resolved на этом контейнере.
 - `dispose()` трогает только экземпляры, которыми владеет данный контейнер. Родительские и дочерние контейнеры не очищают друг друга.
@@ -149,7 +150,7 @@ if (cached !== undefined) return ...
 
 - [ ] Добавлена работа перед `cache.get(key)` в `get()`?
 - [ ] Изменились `UNDEFINED_MARKER`, `cache`, `regs`, `lookupCache` или форма `Registration`?
-- [ ] Порядок свойств `Registration` изменился с `{kind, lazy, fn}`?
+- [ ] Порядок свойств `Registration` изменился с `{kind, lazy, fn, owned}`?
 - [ ] Поиск локальной регистрации перенесён после поиска родителя?
 - [ ] В resolve добавлены `Proxy`, `Reflect.get`, `Object.defineProperty` или metadata lookup?
 - [ ] `get()` стал `async`?
@@ -201,6 +202,7 @@ if (cached !== undefined) return ...
 | Нет номинального различия для одинаковых структурных зависимостей | TypeScript использует структурную совместимость. Если два ключа имеют одну форму, `DepsOf` не знает семантический смысл пользователя. Используйте branded-типы или `unique symbol` keys, когда порядок важен между сервисами одинаковой формы.                    |
 | Нет async `get()`                                                 | Текущие проверки циклов и времени жизни используют общее синхронное состояние call stack. Асинхронному resolve API нужен отдельный per-resolve bookkeeping.                                                                                                       |
 | Нет детекта циклов между async-фабриками                          | После `await` синхронный resolve stack исчезает, а pending promises могут удовлетворять последующие `c.get()`. Детект добавил бы async tracking в resolve. Разделите цикл, поднимите общую инициализацию или используйте `Lazy<singleton>` там, где это легально. |
+| Нет runtime-проверки времени жизни после async-границы            | `AllowedDeps` блокирует неверные типизированные фабрики, но `as`-cast и захваченные внешние контейнеры после `await` выполняются уже после очистки `singletonStack`. Полная защита потребовала бы async-context tracking. Читайте зависимости в синхронной части фабрики. |
 | Нет auto-cycle-breaking                                           | Циклы - архитектурные дефекты, если одна сторона не является явным lazy singleton companion. InferDI детектирует поддерживаемые runtime cycles и сообщает о них; он не создаёт proxies или partial instances.                                                     |
 | Нет generic `<T>(c: Container<T>) => ...` modules                 | `keyof T` схлопывается до верхней границы `DependenciesMap` внутри generic body. Используйте inline `.use()` lambdas или `Module<TIn, TOut>` с известной input shape.                                                                                             |
 | Нет dynamic DI resolver API                                       | `.has(key)` - разрешённая динамическая проверка. Статические ключи должны напрямую использовать `.get()`.                                                                                                                                                         |

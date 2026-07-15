@@ -798,6 +798,31 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
       expect(grand.get('a')).toBe('second')
     })
 
+    it('a nearer ancestor registration invalidates a cached farther owner', () => {
+      const root = new Container().registerValue('a', 'root')
+      const middle = root.createScope()
+      const leaf = middle.createScope()
+
+      expect(leaf.get('a')).toBe('root')
+
+      ;(middle as unknown as { registerValue: (k: string, v: unknown) => unknown })
+        .registerValue('a', 'middle')
+
+      expect(leaf.get('a')).toBe('middle')
+    })
+
+    it('disposing an intermediate ancestor invalidates a cached farther owner', async () => {
+      const root = new Container().registerValue('a', 'root')
+      const middle = root.createScope()
+      const leaf = middle.createScope()
+
+      expect(leaf.get('a')).toBe('root')
+
+      await middle.dispose()
+
+      expect(() => leaf.get('a')).toThrowError(/Ancestor container is disposed/)
+    })
+
     it('registering an unrelated key on the owner does not affect cached resolution of other keys', () => {
       const root = new Container().registerValue('a', 'A')
       const child = root.createScope()
@@ -805,10 +830,10 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
       // First resolve — populates child.lookupCache with entry for 'a'
       expect(child.get('a')).toBe('A')
 
-      // Bump root.regsVersion via a brand-new key. The cached entry for 'a' will
-      // miss the version compare on next access, fall back to walk-up, and find
-      // the same registration — correct result even if the cache invalidation
-      // is over-eager.
+      // Bump the tree mutation epoch via a brand-new key. The cached entry for
+      // 'a' will miss the version compare on next access, fall back to walk-up,
+      // and find the same registration — correct even though tree-wide
+      // invalidation is deliberately over-eager for cold mutations.
       ;(root as unknown as { registerValue: (k: string, v: unknown) => unknown })
         .registerValue('b', 'B')
 
@@ -929,7 +954,7 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
       expect(child.get('maybe')).toBeUndefined()
     })
 
-    it('singleton resolved from child after the owner is disposed throws via helper disposed-check', async () => {
+    it('singleton resolved from child after the owner is disposed reports the disposed ancestor', async () => {
       const root = new Container().registerClass('svc', AppConfig as never, [] as never)
       const child = root.createScope()
 
@@ -938,10 +963,7 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
 
       await root.dispose()
 
-      // Cache entry on child still points at the (now disposed) root.
-      // root.regsVersion is unchanged by dispose(), so the cached entry passes
-      // the version check and lands in the helper's disposed-target branch.
-      expect(() => child.get('svc')).toThrowError(/Container is disposed/)
+      expect(() => child.get('svc')).toThrowError(/Ancestor container is disposed/)
     })
   })
   describe('owned array de-duplication', () => {
@@ -1186,6 +1208,21 @@ describe('Phase 7 — Test Overrides', () => {
     expect(sibling.get('reqCtx')).toBeInstanceOf(ConsoleLogger)
     // sibling is stable within its own scope
     expect(sibling.get('reqCtx')).toBe(sibling.get('reqCtx'))
+  })
+
+  it('scoped override remains externally owned when resolved from a descendant', async () => {
+    const root = new Container().registerClass('reqCtx', TrackableAsync, [], 'scoped')
+    const child = root.createScope()
+    const grandchild = child.createScope()
+    const mock = new TrackableAsync()
+
+    child.override('reqCtx', mock)
+
+    expect(grandchild.get('reqCtx')).toBe(mock)
+
+    await grandchild.dispose()
+
+    expect(mock.asyncDisposeCalls).toBe(0)
   })
 
   it('overrides a Lazy<T> companion key — UnwrappedValue types the inner mock', () => {

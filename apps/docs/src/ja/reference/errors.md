@@ -64,6 +64,7 @@ InferDI は、依存グラフやライフサイクルの誤用に対して明示
 | 破棄されたコンテナでの解決 | `Container is disposed (key: "k")` |
 | 破棄された祖先コンテナでの解決 | `Ancestor container is disposed (key: "k")` |
 | 破棄後の `createScope()` | `Cannot create scope from a disposed container` |
+| 破棄後の登録 | `Cannot register on a disposed container (key: "k")` |
 | シングルトンのライフタイム違反 | `Singleton "x" cannot depend on scoped "y"...` |
 | 同期的な循環 | `Circular dependency detected: a -> b -> a...` |
 | 非同期リソースに対する同期破棄 | `Sync [Symbol.dispose] called on a resource whose .dispose() returned a Promise...` |

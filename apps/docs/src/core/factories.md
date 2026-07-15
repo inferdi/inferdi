@@ -119,3 +119,5 @@ await c.dispose()
 ```
 
 `.get()` stays synchronous. Callers await the returned value when the registration is async.
+
+The runtime cycle and lifetime guards project only the synchronous factory call stack. After `await`, `AllowedDeps` still protects normal typed code, but an `as`-cast or captured outer container is outside runtime guard context. Keep dependency reads in the synchronous factory prelude.

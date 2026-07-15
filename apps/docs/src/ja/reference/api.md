@@ -124,7 +124,7 @@ namespace Container {
 | 型 | 用途 |
 | --- | --- |
 | `Container.Resolve<C>` | 構築済みのコンテナからフラットな `{ key: Value }` マップを抽出します。 |
-| `Container.ResolveUnwrapped<C>` | `Resolve` と同様ですが、`Lazy<T>` のエントリーを `T` にアンラップします。 |
+| `Container.ResolveUnwrapped<C>` | `Resolve` と同様ですが、管理対象の `LazySpec` コンパニオンだけを `T` に展開します。通常の `.get()` メソッドを持つサービスは変更しません。 |
 | `Container.UnwrappedValue<C, K>` | アンラップされた 1 つのサービス型を参照します。 |
 | `Container.Providers<C>` | テスト用にプロバイダーのサンクのマップを作成します。 |
 

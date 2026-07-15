@@ -124,7 +124,7 @@ namespace Container {
 | Тип | Назначение |
 | --- | --- |
 | `Container.Resolve<C>` | Извлекает плоскую карту `{ key: Value }` из собранного контейнера. |
-| `Container.ResolveUnwrapped<C>` | Как `Resolve`, но разворачивает записи `Lazy<T>` в `T`. |
+| `Container.ResolveUnwrapped<C>` | Как `Resolve`, но разворачивает в `T` только управляемые записи-компаньоны `LazySpec`; обычные сервисы с методом `.get()` не меняются. |
 | `Container.UnwrappedValue<C, K>` | Находит один развёрнутый тип сервиса. |
 | `Container.Providers<C>` | Карта provider-thunks для тестов. |
 

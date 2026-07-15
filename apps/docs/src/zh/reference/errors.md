@@ -64,6 +64,7 @@ InferDI 会针对依赖图和生命周期的误用抛出明确的错误。请让
 | 在已释放的容器上解析 | `Container is disposed (key: "k")` |
 | 在已释放的祖先容器上解析 | `Ancestor container is disposed (key: "k")` |
 | 释放后调用 `createScope()` | `Cannot create scope from a disposed container` |
+| 释放后注册 | `Cannot register on a disposed container (key: "k")` |
 | 违反单例生命周期 | `Singleton "x" cannot depend on scoped "y"...` |
 | 同步循环依赖 | `Circular dependency detected: a -> b -> a...` |
 | 对异步资源进行同步释放 | `Sync [Symbol.dispose] called on a resource whose .dispose() returned a Promise...` |

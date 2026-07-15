@@ -144,6 +144,9 @@ registro lleva su tiempo de vida a través de `Spec<V, Kind>`.
   siendo ilegales para consumidores singleton.
 - El flag de runtime `Registration.lazy` debe ser `true` solo para companions
   lazy cuyo tipo de objetivo es `'singleton'`.
+- El flag de runtime `Registration.owned` es `true` solo para registros de clase
+  o factoría cuyo valor creado pertenece al contenedor. Es `false` para
+  `registerValue`, `.override()` y companions lazy.
 - Los valores de `registerValue` y `.override()` son de propiedad externa. No
   entran en la cola de limpieza.
 - `.override()` es una vía de escape para pruebas. Debe preservar el `kind` y el
@@ -230,7 +233,7 @@ justificación explícita en el PR.
 - [ ] ¿Cambió la forma de `UNDEFINED_MARKER`, `cache`, `regs`, `lookupCache` o
       `Registration`?
 - [ ] ¿Cambió el orden de las propiedades de `Registration` respecto de
-      `{kind, lazy, fn}`?
+      `{kind, lazy, fn, owned}`?
 - [ ] ¿Se movió la búsqueda en el registro local después de la búsqueda en el
       padre?
 - [ ] ¿Se añadió `Proxy`, `Reflect.get`, `Object.defineProperty` o una búsqueda
@@ -294,6 +297,7 @@ Documenta estas decisiones en lugar de "arreglarlas".
 | Sin distinción nominal para dependencias estructurales idénticas | TypeScript usa asignabilidad estructural. Si dos claves exponen la misma forma, `DepsOf` no puede conocer la intención semántica del usuario. Usa tipos con marca o claves `unique symbol` cuando el orden importe entre servicios de la misma forma. |
 | Sin `get()` asíncrono | Los guards actuales de ciclos y tiempos de vida usan estado de pila de llamadas síncrono compartido. Una API de resolución asíncrona necesitaría una contabilidad separada por cada resolución. |
 | Sin detección de ciclos entre factorías asíncronas | Tras un `await`, la pila de resolución síncrona ya no existe y las promesas pendientes pueden satisfacer llamadas `c.get()` posteriores. Detectar esto añadiría seguimiento asíncrono a la resolución. Separa el ciclo, eleva la inicialización compartida o usa `Lazy<singleton>` donde sea legal. |
+| Sin detección de tiempo de vida en runtime tras un límite asíncrono | `AllowedDeps` bloquea las factorías tipadas inválidas, pero los casts con `as` y los contenedores externos capturados después de `await` se ejecutan tras limpiar `singletonStack`. La defensa completa requeriría seguimiento de contexto asíncrono. Lee las dependencias en el preámbulo síncrono. |
 | Sin ruptura automática de ciclos | Los ciclos son defectos arquitectónicos a menos que uno de los lados sea un companion singleton lazy explícito. InferDI detecta los ciclos de runtime soportados y los reporta; no inventa proxies ni instancias parciales. |
 | Sin módulos genéricos `<T>(c: Container<T>) => ...` | `keyof T` colapsa al límite superior `DependenciesMap` dentro del cuerpo genérico. Usa lambdas `.use()` en línea o `Module<TIn, TOut>` con una forma de entrada conocida. |
 | Sin API de resolutor de DI dinámico | `.has(key)` es la sonda dinámica autorizada. Las claves estáticas deberían usar `.get()` directamente. |

@@ -84,6 +84,18 @@ describe('Phase 4 — Container.ResolveUnwrapped & UnwrappedValue', () => {
     expectTypeOf<Flat['clockLazy']>().toEqualTypeOf<L>()
   })
 
+  it('ResolveUnwrapped does not unwrap an ordinary service with a get() method', () => {
+    class Store {
+      get(): string {
+        return 'value'
+      }
+    }
+    const c = new Container().registerClass('store', Store, [])
+    type Flat = Container.ResolveUnwrapped<typeof c>
+
+    expectTypeOf<Flat['store']>().toEqualTypeOf<Store>()
+  })
+
   it('UnwrappedValue<C, K> equals the unwrapped service type for that key', () => {
     const c = new Container()
       .registerClass('clock', L, [], 'transient', 'clockLazy')
@@ -489,6 +501,18 @@ describe('Phase 8 — compile-time lifetime guard', () => {
       const v = c.get('cfg')
       return v.port
     }, 'singleton')
+  })
+
+  it('an explicit non-singleton generic requires the matching runtime kind', () => {
+    if (false) {
+      // @ts-expect-error — the type-level kind cannot differ from the omitted runtime default
+      new Container().registerClass<'dep', Dep, [], 'scoped'>('dep', Dep, [])
+      // @ts-expect-error — the type-level kind cannot differ from the omitted runtime default
+      new Container().registerFactory<'dep', Dep, 'scoped'>('dep', () => new Dep())
+    }
+
+    new Container().registerClass<'dep', Dep, [], 'scoped'>('dep', Dep, [], 'scoped')
+    new Container().registerFactory<'dep', Dep, 'scoped'>('dep', () => new Dep(), 'scoped')
   })
 })
 

@@ -119,3 +119,5 @@ await c.dispose()
 ```
 
 `.get()` se mantiene síncrono. Los llamantes esperan (await) el valor devuelto cuando el registro es asíncrono.
+
+Los guards de ciclos y tiempos de vida solo reflejan la pila síncrona de la factoría. Después de `await`, `AllowedDeps` sigue protegiendo el código tipado normal, pero un cast con `as` o un contenedor externo capturado queda fuera del contexto del guard en runtime. Lee las dependencias en el preámbulo síncrono de la factoría.

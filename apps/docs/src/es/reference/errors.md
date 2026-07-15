@@ -64,6 +64,7 @@ InferDI lanza errores explícitos ante el uso indebido del grafo y del ciclo de 
 | Resolver en un contenedor liberado | `Container is disposed (key: "k")` |
 | Resolver con un ancestro liberado | `Ancestor container is disposed (key: "k")` |
 | `createScope()` después de liberar | `Cannot create scope from a disposed container` |
+| Registro después de liberar | `Cannot register on a disposed container (key: "k")` |
 | Violación del tiempo de vida singleton | `Singleton "x" cannot depend on scoped "y"...` |
 | Ciclo síncrono | `Circular dependency detected: a -> b -> a...` |
 | Liberación síncrona sobre un recurso asíncrono | `Sync [Symbol.dispose] called on a resource whose .dispose() returned a Promise...` |

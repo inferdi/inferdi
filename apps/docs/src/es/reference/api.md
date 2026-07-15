@@ -124,7 +124,7 @@ namespace Container {
 | Tipo | Uso |
 | --- | --- |
 | `Container.Resolve<C>` | Extrae un mapa plano `{ key: Value }` de un contenedor construido. |
-| `Container.ResolveUnwrapped<C>` | Como `Resolve`, pero desenvuelve las entradas `Lazy<T>` a `T`. |
+| `Container.ResolveUnwrapped<C>` | Como `Resolve`, pero solo desenvuelve a `T` las entradas auxiliares administradas `LazySpec`; los servicios normales con `.get()` no cambian. |
 | `Container.UnwrappedValue<C, K>` | Busca el tipo de un único servicio desenvuelto. |
 | `Container.Providers<C>` | Crea un mapa de thunks de proveedores para pruebas. |
 

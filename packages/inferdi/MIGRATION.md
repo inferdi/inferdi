@@ -12,15 +12,30 @@ For new features and fixes within a major line, see the release notes on the Git
 
 ## Migration to 5.0
 
-v5 is an **adapter-only** release. `@inferdi/inferdi` core is unchanged — the
-version bump exists only to keep the published packages in lockstep. It
-harmonizes the five framework adapters (`@inferdi/fastify`, `@inferdi/express`,
+The initial v5 release was **adapter-only**. Its version bump kept the published
+packages in lockstep and harmonized the five framework adapters
+(`@inferdi/fastify`, `@inferdi/express`,
 `@inferdi/hono`, `@inferdi/koa`, `@inferdi/elysia`) onto one contract: the same
 option vocabulary (`createScope`, `setupScope`, `disposeScope`, `autoDispose`,
 `onDisposeError`), the same exported types (`MaybePromise`, `InferdiScope`,
 `InferdiRoot`, `InferdiScopeOf`), and one cleanup-ownership model — a disposal
 failure after the response is produced is observed/logged and never corrupts the
 response.
+
+### Core type corrections
+
+Later v5 builds tighten two type-level contracts that previously allowed the
+declared graph to differ from runtime behavior:
+
+- Explicit non-singleton type arguments now require the matching runtime
+  `kind`. Change
+  `registerFactory<'svc', Svc, 'scoped'>('svc', factory)` to
+  `registerFactory<'svc', Svc, 'scoped'>('svc', factory, 'scoped')`. The same
+  rule applies to `registerClass`. Omitting `kind` still infers `singleton`.
+- `Container.ResolveUnwrapped<C>` unwraps only managed `LazySpec` companion
+  entries created through `lazyKey`. An ordinary service that happens to expose
+  a zero-argument `.get()` method now remains that service type instead of being
+  structurally mistaken for `Lazy<T>`.
 
 Three contracts are now identical across the adapters:
 
