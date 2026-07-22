@@ -4,7 +4,7 @@ import {
   inject,
   onUnmounted,
   provide,
-  type InjectionKey,
+  type InjectionKey
 } from 'vue'
 
 class RouteContext {
@@ -20,13 +20,13 @@ class ApiClient {
 class DashboardViewModel {
   constructor(
     private readonly route: RouteContext,
-    private readonly api: ApiClient,
+    private readonly api: ApiClient
   ) {}
 
   async load() {
     return {
       route: this.route.routeName,
-      dashboard: await this.api.dashboard(),
+      dashboard: await this.api.dashboard()
     }
   }
 }
@@ -57,7 +57,7 @@ export const AppDIProvider = defineComponent({
   setup(_props, { slots }) {
     provide(RootDIKey, root)
     return () => slots.default?.()
-  },
+  }
 })
 
 export const DashboardRouteProvider = defineComponent({
@@ -68,13 +68,13 @@ export const DashboardRouteProvider = defineComponent({
     const scope = createDashboardRouteScope(parent)
     provide(RouteDIKey, scope)
 
-    // Vue unmount hooks are synchronous; call async dispose explicitly.
+    // Vue unmount hooks are synchronous; call async dispose explicitly
     onUnmounted(() => {
       scope.dispose().catch(console.error)
     })
 
     return () => slots.default?.()
-  },
+  }
 })
 
 export function useDashboardViewModel() {

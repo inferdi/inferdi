@@ -27,7 +27,7 @@ schema:
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
       "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, 作用域, 清理, 销毁, 子作用域, using, await using, LIFO, 依赖注入"
       "articleSection": "核心概念"

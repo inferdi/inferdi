@@ -27,7 +27,7 @@ schema:
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
       "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, 错误, 异常, 未知的键, 检测到循环, 生命周期违规, 已释放的容器, 依赖注入"
       "articleSection": "参考"

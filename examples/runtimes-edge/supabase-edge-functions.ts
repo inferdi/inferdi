@@ -1,15 +1,19 @@
-// Supabase Edge Functions / Deno consumers: see ../_shared/container.ts and
-// map the bare specifier in your `deno.json` import map:
-//   { "imports": { "@inferdi/inferdi": "jsr:@inferdi/inferdi" } }
-//
-// This example uses its own root container with a Supabase-specific factory
-// instead of the shared one — it shows how an InferDI root can be customized
-// per deployment target while keeping the rest of the request-scope shape.
+/*
+ * Supabase Edge Functions / Deno consumers: see ../_shared/container.ts and
+ * map the bare specifier in your `deno.json` import map:
+ *   { "imports": { "@inferdi/inferdi": "jsr:@inferdi/inferdi" } }
+ *
+ * This example uses its own root container with a Supabase-specific factory
+ * instead of the shared one — it shows how an InferDI root can be customized
+ * per deployment target while keeping the rest of the request-scope shape
+ */
 import { Container } from '@inferdi/inferdi'
 import { createClient, type SupabaseClient } from 'jsr:@supabase/supabase-js'
 
-// EdgeRuntime is a Supabase-provided global; declare its shape locally so
-// this file typechecks under a regular Deno LSP without Supabase ambient types.
+/*
+ * EdgeRuntime is a Supabase-provided global; declare its shape locally so
+ * this file typechecks under a regular Deno LSP without Supabase ambient types
+ */
 declare const EdgeRuntime: {
   waitUntil(promise: Promise<unknown>): void
 }
@@ -30,7 +34,7 @@ function readSupabaseEnv() {
 class ProfilesService {
   constructor(
     private readonly request: RequestContext,
-    private readonly supabase: SupabaseClient,
+    private readonly supabase: SupabaseClient
   ) {}
 
   async list() {
@@ -42,7 +46,7 @@ class ProfilesService {
   async audit(event: string) {
     await this.supabase.from('request_log').insert({
       request_id: this.request.requestId,
-      event,
+      event
     })
   }
 }
@@ -64,13 +68,15 @@ Deno.serve(async (request) => {
     const profiles = scope.get('profiles')
     const result = await profiles.list()
 
-    // Background work that uses scoped services. `EdgeRuntime.waitUntil` keeps
-    // the function instance alive until the promise settles, so we sequence
-    // dispose AFTER the audit write — never in parallel with it. Without the
-    // `.finally(scope.dispose)` the scoped supabase client and RequestContext
-    // would be torn down while the audit write is still in flight.
+    /*
+     * Background work that uses scoped services. `EdgeRuntime.waitUntil` keeps
+     * the function instance alive until the promise settles, so we sequence
+     * dispose AFTER the audit write — never in parallel with it. Without the
+     * `.finally(scope.dispose)` the scoped supabase client and RequestContext
+     * would be torn down while the audit write is still in flight
+     */
     EdgeRuntime.waitUntil(
-      profiles.audit('profiles.listed').finally(() => scope.dispose()),
+      profiles.audit('profiles.listed').finally(() => scope.dispose())
     )
 
     return Response.json(result)
@@ -80,9 +86,11 @@ Deno.serve(async (request) => {
   }
 })
 
-// Optional: flush in-flight state when Supabase signals worker shutdown.
-// `beforeunload` fires when the runtime is about to terminate the instance
-// (e.g. resource limit, deploy). Avoid heavy work here — the window is short.
+/*
+ * Optional: flush in-flight state when Supabase signals worker shutdown.
+ * `beforeunload` fires when the runtime is about to terminate the instance
+ * (e.g. resource limit, deploy). Avoid heavy work here — the window is short
+ */
 addEventListener('beforeunload', () => {
-  // e.g. flush a small in-memory queue to a singleton-owned destination.
+  // e.g. flush a small in-memory queue to a singleton-owned destination
 })

@@ -15,7 +15,7 @@ export const TOKENS = {
   L0: 'inv.L0', L1: 'inv.L1', L2: 'inv.L2', L3: 'inv.L3', L4: 'inv.L4',
   L5: 'inv.L5', L6: 'inv.L6', L7: 'inv.L7', L8: 'inv.L8', L9: 'inv.L9',
   LazyLogger: 'inv.LazyLogger',
-  LazyConsumer: 'inv.LazyConsumer',
+  LazyConsumer: 'inv.LazyConsumer'
 } as const
 
 @injectable()
@@ -32,7 +32,7 @@ export class Config {
 export class Repo {
   constructor(
     @inject(TOKENS.Logger) public logger: Logger,
-    @inject(TOKENS.Config) public config: Config,
+    @inject(TOKENS.Config) public config: Config
   ) {}
 }
 
@@ -40,7 +40,7 @@ export class Repo {
 export class Service {
   constructor(
     @inject(TOKENS.Repo) public repo: Repo,
-    @inject(TOKENS.Logger) public logger: Logger,
+    @inject(TOKENS.Logger) public logger: Logger
   ) {}
 }
 
@@ -48,7 +48,7 @@ export class Service {
 export class TransientService {
   constructor(
     @inject(TOKENS.Repo) public repo: Repo,
-    @inject(TOKENS.Logger) public logger: Logger,
+    @inject(TOKENS.Logger) public logger: Logger
   ) {}
 }
 
@@ -63,7 +63,7 @@ export class Wide4 {
     @inject(TOKENS.Logger) public logger: Logger,
     @inject(TOKENS.Config) public config: Config,
     @inject(TOKENS.Repo) public repo: Repo,
-    @inject(TOKENS.Service) public service: Service,
+    @inject(TOKENS.Service) public service: Service
   ) {}
 }
 
@@ -90,7 +90,7 @@ export class Wide10 {
     @inject(TOKENS.Dep6) public dep6: Dep6,
     @inject(TOKENS.Dep7) public dep7: Dep7,
     @inject(TOKENS.Dep8) public dep8: Dep8,
-    @inject(TOKENS.Dep9) public dep9: Dep9,
+    @inject(TOKENS.Dep9) public dep9: Dep9
   ) {}
 }
 

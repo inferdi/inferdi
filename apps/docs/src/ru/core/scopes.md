@@ -27,7 +27,7 @@ schema:
       "inLanguage": "ru-RU"
       "datePublished": "2026-06-12"
       "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, скоупы, очистка, освобождение ресурсов, дочерний scope, using, await using, LIFO, внедрение зависимостей"
       "articleSection": "Базовые принципы"

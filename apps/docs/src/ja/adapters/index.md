@@ -17,7 +17,7 @@ schema:
       "@id": "https://inferdi.com/ja/adapters/#article"
       "headline": "InferDI フレームワークアダプター — 概要"
       "name": "フレームワークアダプター"
-      "description": "各 InferDI アダプターはリクエストごとに 1 つのリクエストスコープを作成し、それをフレームワークネイティブの場所で公開し、フレームワークの安全な完了ポイントで破棄します — その間、アプリケーションが所有する具体的で完全に型付けされたコンテナを保持します。薄いライフサイクルのグルーであって、IoC フレームワークではありません。"
+      "description": "各 InferDI アダプターはリクエストスコープを作成し、フレームワークネイティブの場所で公開して、安全なライフサイクルの完了ポイントで破棄します。"
       "url": "https://inferdi.com/ja/adapters/"
       "mainEntityOfPage": "https://inferdi.com/ja/adapters/"
       "inLanguage": "ja-JP"

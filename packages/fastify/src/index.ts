@@ -23,7 +23,7 @@ import type {
   FastifyInstance,
   FastifyPluginAsync,
   FastifyReply,
-  FastifyRequest,
+  FastifyRequest
 } from 'fastify'
 
 /**
@@ -98,7 +98,7 @@ export type ScopedOptions<
   readonly createScope?: (
     root: Root,
     request: FastifyRequest,
-    reply: FastifyReply,
+    reply: FastifyReply
   ) => MaybePromise<Scope>
   /**
    * Optional hook to populate the freshly created scope (e.g. seed request
@@ -108,13 +108,13 @@ export type ScopedOptions<
   readonly setupScope?: (
     scope: Scope,
     request: FastifyRequest,
-    reply: FastifyReply,
+    reply: FastifyReply
   ) => MaybePromise<void>
   /** Overrides request-scope disposal. Defaults to `scope.dispose()`. */
   readonly disposeScope?: (
     scope: Scope,
     request: FastifyRequest,
-    reply: FastifyReply,
+    reply: FastifyReply
   ) => MaybePromise<void>
   /**
    * Controls whether the plugin disposes the request scope after the response
@@ -133,7 +133,7 @@ export type ScopedOptions<
   readonly onDisposeError?: (
     error: unknown,
     request: FastifyRequest,
-    reply: FastifyReply,
+    reply: FastifyReply
   ) => MaybePromise<void>
   /**
    * Dispose the root container on `fastify.close()`. Defaults to `false`.
@@ -216,7 +216,7 @@ type RequestState = {
 type DisposeScope<Scope extends InferdiScope> = (
   scope: Scope,
   request: FastifyRequest,
-  reply: FastifyReply,
+  reply: FastifyReply
 ) => MaybePromise<void>
 
 type AutoDispose =
@@ -226,13 +226,15 @@ type AutoDispose =
 type DisposeErrorHandler = (
   error: unknown,
   request: FastifyRequest,
-  reply: FastifyReply,
+  reply: FastifyReply
 ) => MaybePromise<void>
 
 type BaseScope = InferdiScope
-// The implementation always handles a disposable root: `disposeRootOnClose`
-// calls `root.dispose()`, and the public `disposeRootOnClose` type guarantees
-// the root is an `InferdiScope` whenever it can be `true`.
+/*
+ * The implementation always handles a disposable root: `disposeRootOnClose`
+ * calls `root.dispose()`, and the public `disposeRootOnClose` type guarantees
+ * the root is an `InferdiScope` whenever it can be `true`
+ */
 type BaseRoot = InferdiRoot<BaseScope> & InferdiScope
 type BaseOptions = InferdiFastifyOptions<BaseRoot, BaseScope>
 
@@ -266,7 +268,7 @@ export type InferdiFastifyPlugin = <
   Scope extends InferdiScope = InferdiScopeOf<Root>,
 >(
   fastify: FastifyInstance,
-  options: InferdiFastifyOptions<Root, Scope>,
+  options: InferdiFastifyOptions<Root, Scope>
 ) => Promise<void>
 
 const skippedRequests = new WeakSet<FastifyRequest>()
@@ -284,7 +286,7 @@ function handleDisposeError(
   request: FastifyRequest,
   reply: FastifyReply,
   onDisposeError: DisposeErrorHandler | undefined,
-  errors: unknown[],
+  errors: unknown[]
 ): void | PromiseLike<void> {
   if (onDisposeError === undefined) {
     errors.push(error)
@@ -311,14 +313,14 @@ function disposeWithErrors<Scope extends InferdiScope>(
   reply: FastifyReply,
   disposeScope: DisposeScope<Scope>,
   onDisposeError: DisposeErrorHandler | undefined,
-  errors: unknown[],
+  errors: unknown[]
 ): void | PromiseLike<void> {
   try {
     const disposing = disposeScope(scope, request, reply)
     if (isPromiseLike(disposing)) {
       return disposing.then(
         undefined,
-        (error) => handleDisposeError(error, request, reply, onDisposeError, errors),
+        (error) => handleDisposeError(error, request, reply, onDisposeError, errors)
       )
     }
   } catch (error) {
@@ -328,7 +330,7 @@ function disposeWithErrors<Scope extends InferdiScope>(
 
 function logRequestCleanupErrors(
   errors: unknown[],
-  request: FastifyRequest,
+  request: FastifyRequest
 ): void {
   if (errors.length === 0) return
 
@@ -339,9 +341,11 @@ function logRequestCleanupErrors(
   try {
     request.log.error({ err }, 'Failed to dispose InferDI request scope')
   } catch {
-    // A throwing custom logger must not replace the original setup error nor
-    // stall the `onResponse` hook chain. Fastify's own docs recommend wrapping
-    // `onResponse` logging in try/catch for exactly this reason.
+    /*
+     * A throwing custom logger must not replace the original setup error nor
+     * stall the `onResponse` hook chain. Fastify's own docs recommend wrapping
+     * `onResponse` logging in try/catch for exactly this reason
+     */
   }
 }
 
@@ -362,17 +366,19 @@ export function skipInferdiDispose(request: FastifyRequest): void {
 
 async function inferdiFastifyPlugin(
   fastify: FastifyInstance,
-  options: BaseOptions,
+  options: BaseOptions
 ) {
   const root = options.container
 
   fastify.decorate('di', root as never)
 
   if (options.disposeRootOnClose === true) {
-    // `await` surfaces both a synchronous throw and an async rejection to
-    // `fastify.close()` — root-close failures stay separate from the
-    // request-scope sink. The public `disposeRootOnClose` type guarantees the
-    // root is disposable whenever this branch is reachable.
+    /*
+     * `await` surfaces both a synchronous throw and an async rejection to
+     * `fastify.close()` — root-close failures stay separate from the
+     * request-scope sink. The public `disposeRootOnClose` type guarantees the
+     * root is disposable whenever this branch is reachable
+     */
     fastify.addHook('onClose', async () => {
       await root.dispose()
     })
@@ -384,10 +390,12 @@ async function inferdiFastifyPlugin(
     options.disposeScope ?? ((scope) => scope.dispose())
   const autoDispose: AutoDispose | undefined = options.autoDispose
   const onDisposeError = options.onDisposeError
-  // `autoDispose: true` is the default-disposal semantics, so it stays on the
-  // synchronous fast path alongside an omitted `autoDispose`. Only a `false`
-  // value, a predicate, a custom `disposeScope`, or an `onDisposeError` sink
-  // require the `disposeCustom` path.
+  /*
+   * `autoDispose: true` is the default-disposal semantics, so it stays on the
+   * synchronous fast path alongside an omitted `autoDispose`. Only a `false`
+   * value, a predicate, a custom `disposeScope`, or an `onDisposeError` sink
+   * require the `disposeCustom` path
+   */
   const useDefaultDisposePath =
     options.disposeScope === undefined &&
     (options.autoDispose === undefined || options.autoDispose === true) &&
@@ -397,22 +405,24 @@ async function inferdiFastifyPlugin(
 
   function createRequestState(
     request: FastifyRequest,
-    reply: FastifyReply,
+    reply: FastifyReply
   ): RequestState {
     const state: RequestState = {
       reply,
       scope: null,
       exposed: false,
       aborted: false,
-      routeFailed: false,
+      routeFailed: false
     }
     requestStates.set(request, state)
     return state
   }
 
-  // Clears only the double-dispose guard. `onResponse` / `onRequestAbort` key on
-  // `state.scope === null`, so clearing it up front makes a racing hook a no-op
-  // while `request.di` stays pointing at the scope for the cleanup hooks.
+  /*
+   * Clears only the double-dispose guard. `onResponse` / `onRequestAbort` key on
+   * `state.scope === null`, so clearing it up front makes a racing hook a no-op
+   * while `request.di` stays pointing at the scope for the cleanup hooks
+   */
   function clearScopeGuard(state: RequestState): void {
     state.scope = null
     state.exposed = false
@@ -440,22 +450,28 @@ async function inferdiFastifyPlugin(
       ((root: BaseRoot) => root.createScope())
     const setupScope = options.setupScope
 
-    // The thrown error is always the original setup error; a disposal failure
-    // goes to the sink (never aggregated into the thrown error), so error
-    // handlers see the real cause.
+    /*
+     * The thrown error is always the original setup error; a disposal failure
+     * goes to the sink (never aggregated into the thrown error), so error
+     * handlers see the real cause
+     */
     const disposeUnexposedScope = (
       state: RequestState,
       request: FastifyRequest,
-      scope: BaseScope,
+      scope: BaseScope
     ): void | PromiseLike<void> => {
-      // Finding 4: expose `request.di` so setup-failure `disposeScope` /
-      // `onDisposeError` see the same handle the success path exposes, then
-      // clear it before the original setup error reaches Fastify's error
-      // handlers — they must never observe a half-built or disposed scope.
+      /*
+       * Finding 4: expose `request.di` so setup-failure `disposeScope` /
+       * `onDisposeError` see the same handle the success path exposes, then
+       * clear it before the original setup error reaches Fastify's error
+       * handlers — they must never observe a half-built or disposed scope
+       */
       ;(request as DecoratedRequest<BaseScope>).di = scope
       clearScopeGuard(state)
-      // Drop any manual-ownership marker: the half-built scope is always disposed
-      // here regardless of `skipInferdiDispose`, matching the other adapters.
+      /*
+       * Drop any manual-ownership marker: the half-built scope is always disposed
+       * here regardless of `skipInferdiDispose`, matching the other adapters
+       */
       skippedRequests.delete(request)
 
       const errors: unknown[] = []
@@ -465,7 +481,7 @@ async function inferdiFastifyPlugin(
         state.reply,
         disposeScope,
         onDisposeError,
-        errors,
+        errors
       )
       const finalize = () => {
         ;(request as DecoratedRequest<BaseScope>).di = null
@@ -483,7 +499,7 @@ async function inferdiFastifyPlugin(
       state: RequestState,
       request: FastifyRequest,
       setupError: unknown,
-      done: (error?: Error) => void,
+      done: (error?: Error) => void
     ): void => {
       const disposing = disposeUnexposedScope(state, request, state.scope!)
       if (isPromiseLike(disposing)) {
@@ -499,11 +515,11 @@ async function inferdiFastifyPlugin(
     const finishAbortedBeforeExposure = (
       state: RequestState,
       request: FastifyRequest,
-      done: (error?: Error) => void,
+      done: (error?: Error) => void
     ): void => {
       const disposing = disposeUnexposedScope(state, request, state.scope!)
       const error = new Error(
-        'InferDI Fastify request aborted before the request scope was exposed',
+        'InferDI Fastify request aborted before the request scope was exposed'
       )
 
       if (isPromiseLike(disposing)) {
@@ -521,7 +537,7 @@ async function inferdiFastifyPlugin(
       state: RequestState,
       request: FastifyRequest,
       reply: FastifyReply,
-      done: (error?: Error) => void,
+      done: (error?: Error) => void
     ): void => {
       state.scope = scope
 
@@ -556,7 +572,7 @@ async function inferdiFastifyPlugin(
             ;(request as DecoratedRequest<BaseScope>).di = scope
             done()
           },
-          (error) => finishSetupFailure(state, request, error, done),
+          (error) => finishSetupFailure(state, request, error, done)
         )
         return
       }
@@ -566,9 +582,11 @@ async function inferdiFastifyPlugin(
       done()
     }
 
-    // Stay synchronous when `createScope` / `setupScope` are synchronous: a
-    // microtask is scheduled only when one of them actually returns a promise,
-    // mirroring the disposal fast path.
+    /*
+     * Stay synchronous when `createScope` / `setupScope` are synchronous: a
+     * microtask is scheduled only when one of them actually returns a promise,
+     * mirroring the disposal fast path
+     */
     fastify.addHook('onRequest', (request, reply, done) => {
       const state = createRequestState(request, reply)
       let scopeResult: MaybePromise<BaseScope>
@@ -586,7 +604,7 @@ async function inferdiFastifyPlugin(
           (error) => {
             requestStates.delete(request)
             done(error as Error)
-          },
+          }
         )
         return
       }
@@ -595,12 +613,14 @@ async function inferdiFastifyPlugin(
     })
   }
 
-  // Stay synchronous when no scope hooks are configured: a sync `dispose()`
-  // finishes in the same tick and `done()` is called without scheduling a
-  // microtask.
+  /*
+   * Stay synchronous when no scope hooks are configured: a sync `dispose()`
+   * finishes in the same tick and `done()` is called without scheduling a
+   * microtask
+   */
   function disposeDefault(
     scope: BaseScope,
-    request: FastifyRequest,
+    request: FastifyRequest
   ): void | PromiseLike<void> {
     try {
       const disposing = scope.dispose()
@@ -617,7 +637,7 @@ async function inferdiFastifyPlugin(
   async function disposeCustom(
     scope: BaseScope,
     request: FastifyRequest,
-    reply: FastifyReply,
+    reply: FastifyReply
   ): Promise<void> {
     const errors: unknown[] = []
     let shouldDispose = autoDispose !== false
@@ -635,7 +655,7 @@ async function inferdiFastifyPlugin(
           request,
           reply,
           onDisposeError,
-          errors,
+          errors
         )
         if (isPromiseLike(handling)) {
           await handling
@@ -650,7 +670,7 @@ async function inferdiFastifyPlugin(
         reply,
         disposeScope,
         onDisposeError,
-        errors,
+        errors
       )
       if (isPromiseLike(disposing)) {
         await disposing
@@ -663,20 +683,26 @@ async function inferdiFastifyPlugin(
   function disposeExposedScope(
     state: RequestState,
     request: FastifyRequest,
-    scope: BaseScope,
+    scope: BaseScope
   ): void | PromiseLike<void> {
-    // Clear the double-dispose guard up front, but keep `request.di` pointing at
-    // the scope so the cleanup hooks observe the same handle the request did
-    // (Finding 1). It is cleared once cleanup completes.
+    /*
+     * Clear the double-dispose guard up front, but keep `request.di` pointing at
+     * the scope so the cleanup hooks observe the same handle the request did
+     * (Finding 1). It is cleared once cleanup completes
+     */
     clearScopeGuard(state)
 
     const skipped = skippedRequests.delete(request)
-    // Finding 3: a failed request always disposes — `skipInferdiDispose` only
-    // suppresses successful response cleanup. On abort `routeFailed` stays
-    // `false`, so manual ownership is preserved there.
+    /*
+     * Finding 3: a failed request always disposes — `skipInferdiDispose` only
+     * suppresses successful response cleanup. On abort `routeFailed` stays
+     * `false`, so manual ownership is preserved there
+     */
     if (!state.routeFailed && skipped) {
-      // Manual ownership over a successful response: leave `request.di` set so
-      // application-owned cleanup can keep using it.
+      /*
+       * Manual ownership over a successful response: leave `request.di` set so
+       * application-owned cleanup can keep using it
+       */
       requestStates.delete(request)
       return
     }
@@ -698,17 +724,19 @@ async function inferdiFastifyPlugin(
         (error) => {
           logRequestCleanupErrors([error], request)
           finalize()
-        },
+        }
       )
     }
 
     finalize()
   }
 
-  // Finding 3: a route/hook error marks the request failed so `onResponse`
-  // disposes even when `skipInferdiDispose` was called. Fastify runs `onError`
-  // before `onResponse`. The state is absent when the failure originated in the
-  // `onRequest` scope hooks (which already deleted it); there is nothing to flag.
+  /*
+   * Finding 3: a route/hook error marks the request failed so `onResponse`
+   * disposes even when `skipInferdiDispose` was called. Fastify runs `onError`
+   * before `onResponse`. The state is absent when the failure originated in the
+   * `onRequest` scope hooks (which already deleted it); there is nothing to flag
+   */
   fastify.addHook('onError', (request, _reply, _error, done) => {
     const state = requestStates.get(request)
     if (state !== undefined) {
@@ -733,12 +761,14 @@ async function inferdiFastifyPlugin(
     done()
   })
 
-  // `onResponse` does not run when a client aborts the connection before the
-  // response is sent, which would leak the request scope. `onRequestAbort`
-  // releases exposed scopes through the same disposal contract as `onResponse`.
-  // If abort happens while async `createScope` / `setupScope` is still in
-  // flight, the later continuation sees `state.aborted` and disposes the
-  // unexposed scope before completing the hook.
+  /*
+   * `onResponse` does not run when a client aborts the connection before the
+   * response is sent, which would leak the request scope. `onRequestAbort`
+   * releases exposed scopes through the same disposal contract as `onResponse`.
+   * If abort happens while async `createScope` / `setupScope` is still in
+   * flight, the later continuation sees `state.aborted` and disposes the
+   * unexposed scope before completing the hook
+   */
   fastify.addHook('onRequestAbort', (request, done) => {
     const state = requestStates.get(request)
     /* v8 ignore start -- Fastify runs onRequest before onRequestAbort, so the
@@ -808,6 +838,6 @@ export const inferdiFastify = fp(
   inferdiFastifyPlugin as FastifyPluginAsync<BaseOptions>,
   {
     name: '@inferdi/fastify',
-    fastify: '5.x',
-  },
+    fastify: '5.x'
+  }
 ) as InferdiFastifyPlugin

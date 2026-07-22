@@ -3,13 +3,13 @@ import {
   Logger, Config, Repo, Service, TransientService, ScopedService,
   Wide4, Wide10, Dep0, Dep1, Dep2, Dep3, Dep4, Dep5, Dep6, Dep7, Dep8, Dep9,
   L0, L1, L2, L3, L4, L5, L6, L7, L8, L9,
-  LazyConsumer,
+  LazyConsumer
 } from '../fixtures/plain.js'
 import type { Resolver } from './types.js'
 
 function configureRoot() {
-  return new Container()
-    // Logger is registered as singleton + a lazy companion 'lazyLogger' (Lazy<Logger>).
+  return new Container({strict: false})
+    // Logger is registered as singleton + a lazy companion 'lazyLogger' (Lazy<Logger>)
     .registerClass('logger', Logger, [], 'singleton', 'lazyLogger')
     .registerClass('config', Config, [], 'singleton')
     .registerClass('repo', Repo, ['logger', 'config'], 'singleton')
@@ -30,7 +30,7 @@ function configureRoot() {
     .registerClass(
       'wide10', Wide10,
       ['dep0', 'dep1', 'dep2', 'dep3', 'dep4', 'dep5', 'dep6', 'dep7', 'dep8', 'dep9'],
-      'transient',
+      'transient'
     )
     .registerClass('l0', L0, [], 'transient')
     .registerClass('l1', L1, ['l0'], 'transient')
@@ -61,6 +61,6 @@ export function buildRoot(): Resolver {
       s[Symbol.dispose]()
       return v
     },
-    resolveLazy: () => (root.get('lazyConsumer') as LazyConsumer).use(),
+    resolveLazy: () => (root.get('lazyConsumer') as LazyConsumer).use()
   }
 }

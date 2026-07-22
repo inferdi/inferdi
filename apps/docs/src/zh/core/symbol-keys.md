@@ -27,7 +27,7 @@ schema:
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
       "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, symbol 键, Symbol, 字符串键, 标识, 垃圾回收, 依赖注入"
       "articleSection": "核心概念"

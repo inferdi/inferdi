@@ -27,7 +27,7 @@ schema:
       "inLanguage": "es-ES"
       "datePublished": "2026-06-12"
       "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, claves Symbol, Symbol, claves string, identidad, recolección de basura, inyección de dependencias"
       "articleSection": "Conceptos básicos"

@@ -26,8 +26,8 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ru/core/testing"
       "inLanguage": "ru-RU"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, тестирование, override, моки, тестовые двойники, подмена реализации, dependency injection"
       "articleSection": "Базовые принципы"
@@ -75,14 +75,14 @@ const c = buildContainer()
 
 ## Когда делать override
 
-Overrides должны происходить до первого resolve ключа:
+Применяйте overrides до разрешения графа зависимостей:
 
 ```ts
 const logger = c.get('logger')
 c.override('logger', mockLogger)
 ```
 
-Вторая строка бросит ошибку. Поздний override расколол бы граф: существующие потребители держали бы старый экземпляр, а новые resolve возвращали бы мок.
+Вторая строка бросит ошибку, потому что singleton уже находится в локальном кеше контейнера. Проверка намеренно опирается только на кеш: она также обнаруживает scoped-значения в текущем scope, `registerValue` и повторный override. Transient-значения и значения предка, разрешённые через дочерний контейнер, локально не кешируются, поэтому проверка их не видит. Уже выданный transient остаётся у вызывающего кода, а последующие resolve возвращают мок. Это часть контракта, а не разрешение на поздние overrides: применяйте их до разрешения графа, чтобы не расколоть его.
 
 ## Владение
 

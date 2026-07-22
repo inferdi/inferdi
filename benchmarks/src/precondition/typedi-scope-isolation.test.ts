@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { Container } from 'typedi'
 import { ScopedService } from '../fixtures/typedi.js'
 
-// Scenario 6 for TypeDI would be fake if scope resolve returned the global singleton
-// (which happens when @Service() is applied to ScopedService). This test catches the regression
-// BEFORE the bench runs.
+/*
+ * Scenario 6 for TypeDI would be fake if scope resolve returned the global singleton
+ * (which happens when @Service() is applied to ScopedService). This test catches the regression
+ * BEFORE the bench runs
+ */
 
 describe('typedi scope isolation (precondition for bench 06)', () => {
   it('returns different instances per scope when registered locally', () => {

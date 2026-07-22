@@ -4,7 +4,7 @@ import {
   inferdiHono,
   skipInferdiDispose,
   type InferdiHonoEnv,
-  type InferdiScope,
+  type InferdiScope
 } from '../src/index'
 
 function delay(ms: number) {
@@ -20,12 +20,12 @@ class TestScope implements InferdiScope {
     private readonly options: {
       readonly disposeDelay?: number
       readonly disposeError?: Error
-    } = {},
+    } = {}
   ) {}
 
   get(key: 'users') {
     return {
-      profile: (id: string) => ({ id, requestId: this.requestId }),
+      profile: (id: string) => ({ id, requestId: this.requestId })
     }
   }
 
@@ -114,17 +114,17 @@ describe('@inferdi/hono', () => {
       container: root,
       setupScope: (scope, c) => {
         scope.requestId = c.req.header('x-request-id') ?? ''
-      },
+      }
     }))
     app.get('/users/:id', async (c) => {
       return c.json(c.var.di.get('users').profile(c.req.param('id')))
     })
 
     const first = await app.request('/users/1', {
-      headers: { 'x-request-id': 'first' },
+      headers: { 'x-request-id': 'first' }
     })
     const second = await app.request('/users/2', {
-      headers: { 'x-request-id': 'second' },
+      headers: { 'x-request-id': 'second' }
     })
 
     expect(await first.json()).toEqual({ id: '1', requestId: 'first' })
@@ -172,14 +172,14 @@ describe('@inferdi/hono', () => {
         expect(c.var.di).toBe(scope)
         await delay(1)
         disposed.push(scope)
-      },
+      }
     }))
     app.get('/users/:id', async (c) => {
       return c.json(c.var.di.get('users').profile(c.req.param('id')))
     })
 
     const response = await app.request('/users/8', {
-      headers: { 'x-request-id': 'custom' },
+      headers: { 'x-request-id': 'custom' }
     })
 
     expect(response.status).toBe(200)
@@ -220,7 +220,7 @@ describe('@inferdi/hono', () => {
       container: root,
       setupScope: () => {
         throw setupError
-      },
+      }
     }))
     app.onError((error, c) => {
       handledError = error
@@ -249,7 +249,7 @@ describe('@inferdi/hono', () => {
       },
       disposeScope: () => {
         disposed = true
-      },
+      }
     }))
     app.onError((error, c) => {
       handledError = error
@@ -277,7 +277,7 @@ describe('@inferdi/hono', () => {
       container: root,
       setupScope: async () => {
         throw setupError
-      },
+      }
     }))
     app.onError((error, c) => {
       handledError = error
@@ -291,7 +291,7 @@ describe('@inferdi/hono', () => {
     expect(handledError).toBe(setupError)
     expect(errorSpy).toHaveBeenCalledWith(
       'Failed to dispose InferDI Hono request scope',
-      disposeError,
+      disposeError
     )
     errorSpy.mockRestore()
   })
@@ -341,7 +341,7 @@ describe('@inferdi/hono', () => {
     expect(handledError).toBeUndefined()
     expect(errorSpy).toHaveBeenCalledWith(
       'Failed to dispose InferDI Hono request scope',
-      disposeError,
+      disposeError
     )
 
     errorSpy.mockRestore()
@@ -358,7 +358,7 @@ describe('@inferdi/hono', () => {
       container: root,
       disposeScope: () => {
         throw disposeError
-      },
+      }
     }))
     app.onError((error, c) => {
       handledError = error
@@ -372,7 +372,7 @@ describe('@inferdi/hono', () => {
     expect(handledError).toBeUndefined()
     expect(errorSpy).toHaveBeenCalledWith(
       'Failed to dispose InferDI Hono request scope',
-      disposeError,
+      disposeError
     )
 
     errorSpy.mockRestore()
@@ -419,12 +419,14 @@ describe('@inferdi/hono', () => {
     const response = await app.request('/boom')
 
     expect(response.status).toBe(500)
-    // The route error reaches onError once; the dispose error is logged, never
-    // aggregated into the response.
+    /*
+     * The route error reaches onError once; the dispose error is logged, never
+     * aggregated into the response
+     */
     expect(handled).toEqual([routeError])
     expect(errorSpy).toHaveBeenCalledWith(
       'Failed to dispose InferDI Hono request scope',
-      disposeError,
+      disposeError
     )
 
     errorSpy.mockRestore()
@@ -442,7 +444,7 @@ describe('@inferdi/hono', () => {
       onDisposeError: (error, c) => {
         logged.push(error)
         expect(c.req.path).toBe('/ok')
-      },
+      }
     }))
     app.get('/ok', (c) => c.json({ ok: true }))
 
@@ -465,7 +467,7 @@ describe('@inferdi/hono', () => {
       onDisposeError: async (error) => {
         await Promise.resolve()
         logged.push(error)
-      },
+      }
     }))
     app.get('/ok', (c) => c.json({ ok: true }))
 
@@ -489,7 +491,7 @@ describe('@inferdi/hono', () => {
       container: root,
       onDisposeError: () => {
         throw handlerError
-      },
+      }
     }))
     app.onError((error, c) => {
       handled.push(error)
@@ -523,7 +525,7 @@ describe('@inferdi/hono', () => {
       container: root,
       onDisposeError: async () => {
         throw handlerError
-      },
+      }
     }))
     app.onError((error, c) => {
       handledError = error
@@ -552,7 +554,7 @@ describe('@inferdi/hono', () => {
       container: root,
       setupScope: () => {
         throw setupError
-      },
+      }
     }))
     app.onError((error, c) => {
       scopeInErrorHandler = c.var.di
@@ -575,13 +577,13 @@ describe('@inferdi/hono', () => {
 
     booleanApp.use('*', inferdiHono({
       container: booleanRoot,
-      autoDispose: false,
+      autoDispose: false
     }))
     booleanApp.get('/manual', (c) => c.json({ ok: true }))
 
     predicateApp.use('*', inferdiHono({
       container: predicateRoot,
-      autoDispose: (c) => c.req.path !== '/manual',
+      autoDispose: (c) => c.req.path !== '/manual'
     }))
     predicateApp.get('/manual', (c) => c.json({ ok: true }))
     predicateApp.get('/auto', (c) => c.json({ ok: true }))
@@ -601,7 +603,7 @@ describe('@inferdi/hono', () => {
 
     app.use('*', inferdiHono({
       container: root,
-      autoDispose: async (c) => c.req.path !== '/manual',
+      autoDispose: async (c) => c.req.path !== '/manual'
     }))
     app.get('/manual', (c) => c.json({ ok: true }))
     app.get('/auto', (c) => c.json({ ok: true }))
@@ -626,7 +628,7 @@ describe('@inferdi/hono', () => {
       container: root,
       autoDispose: async () => {
         throw predicateError
-      },
+      }
     }))
     app.onError((error, c) => {
       handledError = error
@@ -659,7 +661,7 @@ describe('@inferdi/hono', () => {
       onDisposeError: async (error) => {
         await Promise.resolve()
         handled.push(error)
-      },
+      }
     }))
     app.get('/ok', (c) => c.json({ ok: true }))
 
@@ -700,7 +702,7 @@ describe('@inferdi/hono', () => {
     expect(scope.disposeCalls).toBe(1)
     expect(errorSpy).toHaveBeenCalledWith(
       'Failed to dispose InferDI Hono request scope',
-      disposeError,
+      disposeError
     )
 
     errorSpy.mockRestore()
@@ -718,12 +720,12 @@ describe('@inferdi/hono', () => {
     await expect(
       middleware(fakeContext, async () => {
         throw nextError
-      }),
+      })
     ).rejects.toBe(nextError)
 
     expect(errorSpy).toHaveBeenCalledWith(
       'Failed to dispose InferDI Hono request scope',
-      disposeError,
+      disposeError
     )
 
     errorSpy.mockRestore()
@@ -738,7 +740,7 @@ describe('@inferdi/hono', () => {
     await expect(
       middleware(fakeContext, async () => {
         throw nextError
-      }),
+      })
     ).rejects.toBe(nextError)
 
     expect(root.scopes[0]?.disposeCalls).toBe(1)

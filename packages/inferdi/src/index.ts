@@ -7,5 +7,5 @@ export type {
   Spec,
   SpecMap,
   LazySpec,
-  ContainerOptions,
+  ContainerOptions
 } from './Container'

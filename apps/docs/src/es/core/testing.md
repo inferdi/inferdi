@@ -26,8 +26,8 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/es/core/testing"
       "inLanguage": "es-ES"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, pruebas, override, mocks, dobles de prueba, intercambiar implementación, inyección de dependencias"
       "articleSection": "Conceptos básicos"
@@ -75,14 +75,14 @@ El valor del override debe ser asignable al tipo registrado original. Las claves
 
 ## Momento del override
 
-Los overrides deben ocurrir antes de que se resuelva la clave:
+Aplica los overrides antes de resolver el grafo de dependencias:
 
 ```ts
 const logger = c.get('logger')
 c.override('logger', mockLogger)
 ```
 
-Esa segunda línea lanza una excepción. Un override tardío dividiría el grafo: los consumidores existentes mantendrían la instancia antigua mientras que las resoluciones posteriores devolverían el mock.
+La segunda línea lanza una excepción porque el valor singleton ya está en la caché local de este contenedor. La comprobación se basa deliberadamente en esa caché: también detecta valores scoped almacenados en el scope actual, `registerValue` y overrides repetidos. Las resoluciones transient y los valores propiedad de un ancestro que se resuelven desde un hijo no se guardan en la caché local, por lo que no se registran. Un transient devuelto anteriormente permanece en manos de quien lo recibió, mientras que las resoluciones posteriores devuelven el mock. Este límite forma parte del contrato, pero no justifica overrides tardíos: aplicarlos antes de resolver el grafo evita dividirlo.
 
 ## Propiedad
 

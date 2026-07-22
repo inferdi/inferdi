@@ -27,7 +27,7 @@ schema:
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
       "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16, Bun, Deno"
+      "dependencies": "TypeScript >=5.2, Node.js >=16, Bun, Deno"
       "proficiencyLevel": "Beginner"
       "keywords": "InferDI, install, npm, JSR, Node.js, Bun, Deno, TypeScript dependency injection"
       "articleSection": "Guide"
@@ -104,9 +104,11 @@ import { Container } from 'jsr:@inferdi/inferdi'
 | Node.js | 16 or newer for the core package |
 | Bun | 1.0 or newer |
 | Deno | 1.40 or newer |
-| TypeScript | 5.2+ recommended for `using` / `await using` syntax |
+| TypeScript | 5.6 or newer |
 
 On Node versions before native `Symbol.dispose` and `Symbol.asyncDispose`, InferDI installs a symbol polyfill on import so Explicit Resource Management interop still works.
+
+The published declarations reference the explicit-resource-management library themselves. Consumers targeting ES2022 do not need to add `ESNext.Disposable` to their TypeScript `lib` configuration.
 
 ## Adapter Installs
 

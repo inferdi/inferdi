@@ -1,5 +1,7 @@
-// Constructor parameter names match registration keys exactly.
-// Awilix CLASSIC resolves dependencies by parameter name — a mismatch raises ResolutionError.
+/*
+ * Constructor parameter names match registration keys exactly.
+ * Awilix CLASSIC resolves dependencies by parameter name — a mismatch raises ResolutionError
+ */
 
 export class Logger {
   log(_msg: string): void {}
@@ -30,7 +32,7 @@ export class Wide4 {
     public logger: Logger,
     public config: Config,
     public repo: Repo,
-    public service: Service,
+    public service: Service
   ) {}
 }
 
@@ -56,7 +58,7 @@ export class Wide10 {
     public dep6: Dep6,
     public dep7: Dep7,
     public dep8: Dep8,
-    public dep9: Dep9,
+    public dep9: Dep9
   ) {}
 }
 
@@ -71,7 +73,7 @@ export class L7 { constructor(public l6: L6) {} }
 export class L8 { constructor(public l7: L7) {} }
 export class L9 { constructor(public l8: L8) {} }
 
-// Lazy scenario: Service injects Lazy<Logger> (or the thunk equivalent in other containers).
+// Lazy scenario: Service injects Lazy<Logger> (or the thunk equivalent in other containers)
 export class LazyConsumer {
   constructor(public lazyLogger: { get(): Logger } | (() => Logger)) {}
 

@@ -27,7 +27,7 @@ schema:
       "inLanguage": "es-ES"
       "datePublished": "2026-06-12"
       "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16, Bun, Deno"
+      "dependencies": "TypeScript >=5.2, Node.js >=16, Bun, Deno"
       "proficiencyLevel": "Beginner"
       "keywords": "InferDI, instalación, npm, JSR, Node.js, Bun, Deno, inyección de dependencias TypeScript"
       "articleSection": "Guía"
@@ -104,9 +104,11 @@ import { Container } from 'jsr:@inferdi/inferdi'
 | Node.js | 16 o más reciente para el paquete del núcleo |
 | Bun | 1.0 o más reciente |
 | Deno | 1.40 o más reciente |
-| TypeScript | 5.2+ recomendado para la sintaxis `using` / `await using` |
+| TypeScript | 5.6 o posterior |
 
 En versiones de Node anteriores a `Symbol.dispose` y `Symbol.asyncDispose` nativos, InferDI instala un polyfill de símbolos al importar para que la interoperabilidad con Explicit Resource Management siga funcionando.
+
+Las declaraciones publicadas referencian por sí mismas la biblioteca de tipos de Explicit Resource Management. Los consumidores que apunten a ES2022 no necesitan añadir `ESNext.Disposable` a la configuración `lib` de TypeScript.
 
 ## Instalación de adaptadores
 

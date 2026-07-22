@@ -4,12 +4,14 @@ import {
   AppConfig,
   ConsoleLogger,
   Service,
-  TrackableAsync,
+  TrackableAsync
 } from './helpers'
 
-// ────────────────────────────────────────────────────────────────────────────
-// Phase 1 — Functional
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * Phase 1 — Functional
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 describe('Phase 1 — Functional', () => {
   describe('registerClass', () => {
@@ -31,9 +33,11 @@ describe('Phase 1 — Functional', () => {
     })
   })
 
-  // Arity unrolling in Container.registerClass — separate branches for len === 0..7
-  // and the tail (len >= 8) via Reflect.construct. len === 0 and 1 are already
-  // covered above (ConsoleLogger / Service); here we cover 2..7 and the tail.
+  /*
+   * Arity unrolling in Container.registerClass — separate branches for len === 0..7
+   * and the tail (len >= 8) via Reflect.construct. len === 0 and 1 are already
+   * covered above (ConsoleLogger / Service); here we cover 2..7 and the tail
+   */
   describe('arity unrolling — all JIT-optimization branches', () => {
     it('len === 2: both args are passed in the right order', () => {
       class Two {
@@ -69,7 +73,7 @@ describe('Phase 1 — Functional', () => {
           public a: number,
           public b: string,
           public c: boolean,
-          public d: number,
+          public d: number
         ) {}
       }
       const c = new Container()
@@ -90,7 +94,7 @@ describe('Phase 1 — Functional', () => {
           public b: number,
           public c: number,
           public d: number,
-          public e: number,
+          public e: number
         ) {}
       }
       const c = new Container()
@@ -113,7 +117,7 @@ describe('Phase 1 — Functional', () => {
           public c: number,
           public d: number,
           public e: number,
-          public f: number,
+          public f: number
         ) {}
       }
       const c = new Container()
@@ -138,7 +142,7 @@ describe('Phase 1 — Functional', () => {
           public d: number,
           public e: number,
           public f: number,
-          public g: number,
+          public g: number
         ) {}
       }
       const c = new Container()
@@ -165,7 +169,7 @@ describe('Phase 1 — Functional', () => {
           public e: number,
           public f: number,
           public g: number,
-          public h: number,
+          public h: number
         ) {}
       }
       const c = new Container()
@@ -216,9 +220,11 @@ describe('Phase 1 — Functional', () => {
     })
 
     it('explicit undefined value: cache.has fallback returns it (rare path)', () => {
-      // Anti-pattern, but supported for correctness: registering `undefined` makes the
-      // first `Map.get` return undefined, falling through to the `Map.has` branch
-      // in get(). The branch is not on the hot path — guarded only for completeness.
+      /*
+       * Anti-pattern, but supported for correctness: registering `undefined` makes the
+       * first `Map.get` return undefined, falling through to the `Map.has` branch
+       * in get(). The branch is not on the hot path — guarded only for completeness
+       */
       const c = new Container().registerValue('explicit', undefined as unknown)
 
       expect(c.get('explicit')).toBeUndefined()
@@ -233,8 +239,10 @@ describe('Phase 1 — Functional', () => {
     })
 
     it('missing key inside a live scope chain — still "Key not found", not a disposed message', () => {
-      // The error path walks every ancestor checking _disposed. With a fully live chain
-      // it must complete the walk and fall through to the regular "Key not found" throw.
+      /*
+       * The error path walks every ancestor checking _disposed. With a fully live chain
+       * it must complete the walk and fall through to the regular "Key not found" throw
+       */
       const root = new Container().registerValue('known', 1)
       const child = root.createScope()
 
@@ -255,10 +263,12 @@ describe('Phase 1 — Functional', () => {
         constructor(public a: A) {}
       }
 
-      // Registering recursive classes in fluent style is impossible without casts
-      // because 'b' is needed by 'a' but registered later. We use a pre-declared
-      // type via Container<{}> + an explicit cast to Container with a known shape —
-      // we are testing the runtime cycle-detection behavior specifically.
+      /*
+       * Registering recursive classes in fluent style is impossible without casts
+       * because 'b' is needed by 'a' but registered later. We use a pre-declared
+       * type via Container<{}> + an explicit cast to Container with a known shape —
+       * we are testing the runtime cycle-detection behavior specifically
+       */
       const c = new Container() as Container<{a: A; b: B; cc: C}>
       c.registerClass('a' as never, A, ['b' as never])
       c.registerClass('b' as never, B, ['cc' as never])
@@ -367,7 +377,7 @@ describe('Phase 1 — Functional', () => {
         .registerClass(SCOPED, Dep, [], 'scoped')
         .registerClass(SINGLE, Svc, [SCOPED], 'singleton')
       expect(() => c.get(SINGLE)).toThrow(
-        /Singleton "Symbol\(singleton\)" cannot depend on scoped "Symbol\(scoped\)"/,
+        /Singleton "Symbol\(singleton\)" cannot depend on scoped "Symbol\(scoped\)"/
       )
     })
 
@@ -389,9 +399,11 @@ describe('Phase 1 — Functional', () => {
   })
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// Phase 2 — Lifetimes & Scopes
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * Phase 2 — Lifetimes & Scopes
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 describe('Phase 2 — Lifetimes', () => {
   describe('singleton (default)', () => {
@@ -497,8 +509,10 @@ describe('Phase 2 — Lifetimes', () => {
     })
 
     it('walk-up: key resolves across a 3-level parent chain', () => {
-      // Isolated test for the full chain walk in get(): registration on root,
-      // access from l3 (3 levels of parent links).
+      /*
+       * Isolated test for the full chain walk in get(): registration on root,
+       * access from l3 (3 levels of parent links)
+       */
       const root = new Container().registerValue('depth', 0)
       const l1 = root.createScope()
       const l2 = l1.createScope()
@@ -519,7 +533,7 @@ describe('Phase 2 — Lifetimes', () => {
         .registerClass('singleton', Service, ['scoped'], 'singleton')
 
       expect(() => c.get('singleton')).toThrow(
-        /Singleton "singleton" cannot depend on scoped "scoped"/,
+        /Singleton "singleton" cannot depend on scoped "scoped"/
       )
     })
 
@@ -529,7 +543,7 @@ describe('Phase 2 — Lifetimes', () => {
         .registerClass('singleton', Service, ['transient'], 'singleton')
 
       expect(() => c.get('singleton')).toThrow(
-        /Singleton "singleton" cannot depend on transient "transient"/,
+        /Singleton "singleton" cannot depend on transient "transient"/
       )
     })
 
@@ -558,8 +572,10 @@ describe('Phase 2 — Lifetimes', () => {
         .registerValue('other', {ok: true})
 
       expect(() => c.get('singleton')).toThrow()
-      // singletonStack must be cleared — a subsequent scoped resolve in a different
-      // container of the same tree must not glitch (indirectly — `other` is reachable).
+      /*
+       * singletonStack must be cleared — a subsequent scoped resolve in a different
+       * container of the same tree must not glitch (indirectly — `other` is reachable)
+       */
       expect(c.get('other').ok).toBe(true)
     })
   })
@@ -592,18 +608,69 @@ describe('Phase 2 — Lifetimes', () => {
       expect(wrapper.get()).toBe(c.get('db'))
     })
 
+    it('registerFactory lazy wrapper defers and caches a singleton target', () => {
+      let created = 0
+      const c = new Container().registerFactory(
+        'db',
+        () => ({id: ++created}),
+        'singleton',
+        'dbLazy'
+      )
+
+      const wrapper = c.get('dbLazy')
+      expect(created).toBe(0)
+      expect(wrapper.get()).toBe(wrapper.get())
+      expect(wrapper.get()).toBe(c.get('db'))
+      expect(created).toBe(1)
+    })
+
+    it('registerFactory Lazy<scoped> preserves the runtime lifetime guard', () => {
+      const c = new Container()
+        .registerFactory('request', () => ({}), 'scoped', 'requestLazy')
+        .registerFactory(
+          'holder',
+          (inner) => inner.get('requestLazy' as never),
+          'singleton'
+        )
+
+      expect(() => c.get('holder')).toThrow(
+        /Singleton "holder" cannot depend on transient "requestLazy"/
+      )
+    })
+
+    it('registerFactory lazy wrapper captures the scope where it is resolved', () => {
+      let created = 0
+      const root = new Container().registerFactory(
+        'svc',
+        () => ({id: ++created}),
+        'scoped',
+        'svcLazy'
+      )
+      const a = root.createScope()
+      const b = root.createScope()
+
+      const lazyFromA = a.get('svcLazy')
+      const lazyFromB = b.get('svcLazy')
+
+      expect(lazyFromA.get()).toBe(a.get('svc'))
+      expect(lazyFromB.get()).toBe(b.get('svc'))
+      expect(lazyFromA.get()).not.toBe(lazyFromB.get())
+    })
+
     it('Lazy<scoped|transient> companion does NOT legalize injection into a singleton (v4)', () => {
       class Holder {
         constructor(public readonly leakyLazy: { readonly get: () => ConsoleLogger }) {}
       }
-      // The `as never` bypass mimics an `as`-cast escape past the AllowedDeps
-      // compile-time filter; the runtime guard still catches the leak.
+      /*
+       * The `as never` bypass mimics an `as`-cast escape past the AllowedDeps
+       * compile-time filter; the runtime guard still catches the leak
+       */
       const c = new Container()
         .registerClass('leaky', ConsoleLogger, [], 'scoped', 'leakyLazy')
         .registerClass('holder', Holder, ['leakyLazy' as never], 'singleton')
 
       expect(() => c.get('holder')).toThrow(
-        /Singleton "holder" cannot depend on transient "leakyLazy"/,
+        /Singleton "holder" cannot depend on transient "leakyLazy"/
       )
     })
 
@@ -617,7 +684,7 @@ describe('Phase 2 — Lifetimes', () => {
 
       const holder = c.get('holder')
 
-      // The wrapper resolves to the singleton instance, and the resolution is idempotent.
+      // The wrapper resolves to the singleton instance, and the resolution is idempotent
       expect(holder.cfgLazy.get()).toBe(c.get('cfg'))
       expect(holder.cfgLazy.get()).toBe(holder.cfgLazy.get())
     })
@@ -660,9 +727,11 @@ describe('Phase 2 — Lifetimes', () => {
   })
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// Sanity: T accumulation while chaining + auto-Lazy
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * Sanity: T accumulation while chaining + auto-Lazy
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 describe('fluent shape', () => {
   it('registerClass + registerFactory + registerValue in a chain — compiles and resolves', () => {
     const c = new Container()
@@ -680,10 +749,12 @@ describe('fluent shape', () => {
   })
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// .use() — runtime test (the type contract is already checked in container.test-d.ts).
-// Covers Container.use(): runtime delegation to a module function and T accumulation.
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * .use() — runtime test (the type contract is already checked in container.test-d.ts).
+ * Covers Container.use(): runtime delegation to a module function and T accumulation.
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 describe('use() — runtime', () => {
   it('inline function receives the container and returns an extended one', () => {
     const c = new Container()
@@ -702,18 +773,20 @@ describe('use() — runtime', () => {
       .use((inner) =>
         inner.get('mode') === 'A'
           ? inner.registerValue('out', 'alpha' as const)
-          : inner.registerValue('out', 'beta' as const),
+          : inner.registerValue('out', 'beta' as const)
       )
 
     expect(c.get('out')).toBe('alpha')
   })
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// Regression suite for the get() refactor — lookup cache + helper-based
-// singleton resolution. Each test guards an invariant from the implementation
-// plan that could quietly break under future refactors.
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * Regression suite for the get() refactor — lookup cache + helper-based
+ * singleton resolution. Each test guards an invariant from the implementation
+ * plan that could quietly break under future refactors.
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 describe('get() refactor — invariants under lookup cache + shared helper', () => {
   describe('owned-on-owner invariant', () => {
@@ -743,12 +816,14 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
         .registerClass('holder', Holder, ['cfg'])
 
       const child = (root.createScope() as unknown as { registerValue: (k: string, v: unknown) => unknown })
-      // Bypass the compile-time re-registration guard to model a feature-module
-      // test that re-registers a key in a child scope on purpose.
+      /*
+       * Bypass the compile-time re-registration guard to model a feature-module
+       * test that re-registers a key in a child scope on purpose
+       */
       child.registerValue('cfg', new AppConfig(9999))
 
       const holder = (child as unknown as { get: (k: string) => Holder }).get('holder')
-      // Singleton's factory ran on root, so it sees root's cfg, not child's.
+      // Singleton's factory ran on root, so it sees root's cfg, not child's
       expect(holder.cfg.port).toBe(8000)
     })
   })
@@ -777,8 +852,10 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
 
       expect(child.get('a')).toBe(1)
 
-      // Bypass compile-time re-registration guard to model a runtime override
-      // (lazy modules / test fixtures / hot-reload scenarios).
+      /*
+       * Bypass compile-time re-registration guard to model a runtime override
+       * (lazy modules / test fixtures / hot-reload scenarios)
+       */
       ;(root as unknown as { registerValue: (k: string, v: unknown) => unknown })
         .registerValue('a', 2)
 
@@ -830,10 +907,12 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
       // First resolve — populates child.lookupCache with entry for 'a'
       expect(child.get('a')).toBe('A')
 
-      // Bump the tree mutation epoch via a brand-new key. The cached entry for
-      // 'a' will miss the version compare on next access, fall back to walk-up,
-      // and find the same registration — correct even though tree-wide
-      // invalidation is deliberately over-eager for cold mutations.
+      /*
+       * Bump the tree mutation epoch via a brand-new key. The cached entry for
+       * 'a' will miss the version compare on next access, fall back to walk-up,
+       * and find the same registration — correct even though tree-wide
+       * invalidation is deliberately over-eager for cold mutations
+       */
       ;(root as unknown as { registerValue: (k: string, v: unknown) => unknown })
         .registerValue('b', 'B')
 
@@ -848,8 +927,10 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
       // Child reaches into parent — caches { owner: root, reg, version }
       expect(child.get('a')).toBe('parent')
 
-      // Override locally on child — must invalidate child.lookupCache so the
-      // next resolve sees the local registration.
+      /*
+       * Override locally on child — must invalidate child.lookupCache so the
+       * next resolve sees the local registration
+       */
       ;(child as unknown as { registerValue: (k: string, v: unknown) => unknown })
         .registerValue('a', 'child')
 
@@ -864,14 +945,16 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
         .registerFactory('a', (ctx) => ctx.get('b' as never))
         .registerFactory('b', (ctx) => ctx.get('a' as never))
 
-      // First, a clean resolve — fully exercises the helper + cache writes.
+      // First, a clean resolve — fully exercises the helper + cache writes
       expect(c.get('safe')).toBe(42)
 
-      // Now the cycle must still throw — `resolving` is shared and lives outside
-      // any caching path.
+      /*
+       * Now the cycle must still throw — `resolving` is shared and lives outside
+       * any caching path
+       */
       expect(() => c.get('a' as never)).toThrowError(/Circular dependency/)
 
-      // After the throw, the container is still healthy.
+      // After the throw, the container is still healthy
       expect(c.get('safe')).toBe(42)
     })
 
@@ -907,7 +990,7 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
       const child = root.createScope()
 
       expect(child.get('shared')).toBe('from-root')
-      // Repeat to exercise the cached path.
+      // Repeat to exercise the cached path
       expect(child.get('shared')).toBe('from-root')
     })
   })
@@ -945,12 +1028,14 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
       const root = new Container().registerValue('maybe', undefined)
       const child = root.createScope()
 
-      // First child.get drives the lookupCache miss → walk-up → cache entry.
+      // First child.get drives the lookupCache miss → walk-up → cache entry
       expect(child.get('maybe')).toBeUndefined()
 
-      // Second child.get drives the LOOKUP CACHE HIT path into the helper, where
-      // target.cache.get returns undefined and target.cache.has(key) === true is
-      // the only way to distinguish "registered as undefined" from "miss".
+      /*
+       * Second child.get drives the LOOKUP CACHE HIT path into the helper, where
+       * target.cache.get returns undefined and target.cache.has(key) === true is
+       * the only way to distinguish "registered as undefined" from "miss"
+       */
       expect(child.get('maybe')).toBeUndefined()
     })
 
@@ -958,7 +1043,7 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
       const root = new Container().registerClass('svc', AppConfig as never, [] as never)
       const child = root.createScope()
 
-      // Populate child.lookupCache by resolving once while root is still alive.
+      // Populate child.lookupCache by resolving once while root is still alive
       child.get('svc')
 
       await root.dispose()
@@ -1001,9 +1086,11 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
   })
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// Phase 7 — Test Overrides (.override())
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * Phase 7 — Test Overrides (.override())
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 describe('Phase 7 — Test Overrides', () => {
   it('replaces a registered class with a mock value before first resolve', () => {
@@ -1051,8 +1138,19 @@ describe('Phase 7 — Test Overrides', () => {
     c.get('db')
 
     expect(() => c.override('db', new TrackableAsync())).toThrowError(
-      /Cannot override "db" because it has already been resolved/,
+      /Cannot override "db" because it has already been resolved/
     )
+  })
+
+  it('allows overriding a previously resolved transient and affects only later resolves', () => {
+    const c = new Container().registerClass('logger', ConsoleLogger, [], 'transient')
+    const original = c.get('logger')
+    const mock = new ConsoleLogger()
+
+    c.override('logger', mock)
+
+    expect(original).not.toBe(mock)
+    expect(c.get('logger')).toBe(mock)
   })
 
   it('throws on a second override (the first override populates the cache)', () => {
@@ -1061,7 +1159,7 @@ describe('Phase 7 — Test Overrides', () => {
     c.override('logger', new ConsoleLogger())
 
     expect(() => c.override('logger', new ConsoleLogger())).toThrowError(
-      /Cannot override "logger" because it has already been resolved/,
+      /Cannot override "logger" because it has already been resolved/
     )
   })
 
@@ -1070,7 +1168,7 @@ describe('Phase 7 — Test Overrides', () => {
     await c.dispose()
 
     expect(() => c.override('logger', new ConsoleLogger())).toThrowError(
-      /Cannot override on a disposed container \(key: "logger"\)/,
+      /Cannot override on a disposed container \(key: "logger"\)/
     )
   })
 
@@ -1100,8 +1198,10 @@ describe('Phase 7 — Test Overrides', () => {
     const root = new Container().registerClass('logger', ConsoleLogger, [])
     const child = root.createScope()
 
-    // Walk-up populates child.lookupCache with entry { owner: root, ... }.
-    // Singleton lives on root, so child.cache stays empty for this key.
+    /*
+     * Walk-up populates child.lookupCache with entry { owner: root, ... }.
+     * Singleton lives on root, so child.cache stays empty for this key
+     */
     expect(child.get('logger')).toBeInstanceOf(ConsoleLogger)
 
     const mock = new ConsoleLogger()
@@ -1115,14 +1215,14 @@ describe('Phase 7 — Test Overrides', () => {
     const c = new Container().registerValue('flag', 'on' as string)
 
     expect(() => c.override('flag', 'off')).toThrowError(
-      /Cannot override "flag" because it has already been resolved/,
+      /Cannot override "flag" because it has already been resolved/
     )
   })
 
   it('handles override(key, undefined) via UNDEFINED_MARKER on a non-seeded key', () => {
     const c = new Container().registerFactory<'maybe', string | undefined>(
       'maybe',
-      () => 'real',
+      () => 'real'
     )
 
     c.override('maybe', undefined)
@@ -1130,9 +1230,11 @@ describe('Phase 7 — Test Overrides', () => {
     expect(c.get('maybe')).toBeUndefined()
   })
 
-  // ────────────────────────────────────────────────────────────────────────
-  // v3 — override walk-up + kind preservation
-  // ────────────────────────────────────────────────────────────────────────
+  /*
+   * ────────────────────────────────────────────────────────────────────────
+   * v3 — override walk-up + kind preservation
+   * ────────────────────────────────────────────────────────────────────────
+   */
 
   it('override preserves kind when the original is local (singleton)', () => {
     const c = new Container().registerClass('logger', ConsoleLogger, [], 'singleton')
@@ -1232,10 +1334,12 @@ describe('Phase 7 — Test Overrides', () => {
     const builder = new Container()
       .registerClass('clock', Clock, [], 'transient', 'clockLazy')
 
-    // Container.UnwrappedValue<typeof builder, 'clockLazy'> resolves to Clock,
-    // not Lazy<Clock> — the wrapper is added at the call site below.
+    /*
+     * Container.UnwrappedValue<typeof builder, 'clockLazy'> resolves to Clock,
+     * not Lazy<Clock> — the wrapper is added at the call site below
+     */
     const clockMock: Container.UnwrappedValue<typeof builder, 'clockLazy'> = {
-      now: () => 42,
+      now: () => 42
     }
 
     builder.override('clockLazy', {get: () => clockMock})
@@ -1244,13 +1348,15 @@ describe('Phase 7 — Test Overrides', () => {
   })
 
   it('override on a Lazy<singleton> companion preserves the lazy-exempt flag across scope walk-up', () => {
-    // The override on root pre-seeds root.cache, so a same-container resolve
-    // never reaches the lifetime guard. The walk-up path is what actually
-    // exercises the regs entry: a singleton consumer registered on a child
-    // scope resolves the companion through root.regs (cache miss on scope,
-    // walk-up to root.regs hit). If override stripped `lazy: true`, the
-    // strict-mode lifetime guard would reject the transient lookup inside
-    // an active singleton stack — see `tikets/override-strips-lazy-flag.md`.
+    /*
+     * The override on root pre-seeds root.cache, so a same-container resolve
+     * never reaches the lifetime guard. The walk-up path is what actually
+     * exercises the regs entry: a singleton consumer registered on a child
+     * scope resolves the companion through root.regs (cache miss on scope,
+     * walk-up to root.regs hit). If override stripped `lazy: true`, the
+     * strict-mode lifetime guard would reject the transient lookup inside
+     * an active singleton stack — see `tikets/override-strips-lazy-flag.md`
+     */
     class Logger { info(_msg: string) {} }
     class App { constructor(public readonly loggerLazy: Lazy<Logger>) {} }
     const mock: Logger = {info: () => {}}
@@ -1269,10 +1375,12 @@ describe('Phase 7 — Test Overrides', () => {
   })
 
   it('override on a Lazy<scoped> companion preserves the lifetime-guard rejection across scope walk-up', () => {
-    // Symmetric to the previous test: for a Lazy<scoped> companion the
-    // original registration carries `lazy: false`, and override must copy
-    // that — otherwise an `as`-cast bypass plus override would silently let
-    // a scoped target slip into a singleton through the walk-up path.
+    /*
+     * Symmetric to the previous test: for a Lazy<scoped> companion the
+     * original registration carries `lazy: false`, and override must copy
+     * that — otherwise an `as`-cast bypass plus override would silently let
+     * a scoped target slip into a singleton through the walk-up path
+     */
     class Req {}
     class Holder { constructor(public readonly reqLazy: {readonly get: () => Req}) {} }
 
@@ -1286,14 +1394,16 @@ describe('Phase 7 — Test Overrides', () => {
       .registerClass('holder', Holder, ['reqLazy' as never], 'singleton')
 
     expect(() => scope.get('holder')).toThrow(
-      /Singleton "holder" cannot depend on transient "reqLazy"/,
+      /Singleton "holder" cannot depend on transient "reqLazy"/
     )
   })
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// Phase 9 — strict: false (opt-out runtime guards)
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * Phase 9 — strict: false (opt-out runtime guards)
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 describe('Phase 9 — strict: false', () => {
   it('transient resolution skips the cycle bookkeeping (no try/finally)', () => {
@@ -1328,7 +1438,7 @@ describe('Phase 9 — strict: false', () => {
     const child = root.createScope()
     const fromChild = child.get('logger')
     expect(fromChild).toBeInstanceOf(ConsoleLogger)
-    // Cached on root — second resolve from child returns the same instance.
+    // Cached on root — second resolve from child returns the same instance
     expect(child.get('logger')).toBe(fromChild)
     expect(root.get('logger')).toBe(fromChild)
   })
@@ -1344,9 +1454,11 @@ describe('Phase 9 — strict: false', () => {
   })
 
   it('skips the lifetime guard — singleton may depend on a scoped service', () => {
-    // Compile-time guard would normally reject this. We bypass via `as never`
-    // to model an `as`-cast escape; in strict mode this would throw at runtime,
-    // in strict:false it silently constructs the singleton with the scoped dep.
+    /*
+     * Compile-time guard would normally reject this. We bypass via `as never`
+     * to model an `as`-cast escape; in strict mode this would throw at runtime,
+     * in strict:false it silently constructs the singleton with the scoped dep
+     */
     class Holder {
       constructor(public readonly cfg: AppConfig) {}
     }
@@ -1391,9 +1503,11 @@ describe('Phase 9 — strict: false', () => {
     const root = new Container({strict: false})
       .registerFactory('counter', () => ({n: ++calls}), 'transient')
     const child = root.createScope()
-    // child has no local registration for 'counter'; the resolve goes through
-    // the parent walk-up into resolveWithOwnerAndReg with reg.kind === 'transient'.
-    // strict:false branch must NOT cache the result.
+    /*
+     * child has no local registration for 'counter'; the resolve goes through
+     * the parent walk-up into resolveWithOwnerAndReg with reg.kind === 'transient'.
+     * strict:false branch must NOT cache the result
+     */
     expect(child.get('counter').n).toBe(1)
     expect(child.get('counter').n).toBe(2)
     expect(calls).toBe(2)
@@ -1410,9 +1524,11 @@ describe('Phase 9 — strict: false', () => {
   })
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// Phase 10 — has
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * Phase 10 — has
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 describe('Phase 10 — has', () => {
   it('returns true for a locally registered key', () => {
@@ -1427,8 +1543,10 @@ describe('Phase 10 — has', () => {
   })
 
   it('walks across multiple intermediate scopes to find the key', () => {
-    // root → middle → leaf; key lives on root, both middle and leaf are pass-through.
-    // Exercises the `cur = cur.parent` advance step inside the walk-up loop.
+    /*
+     * root → middle → leaf; key lives on root, both middle and leaf are pass-through.
+     * Exercises the `cur = cur.parent` advance step inside the walk-up loop
+     */
     const root = new Container().registerClass('logger', ConsoleLogger, [])
     const middle = root.createScope()
     const leaf = middle.createScope()
@@ -1458,7 +1576,7 @@ describe('Phase 10 — has', () => {
     const scope = root.createScope()
     await scope.dispose()
     expect(scope.has('logger')).toBe(false)
-    // The root is still live.
+    // The root is still live
     expect(root.has('logger')).toBe(true)
   })
 
@@ -1467,11 +1585,11 @@ describe('Phase 10 — has', () => {
     const child = root.createScope()
 
     expect(child.has('logger')).toBe(true)
-    // has() must not populate `owned` on either container.
+    // has() must not populate `owned` on either container
     expect((root as unknown as {owned: unknown[]}).owned).toHaveLength(0)
     expect((child as unknown as {owned: unknown[]}).owned).toHaveLength(0)
 
-    // get() resolves correctly and the instance is owned by the root (singleton).
+    // get() resolves correctly and the instance is owned by the root (singleton)
     const inst = child.get('logger')
     expect((root as unknown as {owned: unknown[]}).owned).toContain(inst)
     expect((child as unknown as {owned: unknown[]}).owned).toHaveLength(0)
@@ -1483,5 +1601,5 @@ describe('Phase 10 — has', () => {
   })
 })
 
-// Suppress unused warnings for imports used only in type tests.
+// Suppress unused warnings for imports used only in type tests
 void ({} as DependenciesMap)

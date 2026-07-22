@@ -26,8 +26,8 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/core/lazy-injection"
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, lazy injection, Lazy, deferred resolution, circular dependency, singleton, dependency injection"
       "articleSection": "Core Concepts"
@@ -80,7 +80,12 @@ const c = new Container()
   .registerClass('audit', Audit, ['clockLazy'], 'singleton')
 ```
 
-Passing a `lazyKey` creates a companion registration whose value is `{ get: () => target }`.
+Passing a `lazyKey` to `registerClass` or `registerFactory` creates a companion registration whose value is `{ get: () => target }`.
+
+```ts
+const c = new Container()
+  .registerFactory('clock', () => new Clock(), 'singleton', 'clockLazy')
+```
 
 ## Lifetime Is Preserved
 

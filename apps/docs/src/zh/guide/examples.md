@@ -27,7 +27,7 @@ schema:
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
       "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, 示例, 模式, 依赖注入, 请求作用域, 框架, 运行时"
       "articleSection": "指南"

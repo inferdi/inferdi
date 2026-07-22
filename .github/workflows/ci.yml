@@ -32,6 +32,11 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
       - run: pnpm run build
+
+      - name: Check core declarations with TypeScript 5.2
+        if: matrix.node == '22'
+        run: pnpm dlx --package typescript@5.2.2 tsc --project packages/inferdi/tsconfig.consumer.json
+
       - run: pnpm run test:coverage
 
       - name: Upload coverage to Codecov

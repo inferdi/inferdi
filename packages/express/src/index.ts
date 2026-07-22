@@ -95,7 +95,7 @@ export interface InferdiExpressOptions<
   readonly createScope?: (
     root: Root,
     req: Request,
-    res: Response,
+    res: Response
   ) => MaybePromise<Scope>
   /**
    * Optional hook to hydrate the freshly created scope before route handlers
@@ -104,7 +104,7 @@ export interface InferdiExpressOptions<
   readonly setupScope?: (
     scope: Scope,
     req: Request,
-    res: Response,
+    res: Response
   ) => MaybePromise<void>
   /**
    * Overrides request-scope disposal. Defaults to `scope.dispose()`.
@@ -112,7 +112,7 @@ export interface InferdiExpressOptions<
   readonly disposeScope?: (
     scope: Scope,
     req: Request,
-    res: Response,
+    res: Response
   ) => MaybePromise<void>
   /**
    * Controls whether the middleware disposes the request scope after response
@@ -129,7 +129,7 @@ export interface InferdiExpressOptions<
   readonly onDisposeError?: (
     error: unknown,
     req: Request,
-    res: Response,
+    res: Response
   ) => MaybePromise<void>
 }
 
@@ -140,7 +140,7 @@ type RequestWithDi<Scope extends InferdiScope> = Request & {
 type DisposeScope<Scope extends InferdiScope> = (
   scope: Scope,
   req: Request,
-  res: Response,
+  res: Response
 ) => MaybePromise<void>
 
 type AutoDispose = InferdiExpressOptions<InferdiRoot>['autoDispose']
@@ -163,7 +163,7 @@ function handleDisposeError(
   req: Request,
   res: Response,
   onDisposeError: DisposeErrorHandler,
-  errors: unknown[],
+  errors: unknown[]
 ): void | PromiseLike<void> {
   if (onDisposeError === undefined) {
     errors.push(error)
@@ -190,14 +190,14 @@ function disposeWithErrors<Scope extends InferdiScope>(
   res: Response,
   disposeScope: DisposeScope<Scope>,
   onDisposeError: DisposeErrorHandler,
-  errors: unknown[],
+  errors: unknown[]
 ): void | PromiseLike<void> {
   try {
     const disposing = disposeScope(scope, req, res)
     if (isPromiseLike(disposing)) {
       return disposing.then(
         undefined,
-        (error) => handleDisposeError(error, req, res, onDisposeError, errors),
+        (error) => handleDisposeError(error, req, res, onDisposeError, errors)
       )
     }
   } catch (error) {
@@ -215,12 +215,12 @@ function logCleanupErrors(errors: unknown[]): void {
   try {
     console.error('Failed to dispose InferDI Express request scope', err)
   } catch {
-    // Response cleanup must not fail because fallback logging failed.
+    // Response cleanup must not fail because fallback logging failed
   }
 }
 
 function clearRequestScope<Scope extends InferdiScope>(
-  req: RequestWithDi<Scope>,
+  req: RequestWithDi<Scope>
 ): void {
   delete (req as { di?: Scope }).di
 }
@@ -228,19 +228,21 @@ function clearRequestScope<Scope extends InferdiScope>(
 function nextSetupFailure<Scope extends InferdiScope>(
   req: RequestWithDi<Scope>,
   next: (error?: unknown) => void,
-  error: unknown,
+  error: unknown
 ): void {
   clearRequestScope(req)
   next(error)
 }
 
-// Setup / activation failures happen before the response is produced, so the
-// error is surfaced through `next(err)`. The disposal teardown still runs
-// through the shared `disposeWithErrors`, so a custom `onDisposeError` sees
-// setup-cleanup failures exactly as it sees post-response ones. Finding 2:
-// only the original lifecycle error is surfaced; any cleanup error
-// `onDisposeError` does not handle is logged, never aggregated into it. `req.di`
-// is cleared so downstream error handlers never observe a half-built scope.
+/*
+ * Setup / activation failures happen before the response is produced, so the
+ * error is surfaced through `next(err)`. The disposal teardown still runs
+ * through the shared `disposeWithErrors`, so a custom `onDisposeError` sees
+ * setup-cleanup failures exactly as it sees post-response ones. Finding 2:
+ * only the original lifecycle error is surfaced; any cleanup error
+ * `onDisposeError` does not handle is logged, never aggregated into it. `req.di`
+ * is cleared so downstream error handlers never observe a half-built scope
+ */
 function handleOwnedScopeFailure<Scope extends InferdiScope>(
   scope: Scope,
   req: RequestWithDi<Scope>,
@@ -248,7 +250,7 @@ function handleOwnedScopeFailure<Scope extends InferdiScope>(
   lifecycleError: unknown,
   disposeScope: DisposeScope<Scope>,
   onDisposeError: DisposeErrorHandler,
-  next: (error?: unknown) => void,
+  next: (error?: unknown) => void
 ): void {
   skippedRequests.delete(req)
 
@@ -259,7 +261,7 @@ function handleOwnedScopeFailure<Scope extends InferdiScope>(
     res,
     disposeScope,
     onDisposeError,
-    errors,
+    errors
   )
 
   if (isPromiseLike(disposing)) {
@@ -274,15 +276,17 @@ function handleOwnedScopeFailure<Scope extends InferdiScope>(
   nextSetupFailure(req, next, lifecycleError)
 }
 
-// Response-completion disposal, shaped like the Koa adapter: a single
-// `onComplete` handler attached to `finish`/`close` removes both listeners and
-// is made idempotent by the `disposed` flag. Normal completion (`fire(false)`)
-// honors `autoDispose` and `skipInferdiDispose` — including a client abort that
-// fires `close` after the handler ran, which is the manual-ownership contract
-// (the route owns that scope's disposal). `force` is used only when the response
-// is *already* destroyed at activation: the handler never ran, so no
-// application-owned cleanup will, and force bypasses `autoDispose` /
-// `skipInferdiDispose` so an already-dead connection cannot leak its scope.
+/*
+ * Response-completion disposal, shaped like the Koa adapter: a single
+ * `onComplete` handler attached to `finish`/`close` removes both listeners and
+ * is made idempotent by the `disposed` flag. Normal completion (`fire(false)`)
+ * honors `autoDispose` and `skipInferdiDispose` — including a client abort that
+ * fires `close` after the handler ran, which is the manual-ownership contract
+ * (the route owns that scope's disposal). `force` is used only when the response
+ * is *already* destroyed at activation: the handler never ran, so no
+ * application-owned cleanup will, and force bypasses `autoDispose` /
+ * `skipInferdiDispose` so an already-dead connection cannot leak its scope
+ */
 function activate<Scope extends InferdiScope>(
   scope: Scope,
   req: RequestWithDi<Scope>,
@@ -290,10 +294,12 @@ function activate<Scope extends InferdiScope>(
   next: (error?: unknown) => void,
   disposeScope: DisposeScope<Scope>,
   autoDispose: AutoDispose,
-  onDisposeError: DisposeErrorHandler,
+  onDisposeError: DisposeErrorHandler
 ): void {
-  // Manual ownership over a live connection is the cheap fast path: no
-  // completion listeners and no cleanup closures.
+  /*
+   * Manual ownership over a live connection is the cheap fast path: no
+   * completion listeners and no cleanup closures
+   */
   if (autoDispose === false && !res.destroyed) {
     next()
     return
@@ -324,7 +330,7 @@ function activate<Scope extends InferdiScope>(
           req,
           res,
           onDisposeError,
-          errors,
+          errors
         )
         if (isPromiseLike(handling)) {
           await handling
@@ -339,7 +345,7 @@ function activate<Scope extends InferdiScope>(
         res,
         disposeScope,
         onDisposeError,
-        errors,
+        errors
       )
       if (isPromiseLike(disposing)) {
         await disposing
@@ -355,7 +361,7 @@ function activate<Scope extends InferdiScope>(
       /* v8 ignore next 3 -- runCleanup sinks its own errors; final bug guard */
       (error) => {
         logCleanupErrors([error])
-      },
+      }
     )
   }
 
@@ -365,9 +371,11 @@ function activate<Scope extends InferdiScope>(
     fire(false)
   }
 
-  // Already destroyed (e.g. client disconnected during async setup, or manual
-  // ownership over a dead connection): force a cleanup and never call next() —
-  // the request will not complete normally.
+  /*
+   * Already destroyed (e.g. client disconnected during async setup, or manual
+   * ownership over a dead connection): force a cleanup and never call next() —
+   * the request will not complete normally
+   */
   if (res.destroyed) {
     fire(true)
     return
@@ -377,9 +385,11 @@ function activate<Scope extends InferdiScope>(
     res.on('finish', onComplete)
     res.on('close', onComplete)
   } catch (error) {
-    // A partial attach (`finish` on, `close` threw) would leave a live listener
-    // that fires after the error handler ends the response and dispose the scope
-    // a second time. Match the Koa adapter and drop both before owned cleanup.
+    /*
+     * A partial attach (`finish` on, `close` threw) would leave a live listener
+     * that fires after the error handler ends the response and dispose the scope
+     * a second time. Match the Koa adapter and drop both before owned cleanup
+     */
     res.removeListener('finish', onComplete)
     res.removeListener('close', onComplete)
     handleOwnedScopeFailure(
@@ -389,12 +399,12 @@ function activate<Scope extends InferdiScope>(
       error,
       disposeScope,
       onDisposeError,
-      next,
+      next
     )
     return
   }
 
-  // The connection may have been destroyed while the listeners were attaching.
+  // The connection may have been destroyed while the listeners were attaching
   if (res.destroyed) {
     res.removeListener('finish', onComplete)
     res.removeListener('close', onComplete)
@@ -414,12 +424,12 @@ function runExposeScope<Scope extends InferdiScope>(
     | ((
         scope: Scope,
         req: Request,
-        res: Response,
+        res: Response
       ) => MaybePromise<void>)
     | undefined,
   disposeScope: DisposeScope<Scope>,
   autoDispose: AutoDispose,
-  onDisposeError: DisposeErrorHandler,
+  onDisposeError: DisposeErrorHandler
 ): void {
   const typedReq = req as RequestWithDi<Scope>
 
@@ -433,7 +443,7 @@ function runExposeScope<Scope extends InferdiScope>(
       error,
       disposeScope,
       onDisposeError,
-      next,
+      next
     )
     return
   }
@@ -450,7 +460,7 @@ function runExposeScope<Scope extends InferdiScope>(
             next,
             disposeScope,
             autoDispose,
-            onDisposeError,
+            onDisposeError
           ),
           (error) => handleOwnedScopeFailure(
             scope,
@@ -459,8 +469,8 @@ function runExposeScope<Scope extends InferdiScope>(
             error,
             disposeScope,
             onDisposeError,
-            next,
-          ),
+            next
+          )
         )
         return
       }
@@ -472,7 +482,7 @@ function runExposeScope<Scope extends InferdiScope>(
         error,
         disposeScope,
         onDisposeError,
-        next,
+        next
       )
       return
     }
@@ -485,7 +495,7 @@ function runExposeScope<Scope extends InferdiScope>(
     next,
     disposeScope,
     autoDispose,
-    onDisposeError,
+    onDisposeError
   )
 }
 
@@ -512,7 +522,7 @@ export function inferdiExpress<
   Root extends InferdiRoot,
   Scope extends InferdiScope = InferdiScopeOf<Root>,
 >(
-  options: InferdiExpressOptions<Root, Scope>,
+  options: InferdiExpressOptions<Root, Scope>
 ): RequestHandler {
   const root = options.container
   const createScope = options.createScope
@@ -542,7 +552,7 @@ export function inferdiExpress<
         undefined,
         disposeScope,
         autoDispose,
-        onDisposeError,
+        onDisposeError
       )
     }
   }
@@ -566,7 +576,7 @@ export function inferdiExpress<
         setupScope,
         disposeScope,
         autoDispose,
-        onDisposeError,
+        onDisposeError
       )
       return
     }
@@ -590,9 +600,9 @@ export function inferdiExpress<
           setupScope,
           disposeScope,
           autoDispose,
-          onDisposeError,
+          onDisposeError
         ),
-        next,
+        next
       )
       return
     }
@@ -605,7 +615,7 @@ export function inferdiExpress<
       setupScope,
       disposeScope,
       autoDispose,
-      onDisposeError,
+      onDisposeError
     )
   }
 }

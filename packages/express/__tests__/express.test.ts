@@ -2,20 +2,20 @@ import { EventEmitter } from 'node:events'
 import {
   createServer,
   request as httpRequest,
-  type Server,
+  type Server
 } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import express, {
   type Express,
   type NextFunction,
   type Request,
-  type Response,
+  type Response
 } from 'express'
 import {describe, expect, it, vi} from 'vitest'
 import {
   inferdiExpress,
   skipInferdiDispose,
-  type InferdiScope,
+  type InferdiScope
 } from '../src/index'
 
 function delay(ms: number) {
@@ -60,7 +60,7 @@ async function close(server: Server) {
 
 async function withServer<T>(
   app: Express,
-  run: (baseUrl: string) => Promise<T>,
+  run: (baseUrl: string) => Promise<T>
 ) {
   const server = createServer(app)
   const baseUrl = await listen(server)
@@ -94,7 +94,7 @@ function errorHandler(errors: unknown[]) {
     error: unknown,
     _req: Request,
     res: Response,
-    _next: NextFunction,
+    _next: NextFunction
   ) => {
     errors.push(error)
     if (!res.headersSent) {
@@ -116,12 +116,12 @@ class TestScope implements InferdiScope {
       readonly disposeError?: Error
       readonly disposeSyncError?: Error
       readonly onDispose?: () => void
-    } = {},
+    } = {}
   ) {}
 
   get(key: 'users') {
     return {
-      profile: (id: string) => ({ id, requestId: this.requestId }),
+      profile: (id: string) => ({ id, requestId: this.requestId })
     }
   }
 
@@ -191,17 +191,17 @@ describe('@inferdi/express', () => {
       container: root,
       setupScope: (scope, req) => {
         scope.requestId = req.get('x-request-id') ?? ''
-      },
+      }
     }))
     app.get('/users/:id', (req, res) => {
       res.json(req.di.get('users').profile(req.params.id))
     })
 
     const first = await requestJson(app, '/users/1', {
-      headers: { 'x-request-id': 'first' },
+      headers: { 'x-request-id': 'first' }
     })
     const second = await requestJson(app, '/users/2', {
-      headers: { 'x-request-id': 'second' },
+      headers: { 'x-request-id': 'second' }
     })
 
     expect(first.body).toEqual({ id: '1', requestId: 'first' })
@@ -235,7 +235,7 @@ describe('@inferdi/express', () => {
         expect(res.headersSent).toBe(true)
         await delay(1)
         disposed.resolve(scope)
-      },
+      }
     }))
     app.get('/users/:id', (req, res) => {
       res.json(req.di.get('users').profile(req.params.id))
@@ -243,7 +243,7 @@ describe('@inferdi/express', () => {
 
     const response = await withServer(app, async (baseUrl) => {
       const result = await fetch(`${baseUrl}/users/8`, {
-        headers: { 'x-request-id': 'custom' },
+        headers: { 'x-request-id': 'custom' }
       })
       const body = await result.json()
       await disposed.promise
@@ -282,12 +282,12 @@ describe('@inferdi/express', () => {
     root.createScopeError = createError
     const app = inferdiExpress({
       container: root,
-      setupScope: () => {},
+      setupScope: () => {}
     })
     const req = {} as Request
     const res = Object.assign(new EventEmitter(), {
       destroyed: false,
-      writableEnded: false,
+      writableEnded: false
     }) as Response
     let failure: unknown
 
@@ -305,12 +305,12 @@ describe('@inferdi/express', () => {
     const app = inferdiExpress({
       container: root,
       createScope: () => customScope,
-      disposeScope: () => {},
+      disposeScope: () => {}
     })
     const req = {} as Request
     const res = Object.assign(new EventEmitter(), {
       destroyed: false,
-      writableEnded: false,
+      writableEnded: false
     }) as Response
     let nextCalls = 0
 
@@ -332,12 +332,12 @@ describe('@inferdi/express', () => {
       container: root,
       createScope: () => {
         throw createError
-      },
+      }
     })
     const req = {} as Request
     const res = Object.assign(new EventEmitter(), {
       destroyed: false,
-      writableEnded: false,
+      writableEnded: false
     }) as Response
     let failure: unknown
 
@@ -359,7 +359,7 @@ describe('@inferdi/express', () => {
       container: root,
       setupScope: () => {
         throw setupError
-      },
+      }
     }))
     app.get('/ok', (_req, res) => {
       res.json({ unreachable: true })
@@ -380,12 +380,12 @@ describe('@inferdi/express', () => {
       container: root,
       setupScope: async () => {
         throw setupError
-      },
+      }
     })
     const req = {} as Request
     const res = Object.assign(new EventEmitter(), {
       destroyed: false,
-      writableEnded: false,
+      writableEnded: false
     }) as Response
     let failure: unknown
 
@@ -410,12 +410,12 @@ describe('@inferdi/express', () => {
       },
       disposeScope: (scope) => {
         disposed.push(scope)
-      },
+      }
     })
     const req = {} as Request
     const res = Object.assign(new EventEmitter(), {
       destroyed: false,
-      writableEnded: false,
+      writableEnded: false
     }) as Response
     let failure: unknown
 
@@ -444,7 +444,7 @@ describe('@inferdi/express', () => {
         container: root,
         setupScope: () => {
           throw setupError
-        },
+        }
       }))
       app.use(errorHandler(errors))
 
@@ -454,7 +454,7 @@ describe('@inferdi/express', () => {
       expect(errors).toEqual([setupError])
       expect(consoleError).toHaveBeenCalledWith(
         'Failed to dispose InferDI Express request scope',
-        disposeError,
+        disposeError
       )
       expect(root.scopes[0]?.disposeCalls).toBe(1)
     } finally {
@@ -478,15 +478,17 @@ describe('@inferdi/express', () => {
       },
       onDisposeError: (error) => {
         handled.push(error)
-      },
+      }
     }))
     app.use(errorHandler(errors))
 
     const response = await requestText(app, '/ok')
 
     expect(response.status).toBe(500)
-    // onDisposeError handled the cleanup failure, so only the original setup
-    // error surfaces — no AggregateError.
+    /*
+     * onDisposeError handled the cleanup failure, so only the original setup
+     * error surfaces — no AggregateError
+     */
     expect(errors).toEqual([setupError])
     expect(handled).toEqual([disposeError])
     expect(root.scopes[0]?.disposeCalls).toBe(1)
@@ -516,12 +518,12 @@ describe('@inferdi/express', () => {
     const root = new TestRoot()
     const app = inferdiExpress({
       container: root,
-      disposeScope: () => {},
+      disposeScope: () => {}
     })
     const req = {} as Request
     const res = Object.assign(new EventEmitter(), {
       destroyed: false,
-      writableEnded: false,
+      writableEnded: false
     }) as Response
     const calls: string[] = []
 
@@ -542,7 +544,7 @@ describe('@inferdi/express', () => {
     const activationError = new Error('response listener failed')
     const app = inferdiExpress({
       container: root,
-      createScope: async (receivedRoot) => receivedRoot.createScope(),
+      createScope: async (receivedRoot) => receivedRoot.createScope()
     })
     const req = {} as Request
     const res = {
@@ -550,7 +552,7 @@ describe('@inferdi/express', () => {
       on: () => {
         throw activationError
       },
-      removeListener: () => {},
+      removeListener: () => {}
     } as unknown as Response
     let failure: unknown
 
@@ -569,7 +571,7 @@ describe('@inferdi/express', () => {
     const activationError = new Error('response listener failed')
     const app = inferdiExpress({
       container: root,
-      setupScope: async () => {},
+      setupScope: async () => {}
     })
     const req = {} as Request
     const res = {
@@ -577,7 +579,7 @@ describe('@inferdi/express', () => {
       on: () => {
         throw activationError
       },
-      removeListener: () => {},
+      removeListener: () => {}
     } as unknown as Response
     let failure: unknown
 
@@ -597,11 +599,11 @@ describe('@inferdi/express', () => {
     const req = Object.defineProperty({}, 'di', {
       configurable: true,
       value: undefined,
-      writable: false,
+      writable: false
     }) as Request
     const res = Object.assign(new EventEmitter(), {
       destroyed: false,
-      writableEnded: false,
+      writableEnded: false
     }) as Response
     let failure: unknown
 
@@ -621,7 +623,7 @@ describe('@inferdi/express', () => {
     const req = {} as Request
     const res = Object.assign(new EventEmitter(), {
       destroyed: false,
-      writableEnded: false,
+      writableEnded: false
     }) as Response
 
     await new Promise<void>((resolve, reject) => {
@@ -658,12 +660,12 @@ describe('@inferdi/express', () => {
       setupScope: async (_scope, req) => {
         skipInferdiDispose(req)
         await delay(1)
-      },
+      }
     })
     const req = {} as Request
     const res = Object.assign(new EventEmitter(), {
       destroyed: true,
-      writableEnded: false,
+      writableEnded: false
     }) as Response
 
     app(req, res, next)
@@ -679,7 +681,7 @@ describe('@inferdi/express', () => {
     const req = {} as Request
     const res = Object.assign(new EventEmitter(), {
       destroyed: false,
-      writableEnded: false,
+      writableEnded: false
     }) as Response
     const originalOn = res.on.bind(res)
     const next = vi.fn()
@@ -710,7 +712,7 @@ describe('@inferdi/express', () => {
       disposeScope: (scope, req) => {
         expect(req.di).toBe(scope)
         disposed.push(scope)
-      },
+      }
     }))
     app.get('/ok', (_req, res) => {
       res.json({ ok: true })
@@ -726,12 +728,12 @@ describe('@inferdi/express', () => {
     const root = new TestRoot()
     const app = inferdiExpress({
       container: root,
-      autoDispose: false,
+      autoDispose: false
     })
     const req = {} as Request
     const res = Object.assign(new EventEmitter(), {
       destroyed: false,
-      writableEnded: false,
+      writableEnded: false
     }) as Response
     let nextCalls = 0
 
@@ -750,12 +752,12 @@ describe('@inferdi/express', () => {
     const root = new TestRoot()
     const app = inferdiExpress({
       container: root,
-      autoDispose: false,
+      autoDispose: false
     })
     const req = {} as Request
     const res = Object.assign(new EventEmitter(), {
       destroyed: true,
-      writableEnded: false,
+      writableEnded: false
     }) as Response
     const next = vi.fn()
 
@@ -781,12 +783,12 @@ describe('@inferdi/express', () => {
       },
       disposeScope: () => {
         throw disposeError
-      },
+      }
     })
     const req = {} as Request
     const res = Object.assign(new EventEmitter(), {
       destroyed: false,
-      writableEnded: false,
+      writableEnded: false
     }) as Response
     let failure: unknown
 
@@ -798,7 +800,7 @@ describe('@inferdi/express', () => {
       expect(failure).toBe(setupError)
       expect(consoleError).toHaveBeenCalledWith(
         'Failed to dispose InferDI Express request scope',
-        disposeError,
+        disposeError
       )
       expect(Object.prototype.hasOwnProperty.call(req, 'di')).toBe(false)
     } finally {
@@ -852,7 +854,7 @@ describe('@inferdi/express', () => {
       error: unknown,
       _req: Request,
       res: Response,
-      _next: NextFunction,
+      _next: NextFunction
     ) => {
       errors.push(error)
       res.status(409).json({ message: (error as Error).message })
@@ -867,13 +869,15 @@ describe('@inferdi/express', () => {
   })
 
   it('keeps skipInferdiDispose honored on a handled route error (documented limitation)', async () => {
-    // Express middleware is callback-style: `next()` returns no downstream
-    // completion promise, so this middleware cannot observe a route exception.
-    // Cleanup fires on the Node response `finish`/`close` event, where a handled
-    // error (the error handler produced a response) is indistinguishable from a
-    // normal response. Unlike Fastify/Koa/Hono/Elysia, Express therefore keeps
-    // `skipInferdiDispose` honored even when the route fails. Documented in the
-    // README; asserted here so the trade-off stays explicit.
+    /*
+     * Express middleware is callback-style: `next()` returns no downstream
+     * completion promise, so this middleware cannot observe a route exception.
+     * Cleanup fires on the Node response `finish`/`close` event, where a handled
+     * error (the error handler produced a response) is indistinguishable from a
+     * normal response. Unlike Fastify/Koa/Hono/Elysia, Express therefore keeps
+     * `skipInferdiDispose` honored even when the route fails. Documented in the
+     * README; asserted here so the trade-off stays explicit
+     */
     const root = new TestRoot()
     const routeError = new Error('route failed')
     const errors: unknown[] = []
@@ -888,7 +892,7 @@ describe('@inferdi/express', () => {
       error: unknown,
       _req: Request,
       res: Response,
-      _next: NextFunction,
+      _next: NextFunction
     ) => {
       errors.push(error)
       res.status(409).json({ message: (error as Error).message })
@@ -898,8 +902,10 @@ describe('@inferdi/express', () => {
 
     expect(response.status).toBe(409)
     expect(errors).toEqual([routeError])
-    // The skip marker is honored despite the failure — the leak the other
-    // adapters prevent is the documented Express trade-off.
+    /*
+     * The skip marker is honored despite the failure — the leak the other
+     * adapters prevent is the documented Express trade-off
+     */
     expect(root.scopes[0]?.disposeCalls).toBe(0)
   })
 
@@ -931,7 +937,7 @@ describe('@inferdi/express', () => {
       expect(unhandled).toEqual([])
       expect(consoleError).toHaveBeenCalledWith(
         'Failed to dispose InferDI Express request scope',
-        disposeError,
+        disposeError
       )
     } finally {
       process.off('unhandledRejection', onUnhandled)
@@ -950,7 +956,7 @@ describe('@inferdi/express', () => {
       container: root,
       onDisposeError: (error, req, res) => {
         handled.push([error, req.di, req.path, res.headersSent])
-      },
+      }
     }))
     app.get('/ok', (_req, res) => {
       res.json({ ok: true })
@@ -977,7 +983,7 @@ describe('@inferdi/express', () => {
         container: root,
         onDisposeError: async () => {
           throw handlerError
-        },
+        }
       }))
       app.get('/ok', (_req, res) => {
         res.json({ ok: true })
@@ -997,7 +1003,7 @@ describe('@inferdi/express', () => {
   it('swallows fallback logging failures after response completion', async () => {
     const root = new TestRoot()
     root.nextScope = new TestScope({
-      disposeError: new Error('dispose failed'),
+      disposeError: new Error('dispose failed')
     })
     const consoleError = vi
       .spyOn(console, 'error')
@@ -1035,12 +1041,12 @@ describe('@inferdi/express', () => {
       },
       onDisposeError: () => {
         throw handlerError
-      },
+      }
     })
     const req = {} as Request
     const res = Object.assign(new EventEmitter(), {
       destroyed: false,
-      writableEnded: false,
+      writableEnded: false
     }) as Response
 
     try {
@@ -1063,7 +1069,7 @@ describe('@inferdi/express', () => {
 
     booleanApp.use(inferdiExpress({
       container: booleanRoot,
-      autoDispose: false,
+      autoDispose: false
     }))
     booleanApp.get('/manual', (_req, res) => {
       res.json({ ok: true })
@@ -1071,7 +1077,7 @@ describe('@inferdi/express', () => {
 
     predicateApp.use(inferdiExpress({
       container: predicateRoot,
-      autoDispose: (req) => req.path !== '/manual',
+      autoDispose: (req) => req.path !== '/manual'
     }))
     predicateApp.get('/:mode', (_req, res) => {
       res.json({ ok: true })
@@ -1090,12 +1096,12 @@ describe('@inferdi/express', () => {
     const root = new TestRoot()
     const app = inferdiExpress({
       container: root,
-      autoDispose: async () => false,
+      autoDispose: async () => false
     })
     const req = {} as Request
     const res = Object.assign(new EventEmitter(), {
       destroyed: false,
-      writableEnded: false,
+      writableEnded: false
     }) as Response
 
     app(req, res, () => {})
@@ -1117,12 +1123,12 @@ describe('@inferdi/express', () => {
       },
       onDisposeError: (error) => {
         handled.push(error)
-      },
+      }
     })
     const req = {} as Request
     const res = Object.assign(new EventEmitter(), {
       destroyed: false,
-      writableEnded: false,
+      writableEnded: false
     }) as Response
 
     app(req, res, () => {})
@@ -1146,7 +1152,7 @@ describe('@inferdi/express', () => {
       },
       onDisposeError: (error, req) => {
         handled.push([error, req.path])
-      },
+      }
     }))
     app.get('/ok', (_req, res) => {
       res.json({ ok: true })
@@ -1156,11 +1162,13 @@ describe('@inferdi/express', () => {
 
     expect(response.status).toBe(200)
     expect(root.scopes[0]?.disposeCalls).toBe(1)
-    // onDisposeError is a per-error sink: the predicate failure and the dispose
-    // failure are reported separately.
+    /*
+     * onDisposeError is a per-error sink: the predicate failure and the dispose
+     * failure are reported separately
+     */
     expect(handled).toEqual([
       [predicateError, '/ok'],
-      [disposeError, '/ok'],
+      [disposeError, '/ok']
     ])
   })
 
@@ -1178,7 +1186,7 @@ describe('@inferdi/express', () => {
       onDisposeError: async (error) => {
         await Promise.resolve()
         handled.push(error)
-      },
+      }
     }))
     app.get('/ok', (_req, res) => {
       res.json({ ok: true })
@@ -1221,7 +1229,7 @@ describe('@inferdi/express', () => {
       setupScope: (_scope, req) => {
         skipInferdiDispose(req)
         throw setupError
-      },
+      }
     }))
     app.use(errorHandler(errors))
 
@@ -1248,13 +1256,13 @@ describe('@inferdi/express', () => {
       disposeScope: (scope, req) => {
         cleanupDi = req.di
         return scope.dispose()
-      },
+      }
     }))
     app.use((
       error: unknown,
       req: Request,
       res: Response,
-      _next: NextFunction,
+      _next: NextFunction
     ) => {
       errors.push(error)
       errorHandlerSawDi = Object.prototype.hasOwnProperty.call(req, 'di')

@@ -3,13 +3,13 @@ import type {AddressInfo} from 'node:net'
 import Fastify, {
   type FastifyBaseLogger,
   type FastifyInstance,
-  type FastifyRequest,
+  type FastifyRequest
 } from 'fastify'
 import {describe, expect, it} from 'vitest'
 import {
   inferdiFastify,
   skipInferdiDispose,
-  type InferdiScope,
+  type InferdiScope
 } from '../src/index'
 
 async function listenOn(app: FastifyInstance): Promise<number> {
@@ -20,7 +20,7 @@ async function listenOn(app: FastifyInstance): Promise<number> {
 
 async function waitFor(
   predicate: () => boolean,
-  timeoutMs = 3000,
+  timeoutMs = 3000
 ): Promise<void> {
   const start = Date.now()
   while (!predicate() && Date.now() - start < timeoutMs) {
@@ -35,8 +35,10 @@ function delay(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms))
 }
 
-// Minimal Pino-compatible logger that captures `request.log.error(...)` calls,
-// so tests can assert what the default disposal sink received.
+/*
+ * Minimal Pino-compatible logger that captures `request.log.error(...)` calls,
+ * so tests can assert what the default disposal sink received
+ */
 function makeLogger(sink: unknown[]): FastifyBaseLogger {
   const logger = {
     level: 'error',
@@ -51,7 +53,7 @@ function makeLogger(sink: unknown[]): FastifyBaseLogger {
     fatal() {},
     child() {
       return logger
-    },
+    }
   }
   return logger as unknown as FastifyBaseLogger
 }
@@ -60,7 +62,7 @@ function loggedError(entry: unknown): unknown {
   return (entry as { err: unknown }).err
 }
 
-// A logger whose `error(...)` throws, used to prove the fallback log is guarded.
+// A logger whose `error(...)` throws, used to prove the fallback log is guarded
 function makeThrowingLogger(loggerError: Error): FastifyBaseLogger {
   const logger = {
     level: 'error',
@@ -75,7 +77,7 @@ function makeThrowingLogger(loggerError: Error): FastifyBaseLogger {
     fatal() {},
     child() {
       return logger
-    },
+    }
   }
   return logger as unknown as FastifyBaseLogger
 }
@@ -91,12 +93,12 @@ class TestScope implements InferdiScope {
       readonly disposeError?: Error
       readonly disposeSyncError?: Error
       readonly disposeSync?: boolean
-    } = {},
+    } = {}
   ) {}
 
   get(key: 'users') {
     return {
-      profile: (id: string) => ({ id, requestId: this.requestId }),
+      profile: (id: string) => ({ id, requestId: this.requestId })
     }
   }
 
@@ -145,7 +147,7 @@ class TestRoot implements InferdiScope {
 
   get(key: 'health') {
     return {
-      check: () => 'ok',
+      check: () => 'ok'
     }
   }
 
@@ -196,8 +198,10 @@ describe('@inferdi/fastify', () => {
     root.nextScope = new TestScope({ disposeSync: true })
 
     app.register(inferdiFastify, { container: root })
-    // A later sync onResponse hook observes that the default sync dispose path
-    // already completed synchronously by the time the plugin called done().
+    /*
+     * A later sync onResponse hook observes that the default sync dispose path
+     * already completed synchronously by the time the plugin called done()
+     */
     app.addHook('onResponse', (_request, _reply, done) => {
       sawDisposedInLaterHook = root.scopes[0]?.disposed === true
       done()
@@ -248,7 +252,7 @@ describe('@inferdi/fastify', () => {
       container: root,
       createScope: () => {
         throw createError
-      },
+      }
     })
     app.setErrorHandler((error, _request, reply) => {
       handledError = error
@@ -273,7 +277,7 @@ describe('@inferdi/fastify', () => {
       container: root,
       setupScope: (scope, request) => {
         scope.requestId = request.id
-      },
+      }
     })
     app.get('/users/:id', async (request) => {
       const scope = (request as RequestWithScope).di
@@ -308,7 +312,7 @@ describe('@inferdi/fastify', () => {
       },
       setupScope: (scope, request) => {
         scope.requestId = request.id
-      },
+      }
     })
     app.get('/users/:id', async (request) => {
       const scope = (request as RequestWithScope).di
@@ -335,7 +339,7 @@ describe('@inferdi/fastify', () => {
 
     app.register(inferdiFastify, {
       container: root,
-      createScope: () => customScope,
+      createScope: () => customScope
     })
     app.get('/users/:id', async (request) => {
       const scope = (request as RequestWithScope).di
@@ -390,7 +394,7 @@ describe('@inferdi/fastify', () => {
       },
       onDisposeError: (error) => {
         handled.push(error)
-      },
+      }
     })
     app.setErrorHandler((error, _request, reply) => {
       handledError = error
@@ -425,7 +429,7 @@ describe('@inferdi/fastify', () => {
       },
       onDisposeError: () => {
         throw handlerError
-      },
+      }
     })
     app.setErrorHandler((error, _request, reply) => {
       handledError = error
@@ -436,7 +440,7 @@ describe('@inferdi/fastify', () => {
     const response = await app.inject('/users/1')
     const aggregate = loggedError(logged[0]) as AggregateError
 
-    // The thrown error stays the original setup error — never an AggregateError.
+    // The thrown error stays the original setup error — never an AggregateError
     expect(response.statusCode).toBe(418)
     expect(handledError).toBe(setupError)
     expect(aggregate).toBeInstanceOf(AggregateError)
@@ -456,7 +460,7 @@ describe('@inferdi/fastify', () => {
       container: root,
       setupScope: () => {
         throw setupError
-      },
+      }
     })
     app.setErrorHandler((error, _request, reply) => {
       handledError = error
@@ -549,7 +553,7 @@ describe('@inferdi/fastify', () => {
       onDisposeError: (error, request) => {
         handled.push(error)
         expect(request.id).toBeTypeOf('string')
-      },
+      }
     })
     app.get('/ok', async () => ({ ok: true }))
 
@@ -572,7 +576,7 @@ describe('@inferdi/fastify', () => {
       container: root,
       onDisposeError: (error) => {
         handled.push(error)
-      },
+      }
     })
     app.get('/ok', async () => ({ ok: true }))
 
@@ -594,7 +598,7 @@ describe('@inferdi/fastify', () => {
 
     app.register(inferdiFastify, {
       container: root,
-      autoDispose: true,
+      autoDispose: true
     })
     app.get('/ok', async () => ({ ok: true }))
 
@@ -617,7 +621,7 @@ describe('@inferdi/fastify', () => {
         expect(request.id).toBeTypeOf('string')
         await Promise.resolve()
         disposed.push(scope)
-      },
+      }
     })
     app.get('/ok', async () => ({ ok: true }))
 
@@ -639,7 +643,7 @@ describe('@inferdi/fastify', () => {
       container: root,
       disposeScope: (scope) => {
         disposed.push(scope)
-      },
+      }
     })
     app.get('/ok', async () => ({ ok: true }))
 
@@ -657,7 +661,7 @@ describe('@inferdi/fastify', () => {
 
     app.register(inferdiFastify, {
       container: root,
-      autoDispose: false,
+      autoDispose: false
     })
     app.get('/ok', async () => ({ ok: true }))
 
@@ -675,7 +679,7 @@ describe('@inferdi/fastify', () => {
 
     app.register(inferdiFastify, {
       container: root,
-      autoDispose: (request) => request.url !== '/manual',
+      autoDispose: (request) => request.url !== '/manual'
     })
     app.get('/manual', async () => ({ ok: true }))
     app.get('/auto', async () => ({ ok: true }))
@@ -695,7 +699,7 @@ describe('@inferdi/fastify', () => {
 
     app.register(inferdiFastify, {
       container: root,
-      autoDispose: async (request) => request.url !== '/manual',
+      autoDispose: async (request) => request.url !== '/manual'
     })
     app.get('/manual', async () => ({ ok: true }))
     app.get('/auto', async () => ({ ok: true }))
@@ -721,7 +725,7 @@ describe('@inferdi/fastify', () => {
       container: root,
       autoDispose: () => {
         throw predicateError
-      },
+      }
     })
     app.get('/ok', async () => ({ ok: true }))
 
@@ -750,7 +754,7 @@ describe('@inferdi/fastify', () => {
       onDisposeError: async (error) => {
         await Promise.resolve()
         handled.push(error)
-      },
+      }
     })
     app.get('/ok', async () => ({ ok: true }))
 
@@ -775,7 +779,7 @@ describe('@inferdi/fastify', () => {
       onDisposeError: async (error) => {
         await Promise.resolve()
         handled.push(error)
-      },
+      }
     })
     app.get('/ok', async () => ({ ok: true }))
 
@@ -799,7 +803,7 @@ describe('@inferdi/fastify', () => {
       container: root,
       onDisposeError: async () => {
         throw handlerError
-      },
+      }
     })
     app.get('/ok', async () => ({ ok: true }))
 
@@ -850,8 +854,10 @@ describe('@inferdi/fastify', () => {
     const response = await app.inject('/boom')
 
     expect(response.statusCode).toBe(409)
-    // Finding 3: a failed request disposes even when skipInferdiDispose was
-    // called; the marker only suppresses successful response cleanup.
+    /*
+     * Finding 3: a failed request disposes even when skipInferdiDispose was
+     * called; the marker only suppresses successful response cleanup
+     */
     expect(root.scopes[0]?.disposeCalls).toBe(1)
 
     await app.close()
@@ -867,15 +873,17 @@ describe('@inferdi/fastify', () => {
       disposeScope: async (scope, request) => {
         diDuringCleanup = (request as RequestWithScope).di
         await scope.dispose()
-      },
+      }
     })
     app.get('/ok', async () => ({ ok: true }))
 
     const response = await app.inject('/ok')
 
     expect(response.statusCode).toBe(200)
-    // Finding 1: cleanup hooks observe the same `request.di` handle the request
-    // did, matching the other adapters.
+    /*
+     * Finding 1: cleanup hooks observe the same `request.di` handle the request
+     * did, matching the other adapters
+     */
     expect(diDuringCleanup).toBe(root.scopes[0])
     expect(root.scopes[0]?.disposeCalls).toBe(1)
 
@@ -897,7 +905,7 @@ describe('@inferdi/fastify', () => {
       disposeScope: (scope, request) => {
         diDuringCleanup = (request as RequestWithScope).di
         return scope.dispose()
-      },
+      }
     })
     app.setErrorHandler((error, request, reply) => {
       diInErrorHandler = (request as RequestWithScope).di
@@ -908,8 +916,10 @@ describe('@inferdi/fastify', () => {
     const response = await app.inject('/ok')
 
     expect(response.statusCode).toBe(500)
-    // Finding 4: setup-failure cleanup hooks see the scope on `request.di`, but
-    // it is cleared before the framework error handler runs.
+    /*
+     * Finding 4: setup-failure cleanup hooks see the scope on `request.di`, but
+     * it is cleared before the framework error handler runs
+     */
     expect(diDuringCleanup).toBe(root.scopes[0])
     expect(diInErrorHandler).toBeNull()
     expect(root.scopes[0]?.disposeCalls).toBe(1)
@@ -923,7 +933,7 @@ describe('@inferdi/fastify', () => {
 
     app.register(inferdiFastify, {
       container: root,
-      scopePerRequest: false,
+      scopePerRequest: false
     })
     app.get('/health', async function (request) {
       const thisRoot = (this as InstanceWithRoot).di
@@ -931,7 +941,7 @@ describe('@inferdi/fastify', () => {
       return {
         sameRoot: thisRoot === root && serverRoot === root,
         hasRequestDi: Object.prototype.hasOwnProperty.call(request, 'di'),
-        health: serverRoot.get('health').check(),
+        health: serverRoot.get('health').check()
       }
     })
 
@@ -941,7 +951,7 @@ describe('@inferdi/fastify', () => {
     expect(JSON.parse(response.body)).toEqual({
       sameRoot: true,
       hasRequestDi: false,
-      health: 'ok',
+      health: 'ok'
     })
     expect(root.createScopeCalls).toBe(0)
     expect(app.hasRequestDecorator('di')).toBe(false)
@@ -955,7 +965,7 @@ describe('@inferdi/fastify', () => {
 
     app.register(inferdiFastify, {
       container: root,
-      disposeRootOnClose: true,
+      disposeRootOnClose: true
     })
 
     await app.ready()
@@ -973,7 +983,7 @@ describe('@inferdi/fastify', () => {
 
     app.register(inferdiFastify, {
       container: root,
-      disposeRootOnClose: true,
+      disposeRootOnClose: true
     })
 
     await app.ready()
@@ -988,7 +998,7 @@ describe('@inferdi/fastify', () => {
 
     app.register(inferdiFastify, {
       container: root,
-      disposeRootOnClose: true,
+      disposeRootOnClose: true
     })
 
     await app.ready()
@@ -1031,7 +1041,7 @@ describe('@inferdi/fastify', () => {
   it('keeps the original setup error when both disposal and the logger throw', async () => {
     const setupError = new Error('setup boom')
     const app = Fastify({
-      loggerInstance: makeThrowingLogger(new Error('logger boom')),
+      loggerInstance: makeThrowingLogger(new Error('logger boom'))
     })
     const root = new TestRoot()
     root.nextScope = new TestScope({ disposeSyncError: new Error('dispose boom') })
@@ -1041,7 +1051,7 @@ describe('@inferdi/fastify', () => {
       container: root,
       setupScope: () => {
         throw setupError
-      },
+      }
     })
     app.setErrorHandler((error, _request, reply) => {
       handledError = error
@@ -1052,7 +1062,7 @@ describe('@inferdi/fastify', () => {
     const response = await app.inject('/x')
     const body = JSON.parse(response.body) as { message: string }
 
-    // The throwing logger must not replace the original setup error.
+    // The throwing logger must not replace the original setup error
     expect(response.statusCode).toBe(500)
     expect(handledError).toBe(setupError)
     expect(body.message).toBe('setup boom')
@@ -1067,9 +1077,11 @@ describe('@inferdi/fastify', () => {
     root.nextScope = new TestScope({ disposeSync: true })
 
     app.register(inferdiFastify, { container: root, autoDispose: true })
-    // A later sync onResponse hook observes that the default sync dispose path
-    // already completed synchronously, proving autoDispose: true did not move
-    // the request onto the async disposeCustom path.
+    /*
+     * A later sync onResponse hook observes that the default sync dispose path
+     * already completed synchronously, proving autoDispose: true did not move
+     * the request onto the async disposeCustom path
+     */
     app.addHook('onResponse', (_request, _reply, done) => {
       disposedInLaterHook = root.scopes[0]?.disposed === true
       done()
@@ -1096,7 +1108,7 @@ describe('@inferdi/fastify', () => {
         await delay(5)
         root.scopes.push(customScope)
         return customScope
-      },
+      }
     })
     app.get('/users/:id', async (request) => {
       const scope = (request as RequestWithScope).di
@@ -1122,7 +1134,7 @@ describe('@inferdi/fastify', () => {
       container: root,
       createScope: async () => {
         throw createError
-      },
+      }
     })
     app.setErrorHandler((error, _request, reply) => {
       reply.code(500).send({ message: error.message })
@@ -1147,7 +1159,7 @@ describe('@inferdi/fastify', () => {
       setupScope: async (scope, request) => {
         await delay(5)
         scope.requestId = request.id
-      },
+      }
     })
     app.get('/users/:id', async (request) => {
       const scope = (request as RequestWithScope).di
@@ -1176,7 +1188,7 @@ describe('@inferdi/fastify', () => {
       container: root,
       setupScope: async () => {
         throw setupError
-      },
+      }
     })
     app.setErrorHandler((error, _request, reply) => {
       handledError = error
@@ -1350,7 +1362,7 @@ describe('@inferdi/fastify client abort', () => {
         createStarted = true
         await createGate
         return root.createScope()
-      },
+      }
     })
     app.addHook('onRequestAbort', (_request, done) => {
       aborted = true
@@ -1393,7 +1405,7 @@ describe('@inferdi/fastify client abort', () => {
       setupScope: async () => {
         setupStarted = true
         await setupGate
-      },
+      }
     })
     app.addHook('onRequestAbort', (_request, done) => {
       aborted = true
@@ -1439,7 +1451,7 @@ describe('@inferdi/fastify client abort', () => {
       disposeScope: (scope, _request, reply) => {
         expect(typeof reply.code).toBe('function')
         disposed.push(scope)
-      },
+      }
     })
     app.get('/slow', async () => {
       entered = true
@@ -1480,7 +1492,7 @@ describe('@inferdi/fastify client abort', () => {
       onDisposeError: (error, _request, reply) => {
         expect(typeof reply.code).toBe('function')
         handled.push(error)
-      },
+      }
     })
     app.get('/slow', async () => {
       entered = true

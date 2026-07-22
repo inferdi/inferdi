@@ -36,16 +36,20 @@ async function main() {
     .registerClass('logger', Logger, [])
     .registerClass('userService', UserService, ['logger', 'token'])
 
-  // Uncomment in an editor with JavaScript type checking enabled:
-  // new Container()
-  //   .registerValue('token', 'secret-123')
-  //   .registerClass('logger', Logger, [])
-  //   .registerClass('userService', UserService, ['token', 'logger'])
+  /*
+   * Uncomment in an editor with JavaScript type checking enabled:
+   * new Container()
+   *   .registerValue('token', 'secret-123')
+   *   .registerClass('logger', Logger, [])
+   *   .registerClass('userService', UserService, ['token', 'logger'])
+   */
 
   console.log(container.get('userService').find('42'))
 
-  // If your runtime/toolchain supports Explicit Resource Management syntax,
-  // Container also supports: await using container = new Container()
+  /*
+   * If your runtime/toolchain supports Explicit Resource Management syntax,
+   * Container also supports: await using container = new Container()
+   */
   await container.dispose()
 }
 

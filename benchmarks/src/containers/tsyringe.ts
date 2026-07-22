@@ -11,7 +11,7 @@ function configure(c: DependencyContainer): DependencyContainer {
   c.register(T.Repo, { useClass: F.Repo }, { lifecycle: Lifecycle.Singleton })
   c.register(T.Service, { useClass: F.Service }, { lifecycle: Lifecycle.Singleton })
   c.register(T.TransientService, { useClass: F.TransientService }, { lifecycle: Lifecycle.Transient })
-  // ContainerScoped — cached in the child container; clearInstances() actually disposes it.
+  // ContainerScoped — cached in the child container; clearInstances() actually disposes it
   c.register(T.ScopedService, { useClass: F.ScopedService }, { lifecycle: Lifecycle.ContainerScoped })
   c.register(T.Wide4, { useClass: F.Wide4 }, { lifecycle: Lifecycle.Transient })
   c.register(T.Dep0, { useClass: F.Dep0 }, { lifecycle: Lifecycle.Singleton })
@@ -35,7 +35,7 @@ function configure(c: DependencyContainer): DependencyContainer {
   c.register(T.L7, { useClass: F.L7 }, { lifecycle: Lifecycle.Transient })
   c.register(T.L8, { useClass: F.L8 }, { lifecycle: Lifecycle.Transient })
   c.register(T.L9, { useClass: F.L9 }, { lifecycle: Lifecycle.Transient })
-  // Lazy — factory provider; each thunk invocation resolves the logger anew.
+  // Lazy — factory provider; each thunk invocation resolves the logger anew
   c.register(T.LazyLogger, { useFactory: (dep) => () => dep.resolve(T.Logger) })
   c.register(T.LazyConsumer, { useClass: F.LazyConsumer }, { lifecycle: Lifecycle.Singleton })
   return c
@@ -57,6 +57,6 @@ export function buildRoot(): Resolver {
       s.clearInstances()
       return v
     },
-    resolveLazy: () => (root.resolve(T.LazyConsumer) as F.LazyConsumer).use(),
+    resolveLazy: () => (root.resolve(T.LazyConsumer) as F.LazyConsumer).use()
   }
 }

@@ -7,12 +7,14 @@ import {
   TrackableAsyncPlain,
   TrackablePlain,
   TrackableSync,
-  TriProtocol,
+  TriProtocol
 } from './helpers'
 
-// ────────────────────────────────────────────────────────────────────────────
-// Phase 3 — Teardown / Disposal
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * Phase 3 — Teardown / Disposal
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 describe('Phase 3 — LIFO order', () => {
   it('registered A → B → C, dispose order C → B → A', async () => {
@@ -168,7 +170,7 @@ describe('Phase 3 — ownership boundaries', () => {
         created.push(inst)
         return inst
       },
-      'transient',
+      'transient'
     )
 
     c.get('t')
@@ -266,7 +268,7 @@ describe('Phase 3 — idempotency and blocking', () => {
       async [Symbol.asyncDispose](): Promise<void> {
         this.calls++
         await gate
-      },
+      }
     }
     const c = new Container().registerFactory('r', () => inst)
     c.get('r')
@@ -315,9 +317,11 @@ describe('Phase 3 — idempotency and blocking', () => {
   })
 
   it('descendant.get() after parent dispose — throws "Ancestor container is disposed"', async () => {
-    // Parent was torn down (regs.clear() emptied its registrations) while a child
-    // scope is still live and reaching for a key registered on the parent. Without
-    // the explicit ancestor check, the user would see a misleading "Key not found".
+    /*
+     * Parent was torn down (regs.clear() emptied its registrations) while a child
+     * scope is still live and reaching for a key registered on the parent. Without
+     * the explicit ancestor check, the user would see a misleading "Key not found"
+     */
     const root = new Container().registerValue('cfg', {port: 8080})
     const scope = root.createScope()
     await root.dispose()
@@ -354,13 +358,17 @@ describe('Phase 3 — idempotency and blocking', () => {
   })
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// Sync teardown via [Symbol.dispose]
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * Sync teardown via [Symbol.dispose]
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 describe('Phase 3 — sync [Symbol.dispose]', () => {
-  // Watch unhandledRejection to confirm we swallow promises from
-  // an async plain .dispose() without flooding the event loop.
+  /*
+   * Watch unhandledRejection to confirm we swallow promises from
+   * an async plain .dispose() without flooding the event loop
+   */
   let rejections: unknown[] = []
   let handler: (reason: unknown) => void
 
@@ -415,8 +423,10 @@ describe('Phase 3 — sync [Symbol.dispose]', () => {
   })
 
   it('unhandledRejection from async-in-sync dispose is suppressed', async () => {
-    // A resource whose plain dispose() returns a rejected Promise.
-    // Without .catch(() => {}) inside Container — we would catch unhandledRejection.
+    /*
+     * A resource whose plain dispose() returns a rejected Promise.
+     * Without .catch(() => {}) inside Container — we would catch unhandledRejection
+     */
     class RejectingPlain {
       public disposeCalls = 0
       public dispose(): Promise<void> {
@@ -431,8 +441,10 @@ describe('Phase 3 — sync [Symbol.dispose]', () => {
 
     expect(() => c[Symbol.dispose]()).toThrow(/await using/i)
 
-    // Wait for microtasks so the promise definitely settles. The error should be
-    // caught by the internal .catch(() => {}) and NOT reach process unhandledRejection.
+    /*
+     * Wait for microtasks so the promise definitely settles. The error should be
+     * caught by the internal .catch(() => {}) and NOT reach process unhandledRejection
+     */
     await new Promise((resolve) => setImmediate(resolve))
     await new Promise((resolve) => setImmediate(resolve))
 
@@ -466,8 +478,10 @@ describe('Phase 3 — sync [Symbol.dispose]', () => {
   })
 
   it('one sync disposer throws — the error is propagated as-is (not AggregateError)', () => {
-    // Sync variant of an exception inside [Symbol.dispose]: covers the
-    // catch → errors.push branch in Container[Symbol.dispose].
+    /*
+     * Sync variant of an exception inside [Symbol.dispose]: covers the
+     * catch → errors.push branch in Container[Symbol.dispose]
+     */
     class ThrowingSync {
       public [Symbol.dispose](): void {
         throw new Error('sync-boom')
@@ -481,8 +495,10 @@ describe('Phase 3 — sync [Symbol.dispose]', () => {
   })
 
   it('two sync disposers throw — AggregateError with all causes', () => {
-    // Covers the second `if (errors.length > 1)` branch and the AggregateError throw
-    // in the sync variant of Container[Symbol.dispose].
+    /*
+     * Covers the second `if (errors.length > 1)` branch and the AggregateError throw
+     * in the sync variant of Container[Symbol.dispose]
+     */
     class ThrowingSync {
       constructor(private readonly msg: string) {}
       public [Symbol.dispose](): void {
@@ -549,13 +565,15 @@ describe('Phase 3 — symbol keys', () => {
   })
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// Phase 3 — async-factory Promise unwrap
-//
-// Async factories cache a Promise in `owned`. The async dispose() awaits it
-// before probing the resolved instance for the disposer protocol; sync
-// [Symbol.dispose] cannot await and surfaces the misuse as an Error.
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * Phase 3 — async-factory Promise unwrap
+ *
+ * Async factories cache a Promise in `owned`. The async dispose() awaits it
+ * before probing the resolved instance for the disposer protocol; sync
+ * [Symbol.dispose] cannot await and surfaces the misuse as an Error.
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 describe('Phase 3 — async-factory Promise unwrap', () => {
   let rejections: unknown[] = []
@@ -630,7 +648,7 @@ describe('Phase 3 — async-factory Promise unwrap', () => {
 
   it('async dispose: rejecting async factory — rejection propagates as the single error', async () => {
     const c = new Container().registerFactory('r', () =>
-      Promise.reject(new Error('factory-boom')) as Promise<TrackableAsync>,
+      Promise.reject(new Error('factory-boom')) as Promise<TrackableAsync>
     )
     c.get('r')
 
@@ -640,7 +658,7 @@ describe('Phase 3 — async-factory Promise unwrap', () => {
   it('async dispose: rejecting async factory + throwing sync resource — AggregateError aggregates both', async () => {
     const c = new Container()
       .registerFactory('rej', () =>
-        Promise.reject(new Error('factory-boom')) as Promise<TrackableAsync>,
+        Promise.reject(new Error('factory-boom')) as Promise<TrackableAsync>
       )
       .registerFactory('thr', () => new Throwing('disposer-boom'))
 
@@ -783,7 +801,7 @@ describe('Phase 3 — TC39 using / await using', () => {
       // Explicitly verify that scope's dispose runs even when it has no owned resources
       void scope
     }
-    // At this point scope must be disposed. inst belongs to outer — not yet closed.
+    // At this point scope must be disposed. inst belongs to outer — not yet closed
     expect(inst.asyncDisposeCalls).toBe(0)
 
     await outer.dispose()

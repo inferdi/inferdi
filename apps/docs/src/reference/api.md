@@ -26,8 +26,8 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/reference/api"
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "executableLibraryName": "@inferdi/inferdi"
       "programmingModel": "Explicit registration, fluent builder"
@@ -82,7 +82,7 @@ class Container<T extends DependenciesMap = Record<never, never>> {
   constructor(options?: ContainerOptions)
 
   registerClass(key, Ctor, deps, kind?, lazyKey?)
-  registerFactory(key, factory, kind?)
+  registerFactory(key, factory, kind?, lazyKey?)
   registerValue(key, value)
   override(key, value)
   use(fn)
@@ -105,10 +105,14 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 | `registerClass` | Register a constructor and dependency tuple. |
 | `registerFactory` | Register custom construction logic. |
 | `registerValue` | Register an externally owned singleton value. |
-| `override` | Replace an existing registration before first resolve. |
+| `override` | Replace an existing registration; rejects a key already cached locally. |
 | `use` | Apply a module builder. |
 
-`registerClass` and `registerFactory` accept `singleton`, `scoped`, and `transient` lifetimes. `registerValue` is always singleton and externally owned.
+`registerClass` and `registerFactory` accept `singleton`, `scoped`, and `transient` lifetimes, plus an optional `lazyKey` companion. `registerValue` is always singleton and externally owned.
+
+Treat the dependency tuple passed to `registerClass` as immutable after registration. The optimized constructor paths do not add a defensive copy.
+
+The `override` timing guard checks only the current container's cache. It catches locally cached singleton/scoped values, `registerValue`, and repeated overrides, but it does not record transient resolutions or ancestor-owned values resolved through a child. Apply overrides before resolving the dependency graph.
 
 ## Namespace Types
 

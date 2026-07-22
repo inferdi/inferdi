@@ -26,8 +26,8 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ru/core/lazy-injection"
       "inLanguage": "ru-RU"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, ленивое внедрение, Lazy, отложенный resolve, циклическая зависимость, singleton, внедрение зависимостей"
       "articleSection": "Базовые принципы"
@@ -80,7 +80,12 @@ const c = new Container()
   .registerClass('audit', Audit, ['clockLazy'], 'singleton')
 ```
 
-`lazyKey` создаёт companion-регистрацию со значением `{ get: () => target }`.
+`lazyKey`, переданный в `registerClass` или `registerFactory`, создаёт companion-регистрацию со значением `{ get: () => target }`.
+
+```ts
+const c = new Container()
+  .registerFactory('clock', () => new Clock(), 'singleton', 'clockLazy')
+```
 
 ## Время жизни сохраняется
 

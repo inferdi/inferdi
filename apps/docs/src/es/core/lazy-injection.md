@@ -26,8 +26,8 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/es/core/lazy-injection"
       "inLanguage": "es-ES"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, inyección perezosa, Lazy, resolución diferida, dependencia circular, singleton, inyección de dependencias"
       "articleSection": "Conceptos básicos"
@@ -80,7 +80,12 @@ const c = new Container()
   .registerClass('audit', Audit, ['clockLazy'], 'singleton')
 ```
 
-Pasar un `lazyKey` crea un registro acompañante cuyo valor es `{ get: () => target }`.
+Pasar un `lazyKey` a `registerClass` o `registerFactory` crea un registro acompañante cuyo valor es `{ get: () => target }`.
+
+```ts
+const c = new Container()
+  .registerFactory('clock', () => new Clock(), 'singleton', 'clockLazy')
+```
 
 ## El tiempo de vida se preserva
 

@@ -27,7 +27,7 @@ schema:
       "inLanguage": "ru-RU"
       "datePublished": "2026-06-12"
       "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16, Bun, Deno"
+      "dependencies": "TypeScript >=5.2, Node.js >=16, Bun, Deno"
       "proficiencyLevel": "Beginner"
       "keywords": "InferDI, установка, npm, JSR, Node.js, Bun, Deno, внедрение зависимостей в TypeScript"
       "articleSection": "Руководство"
@@ -104,9 +104,11 @@ import { Container } from 'jsr:@inferdi/inferdi'
 | Node.js | 16 или новее для основного пакета |
 | Bun | 1.0 или новее |
 | Deno | 1.40 или новее |
-| TypeScript | 5.2+ рекомендуется для `using` / `await using` |
+| TypeScript | 5.6 или новее |
 
 На версиях Node без нативных `Symbol.dispose` и `Symbol.asyncDispose` InferDI при импорте устанавливает полифил символов, чтобы `using` и `await using` продолжали работать.
+
+Опубликованные декларации сами подключают библиотеку типов для Explicit Resource Management. Если проект нацелен на ES2022, добавлять `ESNext.Disposable` в настройку TypeScript `lib` не нужно.
 
 ## Установка адаптеров
 

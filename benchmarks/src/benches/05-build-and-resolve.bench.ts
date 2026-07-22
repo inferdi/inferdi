@@ -9,9 +9,11 @@ import * as typedi from '../containers/typedi.js'
 import * as typedInject from '../containers/typed-inject.js'
 import { b } from './_helpers.js'
 
-// Each iteration builds a fresh container inside the resolver method and resolves one service.
-// NOTE: for TypeDI/tsyringe decorators run at import time, so their "build" means
-// child-context creation, not a full build (see README, fairness note).
+/*
+ * Each iteration builds a fresh container inside the resolver method and resolves one service.
+ * NOTE: for TypeDI/tsyringe decorators run at import time, so their "build" means
+ * child-context creation, not a full build (see README, fairness note)
+ */
 describe('05 build + first resolve (cold container)', () => {
   const ifd = inferdi.buildRoot()
   const inv = inversify.buildRoot()

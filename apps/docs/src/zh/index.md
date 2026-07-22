@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: InferDI
-  text: 面向现代 TypeScript 的唯一极速依赖注入
-  tagline: 借助极速架构、清晰的领域逻辑和一流的可测试性，为任意现代运行时构建采用下一代 DI 的应用。
+  text: 面向现代 TypeScript 的强类型依赖注入
+  tagline: 显式注册服务，让 TypeScript 检查依赖图，并保持精简的运行时解析路径。
   image:
     src: /logo.png
     alt: InferDI
@@ -61,7 +61,7 @@ features:
       src: /puzzle.png
       alt: Framework-agnostic core
     title: 与框架无关的内核
-    details: "InferDI 零依赖，可在任何地方运行 —— Node、Bun、Deno、浏览器、workers。适配器只是可选的请求作用域胶水代码，从来都不是必需品。"
+    details: "InferDI 没有运行时依赖，可运行于 Node、Bun、Deno、浏览器和 workers。适配器为请求作用域提供可选的生命周期胶水代码。"
     link: /zh/adapters/
     linkText: 适配器如何工作
 schema:
@@ -71,7 +71,7 @@ schema:
       "@id": "https://inferdi.com/#website"
       "url": "https://inferdi.com/zh/"
       "name": "InferDI"
-      "description": "面向现代 TypeScript 的极速、无装饰器、强类型依赖注入。"
+      "description": "面向现代 TypeScript 的无装饰器、强类型依赖注入。"
       "inLanguage": "zh-CN"
       "publisher":
         "@id": "https://inferdi.com/#organization"
@@ -96,11 +96,11 @@ schema:
       "name": "InferDI"
       "applicationCategory": "DeveloperApplication"
       "operatingSystem": "Node.js, Bun, Deno, Browser, Edge runtimes"
-      "softwareVersion": "5.0.4"
+      "softwareVersion": "5.0.5"
       "programmingLanguage": "TypeScript"
       "url": "https://inferdi.com/"
       "downloadUrl": "https://www.npmjs.com/package/@inferdi/inferdi"
-      "description": "面向 TypeScript 的零依赖、无装饰器、强类型 DI 容器。依赖图即类型：参数顺序错误、缺失键和生命周期泄漏都是编译错误，而非运行时异常。"
+      "description": "面向 TypeScript 的零运行时依赖、无装饰器、强类型 DI 容器。TypeScript 会在注册时检查参数顺序、缺失键和生命周期依赖。"
       "license": "https://github.com/inferdi/inferdi/blob/main/LICENSE"
       "author":
         "@id": "https://inferdi.com/#organization"

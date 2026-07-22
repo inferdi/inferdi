@@ -4,13 +4,15 @@ import {
   type PropsWithChildren,
   useContext,
   useEffect,
-  useState,
+  useState
 } from 'react'
 
-// Frontend examples keep their own minimal builder because the browser does
-// not have the `Database` / `process.env` shape that `_shared/container.ts`
-// uses on the server. The patterns are the same: scoped `FeatureContext`,
-// singleton services on the root, page-level scope on mount.
+/*
+ * Frontend examples keep their own minimal builder because the browser does
+ * not have the `Database` / `process.env` shape that `_shared/container.ts`
+ * uses on the server. The patterns are the same: scoped `FeatureContext`,
+ * singleton services on the root, page-level scope on mount
+ */
 
 class FeatureContext {
   featureName = ''
@@ -25,13 +27,13 @@ class ApiClient {
 class ProjectsViewModel {
   constructor(
     private readonly feature: FeatureContext,
-    private readonly api: ApiClient,
+    private readonly api: ApiClient
   ) {}
 
   async load() {
     return {
       feature: this.feature.featureName,
-      projects: await this.api.listProjects(),
+      projects: await this.api.listProjects()
     }
   }
 }
@@ -66,16 +68,20 @@ export function ProjectsPage({ children }: PropsWithChildren) {
   const parent = useContext(RootDIContext)
   if (parent === null) throw new Error('DI provider is missing')
 
-  // useState with a lazy initializer is the correct primitive for "create
-  // exactly once per mounted instance". `useMemo` is documented as an
-  // optimization, not a guarantee — under concurrent rendering React may
-  // re-run the factory at any time and the discarded scope would leak
-  // because `useEffect` cleanup only runs on the kept render.
+  /*
+   * useState with a lazy initializer is the correct primitive for "create
+   * exactly once per mounted instance". `useMemo` is documented as an
+   * optimization, not a guarantee — under concurrent rendering React may
+   * re-run the factory at any time and the discarded scope would leak
+   * because `useEffect` cleanup only runs on the kept render
+   */
   const [scope] = useState(() => createProjectsPageScope(parent))
 
   useEffect(() => {
-    // React cleanup is synchronous. Use async dispose explicitly so scopes
-    // with async factories/disposers do not go through sync [Symbol.dispose]().
+    /*
+     * React cleanup is synchronous. Use async dispose explicitly so scopes
+     * with async factories/disposers do not go through sync [Symbol.dispose]()
+     */
     return () => {
       scope.dispose().catch(console.error)
     }

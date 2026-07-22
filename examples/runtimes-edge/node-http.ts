@@ -2,15 +2,17 @@ import { createServer, type ServerResponse } from 'node:http'
 
 import {
   buildRootContainer,
-  createRequestScope,
+  createRequestScope
 } from '../_shared/container.js'
 
 const root = buildRootContainer()
 
 function attachCleanup(res: ServerResponse, cleanup: () => void) {
-  // 'finish' fires on normal completion, 'close' on client-side abort.
-  // `dispose()` is idempotent — guarding once with a flag avoids issuing
-  // two parallel disposal walks if both fire in quick succession.
+  /*
+   * 'finish' fires on normal completion, 'close' on client-side abort.
+   * `dispose()` is idempotent — guarding once with a flag avoids issuing
+   * two parallel disposal walks if both fire in quick succession
+   */
   let done = false
   const once = () => {
     if (done) return
@@ -24,7 +26,7 @@ function attachCleanup(res: ServerResponse, cleanup: () => void) {
 export const server = createServer((req, res) => {
   void (async () => {
     const scope = await createRequestScope(root, {
-      requestId: req.headers['x-request-id'] as string | undefined ?? crypto.randomUUID(),
+      requestId: req.headers['x-request-id'] as string | undefined ?? crypto.randomUUID()
     })
 
     attachCleanup(res, () => {

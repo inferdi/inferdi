@@ -27,7 +27,7 @@ schema:
       "inLanguage": "ja-JP"
       "datePublished": "2026-06-12"
       "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, 例, パターン, 依存性注入, リクエストスコープ, フレームワーク, ランタイム"
       "articleSection": "ガイド"

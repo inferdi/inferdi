@@ -27,7 +27,7 @@ class ProjectsViewModel {
   async load() {
     return {
       page: this.page.pageName,
-      projects: await this.api.listProjects(),
+      projects: await this.api.listProjects()
     }
   }
 }
@@ -37,11 +37,13 @@ const root = new Container()
   .registerClass('api', ApiClient, [])
   .registerClass('projectsVm', ProjectsViewModel, ['page', 'api'], 'scoped')
 
-// Uncomment in an editor with JavaScript type checking enabled:
-// new Container()
-//   .registerClass('page', PageContext, [], 'scoped')
-//   .registerClass('api', ApiClient, [])
-//   .registerClass('projectsVm', ProjectsViewModel, ['api', 'page'], 'scoped')
+/*
+ * Uncomment in an editor with JavaScript type checking enabled:
+ * new Container()
+ *   .registerClass('page', PageContext, [], 'scoped')
+ *   .registerClass('api', ApiClient, [])
+ *   .registerClass('projectsVm', ProjectsViewModel, ['api', 'page'], 'scoped')
+ */
 
 export function createProjectsPageScope() {
   const scope = root.createScope()

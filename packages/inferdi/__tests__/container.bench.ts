@@ -1,12 +1,14 @@
 import {bench, describe} from 'vitest'
 import {Container} from '../src/Container'
 
-// ────────────────────────────────────────────────────────────────────────────
-// Phase 6 — Benchmarks
-//
-// Run via `pnpm run bench` (vitest bench). Not part of the CI run; the goal is
-// to track performance regressions across container changes.
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * Phase 6 — Benchmarks
+ *
+ * Run via `pnpm run bench` (vitest bench). Not part of the CI run; the goal is
+ * to track performance regressions across container changes.
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 describe('symbol vs string: singleton cache hit', () => {
   const SYM = Symbol('foo')
@@ -22,19 +24,23 @@ describe('symbol vs string: singleton cache hit', () => {
   })
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// Deep dependency graph: 50 links, each depending on the previous one.
-// Cold — first resolve, walks the full constructor chain.
-// Hot — second+ resolve, fully cached, should be ≈ O(1).
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * Deep dependency graph: 50 links, each depending on the previous one.
+ * Cold — first resolve, walks the full constructor chain.
+ * Hot — second+ resolve, fully cached, should be ≈ O(1).
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 const DEPTH = 50
 type DeepDeps = Record<string, {level: number}>
 
 function buildDeepContainer(): {container: Container<DeepDeps>; topKey: string} {
-  // Use a "wide" starting T = DeepDeps via an explicit cast. Registering string
-  // keys through `as never` bypasses Exclude<K, keyof T> (for the benchmark only
-  // runtime matters, not type-safety of the registration loop).
+  /*
+   * Use a "wide" starting T = DeepDeps via an explicit cast. Registering string
+   * keys through `as never` bypasses Exclude<K, keyof T> (for the benchmark only
+   * runtime matters, not type-safety of the registration loop)
+   */
   const container = new Container<DeepDeps>()
 
   // level0 — foundation, no dependencies
@@ -50,17 +56,17 @@ function buildDeepContainer(): {container: Container<DeepDeps>; topKey: string} 
 }
 
 describe('deep graph resolution', () => {
-  // Cold: a fresh container on EVERY call.
+  // Cold: a fresh container on EVERY call
   bench(
     `deep graph cold resolve (${DEPTH} levels, first get)`,
     () => {
       const {container, topKey} = buildDeepContainer()
       container.get(topKey)
     },
-    {iterations: 200},
+    {iterations: 200}
   )
 
-  // Hot: a single container with a warmed-up cache.
+  // Hot: a single container with a warmed-up cache
   const warm = buildDeepContainer()
   warm.container.get(warm.topKey)
 
@@ -69,9 +75,11 @@ describe('deep graph resolution', () => {
   })
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// DI overhead vs raw instantiation — a baseline for understanding the container's "cost".
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * DI overhead vs raw instantiation — a baseline for understanding the container's "cost".
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 class Leaf {}
 class Mid {
@@ -107,9 +115,11 @@ describe('DI overhead vs raw new', () => {
   })
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// Scoped lifetime — cache hit vs creation
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * Scoped lifetime — cache hit vs creation
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 describe('scoped lifetime', () => {
   class Svc {
@@ -118,7 +128,7 @@ describe('scoped lifetime', () => {
 
   const root = new Container().registerClass('svc', Svc, [], 'scoped')
 
-  // Warmed-up scope: instance is already in scope.cache, takes the fast path.
+  // Warmed-up scope: instance is already in scope.cache, takes the fast path
   const warmScope = root.createScope()
   warmScope.get('svc')
 
@@ -126,13 +136,13 @@ describe('scoped lifetime', () => {
     warmScope.get('svc')
   })
 
-  // Fresh scope + first resolve — cost of scope creation + walking up through parents.
+  // Fresh scope + first resolve — cost of scope creation + walking up through parents
   bench('root.createScope() + scope.get("svc") (first resolve in a fresh scope)', () => {
     const s = root.createScope()
     s.get('svc')
   })
 
-  // Comparison: scope.get vs root.get for a singleton (parent walk vs local cache).
+  // Comparison: scope.get vs root.get for a singleton (parent walk vs local cache)
   const rootSingleton = new Container().registerClass('svc', Svc, [], 'singleton')
   const singletonChild = rootSingleton.createScope()
   singletonChild.get('svc') // warm up the owner cache (singleton lives on root, not child)
@@ -142,9 +152,11 @@ describe('scoped lifetime', () => {
   })
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// Lazy overhead — wrapper vs direct resolve
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * Lazy overhead — wrapper vs direct resolve
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 describe('lazy overhead', () => {
   class Target {
@@ -163,16 +175,20 @@ describe('lazy overhead', () => {
     wrapper.get()
   })
 
-  // The wrapper is transient: each get returns a NEW {get} object. We measure the
-  // cost of creating the wrapper itself (one allocation + closure).
+  /*
+   * The wrapper is transient: each get returns a NEW {get} object. We measure the
+   * cost of creating the wrapper itself (one allocation + closure)
+   */
   bench('container.get("targetLazy") (creation of a new transient wrapper)', () => {
     c.get('targetLazy')
   })
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// Fan-out — wide graph (class with 5-8 deps), compared against the chain
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * Fan-out — wide graph (class with 5-8 deps), compared against the chain
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 describe('fan-out (wide graph)', () => {
   class D0 {}
@@ -190,7 +206,7 @@ describe('fan-out (wide graph)', () => {
       public b: D1,
       public c: D2,
       public d: D3,
-      public e: D4,
+      public e: D4
     ) {}
   }
   class Wide8 {
@@ -202,11 +218,11 @@ describe('fan-out (wide graph)', () => {
       public e: D4,
       public f: D5,
       public g: D6,
-      public h: D7,
+      public h: D7
     ) {}
   }
 
-  // Warm container: top is cached, benchmark measures a pure hit.
+  // Warm container: top is cached, benchmark measures a pure hit
   const warm5 = new Container()
     .registerClass('d0', D0, [])
     .registerClass('d1', D1, [])
@@ -236,7 +252,7 @@ describe('fan-out (wide graph)', () => {
     warm8.get('top')
   })
 
-  // Cold: top is built for the first time — cost of iterating deps + N recursive gets.
+  // Cold: top is built for the first time — cost of iterating deps + N recursive gets
   bench(
     'fan-out 5 deps cold (fresh container, first resolve)',
     () => {
@@ -249,7 +265,7 @@ describe('fan-out (wide graph)', () => {
         .registerClass('top', Wide5, ['d0', 'd1', 'd2', 'd3', 'd4'])
       c.get('top')
     },
-    {iterations: 500},
+    {iterations: 500}
   )
 
   bench(
@@ -267,16 +283,18 @@ describe('fan-out (wide graph)', () => {
         .registerClass('top', Wide8, ['d0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7'])
       c.get('top')
     },
-    {iterations: 500},
+    {iterations: 500}
   )
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// Error paths — missing key and cycle detection
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * Error paths — missing key and cycle detection
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 describe('error paths', () => {
-  // Standalone container — `get('missing')` will walk up (no parent), then throw.
+  // Standalone container — `get('missing')` will walk up (no parent), then throw
   const emptyC = new Container<Record<string, unknown>>()
 
   bench('get() missing key → throw "Key not found"', () => {
@@ -287,7 +305,7 @@ describe('error paths', () => {
     }
   })
 
-  // Comparison: a manual throw without the container — shows the "bare" throw+catch cost.
+  // Comparison: a manual throw without the container — shows the "bare" throw+catch cost
   bench('baseline: bare try/throw/catch (no container)', () => {
     try {
       throw new Error('bare')
@@ -296,7 +314,7 @@ describe('error paths', () => {
     }
   })
 
-  // Cycle: A → B → A. Detection triggers on the third get('a') call, unwinds 2 try-finally blocks.
+  // Cycle: A → B → A. Detection triggers on the third get('a') call, unwinds 2 try-finally blocks
   class A {
     constructor(public b: B) {}
   }
@@ -304,8 +322,10 @@ describe('error paths', () => {
     constructor(public a: A) {}
   }
 
-  // Cyclic registration is impossible in pure fluent style (a references b, which is
-  // registered later). We use a pre-declared T + `as never` cast for registration.
+  /*
+   * Cyclic registration is impossible in pure fluent style (a references b, which is
+   * registered later). We use a pre-declared T + `as never` cast for registration
+   */
   const cycleC = new Container() as Container<{a: A; b: B}>
   cycleC.registerClass('a' as never, A, ['b' as never])
   cycleC.registerClass('b' as never, B, ['a' as never])
@@ -318,8 +338,10 @@ describe('error paths', () => {
     }
   })
 
-  // For comparison: a successful singleton hit on the same container — baseline showing
-  // how much more expensive the error path is than the fast path.
+  /*
+   * For comparison: a successful singleton hit on the same container — baseline showing
+   * how much more expensive the error path is than the fast path
+   */
   const happyC = new Container().registerValue('x', {value: 1})
 
   bench('baseline: successful get (singleton cached)', () => {
@@ -327,10 +349,12 @@ describe('error paths', () => {
   })
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// Deep dependency graph — all-symbol variant. Mirrors the string-keyed deep
-// graph above so we can compare V8 Map performance for symbol vs string keys.
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * Deep dependency graph — all-symbol variant. Mirrors the string-keyed deep
+ * graph above so we can compare V8 Map performance for symbol vs string keys.
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 function buildDeepSymbolContainer(): {
   container: Container<Record<symbol, {level: number}>>
@@ -359,7 +383,7 @@ describe('deep graph: symbol keys', () => {
       const {container, topKey} = buildDeepSymbolContainer()
       container.get(topKey as never)
     },
-    {iterations: 200},
+    {iterations: 200}
   )
 
   const warmSym = buildDeepSymbolContainer()
@@ -370,11 +394,13 @@ describe('deep graph: symbol keys', () => {
   })
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// Mixed fan-out — string + symbol deps in the same constructor. Targets the
-// explicitly unrolled 5-ary branch. If V8's `c.get(keys[i])` IC degrades from
-// monomorphic to polymorphic in mixed key shapes, this bench surfaces it.
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * Mixed fan-out — string + symbol deps in the same constructor. Targets the
+ * explicitly unrolled 5-ary branch. If V8's `c.get(keys[i])` IC degrades from
+ * monomorphic to polymorphic in mixed key shapes, this bench surfaces it.
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 describe('fan-out: mixed string + symbol (IC polymorphism check)', () => {
   class M0 {}

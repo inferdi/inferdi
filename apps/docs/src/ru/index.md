@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: InferDI
-  text: Единственный ультрабыстрый DI для современного TypeScript
-  tagline: Стройте приложения для современных рантаймов с быстрым DI, чистой доменной логикой и удобным тестированием.
+  text: Типизированный DI для современного TypeScript
+  tagline: Явно регистрируйте сервисы, проверяйте граф зависимостей через TypeScript и сохраняйте короткий путь resolve.
   image:
     src: /logo.png
     alt: InferDI
@@ -61,7 +61,7 @@ features:
       src: /puzzle.png
       alt: Ядро без привязки к фреймворку
     title: Ядро без привязки к фреймворку
-    details: "InferDI не имеет зависимостей и работает где угодно — Node, Bun, Deno, браузеры, воркеры. Адаптеры опциональны, а не обязательны."
+    details: "У InferDI нет runtime-зависимостей. Ядро работает в Node, Bun, Deno, браузерах и воркерах; адаптеры добавляют lifecycle для request scope."
     link: /ru/adapters/
     linkText: Как работают адаптеры
 schema:
@@ -71,7 +71,7 @@ schema:
       "@id": "https://inferdi.com/#website"
       "url": "https://inferdi.com/ru/"
       "name": "InferDI"
-      "description": "Ультрабыстрый, строго типизированный DI без декораторов для современного TypeScript."
+      "description": "Строго типизированный DI без декораторов для современного TypeScript."
       "inLanguage": "ru-RU"
       "publisher":
         "@id": "https://inferdi.com/#organization"
@@ -96,11 +96,11 @@ schema:
       "name": "InferDI"
       "applicationCategory": "DeveloperApplication"
       "operatingSystem": "Node.js, Bun, Deno, Browser, Edge runtimes"
-      "softwareVersion": "5.0.4"
+      "softwareVersion": "5.0.5"
       "programmingLanguage": "TypeScript"
       "url": "https://inferdi.com/"
       "downloadUrl": "https://www.npmjs.com/package/@inferdi/inferdi"
-      "description": "DI-контейнер для TypeScript без зависимостей и декораторов, со строгой типизацией. Граф зависимостей — это тип: перепутанные аргументы, отсутствующие ключи и утечки времени жизни становятся ошибками компиляции, а не исключениями во время выполнения."
+      "description": "DI-контейнер для TypeScript без runtime-зависимостей и декораторов. TypeScript проверяет порядок аргументов, ключи и допустимые зависимости по времени жизни при регистрации."
       "license": "https://github.com/inferdi/inferdi/blob/main/LICENSE"
       "author":
         "@id": "https://inferdi.com/#organization"

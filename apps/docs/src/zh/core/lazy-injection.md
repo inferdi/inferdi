@@ -26,8 +26,8 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/zh/core/lazy-injection"
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, 惰性注入, Lazy, 延迟解析, 循环依赖, 单例, 依赖注入"
       "articleSection": "核心概念"
@@ -80,7 +80,12 @@ const c = new Container()
   .registerClass('audit', Audit, ['clockLazy'], 'singleton')
 ```
 
-传入一个 `lazyKey` 会创建一个伴随注册，其值为 `{ get: () => target }`。
+向 `registerClass` 或 `registerFactory` 传入 `lazyKey` 会创建一个伴随注册，其值为 `{ get: () => target }`。
+
+```ts
+const c = new Container()
+  .registerFactory('clock', () => new Clock(), 'singleton', 'clockLazy')
+```
 
 ## 生命周期得以保留
 

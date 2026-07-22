@@ -34,7 +34,7 @@ function configureRoot() {
   c.bind(T.L7).to(F.L7).inTransientScope()
   c.bind(T.L8).to(F.L8).inTransientScope()
   c.bind(T.L9).to(F.L9).inTransientScope()
-  // Lazy: a thunk via toDynamicValue. Every lazy() call hits container.get().
+  // Lazy: a thunk via toDynamicValue. Every lazy() call hits container.get()
   c.bind<() => F.Logger>(T.LazyLogger).toDynamicValue(({ get }) => () => get(T.Logger)).inSingletonScope()
   c.bind(T.LazyConsumer).to(F.LazyConsumer).inSingletonScope()
   return c
@@ -51,13 +51,13 @@ export function buildRoot(): Resolver {
     resolveWide10: () => root.get(T.Wide10),
     buildAndResolve: () => configureRoot().get(T.Service),
     scopedResolveAndDispose: () => {
-      // Inversify v8 has no native scope lifecycle — a local bind in the child gives honest semantics.
+      // Inversify v8 has no native scope lifecycle — a local bind in the child gives honest semantics
       const s = new Container({ parent: root })
       s.bind(T.ScopedService).to(F.ScopedService).inSingletonScope()
       const v = s.get(T.ScopedService)
-      // No cleanup — the child is not tracked by the parent, GC will collect it.
+      // No cleanup — the child is not tracked by the parent, GC will collect it
       return v
     },
-    resolveLazy: () => (root.get(T.LazyConsumer) as F.LazyConsumer).use(),
+    resolveLazy: () => (root.get(T.LazyConsumer) as F.LazyConsumer).use()
   }
 }

@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: InferDI
-  text: The only ultra-fast DI for modern TypeScript
-  tagline: Build apps with next-gen DI for any modern runtime with ultra-fast architecture, clean domain logic, and first-class testability.
+  text: Typed dependency injection for modern TypeScript
+  tagline: Register services explicitly, let TypeScript check the graph, and keep runtime resolution small.
   image:
     src: /logo.png
     alt: InferDI
@@ -22,7 +22,7 @@ features:
       alt: Fastify
     title: Fastify
     details: >-
-      Fastify is built for speed, the DI layer should stay out of its way. The Fastify v5 adapter plugs into plugins and hooks, creates a typed request scope in onRequest, and cleans it up in onResponse.
+      The Fastify v5 adapter creates a typed request scope in `onRequest` and disposes it in `onResponse`. It works with Fastify plugins and lifecycle hooks.
     link: /adapters/fastify
     linkText: Fastify adapter
   - icon:
@@ -30,7 +30,7 @@ features:
       alt: Hono
     title: Hono
     details: >-
-      Edge apps need thin glue and quick starts. The Hono v4 adapter stores the request scope in context variables, fits Workers and Bun deployments, and keeps strict types at the network boundary.
+      The Hono v4 adapter stores the request scope in context variables. Use it with Workers and Bun while keeping the scope type at the handler boundary.
     link: /adapters/hono
     linkText: Hono adapter
   - icon:
@@ -38,7 +38,7 @@ features:
       alt: Koa
     title: Koa
     details: >-
-      Koa works best when the middleware chain stays small and explicit. The Koa v3 adapter binds request context to your services through a typed scope without hiding the async control flow.
+      The Koa v3 adapter binds request context to services through a typed scope and preserves Koa's async middleware flow.
     link: /adapters/koa
     linkText: Koa adapter
   - icon:
@@ -46,7 +46,7 @@ features:
       alt: Express
     title: Express
     details: >-
-      Express 5 is still the familiar default for many Node apps. This adapter gives those middleware chains a typed request scope, so services stop leaking through globals, hand-rolled factories, and scattered imports.
+      The Express 5 adapter adds a typed request scope to middleware and routes. Keep service wiring out of globals and ad hoc request factories.
     link: /adapters/express
     linkText: Express adapter
   - icon:
@@ -54,14 +54,14 @@ features:
       alt: Elysia
     title: Elysia
     details: >-
-      Elysia v1 already gives Bun apps sharp route types. The adapter carries that type chain into your services, wiring each request to a DI scope so autocomplete follows the path from handler to business logic.
+      The Elysia v1 adapter connects each request to a typed DI scope and carries route types into the service layer.
     link: /adapters/elysia
     linkText: Elysia adapter
   - icon:
       src: /puzzle.png
       alt: Framework-agnostic core
     title: Framework-agnostic core
-    details: "InferDI has zero dependencies and runs anywhere — Node, Bun, Deno, browsers, workers. Adapters are optional request-scope glue, never a requirement."
+    details: "InferDI has zero runtime dependencies and runs in Node, Bun, Deno, browsers, and workers. Adapters add optional request-scope lifecycle glue."
     link: /adapters/
     linkText: How adapters work
 schema:
@@ -71,7 +71,7 @@ schema:
       "@id": "https://inferdi.com/#website"
       "url": "https://inferdi.com/"
       "name": "InferDI"
-      "description": "Ultra-fast, decorator-free, strongly typed dependency injection for modern TypeScript."
+      "description": "Decorator-free, strongly typed dependency injection for modern TypeScript."
       "inLanguage": "en-US"
       "publisher":
         "@id": "https://inferdi.com/#organization"
@@ -96,11 +96,11 @@ schema:
       "name": "InferDI"
       "applicationCategory": "DeveloperApplication"
       "operatingSystem": "Node.js, Bun, Deno, Browser, Edge runtimes"
-      "softwareVersion": "5.0.4"
+      "softwareVersion": "5.0.5"
       "programmingLanguage": "TypeScript"
       "url": "https://inferdi.com/"
       "downloadUrl": "https://www.npmjs.com/package/@inferdi/inferdi"
-      "description": "Zero-dependency, decorator-free, strongly typed DI container for TypeScript. The dependency graph is the type: misordered arguments, missing keys, and lifetime leaks are compile errors, not runtime exceptions."
+      "description": "Zero-dependency, decorator-free, strongly typed DI container for TypeScript. TypeScript rejects misordered arguments, missing keys, and invalid lifetime dependencies at registration."
       "license": "https://github.com/inferdi/inferdi/blob/main/LICENSE"
       "author":
         "@id": "https://inferdi.com/#organization"

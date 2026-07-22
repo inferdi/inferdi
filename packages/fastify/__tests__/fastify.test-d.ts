@@ -1,6 +1,6 @@
 import Fastify, {
   type FastifyReply,
-  type FastifyRequest,
+  type FastifyRequest
 } from 'fastify'
 import {describe, expectTypeOf, it} from 'vitest'
 import {Container} from '@inferdi/inferdi'
@@ -10,7 +10,7 @@ import {
   type InferdiRoot,
   type InferdiScope,
   type InferdiScopeOf,
-  type ScopedOptions,
+  type ScopedOptions
 } from '../src/index'
 
 class HealthService {
@@ -55,9 +55,11 @@ describe('@inferdi/fastify types', () => {
   })
 
   it('types scoped hooks with the concrete request scope when options are typed directly', () => {
-    // When the option object is typed as ScopedOptions/InferdiFastifyOptions,
-    // `Scope` resolves to `InferdiScopeOf<Root>` and every hook param is
-    // concrete without an annotation.
+    /*
+     * When the option object is typed as ScopedOptions/InferdiFastifyOptions,
+     * `Scope` resolves to `InferdiScopeOf<Root>` and every hook param is
+     * concrete without an annotation
+     */
     const options: ScopedOptions<RootContainer> = {
       container: root,
       setupScope: (scope, request, reply) => {
@@ -66,7 +68,7 @@ describe('@inferdi/fastify types', () => {
         expectTypeOf(reply).toEqualTypeOf<FastifyReply>()
         scope.get('request').requestId = request.id
 
-        // @ts-expect-error — missing DI keys remain compile errors.
+        // @ts-expect-error — missing DI keys remain compile errors
         scope.get('missing')
       },
       disposeScope: (scope, request, reply) => {
@@ -83,7 +85,7 @@ describe('@inferdi/fastify types', () => {
         expectTypeOf(error).toEqualTypeOf<unknown>()
         expectTypeOf(request).toEqualTypeOf<FastifyRequest>()
         expectTypeOf(reply).toEqualTypeOf<FastifyReply>()
-      },
+      }
     }
     void options
   })
@@ -91,18 +93,20 @@ describe('@inferdi/fastify types', () => {
   it('recovers the concrete scope in register hooks via an explicit annotation', () => {
     const app = Fastify()
 
-    // `app.register` cannot infer the plugin's generics (it collapses them to
-    // their constraints before checking the options), so inline hook params are
-    // annotated explicitly to recover the concrete scope.
+    /*
+     * `app.register` cannot infer the plugin's generics (it collapses them to
+     * their constraints before checking the options), so inline hook params are
+     * annotated explicitly to recover the concrete scope
+     */
     app.register(inferdiFastify, {
       container: root,
       setupScope: (scope: InferdiScopeOf<typeof root>) => {
         expectTypeOf(scope).toEqualTypeOf<RequestContainer>()
         scope.get('request').requestId = 'x'
 
-        // @ts-expect-error — missing DI keys remain compile errors.
+        // @ts-expect-error — missing DI keys remain compile errors
         scope.get('missing')
-      },
+      }
     })
   })
 
@@ -114,7 +118,7 @@ describe('@inferdi/fastify types', () => {
       expectTypeOf(request.di).toEqualTypeOf<RequestContainer>()
       expectTypeOf(request.di.get('users')).toEqualTypeOf<UserService>()
 
-      // @ts-expect-error — missing DI keys remain compile errors through request.di.
+      // @ts-expect-error — missing DI keys remain compile errors through request.di
       request.di.get('missing')
 
       return request.di.get('users').profile('1')
@@ -126,7 +130,7 @@ describe('@inferdi/fastify types', () => {
 
     app.register(inferdiFastify, {
       container: root,
-      scopePerRequest: false,
+      scopePerRequest: false
     })
     app.get('/health', async function (request) {
       expectTypeOf(this.di).toEqualTypeOf<RootContainer>()
@@ -139,14 +143,14 @@ describe('@inferdi/fastify types', () => {
   it('allows disposeRootOnClose on a disposable root', () => {
     const scoped: ScopedOptions<RootContainer> = {
       container: root,
-      disposeRootOnClose: true,
+      disposeRootOnClose: true
     }
     void scoped
 
     const rootOnly: InferdiFastifyOptions<RootContainer> = {
       container: root,
       scopePerRequest: false,
-      disposeRootOnClose: true,
+      disposeRootOnClose: true
     }
     void rootOnly
   })
@@ -157,8 +161,8 @@ describe('@inferdi/fastify types', () => {
 
     const options: ScopedOptions<BareRoot> = {
       container: bare,
-      // @ts-expect-error — disposeRootOnClose requires a disposable root.
-      disposeRootOnClose: true,
+      // @ts-expect-error — disposeRootOnClose requires a disposable root
+      disposeRootOnClose: true
     }
     void options
   })
@@ -166,47 +170,47 @@ describe('@inferdi/fastify types', () => {
   it('rejects request-scope options in root-only mode', () => {
     const validRootOnly: InferdiFastifyOptions<RootContainer> = {
       container: root,
-      scopePerRequest: false,
+      scopePerRequest: false
     }
     void validRootOnly
 
-    // @ts-expect-error — createScope is scoped-mode behavior.
+    // @ts-expect-error — createScope is scoped-mode behavior
     const invalidCreateScope: InferdiFastifyOptions<RootContainer> = {
       container: root,
       scopePerRequest: false,
-      createScope: () => root.createScope(),
+      createScope: () => root.createScope()
     }
     void invalidCreateScope
 
-    // @ts-expect-error — setupScope is scoped-mode behavior.
+    // @ts-expect-error — setupScope is scoped-mode behavior
     const invalidSetupScope: InferdiFastifyOptions<RootContainer> = {
       container: root,
       scopePerRequest: false,
-      setupScope: () => {},
+      setupScope: () => {}
     }
     void invalidSetupScope
 
-    // @ts-expect-error — disposeScope is scoped-mode behavior.
+    // @ts-expect-error — disposeScope is scoped-mode behavior
     const invalidDisposeScope: InferdiFastifyOptions<RootContainer> = {
       container: root,
       scopePerRequest: false,
-      disposeScope: () => {},
+      disposeScope: () => {}
     }
     void invalidDisposeScope
 
-    // @ts-expect-error — autoDispose is scoped-mode behavior.
+    // @ts-expect-error — autoDispose is scoped-mode behavior
     const invalidAutoDispose: InferdiFastifyOptions<RootContainer> = {
       container: root,
       scopePerRequest: false,
-      autoDispose: false,
+      autoDispose: false
     }
     void invalidAutoDispose
 
-    // @ts-expect-error — onDisposeError is scoped-mode behavior.
+    // @ts-expect-error — onDisposeError is scoped-mode behavior
     const invalidDisposeErrorHandler: InferdiFastifyOptions<RootContainer> = {
       container: root,
       scopePerRequest: false,
-      onDisposeError: () => {},
+      onDisposeError: () => {}
     }
     void invalidDisposeErrorHandler
   })

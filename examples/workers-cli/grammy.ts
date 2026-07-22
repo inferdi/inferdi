@@ -3,7 +3,7 @@ import { Bot, type Context, type MiddlewareFn } from 'grammy'
 import {
   buildRootContainer,
   createRequestScope,
-  type RequestContainer,
+  type RequestContainer
 } from '../_shared/container.js'
 
 const root = buildRootContainer()
@@ -15,7 +15,7 @@ type BotContext = Context & {
 const withContainer: MiddlewareFn<BotContext> = async (ctx, next) => {
   await using scope = await createRequestScope(root, {
     requestId: String(ctx.update.update_id),
-    userId: ctx.from?.id !== undefined ? String(ctx.from.id) : undefined,
+    userId: ctx.from?.id !== undefined ? String(ctx.from.id) : undefined
   })
 
   ctx.container = scope

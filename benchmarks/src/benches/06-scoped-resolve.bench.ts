@@ -9,9 +9,11 @@ import * as typedi from '../containers/typedi.js'
 import * as typedInject from '../containers/typed-inject.js'
 import { b } from './_helpers.js'
 
-// Composite metric: creation + resolve + cleanup (where dispose is synchronous).
-// inferdi/tsyringe/typedi pay the real cost of a sync dispose;
-// awilix/typed-inject/inversify rely on GC. See README fairness note.
+/*
+ * Composite metric: creation + resolve + cleanup (where dispose is synchronous).
+ * inferdi/tsyringe/typedi pay the real cost of a sync dispose;
+ * awilix/typed-inject/inversify rely on GC. See README fairness note
+ */
 describe('06 scoped lifecycle (composite: create + resolve + cleanup)', () => {
   const ifd = inferdi.buildRoot()
   const inv = inversify.buildRoot()

@@ -27,7 +27,7 @@ schema:
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
       "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, 生命周期, 单例, 作用域级, 瞬态, 生命周期守卫, 受困依赖, 依赖注入"
       "articleSection": "核心概念"

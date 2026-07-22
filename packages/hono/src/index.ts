@@ -116,7 +116,7 @@ export interface InferdiHonoOptions<
    */
   readonly createScope?: (
     root: Root,
-    context: Context<E>,
+    context: Context<E>
   ) => MaybePromise<Scope>
   /**
    * Optional hook to hydrate the freshly created scope before route handlers
@@ -124,14 +124,14 @@ export interface InferdiHonoOptions<
    */
   readonly setupScope?: (
     scope: Scope,
-    context: Context<E>,
+    context: Context<E>
   ) => MaybePromise<void>
   /**
    * Overrides request-scope disposal. Defaults to `scope.dispose()`.
    */
   readonly disposeScope?: (
     scope: Scope,
-    context: Context<E & InferdiHonoScopeEnv<Scope, Key>>,
+    context: Context<E & InferdiHonoScopeEnv<Scope, Key>>
   ) => MaybePromise<void>
   /**
    * Controls whether the middleware disposes the request scope after `next()`.
@@ -140,7 +140,7 @@ export interface InferdiHonoOptions<
   readonly autoDispose?:
     | boolean
     | ((
-        context: Context<E & InferdiHonoScopeEnv<Scope, Key>>,
+        context: Context<E & InferdiHonoScopeEnv<Scope, Key>>
       ) => MaybePromise<boolean>)
   /**
    * Optional sink for disposal failures. If it returns normally, the disposal
@@ -149,7 +149,7 @@ export interface InferdiHonoOptions<
    */
   readonly onDisposeError?: (
     error: unknown,
-    context: Context<E & InferdiHonoScopeEnv<Scope, Key>>,
+    context: Context<E & InferdiHonoScopeEnv<Scope, Key>>
   ) => MaybePromise<void>
 }
 
@@ -179,7 +179,7 @@ function logCleanupErrors(errors: unknown[]): void {
   try {
     console.error('Failed to dispose InferDI Hono request scope', err)
   } catch {
-    // Response cleanup must not fail because the fallback logger failed.
+    // Response cleanup must not fail because the fallback logger failed
   }
 }
 
@@ -203,22 +203,22 @@ function disposeWithErrors<
   context: TypedContext<E, Scope, Key>,
   disposeScope: (
     scope: Scope,
-    context: TypedContext<E, Scope, Key>,
+    context: TypedContext<E, Scope, Key>
   ) => MaybePromise<void>,
   onDisposeError:
     | ((
         error: unknown,
-        context: TypedContext<E, Scope, Key>,
+        context: TypedContext<E, Scope, Key>
       ) => MaybePromise<void>)
     | undefined,
-  errors: unknown[],
+  errors: unknown[]
 ): void | PromiseLike<void> {
   try {
     const disposing = disposeScope(scope, context)
     if (isPromiseLike(disposing)) {
       return disposing.then(
         undefined,
-        (error) => handleDisposeError(error, context, onDisposeError, errors),
+        (error) => handleDisposeError(error, context, onDisposeError, errors)
       )
     }
   } catch (error) {
@@ -236,10 +236,10 @@ function handleDisposeError<
   onDisposeError:
     | ((
         error: unknown,
-        context: TypedContext<E, Scope, Key>,
+        context: TypedContext<E, Scope, Key>
       ) => MaybePromise<void>)
     | undefined,
-  errors: unknown[],
+  errors: unknown[]
 ): void | PromiseLike<void> {
   if (onDisposeError === undefined) {
     errors.push(error)
@@ -286,7 +286,7 @@ export function inferdiHono<
 >(
   options: Omit<InferdiHonoOptions<Root, E, 'di', Scope>, 'key'> & {
     readonly key?: 'di'
-  },
+  }
 ): MiddlewareHandler<E & InferdiHonoScopeEnv<Scope, 'di'>>
 
 /**
@@ -306,7 +306,7 @@ export function inferdiHono<
 >(
   options: InferdiHonoOptions<Root, E, Key, Scope> & {
     readonly key: Key
-  },
+  }
 ): MiddlewareHandler<E & InferdiHonoScopeEnv<Scope, Key>>
 
 export function inferdiHono<
@@ -315,7 +315,7 @@ export function inferdiHono<
   Key extends string = string,
   Scope extends InferdiScope = InferdiScopeOf<Root>,
 >(
-  options: InferdiHonoOptions<Root, E, Key, Scope>,
+  options: InferdiHonoOptions<Root, E, Key, Scope>
 ): MiddlewareHandler<E & InferdiHonoScopeEnv<Scope, Key>> {
   const root = options.container
   const key = (options.key ?? 'di') as Key
@@ -337,17 +337,19 @@ export function inferdiHono<
     const typedContext = context as TypedContext<E, Scope, Key>
     const setVar = typedContext.set as unknown as (
       key: Key,
-      value: Scope | undefined,
+      value: Scope | undefined
     ) => void
     const scopeOrPromise = createScope(root, context as Context<E>)
     const scope = isPromiseLike(scopeOrPromise)
       ? await scopeOrPromise
       : scopeOrPromise
 
-    // Expose the scope before setupScope so setup-failure cleanup hooks
-    // (`disposeScope` / `onDisposeError`) see the same `c.var[key]` as the
-    // success path. Route handlers never observe a half-built scope because
-    // `next()` has not run yet.
+    /*
+     * Expose the scope before setupScope so setup-failure cleanup hooks
+     * (`disposeScope` / `onDisposeError`) see the same `c.var[key]` as the
+     * success path. Route handlers never observe a half-built scope because
+     * `next()` has not run yet
+     */
     setVar(key, scope)
 
     if (setupScope !== undefined) {
@@ -357,18 +359,20 @@ export function inferdiHono<
           await setupResult
         }
       } catch (error) {
-        // Setup runs before the response is produced, so the error is surfaced
-        // (Hono routes it to `app.onError()`). Finding 2: surface only the setup
-        // error; cleanup failures go to `onDisposeError`, else are logged —
-        // never aggregated into the thrown error. Clear the exposed scope first
-        // so the error handler never observes a disposed scope.
+        /*
+         * Setup runs before the response is produced, so the error is surfaced
+         * (Hono routes it to `app.onError()`). Finding 2: surface only the setup
+         * error; cleanup failures go to `onDisposeError`, else are logged —
+         * never aggregated into the thrown error. Clear the exposed scope first
+         * so the error handler never observes a disposed scope
+         */
         const cleanupErrors: unknown[] = []
         const disposing = disposeWithErrors(
           scope,
           typedContext,
           disposeScope,
           onDisposeError,
-          cleanupErrors,
+          cleanupErrors
         )
         if (isPromiseLike(disposing)) {
           await disposing
@@ -419,7 +423,7 @@ export function inferdiHono<
               error,
               typedContext,
               onDisposeError,
-              cleanupErrors,
+              cleanupErrors
             )
             if (isPromiseLike(handling)) {
               await handling
@@ -433,21 +437,23 @@ export function inferdiHono<
             typedContext,
             disposeScope,
             onDisposeError,
-            cleanupErrors,
+            cleanupErrors
           )
           if (isPromiseLike(disposing)) {
             await disposing
           }
         }
 
-        // Cleanup runs after `next()`: a failure here must never replace an
-        // already-produced response, so it is observed via `onDisposeError` or
-        // logged — never thrown.
+        /*
+         * Cleanup runs after `next()`: a failure here must never replace an
+         * already-produced response, so it is observed via `onDisposeError` or
+         * logged — never thrown
+         */
         logCleanupErrors(cleanupErrors)
       }
     }
 
-    // The route error keeps flowing through Hono's normal error handling.
+    // The route error keeps flowing through Hono's normal error handling
     if (hasRouteError) {
       throw routeError
     }

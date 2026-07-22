@@ -11,5 +11,5 @@ export default defineConfig({
   target: 'node20',
   outExtension({ format }) {
     return { js: format === 'cjs' ? '.cjs' : '.js' }
-  },
+  }
 })

@@ -66,53 +66,53 @@ A zero-dependency, **decorator-free**, strongly typed DI container for modern Ty
 
 ## Why InferDI?
 
-Legacy DI is slow, bloated with decorators, and prone to memory leaks. **InferDI is built for 2026:** it’s ruthlessly fast, strictly typed, and built for the modern edge.
+InferDI gives TypeScript applications an explicit, typed dependency graph without decorators, reflection, or runtime dependencies. It suits services and edge workloads that need fast startup, predictable resolution, and compiler-checked wiring.
 
-- ☁️ **Zero-Weight Edge Native**  
-  Zero dependencies. The perfect fit for all serverless platforms, including Cloudflare Workers, Vercel Edge, Deno Deploy, and Supabase. While other frameworks trigger cold starts, InferDI is already running.
+- ☁️ **Zero-dependency core**
+  Ship the core without a runtime dependency tree. Use it in Node, Bun, Deno, browsers, Workers, and serverless functions.
 
-- ⚡ **Raw Engine Speed**  
-  Built to outperform the competition. Highly optimized for V8 and JSC inline caching. It doesn't just resolve dependencies — it executes at native engine speed.
+- ⚡ **Fast resolve path**
+  Cached services resolve through a `Map.get()` fast path. Class construction uses direct calls for constructors with up to seven dependencies.
 
-- 🛡️ **Zero Magic. 100% Type-Safe**  
-  No `@Inject()`. No `reflect-metadata`. The compiler strictly enforces your constructor signatures. Wrong argument order or type? It simply won't compile.
+- 🛡️ **Typed registration**
+  TypeScript checks constructor arguments, missing keys, duplicate keys, and lifetime boundaries at the registration site.
 
-- 🛑 **Impossible Memory Leaks**  
-  Silent cross-user data leaks are a thing of the past. InferDI physically blocks you from injecting short-lived scoped resources into global singletons. Architectural flaws crash instantly in development, guaranteeing zero leaks in production.
+- 🛑 **Lifetime checks**
+  A singleton cannot depend on a scoped or transient service. TypeScript rejects that graph, and strict mode catches cast-based or dynamic-key bypasses at runtime.
 
-- ♻️ **Native `using` Teardown**  
-  Full support for modern resource management. Scopes destroy instances in strict **LIFO order**, safely catching multiple disconnect failures in a single clean `AggregateError`.
+- ♻️ **Native `using` teardown**
+  Scopes dispose owned instances in **LIFO order** and collect multiple cleanup failures in one `AggregateError`.
 
-- 🔣 **String *or* Symbol keys**  
-  Register services under either a plain string or a `symbol`. Use `Symbol.for('shared')` for cross-module identity without imports, `unique symbol` constants for type-level branding, or local `Symbol()` for collision-free private DI.
+- 🔣 **String and symbol keys**
+  Register services with strings or symbols. Use `Symbol.for('shared')` across modules, `unique symbol` for type-level branding, and local `Symbol()` values for private tokens.
 
 ## Performance
 
-InferDI is built for raw engine speed. Static type checking instead of runtime reflection, no `Proxy` traps on resolve, and arity-unrolled constructor calls (0–7 args take a direct `new Ctor(...)` path) translate into measurable wins across every common DI workload.
+InferDI keeps the hot path small: static type checks replace runtime reflection, resolve avoids `Proxy` traps, and constructors with 0-7 dependencies use direct `new Ctor(...)` calls. The benchmark suite measures the result across common DI workloads.
 
-The repository ships a comprehensive benchmark suite in [`benchmarks/`](https://github.com/inferdi/inferdi/tree/main/benchmarks) comparing InferDI against the five widely used TypeScript DI containers — **InversifyJS v8, Awilix v13 (both PROXY and CLASSIC modes), TSyringe v4, TypeDI v0.10, and Typed Inject v5**. All numbers below are operations per second on Node 22 — higher is better. Reproduce locally with `cd benchmarks && pnpm install --frozen-lockfile && pnpm run bench`.
+The [`benchmarks/`](https://github.com/inferdi/inferdi/tree/main/benchmarks) workspace compares InferDI with **InversifyJS v8, Awilix v13 (PROXY and CLASSIC), TSyringe v4, TypeDI v0.10, and Typed Inject v5**. Numbers show operations per second on Node 22. Higher values win. Run `cd benchmarks && pnpm install --frozen-lockfile && pnpm run bench` to reproduce them.
 
 ![benchmarks](https://raw.githubusercontent.com/inferdi/inferdi/main/assets/benchmarking_results.png)
 
-| Scenario                                              | InferDI    | Typed Inject | Awilix (PROXY) | Awilix (CLASSIC) | InversifyJS | TSyringe | TypeDI |
-|-------------------------------------------------------|------------|--------------|----------------|------------------|-------------|----------|--------|
-| **1. Hot singleton resolve** (warm cache)             | **14.2 M** | 7.0 M        | 7.2 M          | 6.9 M            | 6.3 M       | 6.2 M    | 6.4 M  |
-| **2. Transient resolve** (new instance per call)      | **8.4 M**  | 4.3 M        | 3.4 M          | 2.9 M            | 3.4 M       | 2.4 M    | 1.6 M  |
-| **3. Deep graph** (10 levels, all transient)          | **1.85 M** | 1.28 M       | 701 k          | 739 k            | 750 k       | 601 k    | 214 k  |
-| **4a. Wide graph** (4 deps, root transient)           | **7.3 M**  | 3.2 M        | 2.2 M          | 2.3 M            | 2.3 M       | 1.6 M    | 1.1 M  |
-| **4b. Wide graph** (10 deps, root transient)          | **3.5 M**  | 2.6 M        | 1.2 M          | 1.3 M            | 1.6 M       | 1.0 M    | 437 k  |
-| **5. Container build + first resolve**                | **400 k**  | 228 k        | 10 k           | 8 k              | 13 k        | 202 k    | 272 k  |
-| **6. Scoped lifecycle** (create + resolve + cleanup)  | **2.66 M** | 2.39 M       | 492 k          | 413 k            | 28 k        | 1.08 M   | 637 k  |
-| **7. Lazy resolve** (deferred wrapper)                | **12.1 M** | 7.0 M        | 5.5 M          | 4.7 M            | 4.2 M       | 4.0 M    | 2.8 M  |
+| Scenario                                              | InferDI    | InversifyJS | Typed Inject | Awilix (PROXY) | Awilix (CLASSIC) | TSyringe | TypeDI |
+|-------------------------------------------------------|------------|-------------|--------------|----------------|------------------|----------|--------|
+| **1. Hot singleton resolve** (warm cache)             | **14.3 M** | 10.7 M      | 7.0 M        | 7.3 M          | 6.7 M            | 5.8 M    | 6.45 M |
+| **2. Transient resolve** (new instance per call)      | **9.75 M** | 6.1 M       | 4.1 M        | 3.45 M         | 3.0 M            | 2.5 M    | 1.6 M  |
+| **3. Deep graph** (10 levels, all transient)          | **2.3 M**  | 1.5 M       | 1.3 M        | 716 k          | 736 k            | 643 k    | 222 k  |
+| **4a. Wide graph** (4 deps, root transient)           | **8.25 M** | 4.9 M       | 3.4 M        | 2.2 M          | 2.3 M            | 1.65 M   | 1.1 M  |
+| **4b. Wide graph** (10 deps, root transient)          | **3.5 M**  | 1.9 M       | 2.6 M        | 1.2 M          | 1.3 M            | 938 k    | 458 k  |
+| **5. Container build + first resolve**                | **400 k**  | 13.2 k      | 223 k        | 10 k           | 8.3 k            | 206 k    | 282 k  |
+| **6. Scoped lifecycle** (create + resolve + cleanup)  | **2.85 M** | 35 k        | 2.45 M       | 330 k          | 430 k            | 1.1 M    | 665 k  |
+| **7. Lazy resolve** (deferred wrapper)                | **11.8 M** | 7.6 M       | 7.15 M       | 5.6 M          | 4.7 M            | 4.25 M   | 2.85 M |
 
 ### Highlights
 
-- **~2× faster on the hot path** than every competitor. A cached singleton resolve in InferDI effectively reduces to a hot `Map.get()` fast path — no Proxy, no metadata lookup, no parent-chain walk for warm services.
-- **30× faster than InversifyJS and 48× faster than Awilix** at building a fresh container with a 30+ key graph and resolving its first service. Registration is a flat `Map.set` per service — no fluent-builder chains, no AST parsing of constructor signatures, no decorator side-effects to apply.
-- **Wide-graph leadership confirms the arity-unrolling fast path:** for up to 7 dependencies V8 inlines the direct `new Ctor(...)` call instead of going through `Reflect.construct`. Even at 10 dependencies — where InferDI falls back to `Reflect.construct` — it stays **1.35× ahead** of the next-fastest non-reflection-based competitor (Typed Inject) and up to **3.5× ahead** of reflection-based containers.
-- **Clean sweep across all eight scenarios.** InferDI now leads every workload, including the previously close ones: the deep-graph 10-level chain (**1.44× over Typed Inject**) and the scope lifecycle (Scenario 6, **1.11× over Typed Inject**) — while including a synchronous `Symbol.dispose` on every iteration of the latter and beating InversifyJS by **94×**.
-- **Typed Inject is the strongest non-InferDI baseline.** Its compile-time-known graph and `static inject = [...] as const` design let it close the gap on deep graphs and scoped flows where reflection-based containers fall apart. InferDI still pulls ahead in every scenario, but the proximity is real and worth crediting.
-- **Scenario 5 caveat:** decorator-based libraries (TypeDI, TSyringe) register classes at *import time* via decorator side-effects, so their registration cost is paid during module evaluation — what's measured for them at "build time" is only child-context creation. InferDI still beats them while registering an entire graph from scratch in under 3 μs.
+- **1.34× faster cached singleton resolve** than InversifyJS, the closest result in this scenario. InferDI reads a warm service from `Map.get()` without metadata lookup or a parent-chain walk.
+- **30× faster container build plus first resolve** than InversifyJS, and up to **48× faster** than Awilix. InferDI registers the graph from scratch through `Map.set` calls.
+- **Wide graphs stay competitive as arity grows.** With four dependencies, InferDI leads the next result by **1.68×**. With ten dependencies, it uses `Reflect.construct` and remains **1.35× ahead** of Typed Inject.
+- **InferDI leads all eight measured scenarios.** It leads the ten-level graph by **1.53×** over InversifyJS and the scoped lifecycle by **1.16×** over Typed Inject. The lifecycle result includes a synchronous `Symbol.dispose` call on each iteration.
+- **Typed Inject remains the closest baseline for scoped flows and 10-dependency graphs.** InversifyJS provides the closest result in several other resolve workloads.
+- **Scenario 5 measures different setup costs.** TypeDI and TSyringe register classes through decorator side effects at module evaluation. Their benchmark result measures child-context creation, while InferDI registers the full graph before the first resolve.
 
 Full methodology, fairness notes, fixture sources, and per-scenario reasoning: see [`benchmarks/README.md`](https://github.com/inferdi/inferdi/blob/main/benchmarks/README.md).
 
@@ -171,7 +171,7 @@ import { Container } from 'jsr:@inferdi/inferdi'
 
 - **Node ≥ 16.** On Node < 20.4 `Symbol.dispose` / `Symbol.asyncDispose` are auto-polyfilled via `Symbol.for` on import, so `using` / `await using` interop is preserved.
 - **Bun ≥ 1.0** and **Deno ≥ 1.40** ship native `Symbol.dispose` / `Symbol.asyncDispose` — the polyfill is a no-op there.
-- **TypeScript ≥ 5.2** is recommended on the consumer side if you want to use `using` / `await using` syntax. The library itself works with older TypeScript versions — only the explicit-resource-management syntax requires 5.2+.
+- **TypeScript ≥ 5.2.** Published declarations reference the explicit-resource-management library themselves, so consumers targeting ES2022 do not need to add `ESNext.Disposable` to their `lib` configuration.
 
 ## Quick Start
 
@@ -476,7 +476,7 @@ const container = new Container()
   .registerClass('userRepo', UserRepo, ['pgPool'])
 ```
 
-Factories follow the same lifetime rules as classes — pass the kind as the third argument: `registerFactory('cache', factory, 'scoped')`. Inside a **singleton** factory the container parameter is narrowed via `AllowedDeps<T, 'singleton'>`, so `c.get(...)` will only autocomplete (and accept) singleton keys and `Lazy<singleton>` companions. A `scoped`/`transient` key (or `Lazy<scoped>` / `Lazy<transient>`) inside a singleton factory body is a TypeScript error, not a runtime exception.
+Factories follow the same lifetime rules as classes — pass the kind as the third argument: `registerFactory('cache', factory, 'scoped')`. An optional fourth `lazyKey` registers the same lifetime-preserving `Lazy<V>` companion as `registerClass`: `registerFactory('cache', factory, 'scoped', 'cacheLazy')`. To use the default singleton lifetime with a companion, pass `undefined` as the kind. Inside a **singleton** factory the container parameter is narrowed via `AllowedDeps<T, 'singleton'>`, so `c.get(...)` will only autocomplete (and accept) singleton keys and `Lazy<singleton>` companions. A `scoped`/`transient` key (or `Lazy<scoped>` / `Lazy<transient>`) inside a singleton factory body is a TypeScript error, not a runtime exception.
 
 ## Binding Interfaces
 
@@ -500,6 +500,8 @@ Now any consumer that depends on `'mailer'` sees the `Mailer` abstraction, and y
 
 In traditional DI frameworks, injection errors — like swapping the argument order, passing the wrong type, or forgetting a dependency entirely — only surface as runtime crashes.
 **InferDI validates your dependency graph at compile time.** Thanks to advanced TypeScript mapping (`DepsOf`), the array of dependency keys is strictly checked against the types and positional order of the target class's constructor arguments.
+
+Treat the dependency tuple passed to `registerClass` as immutable after registration. The optimized constructor paths retain its registration-time contents without adding a defensive copy.
 
 ```typescript
 class Logger {
@@ -701,7 +703,7 @@ transient-path speed-up matters.
 
 ## Lazy Injection
 
-`Lazy<T>` is a deferred-resolution primitive — useful when two services would otherwise have to be constructed in a precise order (or when the type system would reject a forward reference). Pass a `lazyKey` to the target registration and the container creates a companion `Lazy<T>` under that explicit key (string or symbol):
+`Lazy<T>` is a deferred-resolution primitive — useful when two services would otherwise have to be constructed in a precise order (or when the type system would reject a forward reference). Pass a `lazyKey` to `registerClass` or `registerFactory` and the container creates a companion `Lazy<T>` under that explicit key (string or symbol):
 
 ```ts
 import { Container, type Lazy } from '@inferdi/inferdi'
@@ -720,6 +722,13 @@ const c = new Container()
   .registerClass('audit', Audit, ['clockLazy'], 'singleton')
 
 c.get('audit').record('login')
+```
+
+Factories use the same companion contract:
+
+```ts
+const c = new Container()
+  .registerFactory('clock', () => new Clock(), 'singleton', 'clockLazy')
 ```
 
 **Lazy preserves the target's lifetime; it is not a lifetime escape hatch.** A singleton consumer may inject only `Lazy<singleton>` companions. `Lazy<scoped>` and `Lazy<transient>` are rejected by the compile-time `AllowedDeps` filter inside a singleton, and the strict-mode runtime guard rejects the same shape if you bypass the type system with an `as`-cast. For scoped or transient consumers, every `Lazy<*>` variant remains legal.
@@ -873,7 +882,7 @@ c.get('userRepo').save(/* ... */)         // uses the mocks
 **Strict guarantees:**
 
 - 🛡️ **Type-safe.** `value` must satisfy the originally registered type (`T[K]`). Mocks have to structurally implement the production interface — no `as any` escape hatch.
-- ⛔ **Fail-fast on late overrides.** `.override()` throws if the key has already been resolved on this container. A late override would leave existing consumers holding the original reference while new resolves see the mock — a split dependency graph. Always override **before** the first `.get()`.
+- ⛔ **Local-cache guard.** `.override()` throws if the key already has a value in this container's local cache. This catches locally resolved singleton/scoped registrations, `registerValue`, and repeated overrides. Transient resolutions and ancestor-owned values resolved through a child are not cached locally, so the guard cannot observe them. Always override **before** resolving the dependency graph; otherwise existing consumers can retain the original value while later resolves see the mock.
 - 💥 **Disposed-container guard.** Throws on a disposed container.
 - 🧹 **Externally owned.** Like `registerValue`, the override value is **not** added to the container's disposal queue. The test suite owns the mock's lifetime.
 - 🔒 **Scope-local.** `.override()` mutates only the container it was called on. `root.createScope().override('db', mock)` leaves `root` untouched and is invisible to sibling scopes; a parent-level override propagates via the standard parent walk-up.
@@ -995,7 +1004,7 @@ class Container<T extends DependenciesMap = Record<never, never>> {
     kind: Kind,
   ): Container<T & Record<K, Spec<V, Kind>>>
 
-  // Both overloads also have a five-argument lazyKey form. Passing undefined
+  // Both registerClass overloads also have a five-argument lazyKey form. Passing undefined
   // as kind produces Spec<V, 'singleton'> and LazySpec<V, 'singleton'>.
 
   registerFactory<
@@ -1012,6 +1021,9 @@ class Container<T extends DependenciesMap = Record<never, never>> {
     factory: (c: Container<AllowedDeps<T, Kind>>) => V,
     kind: Kind,
   ): Container<T & Record<K, Spec<V, Kind>>>
+
+  // Both registerFactory overloads also have a four-argument lazyKey form.
+  // The return type additionally contains Record<LK, LazySpec<V, Kind>>.
 
   registerValue<K extends string | symbol, V>(
     key: Exclude<K, keyof T>,

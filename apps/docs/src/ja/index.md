@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: InferDI
-  text: モダンな TypeScript のための唯一の超高速 DI
-  tagline: 超高速なアーキテクチャ、クリーンなドメインロジック、そして一級のテスタビリティを備えた次世代 DI で、あらゆるモダンランタイム向けのアプリを構築しましょう。
+  text: モダンな TypeScript のための強力な型付き DI
+  tagline: サービスを明示的に登録し、TypeScript で依存グラフを検証し、小さな実行時解決パスを維持します。
   image:
     src: /logo.png
     alt: InferDI
@@ -61,7 +61,7 @@ features:
       src: /puzzle.png
       alt: Framework-agnostic core
     title: フレームワーク非依存のコア
-    details: "InferDI は依存ゼロで、どこでも動作します — Node、Bun、Deno、ブラウザ、ワーカー。アダプターはオプションのリクエストスコープ用グルーであり、決して必須ではありません。"
+    details: "InferDI にはランタイム依存がなく、Node、Bun、Deno、ブラウザ、ワーカーで動作します。アダプターはリクエストスコープ向けの任意のライフサイクル機能を提供します。"
     link: /ja/adapters/
     linkText: アダプターの仕組み
 schema:
@@ -71,7 +71,7 @@ schema:
       "@id": "https://inferdi.com/#website"
       "url": "https://inferdi.com/ja/"
       "name": "InferDI"
-      "description": "モダンな TypeScript のための、超高速・デコレーター不要・強い型付けの依存性注入。"
+      "description": "モダンな TypeScript のための、デコレーター不要で強い型付けの依存性注入。"
       "inLanguage": "ja-JP"
       "publisher":
         "@id": "https://inferdi.com/#organization"
@@ -96,11 +96,11 @@ schema:
       "name": "InferDI"
       "applicationCategory": "DeveloperApplication"
       "operatingSystem": "Node.js, Bun, Deno, Browser, Edge runtimes"
-      "softwareVersion": "5.0.4"
+      "softwareVersion": "5.0.5"
       "programmingLanguage": "TypeScript"
       "url": "https://inferdi.com/"
       "downloadUrl": "https://www.npmjs.com/package/@inferdi/inferdi"
-      "description": "TypeScript 向けの依存ゼロ・デコレーター不要・強い型付けの DI コンテナ。依存グラフがそのまま型になります。引数の順序の誤り、欠落したキー、ライフタイムの漏れは、ランタイム例外ではなくコンパイルエラーになります。"
+      "description": "TypeScript 向けのランタイム依存ゼロ・デコレーター不要・強い型付けの DI コンテナ。TypeScript は登録時に引数の順序、キー、ライフタイム依存を検証します。"
       "license": "https://github.com/inferdi/inferdi/blob/main/LICENSE"
       "author":
         "@id": "https://inferdi.com/#organization"

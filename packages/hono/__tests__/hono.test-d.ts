@@ -8,7 +8,7 @@ import {
   type InferdiHonoScopeEnv,
   type InferdiRoot,
   type InferdiScope,
-  type InferdiScopeOf,
+  type InferdiScopeOf
 } from '../src/index'
 
 class RequestContext {
@@ -43,7 +43,7 @@ describe('@inferdi/hono types', () => {
         expectTypeOf(c.get('di')).toEqualTypeOf<RequestContainer>()
         expectTypeOf(c.var.di.get('users')).toEqualTypeOf<UserService>()
 
-        // @ts-expect-error — missing DI keys remain compile errors.
+        // @ts-expect-error — missing DI keys remain compile errors
         c.var.di.get('missing')
 
         return c.json(c.var.di.get('users').profile(c.req.param('id')))
@@ -56,8 +56,10 @@ describe('@inferdi/hono types', () => {
     type Env = InferdiHonoEnv<RootContainer>
     expectTypeOf<keyof Env['Variables']>().toEqualTypeOf<'di'>()
 
-    // An explicit `key: 'di'` produces the same middleware type as omitting the
-    // key entirely (both take the default-key overload).
+    /*
+     * An explicit `key: 'di'` produces the same middleware type as omitting the
+     * key entirely (both take the default-key overload)
+     */
     const explicit = inferdiHono({ container: root, key: 'di' })
     const implicit = inferdiHono({ container: root })
     expectTypeOf(explicit).toEqualTypeOf<typeof implicit>()
@@ -83,7 +85,7 @@ describe('@inferdi/hono types', () => {
     }
 
     const customRoot = {
-      createScope: () => new CustomScope(),
+      createScope: () => new CustomScope()
     }
 
     const app = new Hono()
@@ -119,7 +121,7 @@ describe('@inferdi/hono types', () => {
         expectTypeOf(scope).toEqualTypeOf<RequestContainer>()
         expectTypeOf(c.env.DATABASE_URL).toEqualTypeOf<string>()
         scope.get('request').requestId = c.var.authUser.id
-      },
+      }
     })
 
     expectTypeOf(middleware).toMatchTypeOf<
@@ -142,7 +144,7 @@ describe('@inferdi/hono types', () => {
       },
       onDisposeError: (_error, c) => {
         expectTypeOf(c.var.container.get('users')).toEqualTypeOf<UserService>()
-      },
+      }
     }
 
     void options
@@ -157,7 +159,7 @@ describe('@inferdi/hono types', () => {
     const app = new Hono()
 
     app.get('/before', (c) => {
-      // @ts-expect-error — the di variable is not globally augmented.
+      // @ts-expect-error — the di variable is not globally augmented
       c.var.di
       return c.text('ok')
     })

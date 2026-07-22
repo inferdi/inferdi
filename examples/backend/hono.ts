@@ -14,7 +14,7 @@ app.use('*', inferdiHono({
     const request = scope.get('request')
     request.requestId = crypto.randomUUID()
     request.userId = c.req.header('x-user-id')
-  },
+  }
 }))
 
 app.get('/users/:id', async (c) => {

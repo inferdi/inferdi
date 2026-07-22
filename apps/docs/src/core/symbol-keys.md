@@ -27,7 +27,7 @@ schema:
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
       "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, symbol keys, Symbol, string keys, identity, garbage collection, dependency injection"
       "articleSection": "Core Concepts"

@@ -27,7 +27,7 @@ schema:
       "inLanguage": "ja-JP"
       "datePublished": "2026-06-12"
       "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, エラー, 例外, 未知のキー, 循環検出, ライフタイム違反, 破棄済みコンテナ, 依存性注入"
       "articleSection": "リファレンス"

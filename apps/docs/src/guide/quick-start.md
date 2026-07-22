@@ -19,15 +19,15 @@ schema:
           "item": "https://inferdi.com/guide/quick-start"
     - "@type": "TechArticle"
       "@id": "https://inferdi.com/guide/quick-start#article"
-      "headline": "InferDI Quick Start — build your first typed dependency graph"
+      "headline": "InferDI Quick Start: build your first typed dependency graph"
       "name": "Quick Start"
-      "description": "Build a dependency graph with InferDI's fluent API while TypeScript checks every constructor argument as you wire it. No @Injectable decorators and no reflect-metadata — just plain code the compiler reads, with a one Map.get() resolve on the hot path."
+      "description": "Build a dependency graph with InferDI's fluent API. TypeScript checks constructor arguments as you register services, and cached resolves use one Map.get() lookup."
       "url": "https://inferdi.com/guide/quick-start"
       "mainEntityOfPage": "https://inferdi.com/guide/quick-start"
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Beginner"
       "keywords": "InferDI, quick start, dependency injection, TypeScript DI, container, fluent API, type-safe"
       "articleSection": "Guide"
@@ -56,7 +56,7 @@ schema:
 
 # Quick Start
 
-You build the dependency graph through a fluent API, and TypeScript checks it as you go: every dependency tuple is matched against the target's constructor positions, so a swapped or missing argument is a compile error, not a runtime surprise. There are no `@Injectable()` decorators and no `reflect-metadata` — the wiring is plain code the compiler can read.
+Build the dependency graph through a fluent API. TypeScript matches each dependency tuple to the target constructor, so swapped and missing arguments fail at compile time. The wiring uses plain code, without `@Injectable()` decorators or `reflect-metadata`.
 
 ```ts
 import { Container } from '@inferdi/inferdi'

@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-min/
 coverage/
 .vitest-cache/
 apps/docs/.vitepress/dist/

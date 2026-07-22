@@ -27,7 +27,7 @@ schema:
       "inLanguage": "ja-JP"
       "datePublished": "2026-06-12"
       "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, モジュール, use, コンテナ合成, 型推論, Module 型, 依存性注入"
       "articleSection": "コアコンセプト"

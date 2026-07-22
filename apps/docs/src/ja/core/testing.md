@@ -26,8 +26,8 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ja/core/testing"
       "inLanguage": "ja-JP"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, テスト, override, モック, テストダブル, 実装の差し替え, 依存性注入"
       "articleSection": "コアコンセプト"
@@ -75,14 +75,14 @@ const c = buildContainer()
 
 ## オーバーライドのタイミング
 
-オーバーライドは、キーが解決される前に行わなければなりません:
+依存関係グラフを解決する前にオーバーライドを適用してください:
 
 ```ts
 const logger = c.get('logger')
 c.override('logger', mockLogger)
 ```
 
-この 2 行目はスローします。遅れたオーバーライドはグラフを分裂させます。既存の利用者は古いインスタンスを保持し続ける一方で、後続の解決はモックを返すことになるためです。
+2 行目は、singleton 値がこのコンテナのローカルキャッシュにすでに存在するため例外をスローします。このガードは意図的にキャッシュだけを確認し、現在のスコープにキャッシュされた scoped 値、`registerValue`、および 2 回目のオーバーライドも検出します。Transient の解決や、子コンテナ経由で解決された祖先所有の値はローカルにキャッシュされないため追跡されません。すでに返された transient は呼び出し側に残り、以後の解決はモックを返します。これは遅いオーバーライドを推奨するものではありません。グラフの分裂を避けるため、すべてのオーバーライドをグラフの解決前に適用してください。
 
 ## 所有権
 

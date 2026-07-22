@@ -26,8 +26,8 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ru/reference/api"
       "inLanguage": "ru-RU"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "executableLibraryName": "@inferdi/inferdi"
       "programmingModel": "Явная регистрация, текучий builder"
@@ -82,7 +82,7 @@ class Container<T extends DependenciesMap = Record<never, never>> {
   constructor(options?: ContainerOptions)
 
   registerClass(key, Ctor, deps, kind?, lazyKey?)
-  registerFactory(key, factory, kind?)
+  registerFactory(key, factory, kind?, lazyKey?)
   registerValue(key, value)
   override(key, value)
   use(fn)
@@ -105,10 +105,14 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 | `registerClass` | Регистрирует конструктор и кортеж зависимостей. |
 | `registerFactory` | Регистрирует пользовательскую логику создания. |
 | `registerValue` | Регистрирует singleton-значение, которым владеет внешний код. |
-| `override` | Заменяет существующую регистрацию до первого resolve. |
+| `override` | Заменяет существующую регистрацию; отклоняет ключ, уже находящийся в локальном кеше. |
 | `use` | Применяет сборщик модуля. |
 
-`registerClass` и `registerFactory` принимают виды времени жизни `singleton`, `scoped` и `transient`. `registerValue` всегда создаёт singleton, которым владеет внешний код.
+`registerClass` и `registerFactory` принимают виды времени жизни `singleton`, `scoped` и `transient`, а также опциональный companion `lazyKey`. `registerValue` всегда создаёт singleton, которым владеет внешний код.
+
+Считайте кортеж зависимостей, переданный в `registerClass`, неизменяемым после регистрации. Оптимизированные пути создания экземпляра не делают защитную копию.
+
+Проверка времени вызова `override` смотрит только в кеш текущего контейнера. Она обнаруживает локально закешированные singleton/scoped-значения, `registerValue` и повторные overrides, но не отслеживает transient-resolve и значения предка, разрешённые через дочерний контейнер. Применяйте overrides до разрешения графа зависимостей.
 
 ## Типы namespace
 

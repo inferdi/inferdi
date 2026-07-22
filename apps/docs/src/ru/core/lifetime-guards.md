@@ -27,7 +27,7 @@ schema:
       "inLanguage": "ru-RU"
       "datePublished": "2026-06-12"
       "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, время жизни, singleton, scoped, transient, контроль времени жизни, захваченная зависимость, внедрение зависимостей"
       "articleSection": "Базовые принципы"

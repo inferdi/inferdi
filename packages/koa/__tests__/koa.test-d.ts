@@ -2,7 +2,7 @@ import Koa, {
   type DefaultContext,
   type DefaultState,
   type Middleware,
-  type ParameterizedContext,
+  type ParameterizedContext
 } from 'koa'
 import {describe, expectTypeOf, it} from 'vitest'
 import {Container} from '@inferdi/inferdi'
@@ -13,7 +13,7 @@ import {
   type InferdiKoaState,
   type InferdiRoot,
   type InferdiScope,
-  type InferdiScopeOf,
+  type InferdiScopeOf
 } from '../src/index'
 
 class RequestContext {
@@ -71,7 +71,7 @@ describe('@inferdi/koa types', () => {
       setupScope: (scope, ctx) => {
         expectTypeOf(scope).toEqualTypeOf<RequestContainer>()
         scope.get('request').requestId = ctx.state.user.id
-      },
+      }
     })
 
     expectTypeOf(middleware).toMatchTypeOf<
@@ -89,7 +89,7 @@ describe('@inferdi/koa types', () => {
         expectTypeOf(ctx.state.di).toEqualTypeOf<RequestContainer>()
         expectTypeOf(ctx.state.di.get('users')).toEqualTypeOf<UserService>()
 
-        // @ts-expect-error — missing DI keys remain compile errors.
+        // @ts-expect-error — missing DI keys remain compile errors
         ctx.state.di.get('missing')
 
         ctx.body = ctx.state.di.get('users').profile('1')
@@ -145,7 +145,7 @@ describe('@inferdi/koa types', () => {
       },
       onDisposeError: (_error, ctx) => {
         expectTypeOf(ctx.state.container).toEqualTypeOf<RequestContainer>()
-      },
+      }
     }
 
     void options
@@ -157,7 +157,7 @@ describe('@inferdi/koa types', () => {
     }
 
     const customRoot = {
-      createScope: () => new CustomScope(),
+      createScope: () => new CustomScope()
     }
 
     const app = new Koa<{}>()
@@ -175,7 +175,7 @@ describe('@inferdi/koa types', () => {
     const app = new Koa<{}>()
 
     app.use((ctx) => {
-      // @ts-expect-error — the di state key is not globally augmented.
+      // @ts-expect-error — the di state key is not globally augmented
       ctx.state.di
       ctx.body = 'ok'
     })

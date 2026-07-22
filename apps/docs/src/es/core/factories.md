@@ -26,8 +26,8 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/es/core/factories"
       "inLanguage": "es-ES"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, factorías, registerFactory, factoría asíncrona, configuración, clientes de terceros, inyección de dependencias"
       "articleSection": "Conceptos básicos"
@@ -70,6 +70,25 @@ const container = new Container()
 
 El valor devuelto por la factoría se convierte en el tipo resuelto de la clave.
 
+## Grafos transitorios calientes
+
+`registerClass` es la opción predeterminada para servicios transitorios. Úsalo mientras el perfilado no muestre que la construcción ocupa una parte relevante de una ruta caliente.
+
+V8 puede ralentizar un patrón concreto: un grafo resuelve repetidamente muchas clases transitorias distintas con el mismo número de dependencias. Si el perfilado y el artefacto compilado de la aplicación confirman ese hotspot, registra solo esos servicios con factorías:
+
+```ts
+const container = new Container()
+  .registerClass('context', RequestContext, [], 'scoped')
+  .registerClass('schema', Schema, [])
+  .registerFactory(
+    'parseRequest',
+    (c) => new ParseRequest(c.get('context'), c.get('schema')),
+    'transient',
+  )
+```
+
+Cada factoría debe contener su propia llamada a `new Service(...)`. No dirijas varios servicios a un helper genérico de construcción si esta optimización importa. Las factorías repiten el cableado de dependencias; resérvalas para hotspots medidos.
+
 ## Tiempos de vida de las factorías
 
 Las factorías usan el mismo modelo de tiempo de vida que las clases:
@@ -81,6 +100,17 @@ const root = new Container()
 ```
 
 Dentro de una factoría de singleton, el parámetro `c` se restringe a dependencias seguras para singletons. Las claves con scope y transitorias no se autocompletan y TypeScript las rechaza.
+
+Pasa un cuarto argumento opcional `lazyKey` para registrar un acompañante `Lazy<V>` que conserva el tiempo de vida, igual que con `registerClass`:
+
+```ts
+const root = new Container()
+  .registerFactory('cache', () => new Cache(), 'singleton', 'cacheLazy')
+
+root.get('cacheLazy').get() // Cache
+```
+
+Para usar el tiempo de vida singleton predeterminado, pasa `undefined` antes de la clave acompañante: `registerFactory('cache', factory, undefined, 'cacheLazy')`.
 
 ## Vincular interfaces
 

@@ -3,15 +3,17 @@ import {
   Logger, Config, Repo, Service, TransientService, ScopedService,
   Wide4, Wide10, Dep0, Dep1, Dep2, Dep3, Dep4, Dep5, Dep6, Dep7, Dep8, Dep9,
   L0, L1, L2, L3, L4, L5, L6, L7, L8, L9,
-  LazyConsumer,
+  LazyConsumer
 } from '../fixtures/typed-inject.js'
 import type { Resolver } from './types.js'
 
-// Lazy for typed-inject: the factory must declare a static `inject` array (zero-reflection).
-// We attach it via `Object.assign`, capturing the $injector special token for deferred resolve.
+/*
+ * Lazy for typed-inject: the factory must declare a static `inject` array (zero-reflection).
+ * We attach it via `Object.assign`, capturing the $injector special token for deferred resolve
+ */
 const lazyLoggerFactory = Object.assign(
   ($injector: Injector<{ logger: Logger }>) => () => $injector.resolve('logger'),
-  { inject: ['$injector'] as const },
+  { inject: ['$injector'] as const }
 )
 
 function configureRoot() {
@@ -59,12 +61,14 @@ export function buildRoot(): Resolver {
     resolveWide10: () => root.resolve('wide10'),
     buildAndResolve: () => configureRoot().resolve('service'),
     scopedResolveAndDispose: () => {
-      // typed-inject: each createChildInjector + provideClass yields a fresh scope-bound singleton.
-      // dispose() is async — we do NOT call it (event-loop overhead); GC will collect.
+      /*
+       * typed-inject: each createChildInjector + provideClass yields a fresh scope-bound singleton.
+       * dispose() is async — we do NOT call it (event-loop overhead); GC will collect
+       */
       const s = root.createChildInjector().provideClass('scoped', ScopedService)
       const v = s.resolve('scoped')
       return v
     },
-    resolveLazy: () => root.resolve('lazyConsumer').use(),
+    resolveLazy: () => root.resolve('lazyConsumer').use()
   }
 }

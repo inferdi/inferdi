@@ -27,7 +27,7 @@ schema:
       "inLanguage": "ru-RU"
       "datePublished": "2026-06-12"
       "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, символьные ключи, Symbol, строковые ключи, идентичность, сборка мусора, внедрение зависимостей"
       "articleSection": "Базовые принципы"

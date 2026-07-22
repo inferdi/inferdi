@@ -1,7 +1,7 @@
 import express, {
   type Request,
   type RequestHandler,
-  type Response,
+  type Response
 } from 'express'
 import {describe, expectTypeOf, it} from 'vitest'
 import {Container} from '@inferdi/inferdi'
@@ -10,7 +10,7 @@ import {
   type InferdiExpressOptions,
   type InferdiRoot,
   type InferdiScope,
-  type InferdiScopeOf,
+  type InferdiScopeOf
 } from '../src/index'
 
 class RequestContext {
@@ -59,7 +59,7 @@ describe('@inferdi/express types', () => {
       expectTypeOf(req.di).toEqualTypeOf<RequestContainer>()
       expectTypeOf(req.di.get('users')).toEqualTypeOf<UserService>()
 
-      // @ts-expect-error — missing DI keys remain compile errors.
+      // @ts-expect-error — missing DI keys remain compile errors
       req.di.get('missing')
 
       res.json(req.di.get('users').profile(req.params.id))
@@ -94,7 +94,7 @@ describe('@inferdi/express types', () => {
       onDisposeError: (_error, req, res) => {
         expectTypeOf(req.di).toEqualTypeOf<RequestContainer>()
         expectTypeOf(res).toEqualTypeOf<Response>()
-      },
+      }
     }
 
     void options
@@ -106,7 +106,7 @@ describe('@inferdi/express types', () => {
     }
 
     const customRoot = {
-      createScope: () => new CustomScope(),
+      createScope: () => new CustomScope()
     }
 
     inferdiExpress({ container: customRoot })

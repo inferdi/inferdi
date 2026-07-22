@@ -1,20 +1,24 @@
 import { createContainer, asClass, asFunction, InjectionMode, type AwilixContainer } from 'awilix'
 
-// Awilix's cradle is typed via the generic parameter AwilixContainer<T>.
-// We register 30+ keys for benchmarks; describing the exact shape is not worth it — use Record<string, any>.
+/*
+ * Awilix's cradle is typed via the generic parameter AwilixContainer<T>.
+ * We register 30+ keys for benchmarks; describing the exact shape is not worth it — use Record<string, any>
+ */
 type Cradle = Record<string, any>
 type Container = AwilixContainer<Cradle>
 import {
   Logger, Config, Repo, Service, TransientService, ScopedService,
   Wide4, Wide10, Dep0, Dep1, Dep2, Dep3, Dep4, Dep5, Dep6, Dep7, Dep8, Dep9,
   L0, L1, L2, L3, L4, L5, L6, L7, L8, L9,
-  LazyConsumer,
+  LazyConsumer
 } from '../fixtures/plain.js'
 import type { Resolver } from './types.js'
 
-// PROXY mode: the factory receives the cradle proxy as its first argument.
-// asClass(Cls) in PROXY would call new Cls(cradle) — a positional constructor would get the proxy
-// in the first parameter and `undefined` for the rest → silent graph corruption. We use asFunction wrappers.
+/*
+ * PROXY mode: the factory receives the cradle proxy as its first argument.
+ * asClass(Cls) in PROXY would call new Cls(cradle) — a positional constructor would get the proxy
+ * in the first parameter and `undefined` for the rest → silent graph corruption. We use asFunction wrappers
+ */
 function configureProxy(): Container {
   const c: Container = createContainer<Cradle>({ injectionMode: InjectionMode.PROXY })
   c.register({
@@ -47,15 +51,17 @@ function configureProxy(): Container {
     l7: asFunction(({ l6 }) => new L7(l6)).transient(),
     l8: asFunction(({ l7 }) => new L8(l7)).transient(),
     l9: asFunction(({ l8 }) => new L9(l8)).transient(),
-    // Lazy via a cradle-bound closure (deferred resolve).
+    // Lazy via a cradle-bound closure (deferred resolve)
     lazyLogger: asFunction((cradle) => () => cradle.logger).singleton(),
-    lazyConsumer: asFunction(({ lazyLogger }) => new LazyConsumer(lazyLogger)).singleton(),
+    lazyConsumer: asFunction(({ lazyLogger }) => new LazyConsumer(lazyLogger)).singleton()
   })
   return c
 }
 
-// CLASSIC mode: Awilix parses the constructor source with a regex and resolves by parameter name.
-// asClass(Cls) → new Cls(...resolved positional dependencies) — compatible with plain TS classes.
+/*
+ * CLASSIC mode: Awilix parses the constructor source with a regex and resolves by parameter name.
+ * asClass(Cls) → new Cls(...resolved positional dependencies) — compatible with plain TS classes
+ */
 function configureClassic(): Container {
   const c: Container = createContainer<Cradle>({ injectionMode: InjectionMode.CLASSIC })
   c.register({
@@ -87,9 +93,9 @@ function configureClassic(): Container {
     l7: asClass(L7).transient(),
     l8: asClass(L8).transient(),
     l9: asClass(L9).transient(),
-    // Lazy in CLASSIC: a 0-arg factory closing over `container` — there is no native deferred mode.
+    // Lazy in CLASSIC: a 0-arg factory closing over `container` — there is no native deferred mode
     lazyLogger: asFunction(() => () => c.cradle.logger).singleton(),
-    lazyConsumer: asFunction(() => new LazyConsumer(c.cradle.lazyLogger)).singleton(),
+    lazyConsumer: asFunction(() => new LazyConsumer(c.cradle.lazyLogger)).singleton()
   })
   return c
 }
@@ -115,9 +121,9 @@ function makeResolver(root: Container, fresh: () => Container): Resolver {
     scopedResolveAndDispose: () => {
       const s = root.createScope()
       const v = s.cradle.scoped
-      // No cleanup — root does not track scopes. dispose() is async-only, not allowed in bench.
+      // No cleanup — root does not track scopes. dispose() is async-only, not allowed in bench
       return v
     },
-    resolveLazy: () => (root.cradle.lazyConsumer as LazyConsumer).use(),
+    resolveLazy: () => (root.cradle.lazyConsumer as LazyConsumer).use()
   }
 }

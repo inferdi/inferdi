@@ -26,8 +26,8 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ru/core/factories"
       "inLanguage": "ru-RU"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, фабрики, registerFactory, асинхронная фабрика, конфигурация, сторонние клиенты, внедрение зависимостей"
       "articleSection": "Базовые принципы"
@@ -70,6 +70,25 @@ const container = new Container()
 
 Возвращаемое значение фабрики становится типом, который выдаёт этот ключ.
 
+## Горячие transient-графы
+
+`registerClass` остаётся стандартным способом регистрации transient-сервисов. Оставляйте его, пока профилировщик не покажет, что создание объектов заметно влияет на горячий путь.
+
+У V8 есть узкий неблагоприятный случай: один граф много раз создаёт разные transient-классы с одинаковым числом зависимостей. Если профилировщик и собранный артефакт приложения подтверждают этот hotspot, зарегистрируйте только такие сервисы через фабрики:
+
+```ts
+const container = new Container()
+  .registerClass('context', RequestContext, [], 'scoped')
+  .registerClass('schema', Schema, [])
+  .registerFactory(
+    'parseRequest',
+    (c) => new ParseRequest(c.get('context'), c.get('schema')),
+    'transient',
+  )
+```
+
+Каждая фабрика должна содержать собственный вызов `new Service(...)`. Не направляйте несколько сервисов в общий конструктор-помощник, если эта оптимизация важна. Фабрики дублируют описание зависимостей, поэтому применяйте их к измеренным hotspot, а не ко всем transient-регистрациям.
+
 ## Время жизни фабрик
 
 Фабрики используют ту же модель времени жизни, что и классы:
@@ -81,6 +100,17 @@ const root = new Container()
 ```
 
 В singleton-фабрике параметр `c` сужен до зависимостей, безопасных для singleton. Scoped и transient ключи не появляются в автодополнении и отклоняются TypeScript.
+
+Опциональный четвёртый аргумент `lazyKey` регистрирует сохраняющий время жизни companion `Lazy<V>` — точно так же, как в `registerClass`:
+
+```ts
+const root = new Container()
+  .registerFactory('cache', () => new Cache(), 'singleton', 'cacheLazy')
+
+root.get('cacheLazy').get() // Cache
+```
+
+Чтобы оставить время жизни singleton по умолчанию, перед ключом companion передайте `undefined`: `registerFactory('cache', factory, undefined, 'cacheLazy')`.
 
 ## Привязка интерфейсов
 

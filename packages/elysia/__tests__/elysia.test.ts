@@ -3,7 +3,7 @@ import {afterEach, describe, expect, it, vi} from 'vitest'
 import {
   inferdiElysia,
   skipInferdiDispose,
-  type InferdiScope,
+  type InferdiScope
 } from '../src/index'
 
 function delay(ms: number) {
@@ -27,12 +27,12 @@ class TestScope implements InferdiScope {
     private readonly options: {
       readonly disposeDelay?: number
       readonly disposeError?: Error
-    } = {},
+    } = {}
   ) {}
 
   get(key: 'users') {
     return {
-      profile: (id: string) => ({ id, requestId: this.requestId }),
+      profile: (id: string) => ({ id, requestId: this.requestId })
     }
   }
 
@@ -67,14 +67,14 @@ class TestRoot {
 
   get(key: 'health') {
     return {
-      check: () => 'ok',
+      check: () => 'ok'
     }
   }
 }
 
 function jsonError(
   target: { value?: unknown },
-  status = 500,
+  status = 500
 ) {
   return ({ error, set }: { error: Readonly<Error>, set: { status?: number } }) => {
     target.value = error
@@ -93,7 +93,7 @@ describe('@inferdi/elysia', () => {
     const app = new Elysia()
       .use(inferdiElysia({ container: root }))
       .get('/users/:id', ({ di, params }) =>
-        di.get('users').profile(params.id),
+        di.get('users').profile(params.id)
       )
 
     const response = await app.handle(request('/users/42'))
@@ -113,17 +113,17 @@ describe('@inferdi/elysia', () => {
         container: root,
         setupScope: (scope, { request }) => {
           scope.requestId = request.headers.get('x-request-id') ?? ''
-        },
+        }
       }))
       .get('/users/:id', ({ di, params }) =>
-        di.get('users').profile(params.id),
+        di.get('users').profile(params.id)
       )
 
     const first = await app.handle(request('/users/1', {
-      headers: { 'x-request-id': 'first' },
+      headers: { 'x-request-id': 'first' }
     }))
     const second = await app.handle(request('/users/2', {
-      headers: { 'x-request-id': 'second' },
+      headers: { 'x-request-id': 'second' }
     }))
     await waitForAfterResponse()
 
@@ -139,7 +139,7 @@ describe('@inferdi/elysia', () => {
     const app = new Elysia()
       .use(inferdiElysia({ container: root, key: 'container' }))
       .get('/users/:id', ({ container, params }) =>
-        container.get('users').profile(params.id),
+        container.get('users').profile(params.id)
       )
 
     const response = await app.handle(request('/users/7'))
@@ -172,14 +172,14 @@ describe('@inferdi/elysia', () => {
           expect(context.phase).toBe('afterResponse')
           await delay(1)
           disposed.push(scope)
-        },
+        }
       }))
       .get('/users/:id', ({ di, params }) =>
-        di.get('users').profile(params.id),
+        di.get('users').profile(params.id)
       )
 
     const response = await app.handle(request('/users/8', {
-      headers: { 'x-request-id': 'custom' },
+      headers: { 'x-request-id': 'custom' }
     }))
     await waitForAfterResponse()
 
@@ -195,10 +195,10 @@ describe('@inferdi/elysia', () => {
     const app = new Elysia()
       .use(inferdiElysia({
         container: root,
-        createScope: () => customScope,
+        createScope: () => customScope
       }))
       .get('/users/:id', ({ di, params }) =>
-        di.get('users').profile(params.id),
+        di.get('users').profile(params.id)
       )
 
     const response = await app.handle(request('/users/9'))
@@ -281,8 +281,8 @@ describe('@inferdi/elysia', () => {
       'Failed to dispose InferDI Elysia request scope',
       {
         err: disposeError,
-        phase: 'afterResponse',
-      },
+        phase: 'afterResponse'
+      }
     )
 
     consoleError.mockRestore()
@@ -315,7 +315,7 @@ describe('@inferdi/elysia', () => {
         container: root,
         setupScope: () => {
           throw setupError
-        },
+        }
       }))
       .onError(jsonError(handled, 418))
       .get('/ok', () => ({ ok: true }))
@@ -341,7 +341,7 @@ describe('@inferdi/elysia', () => {
         container: root,
         setupScope: async () => {
           throw setupError
-        },
+        }
       }))
       .onError(jsonError(handled))
       .get('/ok', () => ({ ok: true }))
@@ -374,7 +374,7 @@ describe('@inferdi/elysia', () => {
         onDisposeError: async (error, context) => {
           await delay(1)
           logged.push([error, context.phase])
-        },
+        }
       }))
       .onError(jsonError(handled, 409))
       .get('/ok', () => ({ ok: true }))
@@ -404,7 +404,7 @@ describe('@inferdi/elysia', () => {
         },
         onDisposeError: () => {
           throw handlerError
-        },
+        }
       }))
       .onError(jsonError(handled))
       .get('/ok', () => ({ ok: true }))
@@ -419,7 +419,7 @@ describe('@inferdi/elysia', () => {
     expect((payload as { err?: unknown }).err).toBeInstanceOf(AggregateError)
     expect(((payload as { err: AggregateError }).err).errors).toEqual([
       disposeError,
-      handlerError,
+      handlerError
     ])
     expect(root.scopes[0]?.disposeCalls).toBe(1)
 
@@ -444,7 +444,7 @@ describe('@inferdi/elysia', () => {
         },
         onDisposeError: async () => {
           throw handlerError
-        },
+        }
       }))
       .onError(jsonError(handled))
       .get('/ok', () => ({ ok: true }))
@@ -459,7 +459,7 @@ describe('@inferdi/elysia', () => {
     expect((payload as { err?: unknown }).err).toBeInstanceOf(AggregateError)
     expect(((payload as { err: AggregateError }).err).errors).toEqual([
       disposeError,
-      handlerError,
+      handlerError
     ])
 
     consoleError.mockRestore()
@@ -505,7 +505,7 @@ describe('@inferdi/elysia', () => {
     expect(response.status).toBe(409)
     expect(await response.json()).toEqual({ handled: true })
     expect(observed).toEqual([
-      [false, { id: 'error', requestId: '' }],
+      [false, { id: 'error', requestId: '' }]
     ])
     expect(root.scopes[0]?.disposeCalls).toBe(0)
 
@@ -543,8 +543,8 @@ describe('@inferdi/elysia', () => {
       .onError(jsonError(handled, 422))
       .get('/needs-header', ({ di }) => di.get('users').profile('1'), {
         headers: t.Object({
-          'x-user-id': t.String(),
-        }),
+          'x-user-id': t.String()
+        })
       })
 
     const response = await app.handle(request('/needs-header'))
@@ -565,23 +565,23 @@ describe('@inferdi/elysia', () => {
         setupValidatedScope: (scope, context) => {
           calls.push([context.di === scope, context.headers['x-user-id']])
           scope.requestId = context.headers['x-user-id'] ?? ''
-        },
+        }
       }))
       .get('/needs-header', ({ di }) => di.get('users').profile('1'), {
         headers: t.Object({
-          'x-user-id': t.String(),
-        }),
+          'x-user-id': t.String()
+        })
       })
 
     const response = await app.handle(request('/needs-header', {
-      headers: { 'x-user-id': 'validated-user' },
+      headers: { 'x-user-id': 'validated-user' }
     }))
     await waitForAfterResponse()
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({
       id: '1',
-      requestId: 'validated-user',
+      requestId: 'validated-user'
     })
     expect(calls).toEqual([[true, 'validated-user']])
     expect(root.scopes[0]?.disposeCalls).toBe(1)
@@ -594,13 +594,13 @@ describe('@inferdi/elysia', () => {
     const app = new Elysia()
       .use(inferdiElysia({
         container: root,
-        setupValidatedScope,
+        setupValidatedScope
       }))
       .onError(jsonError(handled, 422))
       .get('/needs-header', ({ di }) => di.get('users').profile('1'), {
         headers: t.Object({
-          'x-user-id': t.String(),
-        }),
+          'x-user-id': t.String()
+        })
       })
 
     const response = await app.handle(request('/needs-header'))
@@ -621,17 +621,17 @@ describe('@inferdi/elysia', () => {
         container: root,
         setupValidatedScope: () => {
           throw setupError
-        },
+        }
       }))
       .onError(jsonError(handled, 409))
       .get('/needs-header', () => ({ unreachable: true }), {
         headers: t.Object({
-          'x-user-id': t.String(),
-        }),
+          'x-user-id': t.String()
+        })
       })
 
     const response = await app.handle(request('/needs-header', {
-      headers: { 'x-user-id': 'validated-user' },
+      headers: { 'x-user-id': 'validated-user' }
     }))
     await waitForAfterResponse()
 
@@ -649,14 +649,14 @@ describe('@inferdi/elysia', () => {
       .onError(jsonError(handled, 400))
       .post('/json', ({ di }) => di.get('users').profile('1'), {
         body: t.Object({
-          name: t.String(),
-        }),
+          name: t.String()
+        })
       })
 
     const response = await app.handle(request('/json', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: '{',
+      body: '{'
     }))
 
     expect(response.status).toBe(400)
@@ -691,8 +691,8 @@ describe('@inferdi/elysia', () => {
       'Failed to dispose InferDI Elysia request scope',
       {
         err: disposeError,
-        phase: 'error',
-      },
+        phase: 'error'
+      }
     )
 
     consoleError.mockRestore()
@@ -709,7 +709,7 @@ describe('@inferdi/elysia', () => {
         container: root,
         onDisposeError: (error, context) => {
           logged.push([error, context.phase, context.error])
-        },
+        }
       }))
       .onError(({ error, set }) => {
         set.status = 409
@@ -746,8 +746,8 @@ describe('@inferdi/elysia', () => {
       'Failed to dispose InferDI Elysia request scope',
       {
         err: disposeError,
-        phase: 'afterResponse',
-      },
+        phase: 'afterResponse'
+      }
     )
 
     consoleError.mockRestore()
@@ -764,7 +764,7 @@ describe('@inferdi/elysia', () => {
         container: root,
         disposeScope: () => {
           throw disposeError
-        },
+        }
       }))
       .get('/ok', () => ({ ok: true }))
 
@@ -777,8 +777,8 @@ describe('@inferdi/elysia', () => {
       'Failed to dispose InferDI Elysia request scope',
       {
         err: disposeError,
-        phase: 'afterResponse',
-      },
+        phase: 'afterResponse'
+      }
     )
 
     consoleError.mockRestore()
@@ -798,7 +798,7 @@ describe('@inferdi/elysia', () => {
         onDisposeError: async (error, context) => {
           await delay(1)
           logged.push([error, context.phase])
-        },
+        }
       }))
       .get('/ok', () => ({ ok: true }))
 
@@ -825,7 +825,7 @@ describe('@inferdi/elysia', () => {
         },
         onDisposeError: (error, context) => {
           logged.push([error, context.phase])
-        },
+        }
       }))
       .get('/ok', () => ({ ok: true }))
 
@@ -842,14 +842,14 @@ describe('@inferdi/elysia', () => {
     const booleanApp = new Elysia()
       .use(inferdiElysia({
         container: booleanRoot,
-        autoDispose: false,
+        autoDispose: false
       }))
       .get('/manual', () => ({ ok: true }))
     const predicateApp = new Elysia()
       .use(inferdiElysia({
         container: predicateRoot,
         autoDispose: (context) =>
-          new URL(context.request.url).pathname !== '/manual',
+          new URL(context.request.url).pathname !== '/manual'
       }))
       .get('/manual', () => ({ ok: true }))
       .get('/auto', () => ({ ok: true }))
@@ -878,7 +878,7 @@ describe('@inferdi/elysia', () => {
         },
         onDisposeError: async (error, context) => {
           logged.push([error, context.phase])
-        },
+        }
       }))
       .get('/ok', () => ({ ok: true }))
 
@@ -889,7 +889,7 @@ describe('@inferdi/elysia', () => {
     expect(root.scopes[0]?.disposeCalls).toBe(1)
     expect(logged).toEqual([
       [predicateError, 'afterResponse'],
-      [disposeError, 'afterResponse'],
+      [disposeError, 'afterResponse']
     ])
   })
 
@@ -906,7 +906,7 @@ describe('@inferdi/elysia', () => {
         container: root,
         autoDispose: () => {
           throw predicateError
-        },
+        }
       }))
       .get('/ok', () => ({ ok: true }))
 
@@ -920,10 +920,10 @@ describe('@inferdi/elysia', () => {
     const [, payload] = consoleError.mock.calls[0] ?? []
     expect(payload).toMatchObject({ phase: 'afterResponse' })
     expect(
-      (payload as { err?: unknown }).err,
+      (payload as { err?: unknown }).err
     ).toBeInstanceOf(AggregateError)
     expect(
-      ((payload as { err: AggregateError }).err).errors,
+      ((payload as { err: AggregateError }).err).errors
     ).toEqual([predicateError, disposeError])
 
     consoleError.mockRestore()
@@ -942,7 +942,7 @@ describe('@inferdi/elysia', () => {
         container: root,
         onDisposeError: () => {
           throw handlerError
-        },
+        }
       }))
       .get('/ok', () => ({ ok: true }))
 
@@ -955,10 +955,10 @@ describe('@inferdi/elysia', () => {
     const [, payload] = consoleError.mock.calls[0] ?? []
     expect(payload).toMatchObject({ phase: 'afterResponse' })
     expect(
-      (payload as { err?: unknown }).err,
+      (payload as { err?: unknown }).err
     ).toBeInstanceOf(AggregateError)
     expect(
-      ((payload as { err: AggregateError }).err).errors,
+      ((payload as { err: AggregateError }).err).errors
     ).toEqual([disposeError, handlerError])
 
     consoleError.mockRestore()
@@ -1013,7 +1013,7 @@ describe('@inferdi/elysia', () => {
     const app = new Elysia()
       .use(inferdiElysia({
         container: root,
-        autoDispose: true,
+        autoDispose: true
       }))
       .get('/stream', (context) => {
         skipInferdiDispose(context)
@@ -1033,12 +1033,14 @@ describe('@inferdi/elysia', () => {
     const app = new Elysia()
       .use(inferdiElysia({
         container: root,
-        // A predicate forces the custom `disposeOnce` path; skip must
-        // short-circuit before the predicate is ever evaluated.
+        /*
+         * A predicate forces the custom `disposeOnce` path; skip must
+         * short-circuit before the predicate is ever evaluated
+         */
         autoDispose: () => {
           autoDisposeCalls += 1
           return true
-        },
+        }
       }))
       .get('/stream', (context) => {
         skipInferdiDispose(context)
@@ -1082,7 +1084,7 @@ describe('@inferdi/elysia', () => {
       .get('/stream', (context) => {
         skipInferdiDispose(context)
         return {
-          same: context.first === context.second,
+          same: context.first === context.second
         }
       })
 
@@ -1100,7 +1102,7 @@ describe('@inferdi/elysia', () => {
     const app = new Elysia()
       .use(inferdiElysia({
         container: root,
-        scopePerRequest: false,
+        scopePerRequest: false
       }))
       .get('/health', ({ di }) => di.get('health').check())
 
@@ -1118,7 +1120,7 @@ describe('@inferdi/elysia', () => {
       .use(inferdiElysia({ container: firstRoot, key: 'first' }))
       .use(inferdiElysia({ container: secondRoot, key: 'second' }))
       .get('/both', ({ first, second }) => ({
-        same: first === second,
+        same: first === second
       }))
 
     const response = await app.handle(request('/both'))
@@ -1139,7 +1141,7 @@ describe('@inferdi/elysia', () => {
       .use(inferdiElysia({ container: firstRoot }))
       .use(inferdiElysia({ container: secondRoot }))
       .get('/same-key', ({ di }) => ({
-        fromSecondPlugin: di === secondRoot.scopes[0],
+        fromSecondPlugin: di === secondRoot.scopes[0]
       }))
 
     const response = await app.handle(request('/same-key'))
@@ -1154,12 +1156,14 @@ describe('@inferdi/elysia', () => {
   })
 
   it('adds no request-time parsing inference to routes in scope', async () => {
-    // Elysia's Sucrose statically analyzes every lifecycle handler; the moment
-    // one passes the whole `context` to another function it marks body/query/
-    // cookie/header parsing as needed for every request in scope. The plugin's
-    // hooks must touch only `request`, so they add no parsing a route did not
-    // ask for. Assert the plugin leaves Elysia's inference identical to a bare
-    // app with the same no-op route (robust against Elysia changing defaults).
+    /*
+     * Elysia's Sucrose statically analyzes every lifecycle handler; the moment
+     * one passes the whole `context` to another function it marks body/query/
+     * cookie/header parsing as needed for every request in scope. The plugin's
+     * hooks must touch only `request`, so they add no parsing a route did not
+     * ask for. Assert the plugin leaves Elysia's inference identical to a bare
+     * app with the same no-op route (robust against Elysia changing defaults)
+     */
     const readInference = (app: unknown) =>
       (app as { inference: Record<string, boolean> }).inference
     const buildApp = (plugin?: Elysia) => {

@@ -14,13 +14,13 @@ class ApiClient {
 class InboxViewModel {
   constructor(
     private readonly route: RouteContext,
-    private readonly api: ApiClient,
+    private readonly api: ApiClient
   ) {}
 
   async load() {
     return {
       route: this.route.routeName,
-      messages: await this.api.loadInbox(),
+      messages: await this.api.loadInbox()
     }
   }
 }
@@ -60,7 +60,7 @@ export function provideInboxRouteScope() {
 
   setContext(RouteDIKey, scope)
 
-  // Svelte onDestroy is synchronous; start async cleanup and report failures.
+  // Svelte onDestroy is synchronous; start async cleanup and report failures
   onDestroy(() => {
     scope.dispose().catch(console.error)
   })

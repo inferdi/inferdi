@@ -4,7 +4,7 @@ import {
   type PropsWithChildren,
   useContext,
   useEffect,
-  useState,
+  useState
 } from 'react'
 
 class ScreenContext {
@@ -20,13 +20,13 @@ class DeviceStorage {
 class SettingsViewModel {
   constructor(
     private readonly screen: ScreenContext,
-    private readonly storage: DeviceStorage,
+    private readonly storage: DeviceStorage
   ) {}
 
   async loadTheme() {
     return {
       screen: this.screen.screenName,
-      theme: await this.storage.getItem('theme'),
+      theme: await this.storage.getItem('theme')
     }
   }
 }
@@ -61,8 +61,10 @@ export function SettingsScreenScope({ children }: PropsWithChildren) {
   const parent = useContext(RootDIContext)
   if (parent === null) throw new Error('DI provider is missing')
 
-  // useState with a lazy initializer (not useMemo) — see the React example
-  // for the rationale: useMemo is not a guarantee, lazy useState is.
+  /*
+   * useState with a lazy initializer (not useMemo) — see the React example
+   * for the rationale: useMemo is not a guarantee, lazy useState is
+   */
   const [scope] = useState(() => createSettingsScreenScope(parent))
 
   useEffect(() => {

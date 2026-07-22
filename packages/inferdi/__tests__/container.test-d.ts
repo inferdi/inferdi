@@ -1,14 +1,16 @@
 import {describe, it, expectTypeOf} from 'vitest'
 import {Container, type Lazy, type Module, type Spec, type SpecMap} from '../src/Container'
 
-// ────────────────────────────────────────────────────────────────────────────
-// Phase 4 — Type-level tests (fluent API)
-//
-// Run via `pnpm run test:types` (vitest --typecheck).
-// Vitest enforces @ts-expect-error: if the marked line has NO TS error, the
-// test fails. So these comments simultaneously verify negative cases
-// (must not compile) and positive cases (must compile).
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * Phase 4 — Type-level tests (fluent API)
+ *
+ * Run via `pnpm run test:types` (vitest --typecheck).
+ * Vitest enforces @ts-expect-error: if the marked line has NO TS error, the
+ * test fails. So these comments simultaneously verify negative cases
+ * (must not compile) and positive cases (must compile).
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 interface Logger {
   log(msg: string): void
@@ -221,13 +223,44 @@ describe('Phase 4 — Lazy companion via lazyKey', () => {
     // @ts-expect-error — lazyKey conflicts with the already-registered 'busy'
     c.registerClass('svc', L, [], 'singleton', 'busy')
   })
+
+  it('registerFactory adds the requested companion with type Lazy<V>', () => {
+    const c = new Container().registerFactory('foo', () => new L(), 'singleton', 'fooLazy')
+
+    expectTypeOf(c.get('fooLazy')).toEqualTypeOf<Lazy<L>>()
+  })
+
+  it('registerFactory supports the default singleton kind with a lazyKey', () => {
+    const c = new Container().registerFactory('foo', () => new L(), undefined, 'fooLazy')
+
+    expectTypeOf(c.get('foo')).toEqualTypeOf<L>()
+    expectTypeOf(c.get('fooLazy')).toEqualTypeOf<Lazy<L>>()
+  })
+
+  it('registerFactory lazyKey cannot equal or collide with another key', () => {
+    // @ts-expect-error — primary and companion keys must differ
+    new Container().registerFactory('foo', () => new L(), 'singleton', 'foo')
+
+    const c = new Container().registerValue('busy', 1)
+    // @ts-expect-error — lazyKey conflicts with the already-registered 'busy'
+    c.registerFactory('foo', () => new L(), 'singleton', 'busy')
+  })
+
+  it('registerFactory lazyKey companion is considered taken', () => {
+    const c = new Container().registerFactory('foo', () => new L(), 'singleton', 'fooLazy')
+
+    // @ts-expect-error — fooLazy was already added by the lazyKey companion
+    c.registerValue('fooLazy', {get: () => new L()})
+  })
 })
 
 describe('Phase 4 — documented limitation: ambiguous deps', () => {
   it('two keys with identical structural type — TS does not distinguish them (by design)', () => {
-    // This is a limitation, not a bug: DepsOf uses structural assignability,
-    // so if two services share the same runtime type, TS will accept either
-    // in either position. Branding solves this (see di-stydy.md).
+    /*
+     * This is a limitation, not a bug: DepsOf uses structural assignability,
+     * so if two services share the same runtime type, TS will accept either
+     * in either position. Branding solves this (see di-stydy.md)
+     */
 
     class Holder {
       constructor(public readonly master: Logger, public readonly slave: Logger) {}
@@ -237,8 +270,10 @@ describe('Phase 4 — documented limitation: ambiguous deps', () => {
       .registerClass('master', L, [])
       .registerClass('slave', L, [])
 
-    // NOT @ts-expect-error — TS passes it, even though the order is "logically" swapped.
-    // This is a documented limitation.
+    /*
+     * NOT @ts-expect-error — TS passes it, even though the order is "logically" swapped.
+     * This is a documented limitation
+     */
     c.registerClass('holder', Holder, ['slave', 'master'])
   })
 })
@@ -302,12 +337,20 @@ describe('Phase 4 — symbol keys', () => {
     expectTypeOf(c.get(SVC_LAZY)).toEqualTypeOf<Lazy<L>>()
   })
 
+  it('registerFactory lazyKey accepts mixed symbol and string keys', () => {
+    const SVC = Symbol('svc')
+    const c = new Container().registerFactory(SVC, () => new L(), 'singleton', 'svcLazy')
+    expectTypeOf(c.get('svcLazy')).toEqualTypeOf<Lazy<L>>()
+  })
+
   it('Module<TIn, TOut> with symbol keys', () => {
     const CFG = Symbol('cfg')
     const MAILER = Symbol('mailer')
-    // v3: Module<TIn, TOut> uses the Spec-shaped DependenciesMap directly.
-    // Wrap flat `{ key: ServiceType }` maps in `SpecMap<...>` to default each
-    // entry to singleton.
+    /*
+     * v3: Module<TIn, TOut> uses the Spec-shaped DependenciesMap directly.
+     * Wrap flat `{ key: ServiceType }` maps in `SpecMap<...>` to default each
+     * entry to singleton
+     */
     const m: Module<SpecMap<Record<typeof CFG, {env: string}>>, SpecMap<Record<typeof MAILER, L>>> =
       (c) => c.registerClass(MAILER, L, [])
     void m
@@ -368,14 +411,16 @@ describe('Phase 4 — override types', () => {
   })
 })
 
-// ────────────────────────────────────────────────────────────────────────────
-// v3.0 — Compile-time lifetime guard (Variant C)
-//
-// `AllowedDeps<T, Kind>` filters the visible keyspace inside a registration so
-// that singleton consumers cannot inject scoped/transient deps. The runtime
-// guard in get() still fires for `as`-cast bypasses; these tests cover the
-// TypeScript-level coverage.
-// ────────────────────────────────────────────────────────────────────────────
+/*
+ * ────────────────────────────────────────────────────────────────────────────
+ * v3.0 — Compile-time lifetime guard (Variant C)
+ *
+ * `AllowedDeps<T, Kind>` filters the visible keyspace inside a registration so
+ * that singleton consumers cannot inject scoped/transient deps. The runtime
+ * guard in get() still fires for `as`-cast bypasses; these tests cover the
+ * TypeScript-level coverage.
+ * ────────────────────────────────────────────────────────────────────────────
+ */
 
 describe('Phase 8 — compile-time lifetime guard', () => {
   class Dep {
@@ -404,9 +449,11 @@ describe('Phase 8 — compile-time lifetime guard', () => {
   })
 
   it('singleton class CAN depend on a Lazy<singleton> companion', () => {
-    // LazySpec<V, 'singleton'> passes the AllowedDeps<T, 'singleton'> filter:
-    // a singleton may legally defer its dependency on another singleton via
-    // a lazy wrapper (useful for breaking init-time cycles between singletons).
+    /*
+     * LazySpec<V, 'singleton'> passes the AllowedDeps<T, 'singleton'> filter:
+     * a singleton may legally defer its dependency on another singleton via
+     * a lazy wrapper (useful for breaking init-time cycles between singletons)
+     */
     class HolderLazy {
       constructor(public readonly d: Lazy<Dep>) {}
     }
@@ -415,13 +462,31 @@ describe('Phase 8 — compile-time lifetime guard', () => {
       .registerClass('holder', HolderLazy, ['depLazy'], 'singleton')
   })
 
+  it('singleton class CAN depend on a factory-created Lazy<singleton> companion', () => {
+    class HolderLazy {
+      constructor(public readonly d: Lazy<Dep>) {}
+    }
+    new Container()
+      .registerFactory('dep', () => new Dep(), 'singleton', 'depLazy')
+      .registerClass('holder', HolderLazy, ['depLazy'], 'singleton')
+  })
+
   it('singleton class CANNOT depend on a Lazy<scoped> companion', () => {
-    // v4: Lazy preserves the target's lifetime — Lazy<scoped> is not singleton-safe.
+    // v4: Lazy preserves the target's lifetime — Lazy<scoped> is not singleton-safe
     class HolderLazy {
       constructor(public readonly d: Lazy<Dep>) {}
     }
     const c = new Container().registerClass('dep', Dep, [], 'scoped', 'depLazy')
-    // @ts-expect-error — LazySpec<Dep, 'scoped'> is excluded by AllowedDeps<T, 'singleton'>.
+    // @ts-expect-error — LazySpec<Dep, 'scoped'> is excluded by AllowedDeps<T, 'singleton'>
+    c.registerClass('holder', HolderLazy, ['depLazy'], 'singleton')
+  })
+
+  it('singleton class CANNOT depend on a factory-created Lazy<scoped> companion', () => {
+    class HolderLazy {
+      constructor(public readonly d: Lazy<Dep>) {}
+    }
+    const c = new Container().registerFactory('dep', () => new Dep(), 'scoped', 'depLazy')
+    // @ts-expect-error — the factory companion preserves the scoped target lifetime
     c.registerClass('holder', HolderLazy, ['depLazy'], 'singleton')
   })
 
@@ -430,14 +495,16 @@ describe('Phase 8 — compile-time lifetime guard', () => {
       constructor(public readonly d: Lazy<Dep>) {}
     }
     const c = new Container().registerClass('dep', Dep, [], 'transient', 'depLazy')
-    // @ts-expect-error — LazySpec<Dep, 'transient'> is excluded by AllowedDeps<T, 'singleton'>.
+    // @ts-expect-error — LazySpec<Dep, 'transient'> is excluded by AllowedDeps<T, 'singleton'>
     c.registerClass('holder', HolderLazy, ['depLazy'], 'singleton')
   })
 
   it('scoped class CAN depend on a Lazy<scoped> companion', () => {
-    // Non-singleton consumers are not filtered by AllowedDeps — any companion
-    // (or direct dep) is legal. This preserves the v3 ergonomics for
-    // scoped↔scoped cycle-breaking inside a request scope.
+    /*
+     * Non-singleton consumers are not filtered by AllowedDeps — any companion
+     * (or direct dep) is legal. This preserves the v3 ergonomics for
+     * scoped↔scoped cycle-breaking inside a request scope
+     */
     class HolderLazy {
       constructor(public readonly d: Lazy<Dep>) {}
     }
@@ -453,7 +520,7 @@ describe('Phase 8 — compile-time lifetime guard', () => {
   })
 
   it('scoped class can depend on a transient class', () => {
-    // Per runtime semantics: scoped/transient targets accept any kind of dep.
+    // Per runtime semantics: scoped/transient targets accept any kind of dep
     new Container()
       .registerClass('dep', Dep, [], 'transient')
       .registerClass('consumer', Consumer, ['dep'], 'scoped')
@@ -471,10 +538,10 @@ describe('Phase 8 — compile-time lifetime guard', () => {
       .registerClass('scopedDep', Dep, [], 'scoped')
 
     c.registerFactory('built', (c) => {
-      // singletonDep is visible — singleton deps are legal for a singleton target.
+      // singletonDep is visible — singleton deps are legal for a singleton target
       const ok = c.get('singletonDep')
       void ok
-      // @ts-expect-error — scopedDep is filtered out of the narrowed container's keys.
+      // @ts-expect-error — scopedDep is filtered out of the narrowed container's keys
       c.get('scopedDep')
       return new Dep()
     }, 'singleton')
@@ -540,8 +607,10 @@ describe('Phase 8 — Spec / SpecMap helpers', () => {
 
 describe('Phase 4 — async-factory inference', () => {
   it('async factory: get() returns Promise<V>; no implicit Awaited unwrap', () => {
-    // The container caches the factory's return value verbatim. An async factory
-    // produces `Promise<V>` — `get()` returns that same Promise, callers await.
+    /*
+     * The container caches the factory's return value verbatim. An async factory
+     * produces `Promise<V>` — `get()` returns that same Promise, callers await
+     */
     const c = new Container().registerFactory('db', async () => new L())
     expectTypeOf(c.get('db')).toEqualTypeOf<Promise<L>>()
   })
@@ -553,14 +622,14 @@ describe('Phase 4 — has type-guard', () => {
     const k = 'logger' as string
 
     if (c.has(k)) {
-      // Inside the branch k is narrowed to keyof T, so get() type-checks.
+      // Inside the branch k is narrowed to keyof T, so get() type-checks
       expectTypeOf(c.get(k)).toEqualTypeOf<L>()
     }
   })
 
   it('has() accepts arbitrary string | symbol without TS error', () => {
     const c = new Container().registerClass('logger', L, [])
-    // Dynamic key — no compile error, runtime returns false.
+    // Dynamic key — no compile error, runtime returns false
     const ok: boolean = c.has('anyDynamicKey')
     void ok
   })
@@ -588,8 +657,10 @@ describe('Phase 4 — Container.Providers', () => {
     type P = Container.Providers<typeof c>
 
     expectTypeOf<P['clock']>().toEqualTypeOf<() => L>()
-    // The companion's provider returns the Lazy<L> wrapper, not L directly —
-    // matches the registered shape.
+    /*
+     * The companion's provider returns the Lazy<L> wrapper, not L directly —
+     * matches the registered shape
+     */
     expectTypeOf<P['clockLazy']>().toEqualTypeOf<() => Lazy<L>>()
   })
 
@@ -598,7 +669,7 @@ describe('Phase 4 — Container.Providers', () => {
     const _bad: Container.Providers<typeof c> = {
       logger: () => new L(),
       // @ts-expect-error — 'extra' is not in keyof T
-      extra: () => new L(),
+      extra: () => new L()
     }
     void _bad
   })
@@ -609,7 +680,7 @@ describe('Phase 4 — Container.Providers', () => {
       .registerClass('repo', UserRepoImpl, [])
     // @ts-expect-error — 'repo' is required
     const _bad: Container.Providers<typeof c> = {
-      logger: () => new L(),
+      logger: () => new L()
     }
     void _bad
   })

@@ -15,7 +15,7 @@ function readCommand(pid) {
     try {
       return execFileSync('ps', ['-p', String(pid), '-o', 'command='], {
         encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
+        stdio: ['ignore', 'pipe', 'ignore']
       }).trim()
     } catch {
       return ''
@@ -27,7 +27,7 @@ function findListeningPids() {
   try {
     return execFileSync('lsof', ['-nP', '-ti', `tcp:${port}`], {
       encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
+      stdio: ['ignore', 'pipe', 'ignore']
     })
       .split(/\s+/)
       .filter(Boolean)
@@ -40,7 +40,7 @@ function findListeningPids() {
 
 const processes = findListeningPids().map((pid) => ({
   pid,
-  command: readCommand(pid),
+  command: readCommand(pid)
 }))
 
 if (processes.length === 0) {

@@ -26,8 +26,8 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ja/core/lazy-injection"
       "inLanguage": "ja-JP"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, 遅延注入, Lazy, 遅延解決, 循環依存, シングルトン, 依存性注入"
       "articleSection": "コアコンセプト"
@@ -80,7 +80,12 @@ const c = new Container()
   .registerClass('audit', Audit, ['clockLazy'], 'singleton')
 ```
 
-`lazyKey` を渡すと、値が `{ get: () => target }` であるコンパニオン登録が生成されます。
+`registerClass` または `registerFactory` に `lazyKey` を渡すと、値が `{ get: () => target }` であるコンパニオン登録が生成されます。
+
+```ts
+const c = new Container()
+  .registerFactory('clock', () => new Clock(), 'singleton', 'clockLazy')
+```
 
 ## ライフタイムは保持される
 

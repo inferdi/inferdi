@@ -17,7 +17,7 @@ schema:
       "@id": "https://inferdi.com/zh/adapters/#article"
       "headline": "InferDI 框架适配器 —— 概览"
       "name": "框架适配器"
-      "description": "每个 InferDI 适配器都会为每个请求创建一个请求作用域，将其暴露在框架原生的位置，并在框架安全的完成时机释放它 —— 同时保留应用所拥有的具体且完全带类型的容器。它们只是轻量的生命周期粘合层，绝不是 IoC 框架。"
+      "description": "每个 InferDI 适配器都会创建请求作用域，通过框架原生位置公开它，并在安全的生命周期节点释放它。"
       "url": "https://inferdi.com/zh/adapters/"
       "mainEntityOfPage": "https://inferdi.com/zh/adapters/"
       "inLanguage": "zh-CN"

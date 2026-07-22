@@ -5,7 +5,7 @@ import {
   buildRootContainer,
   createRequestScope,
   type RootContainer,
-  type RequestContainer,
+  type RequestContainer
 } from '../_shared/container.js'
 
 const root = buildRootContainer()
@@ -29,13 +29,13 @@ export function buildServer(): FastifyInstance {
 
   app.register(inferdiFastify, {
     container: root,
-    // Annotate hook params: `app.register` cannot infer the plugin's generics.
+    // Annotate hook params: `app.register` cannot infer the plugin's generics
     createScope: (root: RootContainer, request: FastifyRequest) =>
       createRequestScope(root, {
         requestId: request.id,
         ip: request.ip,
-        userId: normalizeHeader(request.headers['x-user-id']),
-      }),
+        userId: normalizeHeader(request.headers['x-user-id'])
+      })
   })
 
   app.get('/users/:id', async (request) => {

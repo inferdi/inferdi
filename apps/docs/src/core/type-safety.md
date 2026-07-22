@@ -19,15 +19,15 @@ schema:
           "item": "https://inferdi.com/core/type-safety"
     - "@type": "TechArticle"
       "@id": "https://inferdi.com/core/type-safety#article"
-      "headline": "Type Safety in InferDI — the graph is the type"
+      "headline": "Type Safety in InferDI: the graph is the type"
       "name": "Type Safety"
-      "description": "InferDI keeps the dependency graph in the type system: a wrong argument order, an unregistered key, or a singleton reaching for scoped state is a compile error in your editor, not a runtime stack trace you find under load."
+      "description": "InferDI models the dependency graph in TypeScript. Invalid argument order, unknown keys, and invalid lifetime dependencies fail at the registration site."
       "url": "https://inferdi.com/core/type-safety"
       "mainEntityOfPage": "https://inferdi.com/core/type-safety"
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, type safety, TypeScript, type inference, constructor signatures, compile-time, dependency injection"
       "articleSection": "Core Concepts"
@@ -56,7 +56,7 @@ schema:
 
 # Type Safety
 
-InferDI's central rule: the dependency graph lives in the type system. An invalid graph — a wrong argument order, a key that was never registered, a singleton reaching for scoped state — is a type error you see in your editor, not a stack trace you discover under load. Anything the compiler can prove statically is checked statically; runtime guards exist only to catch what `as` casts and dynamic keys slip past.
+InferDI models the dependency graph in the type system. A wrong argument order, an unregistered key, and a singleton dependency on scoped state produce type errors in your editor. Runtime guards handle cast-based and dynamic-key bypasses that TypeScript cannot prove.
 
 ## Constructor Signatures
 

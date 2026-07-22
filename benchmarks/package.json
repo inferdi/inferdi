@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "version": "0.0.0",
-  "packageManager": "pnpm@11.3.0",
+  "packageManager": "pnpm@10.23.0",
   "description": "Comparative DI container benchmarks.",
   "scripts": {
     "bench": "cross-env NODE_OPTIONS=\"--no-warnings\" vitest bench --run",
@@ -12,8 +12,8 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "inversify": "^8.1.0",
-    "awilix": "^13.0.3",
+    "inversify": "^8.2.1",
+    "awilix": "^13.0.5",
     "tsyringe": "^4.10.0",
     "typedi": "^0.10.0",
     "typed-inject": "^5.0.0",

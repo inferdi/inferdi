@@ -27,7 +27,7 @@ schema:
       "inLanguage": "es-ES"
       "datePublished": "2026-06-12"
       "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, errores, excepciones, clave desconocida, ciclo detectado, violación de tiempo de vida, contenedor liberado, inyección de dependencias"
       "articleSection": "Referencia"

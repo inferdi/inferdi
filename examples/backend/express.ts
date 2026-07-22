@@ -4,7 +4,7 @@ import { inferdiExpress } from '@inferdi/express'
 import {
   buildRootContainer,
   createRequestScope,
-  type RequestContainer,
+  type RequestContainer
 } from '../_shared/container.js'
 
 const root = buildRootContainer()
@@ -28,10 +28,10 @@ app.use(inferdiExpress({
   createScope: (root, req) =>
     createRequestScope(root, {
       requestId: crypto.randomUUID(),
-      // req.ip is `string | undefined` in @types/express — propagate that shape.
+      // req.ip is `string | undefined` in @types/express — propagate that shape
       ip: req.ip,
-      userId: normalizeHeader(req.headers['x-user-id']),
-    }),
+      userId: normalizeHeader(req.headers['x-user-id'])
+    })
 }))
 
 app.get('/users/:id', async (req, res, next) => {

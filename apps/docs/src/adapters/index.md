@@ -15,14 +15,14 @@ schema:
           "item": "https://inferdi.com/adapters/"
     - "@type": "TechArticle"
       "@id": "https://inferdi.com/adapters/#article"
-      "headline": "InferDI Framework Adapters — overview"
+      "headline": "InferDI Framework Adapters: overview"
       "name": "Framework Adapters"
-      "description": "Each InferDI adapter creates one request scope per request, exposes it at the framework-native location, and disposes it at the framework's safe completion point — while preserving the concrete, fully typed container your application owns. Thin lifecycle glue, never an IoC framework."
+      "description": "Each InferDI adapter creates one request scope, exposes it through the framework's request object, and disposes it at the framework's safe completion point."
       "url": "https://inferdi.com/adapters/"
       "mainEntityOfPage": "https://inferdi.com/adapters/"
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
+      "dateModified": "2026-07-21"
       "dependencies": "TypeScript, @inferdi/inferdi, Fastify, Hono, Koa, Express, Elysia"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, adapters, request scope, Fastify, Hono, Koa, Express, Elysia, middleware, dependency injection"
@@ -52,9 +52,9 @@ schema:
 
 # Framework Adapters
 
-Each adapter creates exactly one request scope per request, exposes it at the framework-native location, and disposes it at the framework's safe completion point — while preserving the concrete container type your application owns, so `request.di` is fully typed, not `any` or a base container.
+Each adapter creates one request scope, exposes it at the framework-native location, and disposes it at the framework's safe completion point. Your application keeps its concrete container type, so `request.di` remains fully typed.
 
-That is the entire job. Adapters are thin lifecycle glue: the same design that keeps [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) zero-dependency also keeps decorators, controller scanning, handler parameter injection, and route discovery out of the core. You opt into a framework's request lifecycle, not into a framework's idea of dependency injection.
+Adapters manage request-scope lifecycle. The core package stays zero-dependency and does not add decorators, controller scanning, handler parameter injection, or route discovery.
 
 ## Packages
 

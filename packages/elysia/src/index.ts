@@ -34,7 +34,7 @@ import { Elysia, type Context } from 'elysia'
 import type {
   DefinitionBase,
   MetadataBase,
-  RouteBase,
+  RouteBase
 } from 'elysia'
 
 /**
@@ -194,7 +194,7 @@ export type ScopedOptions<
    */
   readonly createScope?: (
     root: Root,
-    context: InferdiElysiaRequestContext,
+    context: InferdiElysiaRequestContext
   ) => MaybePromise<Scope>
   /**
    * Optional hook to hydrate the freshly created scope before route handlers
@@ -202,7 +202,7 @@ export type ScopedOptions<
    */
   readonly setupScope?: (
     scope: Scope,
-    context: InferdiElysiaRequestContext,
+    context: InferdiElysiaRequestContext
   ) => MaybePromise<void>
   /**
    * Optional hook to hydrate the scope from validated request data. Runs after
@@ -210,12 +210,12 @@ export type ScopedOptions<
    */
   readonly setupValidatedScope?: (
     scope: Scope,
-    context: InferdiElysiaValidatedContext<Scope, Key>,
+    context: InferdiElysiaValidatedContext<Scope, Key>
   ) => MaybePromise<void>
   /** Overrides request-scope disposal. Defaults to `scope.dispose()`. */
   readonly disposeScope?: (
     scope: Scope,
-    context: InferdiElysiaLifecycleContext<Scope, Key>,
+    context: InferdiElysiaLifecycleContext<Scope, Key>
   ) => MaybePromise<void>
   /**
    * Controls whether the plugin disposes the request scope. Returning `false`
@@ -224,7 +224,7 @@ export type ScopedOptions<
   readonly autoDispose?:
     | boolean
     | ((
-        context: InferdiElysiaLifecycleContext<Scope, Key>,
+        context: InferdiElysiaLifecycleContext<Scope, Key>
       ) => MaybePromise<boolean>)
   /**
    * Optional sink for cleanup failures. Returning normally marks the cleanup
@@ -232,7 +232,7 @@ export type ScopedOptions<
    */
   readonly onDisposeError?: (
     error: unknown,
-    context: InferdiElysiaLifecycleContext<Scope, Key>,
+    context: InferdiElysiaLifecycleContext<Scope, Key>
   ) => MaybePromise<void>
 }
 
@@ -371,11 +371,13 @@ type RequestState = {
   error?: unknown
 }
 
-// Process-global on purpose: keyed by the unique `Request` identity, so it
-// never confuses requests, and a single `skipInferdiDispose(context)` call
-// suppresses disposal for every plugin instance on that request (see the
-// `skipInferdiDispose` docs). A per-factory `WeakSet` would make the skip
-// per-instance and force one call per mounted plugin.
+/*
+ * Process-global on purpose: keyed by the unique `Request` identity, so it
+ * never confuses requests, and a single `skipInferdiDispose(context)` call
+ * suppresses disposal for every plugin instance on that request (see the
+ * `skipInferdiDispose` docs). A per-factory `WeakSet` would make the skip
+ * per-instance and force one call per mounted plugin
+ */
 const skippedRequests = new WeakSet<Request>()
 let pluginInstanceId = 0
 
@@ -395,12 +397,12 @@ function lifecycleContext<
   scope: Scope,
   request: Request,
   phase: InferdiElysiaLifecyclePhase,
-  error?: unknown,
+  error?: unknown
 ): InferdiElysiaLifecycleContext<Scope, Key> {
   const result = {
     request,
     phase,
-    [key]: scope,
+    [key]: scope
   } as InferdiElysiaLifecycleContext<Scope, Key>
 
   if (error !== undefined) {
@@ -419,10 +421,10 @@ function handleDisposeError<
   onDisposeError:
     | ((
         error: unknown,
-        context: InferdiElysiaLifecycleContext<Scope, Key>,
+        context: InferdiElysiaLifecycleContext<Scope, Key>
       ) => MaybePromise<void>)
     | undefined,
-  errors: unknown[],
+  errors: unknown[]
 ): void | PromiseLike<void> {
   if (onDisposeError === undefined) {
     errors.push(error)
@@ -451,22 +453,22 @@ function disposeWithErrors<
   context: InferdiElysiaLifecycleContext<Scope, Key>,
   disposeScope: (
     scope: Scope,
-    context: InferdiElysiaLifecycleContext<Scope, Key>,
+    context: InferdiElysiaLifecycleContext<Scope, Key>
   ) => MaybePromise<void>,
   onDisposeError:
     | ((
         error: unknown,
-        context: InferdiElysiaLifecycleContext<Scope, Key>,
+        context: InferdiElysiaLifecycleContext<Scope, Key>
       ) => MaybePromise<void>)
     | undefined,
-  errors: unknown[],
+  errors: unknown[]
 ): void | PromiseLike<void> {
   try {
     const disposing = disposeScope(scope, context)
     if (isPromiseLike(disposing)) {
       return disposing.then(
         undefined,
-        (error) => handleDisposeError(error, context, onDisposeError, errors),
+        (error) => handleDisposeError(error, context, onDisposeError, errors)
       )
     }
   } catch (error) {
@@ -479,7 +481,7 @@ function logUnhandledDisposeErrors<
   Key extends string,
 >(
   errors: unknown[],
-  context: InferdiElysiaLifecycleContext<Scope, Key>,
+  context: InferdiElysiaLifecycleContext<Scope, Key>
 ): void {
   if (errors.length === 0) return
 
@@ -490,10 +492,10 @@ function logUnhandledDisposeErrors<
   try {
     console.error('Failed to dispose InferDI Elysia request scope', {
       err,
-      phase: context.phase,
+      phase: context.phase
     })
   } catch {
-    // Response cleanup must not fail because the fallback logger failed.
+    // Response cleanup must not fail because the fallback logger failed
   }
 }
 
@@ -507,31 +509,33 @@ async function disposeAfterSetupFailure<
   key: Key,
   disposeScope: (
     scope: Scope,
-    context: InferdiElysiaLifecycleContext<Scope, Key>,
+    context: InferdiElysiaLifecycleContext<Scope, Key>
   ) => MaybePromise<void>,
   onDisposeError:
     | ((
         error: unknown,
-        context: InferdiElysiaLifecycleContext<Scope, Key>,
+        context: InferdiElysiaLifecycleContext<Scope, Key>
       ) => MaybePromise<void>)
-    | undefined,
+    | undefined
 ): Promise<never> {
-  // Finding 2: surface only the original setup error; cleanup failures go to
-  // `onDisposeError`, else are logged — never aggregated into the thrown error.
+  /*
+   * Finding 2: surface only the original setup error; cleanup failures go to
+   * `onDisposeError`, else are logged — never aggregated into the thrown error
+   */
   const errors: unknown[] = []
   const disposeContext = lifecycleContext(
     key,
     scope,
     request,
     'setup',
-    setupError,
+    setupError
   )
   const disposing = disposeWithErrors(
     scope,
     disposeContext,
     disposeScope,
     onDisposeError,
-    errors,
+    errors
   )
 
   await disposing
@@ -564,7 +568,7 @@ async function disposeAfterSetupFailure<
  * @param context - The current Elysia context.
  */
 export function skipInferdiDispose(
-  context: InferdiElysiaSkipContext,
+  context: InferdiElysiaSkipContext
 ): void {
   skippedRequests.add(context.request)
 }
@@ -582,7 +586,7 @@ export function inferdiElysia<
 >(
   options: Omit<ScopedOptions<Root, 'di', Scope>, 'key'> & {
     readonly key?: 'di'
-  },
+  }
 ): InferdiElysiaScopedPlugin<Scope, 'di'>
 
 /**
@@ -600,7 +604,7 @@ export function inferdiElysia<
 >(
   options: ScopedOptions<Root, Key, Scope> & {
     readonly key: Key
-  },
+  }
 ): InferdiElysiaScopedPlugin<Scope, Key>
 
 /**
@@ -614,7 +618,7 @@ export function inferdiElysia<
 >(
   options: Omit<RootOnlyOptions<Root, 'di'>, 'key'> & {
     readonly key?: 'di'
-  },
+  }
 ): InferdiElysiaRootPlugin<Root, 'di'>
 
 /**
@@ -630,7 +634,7 @@ export function inferdiElysia<
 >(
   options: RootOnlyOptions<Root, Key> & {
     readonly key: Key
-  },
+  }
 ): InferdiElysiaRootPlugin<Root, Key>
 
 export function inferdiElysia(options: unknown): unknown {
@@ -642,13 +646,13 @@ export function inferdiElysia(options: unknown): unknown {
   const seed = {
     key,
     scopePerRequest: scoped,
-    instanceId,
+    instanceId
   }
 
   if (!scoped) {
     return new Elysia({
       name: '@inferdi/elysia',
-      seed,
+      seed
     }).decorate(key, root)
   }
 
@@ -657,10 +661,12 @@ export function inferdiElysia(options: unknown): unknown {
   const hasSetupScope = typedOptions.setupScope !== undefined
   const hasCustomDisposeScope = typedOptions.disposeScope !== undefined
   const hasDisposeErrorHandler = typedOptions.onDisposeError !== undefined
-  // `autoDispose: true` is the default-disposal semantics, so it stays on the
-  // synchronous default path alongside an omitted `autoDispose`, matching
-  // Fastify/Hono. Only a `false` value, a predicate, a custom `disposeScope`, or
-  // an `onDisposeError` sink require the `disposeOnce` path.
+  /*
+   * `autoDispose: true` is the default-disposal semantics, so it stays on the
+   * synchronous default path alongside an omitted `autoDispose`, matching
+   * Fastify/Hono. Only a `false` value, a predicate, a custom `disposeScope`, or
+   * an `onDisposeError` sink require the `disposeOnce` path
+   */
   const useDefaultDisposePath =
     !hasCustomDisposeScope &&
     (typedOptions.autoDispose === undefined ||
@@ -678,7 +684,7 @@ export function inferdiElysia(options: unknown): unknown {
   const onDisposeError = typedOptions.onDisposeError
 
   function disposeDefaultOnce(
-    request: Request,
+    request: Request
   ): void | PromiseLike<void> {
     const state = requestState.get(request)
 
@@ -691,23 +697,25 @@ export function inferdiElysia(options: unknown): unknown {
 
     if (phase === 'afterResponse' && skippedRequests.has(request)) return
 
-    // Stay synchronous when dispose() is synchronous: no `async`, so a sync
-    // teardown finishes in the same tick without scheduling a microtask. Only
-    // an actually-async dispose returns a promise for Elysia to await.
+    /*
+     * Stay synchronous when dispose() is synchronous: no `async`, so a sync
+     * teardown finishes in the same tick without scheduling a microtask. Only
+     * an actually-async dispose returns a promise for Elysia to await
+     */
     try {
       const disposing = scope.dispose()
       if (isPromiseLike(disposing)) {
         return disposing.then(undefined, (disposeError) => {
           logUnhandledDisposeErrors(
             [disposeError],
-            lifecycleContext(key, scope, request, phase, error),
+            lifecycleContext(key, scope, request, phase, error)
           )
         })
       }
     } catch (disposeError) {
       logUnhandledDisposeErrors(
         [disposeError],
-        lifecycleContext(key, scope, request, phase, error),
+        lifecycleContext(key, scope, request, phase, error)
       )
     }
   }
@@ -729,7 +737,7 @@ export function inferdiElysia(options: unknown): unknown {
       scope,
       request,
       phase,
-      error,
+      error
     )
     const errors: unknown[] = []
     let shouldDispose = autoDispose !== false
@@ -746,7 +754,7 @@ export function inferdiElysia(options: unknown): unknown {
           autoDisposeError,
           disposeContext,
           onDisposeError,
-          errors,
+          errors
         )
         if (isPromiseLike(handling)) {
           await handling
@@ -760,21 +768,23 @@ export function inferdiElysia(options: unknown): unknown {
         disposeContext,
         disposeScope,
         onDisposeError,
-        errors,
+        errors
       )
       if (isPromiseLike(disposing)) {
         await disposing
       }
     }
 
-    // Elysia schedules `onAfterResponse` after the response has been produced;
-    // cleanup failures must stay observable without corrupting the response.
+    /*
+     * Elysia schedules `onAfterResponse` after the response has been produced;
+     * cleanup failures must stay observable without corrupting the response
+     */
     logUnhandledDisposeErrors(errors, disposeContext)
   }
 
   const plugin = new Elysia({
     name: '@inferdi/elysia',
-    seed,
+    seed
   })
 
   const withScope = !hasCustomCreateScope && !hasSetupScope
@@ -784,7 +794,7 @@ export function inferdiElysia(options: unknown): unknown {
         requestState.set(context.request, { scope, hasError: false })
 
         return {
-          [key]: scope,
+          [key]: scope
         }
       })
     : plugin.derive({ as: 'scoped' }, async (context) => {
@@ -798,7 +808,7 @@ export function inferdiElysia(options: unknown): unknown {
           }
 
           return {
-            [key]: scope,
+            [key]: scope
           }
         } catch (error) {
           requestState.delete(context.request)
@@ -809,7 +819,7 @@ export function inferdiElysia(options: unknown): unknown {
             error,
             key,
             disposeScope,
-            onDisposeError,
+            onDisposeError
           )
         }
       })
@@ -830,28 +840,30 @@ export function inferdiElysia(options: unknown): unknown {
           throw new Error(
             '@inferdi/elysia: request scope is unavailable in ' +
               'setupValidatedScope; the derive hook did not open a scope ' +
-              'before resolve ran',
+              'before resolve ran'
           )
         }
         /* v8 ignore stop */
 
         await setupValidatedScopeHook(
           state.scope,
-          context as InferdiElysiaValidatedContext<BaseScope, string>,
+          context as InferdiElysiaValidatedContext<BaseScope, string>
         )
 
         return {}
-      },
+      }
     )
   }
 
-  // The disposal hooks read only `request` (destructured), never the whole
-  // context. Elysia's Sucrose statically analyzes every lifecycle handler and,
-  // the moment a handler passes the full `context` to another function, marks
-  // *all* of `body`/`query`/`cookie`/`headers` as needed — forcing Elysia to
-  // parse them on every request in this plugin's scope. Touching only `request`
-  // keeps that inference empty, so the adapter adds no request-time parsing for
-  // routes that do not ask for it. `request` is not an inference-gated field.
+  /*
+   * The disposal hooks read only `request` (destructured), never the whole
+   * context. Elysia's Sucrose statically analyzes every lifecycle handler and,
+   * the moment a handler passes the full `context` to another function, marks
+   * *all* of `body`/`query`/`cookie`/`headers` as needed — forcing Elysia to
+   * parse them on every request in this plugin's scope. Touching only `request`
+   * keeps that inference empty, so the adapter adds no request-time parsing for
+   * routes that do not ask for it. `request` is not an inference-gated field
+   */
   return withValidatedScope
     .onError({ as: 'scoped' }, ({ request, error }) => {
       const state = requestState.get(request)
@@ -863,6 +875,6 @@ export function inferdiElysia(options: unknown): unknown {
     .onAfterResponse({ as: 'scoped' }, ({ request }) =>
       useDefaultDisposePath
         ? disposeDefaultOnce(request)
-        : disposeOnce(request),
+        : disposeOnce(request)
     )
 }

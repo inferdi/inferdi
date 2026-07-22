@@ -10,7 +10,7 @@ import {
   type InferdiElysiaValidatedContext,
   type InferdiRoot,
   type InferdiScope,
-  type InferdiScopeOf,
+  type InferdiScopeOf
 } from '../src/index'
 
 class HealthService {
@@ -52,7 +52,7 @@ describe('@inferdi/elysia types', () => {
         expectTypeOf(di.get('users')).toEqualTypeOf<UserService>()
         expectTypeOf(params.id).toEqualTypeOf<string>()
 
-        // @ts-expect-error — missing DI keys remain compile errors.
+        // @ts-expect-error — missing DI keys remain compile errors
         di.get('missing')
 
         return di.get('users').profile(params.id)
@@ -81,7 +81,7 @@ describe('@inferdi/elysia types', () => {
         expectTypeOf(container).toEqualTypeOf<RequestContainer>()
         expectTypeOf(container.get('users')).toEqualTypeOf<UserService>()
 
-        // @ts-expect-error — default di is not exposed for a custom key.
+        // @ts-expect-error — default di is not exposed for a custom key
         container.di
 
         return container.get('users').profile(params.id)
@@ -98,7 +98,7 @@ describe('@inferdi/elysia types', () => {
     }
 
     const customRoot = {
-      createScope: () => new CustomScope(),
+      createScope: () => new CustomScope()
     }
 
     const app = new Elysia()
@@ -152,7 +152,7 @@ describe('@inferdi/elysia types', () => {
       },
       onDisposeError: (_error, context) => {
         expectTypeOf(context.error).toEqualTypeOf<unknown>()
-      },
+      }
     }
 
     void options
@@ -162,7 +162,7 @@ describe('@inferdi/elysia types', () => {
     const app = new Elysia()
       .use(inferdiElysia({
         container: root,
-        scopePerRequest: false,
+        scopePerRequest: false
       }))
       .get('/health', ({ di }) => {
         expectTypeOf(di).toEqualTypeOf<RootContainer>()
@@ -180,7 +180,7 @@ describe('@inferdi/elysia types', () => {
       .use(inferdiElysia({
         container: root,
         key: 'root',
-        scopePerRequest: false,
+        scopePerRequest: false
       }))
       .get('/health', ({ root: container }) => {
         expectTypeOf(container).toEqualTypeOf<RootContainer>()
@@ -195,66 +195,68 @@ describe('@inferdi/elysia types', () => {
   it('rejects request-scope options in root-only mode', () => {
     const validRootOnly: InferdiElysiaOptions<RootContainer, 'di'> = {
       container: root,
-      scopePerRequest: false,
+      scopePerRequest: false
     }
     void validRootOnly
 
-    // The forbidden property makes the object incompatible with the discriminated
-    // union, and TS attributes that error to the assignment, so `@ts-expect-error`
-    // goes on the `const` line rather than the property line.
+    /*
+     * The forbidden property makes the object incompatible with the discriminated
+     * union, and TS attributes that error to the assignment, so `@ts-expect-error`
+     * goes on the `const` line rather than the property line
+     */
 
-    // @ts-expect-error — createScope is scoped-mode behavior.
+    // @ts-expect-error — createScope is scoped-mode behavior
     const invalidCreateScope: InferdiElysiaOptions<RootContainer, 'di'> = {
       container: root,
       scopePerRequest: false,
-      createScope: () => root.createScope(),
+      createScope: () => root.createScope()
     }
     void invalidCreateScope
 
-    // @ts-expect-error — setupScope is scoped-mode behavior.
+    // @ts-expect-error — setupScope is scoped-mode behavior
     const invalidSetupScope: InferdiElysiaOptions<RootContainer, 'di'> = {
       container: root,
       scopePerRequest: false,
-      setupScope: () => {},
+      setupScope: () => {}
     }
     void invalidSetupScope
 
-    // @ts-expect-error — setupValidatedScope is scoped-mode behavior.
+    // @ts-expect-error — setupValidatedScope is scoped-mode behavior
     const invalidSetupValidatedScope: InferdiElysiaOptions<RootContainer, 'di'> = {
       container: root,
       scopePerRequest: false,
-      setupValidatedScope: () => {},
+      setupValidatedScope: () => {}
     }
     void invalidSetupValidatedScope
 
-    // @ts-expect-error — disposeScope is scoped-mode behavior.
+    // @ts-expect-error — disposeScope is scoped-mode behavior
     const invalidDisposeScope: InferdiElysiaOptions<RootContainer, 'di'> = {
       container: root,
       scopePerRequest: false,
-      disposeScope: () => {},
+      disposeScope: () => {}
     }
     void invalidDisposeScope
 
-    // @ts-expect-error — autoDispose is scoped-mode behavior.
+    // @ts-expect-error — autoDispose is scoped-mode behavior
     const invalidAutoDispose: InferdiElysiaOptions<RootContainer, 'di'> = {
       container: root,
       scopePerRequest: false,
-      autoDispose: false,
+      autoDispose: false
     }
     void invalidAutoDispose
 
-    // @ts-expect-error — onDisposeError is scoped-mode behavior.
+    // @ts-expect-error — onDisposeError is scoped-mode behavior
     const invalidDisposeHandler: InferdiElysiaOptions<RootContainer, 'di'> = {
       container: root,
       scopePerRequest: false,
-      onDisposeError: () => {},
+      onDisposeError: () => {}
     }
     void invalidDisposeHandler
   })
 
   it('does not expose di before plugin installation', () => {
     const app = new Elysia().get('/before', (context) => {
-      // @ts-expect-error — the di context property is not globally augmented.
+      // @ts-expect-error — the di context property is not globally augmented
       context.di
       return 'ok'
     })

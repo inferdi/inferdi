@@ -26,8 +26,8 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/zh/core/testing"
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, 测试, override, mock, 测试替身, 替换实现, 依赖注入"
       "articleSection": "核心概念"
@@ -75,14 +75,14 @@ const c = buildContainer()
 
 ## 覆盖时机
 
-覆盖必须发生在键被解析之前：
+请在解析依赖图之前应用覆盖：
 
 ```ts
 const logger = c.get('logger')
 c.override('logger', mockLogger)
 ```
 
-第二行会抛出异常。一次过晚的覆盖会割裂依赖图：已有的消费方会持有旧实例，而之后的解析会返回 mock。
+第二行会抛出异常，因为 singleton 值已缓存在当前容器中。该检查有意只依赖本地缓存：它也能发现缓存在当前作用域中的 scoped 值、`registerValue` 和重复覆盖。Transient 解析以及通过子容器解析但由祖先容器拥有的值不会进入本地缓存，因此不会被记录。已经返回的 transient 仍由原调用方持有，之后的解析则会返回 mock。这是需要了解的契约边界，并不意味着应当延迟覆盖；在解析依赖图之前完成所有覆盖才能避免图发生割裂。
 
 ## 所有权
 

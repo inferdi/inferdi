@@ -3,9 +3,11 @@ import { defineConfig } from 'vitest/config'
 import swc from 'unplugin-swc'
 
 export default defineConfig({
-  // CRITICAL: vitest 4.x uses oxc by default (not esbuild). We disable both so the swc plugin
-  // can transform .ts files with decorator-metadata emission. Otherwise oxc/esbuild would
-  // strip the decorators BEFORE swc sees them.
+  /*
+   * CRITICAL: vitest 4.x uses oxc by default (not esbuild). We disable both so the swc plugin
+   * can transform .ts files with decorator-metadata emission. Otherwise oxc/esbuild would
+   * strip the decorators BEFORE swc sees them
+   */
   esbuild: false,
   oxc: false,
   plugins: [
@@ -13,10 +15,10 @@ export default defineConfig({
       jsc: {
         parser: { syntax: 'typescript', decorators: true },
         transform: { legacyDecorator: true, decoratorMetadata: true },
-        target: 'es2022',
+        target: 'es2022'
       },
-      module: { type: 'es6' },
-    }),
+      module: { type: 'es6' }
+    })
   ],
   test: {
     root: fileURLToPath(new URL('.', import.meta.url)),
@@ -26,12 +28,12 @@ export default defineConfig({
     isolate: true,
     benchmark: {
       include: ['src/benches/**/*.bench.ts'],
-      reporters: ['default'],
-    },
+      reporters: ['default']
+    }
   },
   resolve: {
     alias: {
-      '@inferdi/inferdi': fileURLToPath(new URL('../packages/inferdi/src/index.ts', import.meta.url)),
-    },
-  },
+      '@inferdi/inferdi': fileURLToPath(new URL('../packages/inferdi/src/index.ts', import.meta.url))
+    }
+  }
 })

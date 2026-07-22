@@ -26,8 +26,8 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/zh/reference/api"
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "executableLibraryName": "@inferdi/inferdi"
       "programmingModel": "显式注册，流式构建器"
@@ -82,7 +82,7 @@ class Container<T extends DependenciesMap = Record<never, never>> {
   constructor(options?: ContainerOptions)
 
   registerClass(key, Ctor, deps, kind?, lazyKey?)
-  registerFactory(key, factory, kind?)
+  registerFactory(key, factory, kind?, lazyKey?)
   registerValue(key, value)
   override(key, value)
   use(fn)
@@ -105,10 +105,14 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 | `registerClass` | 注册一个构造函数及其依赖元组。 |
 | `registerFactory` | 注册自定义的构造逻辑。 |
 | `registerValue` | 注册一个由外部拥有的单例值。 |
-| `override` | 在首次解析之前替换已有的注册项。 |
+| `override` | 替换已有注册；若键已存在于本地缓存中则拒绝操作。 |
 | `use` | 应用一个模块构建器。 |
 
-`registerClass` 和 `registerFactory` 接受 `singleton`、`scoped` 和 `transient` 三种生命周期。`registerValue` 始终为单例，且由外部拥有。
+`registerClass` 和 `registerFactory` 接受 `singleton`、`scoped` 和 `transient` 三种生命周期，以及可选的 `lazyKey` 伴随项。`registerValue` 始终为单例，且由外部拥有。
+
+注册完成后，请将传给 `registerClass` 的依赖元组视为不可变。优化后的构造路径不会为它创建防御性副本。
+
+`override` 的时机检查只查看当前容器的缓存。它能发现本地缓存的 singleton/scoped 值、`registerValue` 和重复覆盖，但不会记录 transient 解析，也不会记录通过子容器解析但由祖先容器拥有的值。请在解析依赖图之前应用覆盖。
 
 ## 命名空间类型
 

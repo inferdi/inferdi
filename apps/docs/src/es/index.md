@@ -3,8 +3,8 @@ layout: home
 
 hero:
   name: InferDI
-  text: La única DI ultrarrápida para el TypeScript moderno
-  tagline: Crea aplicaciones con DI de nueva generación para cualquier runtime moderno, con una arquitectura ultrarrápida, lógica de dominio limpia y testabilidad de primera clase.
+  text: Inyección de dependencias tipada para TypeScript moderno
+  tagline: Registra servicios de forma explícita, deja que TypeScript compruebe el grafo y conserva una ruta de resolución pequeña.
   image:
     src: /logo.png
     alt: InferDI
@@ -61,7 +61,7 @@ features:
       src: /puzzle.png
       alt: Framework-agnostic core
     title: Núcleo agnóstico al framework
-    details: "InferDI no tiene dependencias y se ejecuta en cualquier lugar: Node, Bun, Deno, navegadores, workers. Los adaptadores son pegamento opcional para el scope de petición, nunca un requisito."
+    details: "InferDI no tiene dependencias en runtime y se ejecuta en Node, Bun, Deno, navegadores y workers. Los adaptadores añaden ciclo de vida opcional para el scope de petición."
     link: /es/adapters/
     linkText: Cómo funcionan los adaptadores
 schema:
@@ -71,7 +71,7 @@ schema:
       "@id": "https://inferdi.com/#website"
       "url": "https://inferdi.com/es/"
       "name": "InferDI"
-      "description": "Inyección de dependencias ultrarrápida, sin decoradores y fuertemente tipada para el TypeScript moderno."
+      "description": "Inyección de dependencias sin decoradores y fuertemente tipada para el TypeScript moderno."
       "inLanguage": "es-ES"
       "publisher":
         "@id": "https://inferdi.com/#organization"
@@ -96,11 +96,11 @@ schema:
       "name": "InferDI"
       "applicationCategory": "DeveloperApplication"
       "operatingSystem": "Node.js, Bun, Deno, Browser, Edge runtimes"
-      "softwareVersion": "5.0.4"
+      "softwareVersion": "5.0.5"
       "programmingLanguage": "TypeScript"
       "url": "https://inferdi.com/"
       "downloadUrl": "https://www.npmjs.com/package/@inferdi/inferdi"
-      "description": "Contenedor de DI para TypeScript sin dependencias, sin decoradores y fuertemente tipado. El grafo de dependencias es el tipo: los argumentos en orden incorrecto, las claves ausentes y las fugas de tiempo de vida son errores de compilación, no excepciones en runtime."
+      "description": "Contenedor de DI para TypeScript sin dependencias en runtime, sin decoradores y fuertemente tipado. TypeScript comprueba el orden de argumentos, las claves y las dependencias de tiempo de vida al registrar servicios."
       "license": "https://github.com/inferdi/inferdi/blob/main/LICENSE"
       "author":
         "@id": "https://inferdi.com/#organization"

@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events'
 import {
   createServer,
   request as httpRequest,
-  type Server,
+  type Server
 } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { PassThrough } from 'node:stream'
@@ -12,7 +12,7 @@ import {
   inferdiKoa,
   skipInferdiDispose,
   type InferdiKoaState,
-  type InferdiScope,
+  type InferdiScope
 } from '../src/index'
 
 type AppState = InferdiKoaState<TestScope>
@@ -59,7 +59,7 @@ async function close(server: Server) {
 
 async function withServer<T>(
   app: Koa,
-  run: (baseUrl: string) => Promise<T>,
+  run: (baseUrl: string) => Promise<T>
 ) {
   const server = createServer(app.callback())
   const baseUrl = await listen(server)
@@ -97,12 +97,12 @@ class TestScope implements InferdiScope {
       readonly disposeError?: Error
       readonly disposeSyncError?: Error
       readonly onDispose?: () => void
-    } = {},
+    } = {}
   ) {}
 
   get(key: 'users') {
     return {
-      profile: (id: string) => ({ id, requestId: this.requestId }),
+      profile: (id: string) => ({ id, requestId: this.requestId })
     }
   }
 
@@ -171,7 +171,7 @@ describe('@inferdi/koa', () => {
         container: root,
         setupScope: (scope, ctx) => {
           scope.requestId = ctx.get('x-request-id')
-        },
+        }
       }))
       .use((ctx) => {
         const id = ctx.path.split('/').pop() ?? ''
@@ -179,10 +179,10 @@ describe('@inferdi/koa', () => {
       })
 
     const first = await requestJson(app, '/users/1', {
-      headers: { 'x-request-id': 'first' },
+      headers: { 'x-request-id': 'first' }
     })
     const second = await requestJson(app, '/users/2', {
-      headers: { 'x-request-id': 'second' },
+      headers: { 'x-request-id': 'second' }
     })
 
     expect(first.body).toEqual({ id: '1', requestId: 'first' })
@@ -228,7 +228,7 @@ describe('@inferdi/koa', () => {
           expect(ctx.state.di).toBe(scope)
           await delay(1)
           disposed.resolve(scope)
-        },
+        }
       }))
       .use((ctx) => {
         ctx.body = ctx.state.di.get('users').profile('8')
@@ -236,7 +236,7 @@ describe('@inferdi/koa', () => {
 
     const response = await withServer(app, async (baseUrl) => {
       const result = await fetch(`${baseUrl}/users/8`, {
-        headers: { 'x-request-id': 'custom' },
+        headers: { 'x-request-id': 'custom' }
       })
       const body = await result.json()
       await disposed.promise
@@ -259,7 +259,7 @@ describe('@inferdi/koa', () => {
           expect(receivedRoot).toBe(root)
           expect(ctx.path).toBe('/users/9')
           return customScope
-        },
+        }
       }))
       .use((ctx) => {
         ctx.body = ctx.state.di.get('users').profile('9')
@@ -308,7 +308,7 @@ describe('@inferdi/koa', () => {
       container: root,
       setupScope: () => {
         throw setupError
-      },
+      }
     }))
     app.use((ctx) => {
       ctx.body = { unreachable: true }
@@ -335,7 +335,7 @@ describe('@inferdi/koa', () => {
       },
       disposeScope: (scope, ctx) => {
         seen.push(ctx.state.di === scope)
-      },
+      }
     }))
 
     const response = await requestText(app, '/ok')
@@ -360,7 +360,7 @@ describe('@inferdi/koa', () => {
         scopeRes = ctx.res
         setupStarted.resolve()
         await releaseSetup.promise
-      },
+      }
     }))
     app.use((ctx) => {
       ctx.body = { ok: true }
@@ -373,8 +373,10 @@ describe('@inferdi/koa', () => {
       req.once('error', () => {})
       req.end()
 
-      // Abort the connection while setupScope is mid-await, so the response
-      // `close` event fires before the middleware registers its listeners.
+      /*
+       * Abort the connection while setupScope is mid-await, so the response
+       * `close` event fires before the middleware registers its listeners
+       */
       await setupStarted.promise
       const closed = deferred()
       scopeRes?.once('close', closed.resolve)
@@ -404,7 +406,7 @@ describe('@inferdi/koa', () => {
       container: root,
       setupScope: () => {
         throw setupError
-      },
+      }
     }))
     app.use((ctx) => {
       ctx.body = { unreachable: true }
@@ -413,8 +415,10 @@ describe('@inferdi/koa', () => {
     const response = await requestText(app, '/ok')
 
     expect(response.status).toBe(500)
-    // The cleanup failure is emitted through the app sink first; the setup
-    // error is the request error Koa surfaces. They are never aggregated.
+    /*
+     * The cleanup failure is emitted through the app sink first; the setup
+     * error is the request error Koa surfaces. They are never aggregated
+     */
     expect(emitted).toEqual([disposeError, setupError])
     expect(root.scopes[0]?.disposeCalls).toBe(1)
   })
@@ -438,7 +442,7 @@ describe('@inferdi/koa', () => {
       },
       onDisposeError: (error, ctx) => {
         handled.push([error, ctx.path])
-      },
+      }
     }))
 
     const response = await requestText(app, '/ok')
@@ -467,7 +471,7 @@ describe('@inferdi/koa', () => {
       },
       onDisposeError: async () => {
         throw handlerError
-      },
+      }
     }))
 
     const response = await requestText(app, '/ok')
@@ -500,7 +504,7 @@ describe('@inferdi/koa', () => {
       },
       onDisposeError: () => {
         throw handlerError
-      },
+      }
     }))
 
     const response = await requestText(app, '/ok')
@@ -539,7 +543,7 @@ describe('@inferdi/koa', () => {
     const context = {
       app: koaApp,
       res,
-      state: {},
+      state: {}
     } as Context
 
     await app(context, async () => {})
@@ -561,15 +565,15 @@ describe('@inferdi/koa', () => {
     const root = new TestRoot()
     const app = inferdiKoa({
       container: root,
-      autoDispose: false,
+      autoDispose: false
     })
     const res = Object.assign(new EventEmitter(), {
-      destroyed: false,
+      destroyed: false
     }) as Context['res']
     const context = {
       app: new EventEmitter() as Context['app'],
       res,
-      state: {},
+      state: {}
     } as Context
     const next = vi.fn(async () => {})
 
@@ -589,15 +593,15 @@ describe('@inferdi/koa', () => {
       setupScope: async (_scope, ctx) => {
         skipInferdiDispose(ctx)
         await delay(1)
-      },
+      }
     })
     const res = Object.assign(new EventEmitter(), {
-      destroyed: true,
+      destroyed: true
     }) as Context['res']
     const context = {
       app: new EventEmitter() as Context['app'],
       res,
-      state: {},
+      state: {}
     } as Context
     const next = vi.fn(async () => {})
 
@@ -613,13 +617,13 @@ describe('@inferdi/koa', () => {
     const root = new TestRoot()
     const app = inferdiKoa({ container: root })
     const res = Object.assign(new EventEmitter(), {
-      destroyed: false,
+      destroyed: false
     }) as Context['res']
     const originalOn = res.on.bind(res)
     const context = {
       app: new EventEmitter() as Context['app'],
       res,
-      state: {},
+      state: {}
     } as Context
     const next = vi.fn(async () => {})
 
@@ -646,12 +650,12 @@ describe('@inferdi/koa', () => {
       container: root,
       setupScope: () => {
         throw setupError
-      },
+      }
     })
     const context = {
       app: new EventEmitter() as Context['app'],
       res: new EventEmitter() as Context['res'],
-      state: {},
+      state: {}
     } as Context
     const next = vi.fn(async () => {})
 
@@ -670,12 +674,12 @@ describe('@inferdi/koa', () => {
       container: root,
       setupScope: () => {
         throw setupError
-      },
+      }
     })
     const context = {
       app: new EventEmitter() as Context['app'],
       res: new EventEmitter() as Context['res'],
-      state: { di: previous },
+      state: { di: previous }
     } as Context
     const next = vi.fn(async () => {})
 
@@ -692,7 +696,7 @@ describe('@inferdi/koa', () => {
     const context = {
       app: new EventEmitter() as Context['app'],
       res: new EventEmitter() as Context['res'],
-      state: Object.freeze({}),
+      state: Object.freeze({})
     } as Context
     const next = vi.fn(async () => {})
 
@@ -707,12 +711,12 @@ describe('@inferdi/koa', () => {
     const activationError = new Error('activation failed')
     const app = inferdiKoa({ container: root })
     const res = Object.assign(new EventEmitter(), {
-      destroyed: false,
+      destroyed: false
     }) as Context['res']
     const context = {
       app: new EventEmitter() as Context['app'],
       res,
-      state: {},
+      state: {}
     } as Context
     const next = vi.fn(async () => {})
 
@@ -734,16 +738,16 @@ describe('@inferdi/koa', () => {
       container: root,
       disposeScope: () => {
         throw 'dispose failed'
-      },
+      }
     })
     const res = Object.assign(new EventEmitter(), {
-      destroyed: false,
+      destroyed: false
     }) as Context['res']
     const koaApp = new EventEmitter() as Context['app']
     const context = {
       app: koaApp,
       res,
-      state: {},
+      state: {}
     } as Context
 
     koaApp.on('error', (error) => {
@@ -756,7 +760,7 @@ describe('@inferdi/koa', () => {
 
     expect(emitted[0]).toBeInstanceOf(Error)
     expect((emitted[0] as Error).message).toBe(
-      'non-error thrown: dispose failed',
+      'non-error thrown: dispose failed'
     )
   })
 
@@ -769,7 +773,7 @@ describe('@inferdi/koa', () => {
         disposeScope: (scope, ctx) => {
           expect(ctx.state.di).toBe(scope)
           disposed.push(scope)
-        },
+        }
       }))
       .use((ctx) => {
         ctx.body = { ok: true }
@@ -903,8 +907,10 @@ describe('@inferdi/koa', () => {
     const response = await requestJson(app, '/boom')
 
     expect(response.status).toBe(409)
-    // Finding 3: skipInferdiDispose only suppresses successful cleanup; a failed
-    // request disposes regardless of the skip marker.
+    /*
+     * Finding 3: skipInferdiDispose only suppresses successful cleanup; a failed
+     * request disposes regardless of the skip marker
+     */
     expect(root.scopes[0]?.disposeCalls).toBe(1)
   })
 
@@ -932,7 +938,7 @@ describe('@inferdi/koa', () => {
   it('swallows cleanup reporting failures after response completion', async () => {
     const root = new TestRoot()
     root.nextScope = new TestScope({
-      disposeError: new Error('dispose failed'),
+      disposeError: new Error('dispose failed')
     })
     const app = new Koa()
 
@@ -959,7 +965,7 @@ describe('@inferdi/koa', () => {
       container: root,
       onDisposeError: (error, ctx) => {
         handled.push([error, ctx.state.di, ctx.path])
-      },
+      }
     }))
     app.use((ctx) => {
       ctx.body = { ok: true }
@@ -986,7 +992,7 @@ describe('@inferdi/koa', () => {
       container: root,
       onDisposeError: async () => {
         throw handlerError
-      },
+      }
     }))
     app.use((ctx) => {
       ctx.body = { ok: true }
@@ -1006,7 +1012,7 @@ describe('@inferdi/koa', () => {
     const booleanApp = new Koa()
       .use(inferdiKoa({
         container: booleanRoot,
-        autoDispose: false,
+        autoDispose: false
       }))
       .use((ctx) => {
         ctx.body = { ok: true }
@@ -1014,7 +1020,7 @@ describe('@inferdi/koa', () => {
     const predicateApp = new Koa()
       .use(inferdiKoa({
         container: predicateRoot,
-        autoDispose: (ctx) => ctx.path !== '/manual',
+        autoDispose: (ctx) => ctx.path !== '/manual'
       }))
       .use((ctx) => {
         ctx.body = { ok: true }
@@ -1044,7 +1050,7 @@ describe('@inferdi/koa', () => {
       container: root,
       autoDispose: async () => {
         throw predicateError
-      },
+      }
     }))
     app.use((ctx) => {
       ctx.body = { ok: true }
@@ -1077,7 +1083,7 @@ describe('@inferdi/koa', () => {
         await delay(1)
         handled.push([error, ctx.path])
         handledDone.resolve()
-      },
+      }
     }))
     app.use((ctx) => {
       ctx.body = { ok: true }
@@ -1124,7 +1130,7 @@ describe('@inferdi/koa', () => {
       setupScope: (_scope, ctx) => {
         skipInferdiDispose(ctx)
         throw setupError
-      },
+      }
     }))
 
     const response = await requestText(app, '/ok')

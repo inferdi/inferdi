@@ -27,7 +27,7 @@ schema:
       "inLanguage": "ja-JP"
       "datePublished": "2026-06-12"
       "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16, Bun, Deno"
+      "dependencies": "TypeScript >=5.2, Node.js >=16, Bun, Deno"
       "proficiencyLevel": "Beginner"
       "keywords": "InferDI, インストール, npm, JSR, Node.js, Bun, Deno, TypeScript 依存性注入"
       "articleSection": "ガイド"
@@ -104,9 +104,11 @@ import { Container } from 'jsr:@inferdi/inferdi'
 | Node.js | コアパッケージには 16 以降 |
 | Bun | 1.0 以降 |
 | Deno | 1.40 以降 |
-| TypeScript | `using` / `await using` 構文には 5.2 以降を推奨 |
+| TypeScript | 5.6 以降 |
 
 ネイティブの `Symbol.dispose` および `Symbol.asyncDispose` より前の Node バージョンでは、InferDI はインポート時にシンボルのポリフィルをインストールするため、Explicit Resource Management の相互運用が引き続き機能します。
+
+公開される型宣言は Explicit Resource Management の型ライブラリを自身で参照します。ES2022 をターゲットにする利用側が TypeScript の `lib` 設定へ `ESNext.Disposable` を追加する必要はありません。
 
 ## アダプターのインストール
 

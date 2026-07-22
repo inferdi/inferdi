@@ -26,8 +26,8 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ja/reference/api"
       "inLanguage": "ja-JP"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "executableLibraryName": "@inferdi/inferdi"
       "programmingModel": "明示的な登録、フルエントビルダー"
@@ -82,7 +82,7 @@ class Container<T extends DependenciesMap = Record<never, never>> {
   constructor(options?: ContainerOptions)
 
   registerClass(key, Ctor, deps, kind?, lazyKey?)
-  registerFactory(key, factory, kind?)
+  registerFactory(key, factory, kind?, lazyKey?)
   registerValue(key, value)
   override(key, value)
   use(fn)
@@ -105,10 +105,14 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 | `registerClass` | コンストラクターと依存関係のタプルを登録します。 |
 | `registerFactory` | カスタムの構築ロジックを登録します。 |
 | `registerValue` | 外部が所有するシングルトン値を登録します。 |
-| `override` | 最初の解決より前に既存の登録を置き換えます。 |
+| `override` | 既存の登録を置き換えます。キーがローカルキャッシュ済みなら拒否します。 |
 | `use` | モジュールビルダーを適用します。 |
 
-`registerClass` と `registerFactory` は `singleton`、`scoped`、`transient` のライフタイムを受け付けます。`registerValue` は常にシングルトンで、外部が所有します。
+`registerClass` と `registerFactory` は `singleton`、`scoped`、`transient` のライフタイムと、省略可能な `lazyKey` コンパニオンを受け付けます。`registerValue` は常にシングルトンで、外部が所有します。
+
+`registerClass` に渡した依存関係タプルは、登録後に変更しないでください。最適化されたコンストラクター経路では防御的コピーを作成しません。
+
+`override` のタイミングガードが確認するのは現在のコンテナのキャッシュだけです。ローカルにキャッシュされた singleton/scoped 値、`registerValue`、2 回目のオーバーライドは検出しますが、transient の解決や、子コンテナ経由で解決された祖先所有の値は記録しません。依存関係グラフを解決する前にオーバーライドを適用してください。
 
 ## 名前空間の型
 

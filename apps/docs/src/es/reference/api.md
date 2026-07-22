@@ -26,8 +26,8 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/es/reference/api"
       "inLanguage": "es-ES"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "executableLibraryName": "@inferdi/inferdi"
       "programmingModel": "Registro explícito, builder fluido"
@@ -82,7 +82,7 @@ class Container<T extends DependenciesMap = Record<never, never>> {
   constructor(options?: ContainerOptions)
 
   registerClass(key, Ctor, deps, kind?, lazyKey?)
-  registerFactory(key, factory, kind?)
+  registerFactory(key, factory, kind?, lazyKey?)
   registerValue(key, value)
   override(key, value)
   use(fn)
@@ -105,10 +105,14 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 | `registerClass` | Registra un constructor y una tupla de dependencias. |
 | `registerFactory` | Registra lógica de construcción personalizada. |
 | `registerValue` | Registra un valor singleton de propiedad externa. |
-| `override` | Reemplaza un registro existente antes del primer resolver. |
+| `override` | Reemplaza un registro existente; rechaza una clave ya guardada en la caché local. |
 | `use` | Aplica un constructor de módulos. |
 
-`registerClass` y `registerFactory` aceptan los tiempos de vida `singleton`, `scoped` y `transient`. `registerValue` siempre es singleton y de propiedad externa.
+`registerClass` y `registerFactory` aceptan los tiempos de vida `singleton`, `scoped` y `transient`, además de un acompañante opcional `lazyKey`. `registerValue` siempre es singleton y de propiedad externa.
+
+Trata la tupla de dependencias que se pasa a `registerClass` como inmutable después del registro. Las rutas de construcción optimizadas no crean una copia defensiva.
+
+La comprobación de tiempo de `override` solo consulta la caché del contenedor actual. Detecta valores singleton/scoped guardados localmente, `registerValue` y overrides repetidos, pero no registra resoluciones transient ni valores propiedad de un ancestro resueltos desde un hijo. Aplica los overrides antes de resolver el grafo de dependencias.
 
 ## Tipos del namespace
 

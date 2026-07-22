@@ -26,8 +26,8 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/core/factories"
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, factories, registerFactory, async factory, configuration, third-party clients, dependency injection"
       "articleSection": "Core Concepts"
@@ -70,6 +70,25 @@ const container = new Container()
 
 The factory return value becomes the key's resolved type.
 
+## Hot Transient Graphs
+
+`registerClass` is the default for transient services. Keep it unless profiling identifies construction as a meaningful part of a hot path.
+
+V8 can slow a narrow pattern: one graph repeatedly resolves many different transient classes that have the same dependency count. Register only those measured services with factories when the application artifact confirms the hotspot:
+
+```ts
+const container = new Container()
+  .registerClass('context', RequestContext, [], 'scoped')
+  .registerClass('schema', Schema, [])
+  .registerFactory(
+    'parseRequest',
+    (c) => new ParseRequest(c.get('context'), c.get('schema')),
+    'transient',
+  )
+```
+
+Each factory should contain its own `new Service(...)` call. Do not route several services through one generic construction helper if this optimization matters. Factories repeat dependency wiring, so use them for measured hotspots rather than converting every transient registration.
+
 ## Factory Lifetimes
 
 Factories use the same lifetime model as classes:
@@ -81,6 +100,17 @@ const root = new Container()
 ```
 
 Inside a singleton factory, the `c` parameter is narrowed to singleton-safe dependencies. Scoped and transient keys do not autocomplete and are rejected by TypeScript.
+
+Pass an optional fourth `lazyKey` to register a lifetime-preserving `Lazy<V>` companion, exactly as with `registerClass`:
+
+```ts
+const root = new Container()
+  .registerFactory('cache', () => new Cache(), 'singleton', 'cacheLazy')
+
+root.get('cacheLazy').get() // Cache
+```
+
+When using the default singleton lifetime, pass `undefined` before the companion key: `registerFactory('cache', factory, undefined, 'cacheLazy')`.
 
 ## Binding Interfaces
 

@@ -35,7 +35,7 @@ import type {
   DefaultContext,
   DefaultState,
   Middleware,
-  ParameterizedContext,
+  ParameterizedContext
 } from 'koa'
 
 /**
@@ -133,7 +133,7 @@ export interface InferdiKoaOptions<
    */
   readonly createScope?: (
     root: Root,
-    context: ParameterizedContext<StateT, ContextT>,
+    context: ParameterizedContext<StateT, ContextT>
   ) => MaybePromise<Scope>
   /**
    * Optional hook to hydrate the freshly created scope before downstream
@@ -141,14 +141,14 @@ export interface InferdiKoaOptions<
    */
   readonly setupScope?: (
     scope: Scope,
-    context: ParameterizedContext<StateT, ContextT>,
+    context: ParameterizedContext<StateT, ContextT>
   ) => MaybePromise<void>
   /**
    * Overrides request-scope disposal. Defaults to `scope.dispose()`.
    */
   readonly disposeScope?: (
     scope: Scope,
-    context: InferdiKoaContext<StateT, ContextT, Scope, Key>,
+    context: InferdiKoaContext<StateT, ContextT, Scope, Key>
   ) => MaybePromise<void>
   /**
    * Controls whether the middleware disposes the request scope after response
@@ -158,7 +158,7 @@ export interface InferdiKoaOptions<
   readonly autoDispose?:
     | boolean
     | ((
-        context: InferdiKoaContext<StateT, ContextT, Scope, Key>,
+        context: InferdiKoaContext<StateT, ContextT, Scope, Key>
       ) => MaybePromise<boolean>)
   /**
    * Optional sink for cleanup failures. Returning normally marks the cleanup
@@ -166,7 +166,7 @@ export interface InferdiKoaOptions<
    */
   readonly onDisposeError?: (
     error: unknown,
-    context: InferdiKoaContext<StateT, ContextT, Scope, Key>,
+    context: InferdiKoaContext<StateT, ContextT, Scope, Key>
   ) => MaybePromise<void>
 }
 
@@ -208,13 +208,13 @@ function emitAppError(error: unknown, context: Context): void {
   try {
     context.app.emit('error', normalizeError(error), context)
   } catch {
-    // Response cleanup must not fail because application error reporting failed.
+    // Response cleanup must not fail because application error reporting failed
   }
 }
 
 function emitUnhandledCleanupErrors(
   errors: unknown[],
-  context: Context,
+  context: Context
 ): void {
   if (errors.length === 0) return
 
@@ -232,10 +232,10 @@ function handleDisposeError<
   onDisposeError:
     | ((
         error: unknown,
-        context: TypedContext<StateT, ContextT, Scope, Key>,
+        context: TypedContext<StateT, ContextT, Scope, Key>
       ) => MaybePromise<void>)
     | undefined,
-  errors: unknown[],
+  errors: unknown[]
 ): void | PromiseLike<void> {
   if (onDisposeError === undefined) {
     errors.push(error)
@@ -266,15 +266,15 @@ function disposeWithErrors<
   context: TypedContext<StateT, ContextT, Scope, Key>,
   disposeScope: (
     scope: Scope,
-    context: TypedContext<StateT, ContextT, Scope, Key>,
+    context: TypedContext<StateT, ContextT, Scope, Key>
   ) => MaybePromise<void>,
   onDisposeError:
     | ((
         error: unknown,
-        context: TypedContext<StateT, ContextT, Scope, Key>,
+        context: TypedContext<StateT, ContextT, Scope, Key>
       ) => MaybePromise<void>)
     | undefined,
-  errors: unknown[],
+  errors: unknown[]
 ): void | PromiseLike<void> {
   try {
     const disposing = disposeScope(scope, context)
@@ -285,8 +285,8 @@ function disposeWithErrors<
           error,
           context,
           onDisposeError,
-          errors,
-        ),
+          errors
+        )
       )
     }
   } catch (error) {
@@ -305,26 +305,28 @@ async function disposeAfterSetupFailure<
   setupError: unknown,
   disposeScope: (
     scope: Scope,
-    context: TypedContext<StateT, ContextT, Scope, Key>,
+    context: TypedContext<StateT, ContextT, Scope, Key>
   ) => MaybePromise<void>,
   onDisposeError:
     | ((
         error: unknown,
-        context: TypedContext<StateT, ContextT, Scope, Key>,
+        context: TypedContext<StateT, ContextT, Scope, Key>
       ) => MaybePromise<void>)
     | undefined,
-  clearScope: () => void,
+  clearScope: () => void
 ): Promise<never> {
-  // Finding 2: surface only the original setup error. Cleanup failures during
-  // teardown go to `onDisposeError`, else are emitted through the app sink —
-  // never aggregated into the thrown error.
+  /*
+   * Finding 2: surface only the original setup error. Cleanup failures during
+   * teardown go to `onDisposeError`, else are emitted through the app sink —
+   * never aggregated into the thrown error
+   */
   const errors: unknown[] = []
   const disposing = disposeWithErrors(
     scope,
     context,
     disposeScope,
     onDisposeError,
-    errors,
+    errors
   )
 
   try {
@@ -370,7 +372,7 @@ export function inferdiKoa<
     'key'
   > & {
     readonly key?: 'di'
-  },
+  }
 ): Middleware<StateT & InferdiKoaState<Scope, 'di'>, ContextT>
 
 /**
@@ -387,15 +389,17 @@ export function inferdiKoa<
   Root extends InferdiRoot,
   StateT = DefaultState,
   ContextT = DefaultContext,
-  // `const Key` makes an inferred custom key behave like a literal here. Without
-  // it, `StateT & InferdiKoaState<Scope, Key>` does not survive Koa's `.use()`
-  // state inference for a non-default key, collapsing `ctx.state[key]` to `any`.
+  /*
+   * `const Key` makes an inferred custom key behave like a literal here. Without
+   * it, `StateT & InferdiKoaState<Scope, Key>` does not survive Koa's `.use()`
+   * state inference for a non-default key, collapsing `ctx.state[key]` to `any`
+   */
   const Key extends string = string,
   Scope extends InferdiScope = InferdiScopeOf<Root>,
 >(
   options: InferdiKoaOptions<Root, StateT, ContextT, Key, Scope> & {
     readonly key: Key
-  },
+  }
 ): Middleware<StateT & InferdiKoaState<Scope, Key>, ContextT>
 
 export function inferdiKoa<
@@ -405,7 +409,7 @@ export function inferdiKoa<
   Key extends string = string,
   Scope extends InferdiScope = InferdiScopeOf<Root>,
 >(
-  options: InferdiKoaOptions<Root, StateT, ContextT, Key, Scope>,
+  options: InferdiKoaOptions<Root, StateT, ContextT, Key, Scope>
 ): Middleware<StateT & InferdiKoaState<Scope, Key>, ContextT> {
   const root = options.container
   const key = (options.key ?? 'di') as Key
@@ -425,8 +429,10 @@ export function inferdiKoa<
       Scope,
       Key
     >
-    // No-hook fast path: the default scope factory is synchronous, so skip the
-    // wrapper indirection and the `isPromiseLike` probe a custom factory needs.
+    /*
+     * No-hook fast path: the default scope factory is synchronous, so skip the
+     * wrapper indirection and the `isPromiseLike` probe a custom factory needs
+     */
     let scope: Scope
     if (createScope === undefined) {
       scope = root.createScope() as Scope
@@ -446,10 +452,12 @@ export function inferdiKoa<
       Reflect.deleteProperty(state, key)
     }
 
-    // Expose the scope before `setupScope` so the setup-failure disposal hooks
-    // (`disposeScope` / `onDisposeError`) see the same `ctx.state[key]` their
-    // typed context promises. Nothing downstream runs until `next()`, so a
-    // half-built scope is never observable outside cleanup.
+    /*
+     * Expose the scope before `setupScope` so the setup-failure disposal hooks
+     * (`disposeScope` / `onDisposeError`) see the same `ctx.state[key]` their
+     * typed context promises. Nothing downstream runs until `next()`, so a
+     * half-built scope is never observable outside cleanup
+     */
     try {
       state[key] = scope
     } catch (error) {
@@ -460,7 +468,7 @@ export function inferdiKoa<
         error,
         disposeScope,
         onDisposeError,
-        clearScope,
+        clearScope
       )
     }
 
@@ -478,7 +486,7 @@ export function inferdiKoa<
           error,
           disposeScope,
           onDisposeError,
-          clearScope,
+          clearScope
         )
       }
     }
@@ -489,10 +497,12 @@ export function inferdiKoa<
     }
 
     let disposed = false
-    // Finding 3: set when downstream throws so the completion cleanup disposes
-    // even if `skipInferdiDispose` was called — skip suppresses only successful
-    // cleanup. `autoDispose` is still honored (an explicit `false` keeps the
-    // app's ownership even on error, matching the other adapters).
+    /*
+     * Finding 3: set when downstream throws so the completion cleanup disposes
+     * even if `skipInferdiDispose` was called — skip suppresses only successful
+     * cleanup. `autoDispose` is still honored (an explicit `false` keeps the
+     * app's ownership even on error, matching the other adapters)
+     */
     let routeFailed = false
     const response = context.res
 
@@ -518,7 +528,7 @@ export function inferdiKoa<
             error,
             typedContext,
             onDisposeError,
-            errors,
+            errors
           )
           if (isPromiseLike(handling)) {
             await handling
@@ -532,7 +542,7 @@ export function inferdiKoa<
           typedContext,
           disposeScope,
           onDisposeError,
-          errors,
+          errors
         )
         if (isPromiseLike(disposing)) {
           await disposing
@@ -542,15 +552,17 @@ export function inferdiKoa<
       emitUnhandledCleanupErrors(errors, context)
     }
 
-    // One shared completion handler, attached with `on` rather than `once`: it
-    // removes both listeners on the first event, so each request avoids the two
-    // per-listener `once` wrapper allocations, while `runCleanup`'s `disposed`
-    // flag keeps it idempotent. `finish` = response written; `close` =
-    // connection closed before completion.
+    /*
+     * One shared completion handler, attached with `on` rather than `once`: it
+     * removes both listeners on the first event, so each request avoids the two
+     * per-listener `once` wrapper allocations, while `runCleanup`'s `disposed`
+     * flag keeps it idempotent. `finish` = response written; `close` =
+     * connection closed before completion
+     */
     const onComplete = () => {
       response.removeListener('finish', onComplete)
       response.removeListener('close', onComplete)
-      // `runCleanup` handles lifecycle errors itself; this is a final bug guard.
+      // `runCleanup` handles lifecycle errors itself; this is a final bug guard
       /* v8 ignore start */
       void runCleanup(false).then(undefined, (error) => {
         emitAppError(error, context)
@@ -571,14 +583,16 @@ export function inferdiKoa<
         error,
         disposeScope,
         onDisposeError,
-        clearScope,
+        clearScope
       )
     }
 
-    // An async `createScope` / `setupScope` can yield the event loop long enough
-    // for the client to disconnect. If `close` already fired during that await,
-    // the listeners above missed it; `destroyed` is true iff that already
-    // happened, so dispose now instead of leaking the scope.
+    /*
+     * An async `createScope` / `setupScope` can yield the event loop long enough
+     * for the client to disconnect. If `close` already fired during that await,
+     * the listeners above missed it; `destroyed` is true iff that already
+     * happened, so dispose now instead of leaking the scope
+     */
     if (response.destroyed) {
       response.removeListener('finish', onComplete)
       response.removeListener('close', onComplete)

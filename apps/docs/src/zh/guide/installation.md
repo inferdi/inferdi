@@ -27,7 +27,7 @@ schema:
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
       "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16, Bun, Deno"
+      "dependencies": "TypeScript >=5.2, Node.js >=16, Bun, Deno"
       "proficiencyLevel": "Beginner"
       "keywords": "InferDI, 安装, npm, JSR, Node.js, Bun, Deno, TypeScript 依赖注入"
       "articleSection": "指南"
@@ -104,9 +104,11 @@ import { Container } from 'jsr:@inferdi/inferdi'
 | Node.js | 内核包需要 16 或更高版本 |
 | Bun | 1.0 或更高版本 |
 | Deno | 1.40 或更高版本 |
-| TypeScript | 推荐 5.2+ 以支持 `using` / `await using` 语法 |
+| TypeScript | 5.6 或更高版本 |
 
 在原生 `Symbol.dispose` 和 `Symbol.asyncDispose` 出现之前的 Node 版本上，InferDI 会在导入时安装一个 symbol polyfill，使显式资源管理（Explicit Resource Management）的互操作仍能正常工作。
+
+发布的声明文件会自行引用显式资源管理类型库。以 ES2022 为目标的使用者无需在 TypeScript 的 `lib` 配置中额外添加 `ESNext.Disposable`。
 
 ## 适配器安装
 

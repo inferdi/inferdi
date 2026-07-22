@@ -26,8 +26,8 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/core/testing"
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, testing, override, mocks, test doubles, swap implementation, dependency injection"
       "articleSection": "Core Concepts"
@@ -75,14 +75,14 @@ The override value must be assignable to the original registered type. Missing k
 
 ## Override Timing
 
-Overrides must happen before the key is resolved:
+Apply overrides before resolving the dependency graph:
 
 ```ts
 const logger = c.get('logger')
 c.override('logger', mockLogger)
 ```
 
-That second line throws. A late override would split the graph: existing consumers would hold the old instance while later resolves returned the mock.
+The second line throws because the singleton value is already cached on this container. The guard is deliberately cache-based: it also catches scoped values cached on the current scope, `registerValue`, and repeated overrides. Transient resolutions and ancestor-owned values resolved through a child are not cached locally, so they are not tracked. A previously returned transient remains with its caller while later resolves return the mock. Treat this as part of the contract, not permission for late overrides: applying every override before graph resolution avoids split graphs.
 
 ## Ownership
 

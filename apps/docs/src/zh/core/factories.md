@@ -26,8 +26,8 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/zh/core/factories"
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.6, Node.js >=16"
+      "dateModified": "2026-07-21"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, 工厂, registerFactory, 异步工厂, 配置, 第三方客户端, 依赖注入"
       "articleSection": "核心概念"
@@ -70,6 +70,25 @@ const container = new Container()
 
 工厂的返回值即成为该键所解析出的类型。
 
+## 瞬态热路径图
+
+`registerClass` 是注册瞬态服务的默认方式。只有在性能分析表明对象构造占据热路径的重要部分时，才需要改动。
+
+V8 对一种特定模式可能变慢：同一个图反复解析许多依赖数量相同、但不同的瞬态类。性能分析和应用构建产物确认该热点后，只将这些服务改为工厂注册：
+
+```ts
+const container = new Container()
+  .registerClass('context', RequestContext, [], 'scoped')
+  .registerClass('schema', Schema, [])
+  .registerFactory(
+    'parseRequest',
+    (c) => new ParseRequest(c.get('context'), c.get('schema')),
+    'transient',
+  )
+```
+
+每个工厂都应包含自己的 `new Service(...)` 调用。如果这项优化重要，不要将多个服务转给同一个通用构造 helper。工厂会重复依赖接线，只用于已经测量到的热点。
+
 ## 工厂生命周期
 
 工厂使用与类相同的生命周期模型：
@@ -81,6 +100,17 @@ const root = new Container()
 ```
 
 在单例工厂内部，`c` 参数会被收窄为对单例安全的依赖。作用域级和瞬态键不会出现在自动补全中，并会被 TypeScript 拒绝。
+
+传入可选的第四个参数 `lazyKey`，即可注册一个保留目标生命周期的 `Lazy<V>` 伴随项，其行为与 `registerClass` 完全相同：
+
+```ts
+const root = new Container()
+  .registerFactory('cache', () => new Cache(), 'singleton', 'cacheLazy')
+
+root.get('cacheLazy').get() // Cache
+```
+
+若要使用默认的单例生命周期，请在伴随键之前传入 `undefined`：`registerFactory('cache', factory, undefined, 'cacheLazy')`。
 
 ## 绑定接口
 

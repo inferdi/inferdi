@@ -4,7 +4,7 @@ import { inferdiKoa } from '@inferdi/koa'
 import {
   buildRootContainer,
   createRequestScope,
-  type RequestContainer,
+  type RequestContainer
 } from '../_shared/container.js'
 
 const root = buildRootContainer()
@@ -23,8 +23,8 @@ app.use(inferdiKoa({
     createRequestScope(root, {
       requestId: crypto.randomUUID(),
       ip: ctx.ip,
-      userId: ctx.get('x-user-id') || undefined,
-    }),
+      userId: ctx.get('x-user-id') || undefined
+    })
 }))
 app.use(async (ctx) => {
   const id = ctx.path.split('/').pop() ?? ''
