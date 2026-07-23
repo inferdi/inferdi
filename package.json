@@ -26,7 +26,8 @@
     "overrides": {
       "vite": "6.4.3",
       "esbuild": "0.28.1",
-      "body-parser": "2.3.0"
+      "body-parser": "2.3.0",
+      "fast-uri": "3.1.4"
     }
   }
 }
