@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ru/reference/errors"
       "inLanguage": "ru-RU"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, ошибки, исключения, неизвестный ключ, обнаружен цикл, нарушение времени жизни, очищенный контейнер, внедрение зависимостей"
@@ -65,6 +65,7 @@ InferDI бросает явные ошибки при неправильном �
 | Resolve через очищенного предка | `Ancestor container is disposed (key: "k")` |
 | `createScope()` после dispose | `Cannot create scope from a disposed container` |
 | Регистрация после dispose | `Cannot register on a disposed container (key: "k")` |
+| Resolve scoped-ключа из root в strict mode | `Scoped "k" cannot be resolved from the root container. Use createScope().` |
 | Нарушение времени жизни singleton | `Singleton "x" cannot depend on scoped "y"...` |
 | Синхронный цикл | `Circular dependency detected: a -> b -> a...` |
 | Синхронный dispose для async-ресурса | `Sync [Symbol.dispose] called on a resource whose .dispose() returned a Promise...` |

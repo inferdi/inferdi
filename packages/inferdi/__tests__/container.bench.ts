@@ -154,6 +154,86 @@ describe('scoped lifetime', () => {
 
 /*
  * ────────────────────────────────────────────────────────────────────────────
+ * Scope lookup modes and deferred ownership de-duplication
+ * ────────────────────────────────────────────────────────────────────────────
+ */
+
+interface RuntimeBenchContainer {
+  registerFactory(
+    key: string,
+    factory: () => unknown,
+    kind: 'scoped' | 'transient'
+  ): RuntimeBenchContainer
+  createScope(): RuntimeBenchContainer
+  get(key: string): unknown
+  [Symbol.dispose](): void
+}
+
+function buildParentTransient(strict: boolean, depth = 1): RuntimeBenchContainer {
+  let container = new Container({strict})
+    .registerFactory('service', () => ({value: 1}), 'transient')
+
+  for (let i = 0; i < depth; i++) {
+    container = container.createScope()
+  }
+
+  return container as unknown as RuntimeBenchContainer
+}
+
+function buildOwnedScopeRoot(strict: boolean): RuntimeBenchContainer {
+  const root = new Container({strict}) as unknown as RuntimeBenchContainer
+
+  for (let i = 0; i < 16; i++) {
+    root.registerFactory(`service${i}`, () => ({dispose: () => {}}), 'scoped')
+  }
+
+  return root
+}
+
+function resolveOwnedScope(root: RuntimeBenchContainer): void {
+  const scope = root.createScope()
+
+  for (let i = 0; i < 16; i++) {
+    scope.get(`service${i}`)
+  }
+
+  scope[Symbol.dispose]()
+}
+
+describe('scope lookup and ownership hot paths', () => {
+  const strictParentTransient = buildParentTransient(true)
+  const strictNestedParentTransient = buildParentTransient(true, 4)
+  const fastParentTransient = buildParentTransient(false)
+  strictParentTransient.get('service')
+  strictNestedParentTransient.get('service')
+  fastParentTransient.get('service')
+
+  bench('parent transient lookup, strict exact walk (depth 1)', () => {
+    strictParentTransient.get('service')
+  })
+
+  bench('parent transient lookup, strict exact walk (depth 4)', () => {
+    strictNestedParentTransient.get('service')
+  })
+
+  bench('parent transient lookup, fast direct registry', () => {
+    fastParentTransient.get('service')
+  })
+
+  const strictOwnedRoot = buildOwnedScopeRoot(true)
+  const fastOwnedRoot = buildOwnedScopeRoot(false)
+
+  bench('scope + 16 owned services + sync dispose, strict', () => {
+    resolveOwnedScope(strictOwnedRoot)
+  })
+
+  bench('scope + 16 owned services + sync dispose, fast', () => {
+    resolveOwnedScope(fastOwnedRoot)
+  })
+})
+
+/*
+ * ────────────────────────────────────────────────────────────────────────────
  * Lazy overhead — wrapper vs direct resolve
  * ────────────────────────────────────────────────────────────────────────────
  */

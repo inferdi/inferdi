@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ja/core/scopes"
       "inLanguage": "ja-JP"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, スコープ, クリーンアップ, 破棄, 子スコープ, using, await using, LIFO, 依存性注入"
@@ -70,6 +70,8 @@ async function handle(request: Request) {
 ```
 
 `db` はルートのシングルトンです。`request` はスコープごとに 1 回生成され、スコープが破棄されるときに破棄されます。
+
+`scoped` 登録は子スコープに属します。デフォルトの `strict: true` では、`root.get('request')` が `Scoped "request" cannot be resolved from the root container. Use createScope().` をスローします。`createScope()` が返したコンテナからキーを解決してください。`strict: false` はこのランタイムガードを省略します。
 
 ## 所有権
 

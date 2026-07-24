@@ -64,7 +64,7 @@ Una resolución en caliente es un `Map.get(key)` seguido de un `new Ctor(...)` d
 | Servicios singleton y scoped cacheados | Una resolución en caliente lee de `cache.get(key)` antes de que se ejecute la contabilidad de ciclos y tiempos de vida. El recurso a `cache.has(key)` existe solo para valores `undefined` explícitos. |
 | Llamadas directas al constructor | Las clases con 0-7 dependencias usan una ruta `new Ctor(...)` directa. Los constructores más grandes recurren a `Reflect.construct`. |
 | Factorías asíncronas | La `Promise` de la factoría se cachea tal cual, de modo que las llamadas concurrentes comparten una única inicialización en curso mientras `.get()` permanece síncrono. |
-| Frontera del modo estricto | `strict: true` detecta ciclos y fugas de tiempo de vida. `strict: false` elimina esa contabilidad para grafos transitorios calientes ya auditados. |
+| Frontera del modo estricto | `strict: true` detecta ciclos y fugas de tiempo de vida y recorre la cadena exacta de padres para que las mutaciones del árbol sean visibles de inmediato. `strict: false` confía en un grafo de producción auditado e inmutable. |
 
 ![Resultados de los benchmarks](/benchmarking_results.png)
 
@@ -95,11 +95,11 @@ Todas las cifras son operaciones por segundo en Node 22. Más alto es mejor.
 
 ## Modo rápido
 
-`new Container({ strict: false })` elimina la contabilidad de ciclos en runtime, el seguimiento de la pila de singletons y el `try`/`finally` alrededor de la ruta de resolución protegida. El README del paquete reporta resoluciones transitorias locales aproximadamente un 30 % más rápidas en un grafo transitorio plano. Las resoluciones de singleton y scoped cacheados no cambian, porque retornan antes de que se ejecuten esas comprobaciones.
+`new Container({ strict: false })` elimina la contabilidad de ciclos en runtime, el seguimiento de la pila de singletons y el `try`/`finally` alrededor de la ruta de resolución protegida. Los scopes rápidos leen directamente el registro raíz inmutable, sin recorrer la cadena de padres, y reflejan los singletons delegados en la caché del scope. Los scopes strict recorren su cadena exacta de padres en cada fallo local, de modo que las mutaciones siguen visibles sin metadatos de búsqueda por scope ni contabilidad de invalidación. El registro omite la invalidación defensiva en modo rápido. La deduplicación por identidad de instancias owned se ejecuta una sola vez durante el disposal en ambos modos, en lugar de escanear la cola durante la creación.
 
-Usa el modo rápido solo después de que las pruebas hayan ejercitado el grafo en el modo estricto por defecto. TypeScript no puede ver ciclos de singletons, ciclos transitorios, claves dinámicas, casts `as` ni factorías que capturen (close over) un contenedor externo más amplio.
+Usa el modo rápido solo después de que las pruebas hayan ejercitado el grafo en el modo estricto por defecto. TypeScript no puede ver ciclos de singletons, ciclos transitorios, claves dinámicas, casts `as` ni factorías que capturen un contenedor externo más amplio. Registra cada clave de runtime una sola vez mediante una cadena fluent lineal, completa el registro antes de la primera resolución o creación de scope, mantén inmutable el árbol activado y elimina los scopes hijos antes que sus ancestros.
 
-Para una ruta de producción transitoria e intensiva que ya ha sido perfilada, `{ strict: false }` ofrece la configuración compatible más rápida tras esa verificación. Conserva el modo estricto durante el desarrollo y las pruebas. No mejora las resoluciones cacheadas de singleton ni scoped.
+Para una ruta de producción perfilada, `{ strict: false }` ofrece la configuración compatible más rápida tras esa verificación. Conserva el modo estricto durante el desarrollo, las pruebas, el hot reload y en cualquier árbol que cambie después de activarse.
 
 ## Pequeños detalles de la ruta caliente
 

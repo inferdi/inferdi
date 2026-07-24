@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/zh/core/lifetime-guards"
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, 生命周期, 单例, 作用域级, 瞬态, 生命周期守卫, 受困依赖, 依赖注入"
@@ -61,8 +61,10 @@ InferDI 提供三种生命周期：
 | 种类 | 创建时机 | 缓存于 | 由容器释放 |
 | --- | --- | --- | --- |
 | `singleton` | 每个拥有它的容器创建一次 | 拥有它的容器 | 是 |
-| `scoped` | 每个作用域创建一次 | 作用域 | 是 |
+| `scoped` | 每个子作用域创建一次 | 子作用域 | 是 |
 | `transient` | 每次解析都创建 | 从不缓存 | 否 |
+
+在 `strict: true` 模式下，从根容器解析 `scoped` 键会抛出 `Scoped "key" cannot be resolved from the root container. Use createScope().`。请从 `createScope()` 返回的子容器解析 scoped 服务。
 
 ## 生命周期规则
 
@@ -80,6 +82,7 @@ new Container()
 
 `strict: true` 是默认值。它能捕捉：
 
+- 直接从根容器解析 scoped 键
 - 由类型转换引入的单例到作用域级或单例到瞬态的违规
 - 捕获外层容器的工厂泄漏
 - 同步单例循环
@@ -98,6 +101,6 @@ const root = new Container({ strict: true })
 const root = new Container({ strict: false })
 ```
 
-快速模式会从解析路径中移除运行时的循环与生命周期记账。它不会改变类型层面的契约，但也无法防御不诚实的类型转换、捕获的外层容器或循环。
+快速模式会从解析路径中移除运行时的循环与生命周期记账。scope 会直接读取不可变的根注册表，不再遍历父链，并把委托解析的 singleton 镜像到 scope 缓存中。strict scope 在每次本地未命中时遍历精确的父链，因此无需保留查找元数据也能立即看到依赖树变更。owned 实例的身份去重在两种模式下都于 disposal 阶段执行。它不会改变类型层面的契约，但也无法防御不诚实的类型转换、捕获的外层容器或循环。它也会跳过根容器的 scoped 保护，因此应用代码不得从根容器解析 scoped 键。
 
-推荐的工作流程：在严格模式下开发和测试，然后仅在审计之后才为性能敏感的生产环境依赖图切换模式。
+推荐的工作流程：在严格模式下开发和测试，通过单一线性 fluent 链对每个运行时键只注册一次，并在首次解析或创建 scope 前完成注册。然后只为经过审计且不可变的生产依赖图切换模式，并先释放子 scope，再释放其祖先。

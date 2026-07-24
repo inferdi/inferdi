@@ -375,9 +375,19 @@ describe('Phase 1 — Functional', () => {
       class Svc { constructor(_d: Dep) {} }
       const c = new Container()
         .registerClass(SCOPED, Dep, [], 'scoped')
-        .registerClass(SINGLE, Svc, [SCOPED], 'singleton')
+        .createScope()
+        .registerClass(SINGLE, Svc, [SCOPED] as never, 'singleton')
       expect(() => c.get(SINGLE)).toThrow(
         /Singleton "Symbol\(singleton\)" cannot depend on scoped "Symbol\(scoped\)"/
+      )
+    })
+
+    it('root scoped guard formats symbol keys', () => {
+      const SCOPED = Symbol('scoped')
+      const root = new Container().registerClass(SCOPED, ConsoleLogger, [], 'scoped')
+
+      expect(() => root.get(SCOPED)).toThrow(
+        /Scoped "Symbol\(scoped\)" cannot be resolved from the root container/
       )
     })
 
@@ -463,6 +473,14 @@ describe('Phase 2 — Lifetimes', () => {
 
       expect(s1.get('logger')).not.toBe(s2.get('logger'))
     })
+
+    it('root rejects scoped resolution', () => {
+      const root = new Container().registerClass('logger', ConsoleLogger, [], 'scoped')
+
+      expect(() => root.get('logger')).toThrow(
+        'Scoped "logger" cannot be resolved from the root container. Use createScope().'
+      )
+    })
   })
 
   describe('scope hierarchy', () => {
@@ -530,7 +548,8 @@ describe('Phase 2 — Lifetimes', () => {
     it('singleton → scoped: throws', () => {
       const c = new Container()
         .registerClass('scoped', ConsoleLogger, [], 'scoped')
-        .registerClass('singleton', Service, ['scoped'], 'singleton')
+        .createScope()
+        .registerClass('singleton', Service, ['scoped'] as never, 'singleton')
 
       expect(() => c.get('singleton')).toThrow(
         /Singleton "singleton" cannot depend on scoped "scoped"/
@@ -782,13 +801,13 @@ describe('use() — runtime', () => {
 
 /*
  * ────────────────────────────────────────────────────────────────────────────
- * Regression suite for the get() refactor — lookup cache + helper-based
- * singleton resolution. Each test guards an invariant from the implementation
- * plan that could quietly break under future refactors.
+ * Regression suite for parent-chain lookup and helper-based singleton
+ * resolution. Each test guards an invariant that could quietly break under
+ * future refactors.
  * ────────────────────────────────────────────────────────────────────────────
  */
 
-describe('get() refactor — invariants under lookup cache + shared helper', () => {
+describe('get() scope lookup + shared helper invariants', () => {
   describe('owned-on-owner invariant', () => {
     it('singleton resolved from a child is disposed by the owner, not by the child', async () => {
       const root = new Container().registerClass('db', TrackableAsync, [])
@@ -845,7 +864,7 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
     })
   })
 
-  describe('lookup cache invalidation via version snapshot', () => {
+  describe('strict parent lookup observes tree mutations', () => {
     it('re-registering on the owner after a child resolve is observed on the next get', () => {
       const root = new Container().registerValue('a', 1)
       const child = root.createScope()
@@ -875,7 +894,7 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
       expect(grand.get('a')).toBe('second')
     })
 
-    it('a nearer ancestor registration invalidates a cached farther owner', () => {
+    it('a nearer ancestor registration shadows a farther owner', () => {
       const root = new Container().registerValue('a', 'root')
       const middle = root.createScope()
       const leaf = middle.createScope()
@@ -888,7 +907,7 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
       expect(leaf.get('a')).toBe('middle')
     })
 
-    it('disposing an intermediate ancestor invalidates a cached farther owner', async () => {
+    it('disposing an intermediate ancestor prevents lookup through it', async () => {
       const root = new Container().registerValue('a', 'root')
       const middle = root.createScope()
       const leaf = middle.createScope()
@@ -900,19 +919,12 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
       expect(() => leaf.get('a')).toThrowError(/Ancestor container is disposed/)
     })
 
-    it('registering an unrelated key on the owner does not affect cached resolution of other keys', () => {
+    it('registering an unrelated key on the owner does not affect other keys', () => {
       const root = new Container().registerValue('a', 'A')
       const child = root.createScope()
 
-      // First resolve — populates child.lookupCache with entry for 'a'
       expect(child.get('a')).toBe('A')
 
-      /*
-       * Bump the tree mutation epoch via a brand-new key. The cached entry for
-       * 'a' will miss the version compare on next access, fall back to walk-up,
-       * and find the same registration — correct even though tree-wide
-       * invalidation is deliberately over-eager for cold mutations
-       */
       ;(root as unknown as { registerValue: (k: string, v: unknown) => unknown })
         .registerValue('b', 'B')
 
@@ -920,17 +932,12 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
       expect((child as unknown as { get: (k: string) => string }).get('b')).toBe('B')
     })
 
-    it('child override after a parent-resolve clears the child lookupCache', () => {
+    it('child registration after a parent resolve takes local precedence', () => {
       const root = new Container().registerValue('a', 'parent')
       const child = root.createScope()
 
-      // Child reaches into parent — caches { owner: root, reg, version }
       expect(child.get('a')).toBe('parent')
 
-      /*
-       * Override locally on child — must invalidate child.lookupCache so the
-       * next resolve sees the local registration
-       */
       ;(child as unknown as { registerValue: (k: string, v: unknown) => unknown })
         .registerValue('a', 'child')
 
@@ -938,20 +945,15 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
     })
   })
 
-  describe('cycle detection coexistence with lookup cache', () => {
+  describe('cycle detection after prior resolves', () => {
     it('a successful resolve does not let a later cycle escape the detector', () => {
       const c = new Container()
         .registerValue('safe', 42)
         .registerFactory('a', (ctx) => ctx.get('b' as never))
         .registerFactory('b', (ctx) => ctx.get('a' as never))
 
-      // First, a clean resolve — fully exercises the helper + cache writes
       expect(c.get('safe')).toBe(42)
 
-      /*
-       * Now the cycle must still throw — `resolving` is shared and lives outside
-       * any caching path
-       */
       expect(() => c.get('a' as never)).toThrowError(/Circular dependency/)
 
       // After the throw, the container is still healthy
@@ -967,8 +969,8 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
     })
   })
 
-  describe('lifetime guard remains active across repeated cold resolves', () => {
-    it('singleton → scoped throws on every fresh scope, not just the first', () => {
+  describe('root scoped guard remains active across repeated cold resolves', () => {
+    it('delegated singleton cannot resolve a scoped dependency from root', () => {
       class Bad {
         constructor(public readonly s: { value: number }) {}
       }
@@ -979,8 +981,12 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
       const a = root.createScope()
       const b = root.createScope()
 
-      expect(() => a.get('bad')).toThrowError(/Singleton .* cannot depend on scoped/)
-      expect(() => b.get('bad')).toThrowError(/Singleton .* cannot depend on scoped/)
+      expect(() => a.get('bad')).toThrowError(
+        'Scoped "shortLived" cannot be resolved from the root container. Use createScope().'
+      )
+      expect(() => b.get('bad')).toThrowError(
+        'Scoped "shortLived" cannot be resolved from the root container. Use createScope().'
+      )
     })
   })
 
@@ -990,17 +996,16 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
       const child = root.createScope()
 
       expect(child.get('shared')).toBe('from-root')
-      // Repeat to exercise the cached path
+      // Repeat to exercise another parent walk
       expect(child.get('shared')).toBe('from-root')
     })
   })
 
-  describe('lookup cache invalidation across all register* methods', () => {
-    it('registerClass on a scope with a populated lookupCache clears the cache', () => {
+  describe('local registrations after parent resolves', () => {
+    it('registerClass on a scope remains visible after a parent resolve', () => {
       const root = new Container().registerValue('x', 'parent')
       const child = root.createScope()
 
-      // Populate child.lookupCache
       expect(child.get('x')).toBe('parent')
 
       class Local { public hello = 'world' }
@@ -1010,7 +1015,7 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
       expect((child as unknown as { get: (k: string) => Local }).get('local').hello).toBe('world')
     })
 
-    it('registerFactory on a scope with a populated lookupCache clears the cache', () => {
+    it('registerFactory on a scope remains visible after a parent resolve', () => {
       const root = new Container().registerValue('x', 'parent')
       const child = root.createScope()
 
@@ -1024,18 +1029,11 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
   })
 
   describe('delegated resolve of explicit undefined and disposed owners', () => {
-    it('singleton owned by parent stored as explicit undefined: child resolves it through cache.has fallback', () => {
+    it('singleton owned by parent stored as explicit undefined resolves through the owner marker', () => {
       const root = new Container().registerValue('maybe', undefined)
       const child = root.createScope()
 
-      // First child.get drives the lookupCache miss → walk-up → cache entry
       expect(child.get('maybe')).toBeUndefined()
-
-      /*
-       * Second child.get drives the LOOKUP CACHE HIT path into the helper, where
-       * target.cache.get returns undefined and target.cache.has(key) === true is
-       * the only way to distinguish "registered as undefined" from "miss"
-       */
       expect(child.get('maybe')).toBeUndefined()
     })
 
@@ -1043,7 +1041,6 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
       const root = new Container().registerClass('svc', AppConfig as never, [] as never)
       const child = root.createScope()
 
-      // Populate child.lookupCache by resolving once while root is still alive
       child.get('svc')
 
       await root.dispose()
@@ -1052,19 +1049,21 @@ describe('get() refactor — invariants under lookup cache + shared helper', () 
     })
   })
   describe('owned array de-duplication', () => {
-    it('does not push the same instance twice if it is returned by multiple registrations', () => {
-      const instance = { dispose: () => {} }
-      
-      // Registering the exact same instance under two keys
+    it('defers identity de-duplication to teardown', () => {
+      let disposeCalls = 0
+      const instance = {dispose: () => { disposeCalls++ }}
+
       const c = new Container()
         .registerFactory('a', () => instance)
         .registerFactory('b', () => instance)
-        
-      c.get('a') // pushes instance to target.owned
-      c.get('b') // hits the !target.owned.includes(instance) branch, evaluates to false
-      
-      // Cast to inspect private field to ensure it was only added once
-      expect((c as unknown as { owned: unknown[] }).owned.length).toBe(1)
+
+      c.get('a')
+      c.get('b')
+      expect((c as unknown as {owned: unknown[]}).owned).toHaveLength(2)
+
+      c[Symbol.dispose]()
+
+      expect(disposeCalls).toBe(1)
     })
   })
 
@@ -1194,14 +1193,10 @@ describe('Phase 7 — Test Overrides', () => {
     expect(mock.asyncDisposeCalls).toBe(0)
   })
 
-  it('clears the child lookupCache when an override is applied to the child', () => {
+  it('child override after a parent resolve takes local precedence', () => {
     const root = new Container().registerClass('logger', ConsoleLogger, [])
     const child = root.createScope()
 
-    /*
-     * Walk-up populates child.lookupCache with entry { owner: root, ... }.
-     * Singleton lives on root, so child.cache stays empty for this key
-     */
     expect(child.get('logger')).toBeInstanceOf(ConsoleLogger)
 
     const mock = new ConsoleLogger()
@@ -1259,13 +1254,14 @@ describe('Phase 7 — Test Overrides', () => {
   it('override on child reads kind from parent registration via walk-up', () => {
     const root = new Container().registerClass('reqCtx', ConsoleLogger, [], 'scoped')
     const child = root.createScope()
+    const sibling = root.createScope()
     const mock = new ConsoleLogger()
 
     child.override('reqCtx', mock)
 
-    // Override is local on child; parent untouched
+    // Override is local on child; sibling still resolves the parent registration
     expect(child.get('reqCtx')).toBe(mock)
-    expect(root.get('reqCtx')).not.toBe(mock)
+    expect(sibling.get('reqCtx')).not.toBe(mock)
 
     // Child got the kind from parent's registration
     const childReg = (child as unknown as { regs: Map<string, { kind: string }> }).regs.get('reqCtx')
@@ -1433,14 +1429,57 @@ describe('Phase 9 — strict: false', () => {
     expect(a.get('logger')).not.toBe(b.get('logger'))
   })
 
-  it('singleton delegated from a child scope hits the cached path on owner', () => {
+  it('singleton delegated from a child scope is mirrored into the scope cache', () => {
     const root = new Container({strict: false}).registerClass('logger', ConsoleLogger, [])
     const child = root.createScope()
+    const state = child as unknown as {cache: Map<string, unknown>}
+
+    expect(state.cache.has('logger')).toBe(false)
     const fromChild = child.get('logger')
     expect(fromChild).toBeInstanceOf(ConsoleLogger)
-    // Cached on root — second resolve from child returns the same instance
+    expect(state.cache.has('logger')).toBe(true)
     expect(child.get('logger')).toBe(fromChild)
     expect(root.get('logger')).toBe(fromChild)
+  })
+
+  it('delegated undefined singleton is mirrored with the cache marker', () => {
+    const root = new Container({strict: false}).registerValue('maybe', undefined)
+    const child = root.createScope()
+    const cache = (child as unknown as {cache: Map<string, unknown>}).cache
+
+    expect(child.get('maybe')).toBeUndefined()
+    expect(cache.get('maybe')).not.toBeUndefined()
+    expect(child.get('maybe')).toBeUndefined()
+  })
+
+  it('delegated singleton remains owned by the root', async () => {
+    let disposeCalls = 0
+    const instance = {dispose: () => { disposeCalls++ }}
+    const root = new Container({strict: false}).registerFactory('service', () => instance)
+    const child = root.createScope()
+
+    expect(child.get('service')).toBe(instance)
+
+    await child.dispose()
+    expect(disposeCalls).toBe(0)
+
+    await root.dispose()
+    expect(disposeCalls).toBe(1)
+  })
+
+  it('pre-activation scoped override stays externally owned in a fast scope', async () => {
+    let disposeCalls = 0
+    const mock = {dispose: () => { disposeCalls++ }}
+    const root = new Container({strict: false})
+      .registerFactory('service', () => ({dispose: () => {}}), 'scoped')
+
+    root.override('service', mock)
+    const child = root.createScope()
+
+    expect(child.get('service')).toBe(mock)
+
+    await child.dispose()
+    expect(disposeCalls).toBe(0)
   })
 
   it('createScope inherits the strict flag', () => {
@@ -1498,29 +1537,72 @@ describe('Phase 9 — strict: false', () => {
     expect(calls).toBe(1)
   })
 
-  it('transient registered on parent, resolved from child — no caching under strict:false', () => {
+  it('transient registered on parent remains uncached under strict:false', () => {
     let calls = 0
     const root = new Container({strict: false})
       .registerFactory('counter', () => ({n: ++calls}), 'transient')
     const child = root.createScope()
-    /*
-     * child has no local registration for 'counter'; the resolve goes through
-     * the parent walk-up into resolveWithOwnerAndReg with reg.kind === 'transient'.
-     * strict:false branch must NOT cache the result
-     */
+
     expect(child.get('counter').n).toBe(1)
     expect(child.get('counter').n).toBe(2)
     expect(calls).toBe(2)
   })
 
-  it('owned de-duplication still applies under strict:false', () => {
-    const shared = {dispose: () => {}}
+  it('defers owned de-duplication to teardown under strict:false', () => {
+    let disposeCalls = 0
+    const shared = {dispose: () => { disposeCalls++ }}
     const c = new Container({strict: false})
       .registerFactory('a', () => shared)
       .registerFactory('b', () => shared)
     c.get('a')
     c.get('b')
-    expect((c as unknown as {owned: unknown[]}).owned.length).toBe(1)
+    expect((c as unknown as {owned: unknown[]}).owned.length).toBe(2)
+
+    c[Symbol.dispose]()
+
+    expect(disposeCalls).toBe(1)
+  })
+
+  it('reads nested scopes directly from the immutable registry owner', () => {
+    const root = new Container({strict: false}).registerValue('value', 'root')
+    const middle = root.createScope()
+    const leaf = middle.createScope()
+    const leafState = leaf as unknown as {parent: unknown}
+
+    expect(leaf.get('value')).toBe('root')
+    expect(leafState.parent).toBe(root)
+
+    ;(middle as unknown as {registerValue: (key: string, value: string) => unknown})
+      .registerValue('value', 'middle')
+
+    expect(leaf.get('value')).toBe('root')
+  })
+
+  it('reports an unknown key directly from a fast scope', () => {
+    const child = new Container({strict: false})
+      .registerValue('value', 1)
+      .createScope()
+
+    expect(() => (child as unknown as {get: (key: string) => unknown}).get('missing'))
+      .toThrowError('Key "missing" not found')
+  })
+
+  it('reports a disposed fast registry owner before the key has been cached', async () => {
+    const root = new Container({strict: false}).registerValue('value', 1)
+    const child = root.createScope()
+
+    await root.dispose()
+
+    expect(() => child.get('value'))
+      .toThrowError('Ancestor container is disposed (key: "value")')
+  })
+
+  it('preserves the disposed diagnostic under strict:false', async () => {
+    const c = new Container({strict: false}).registerValue('value', 1)
+
+    await c.dispose()
+
+    expect(() => c.get('value')).toThrowError('Container is disposed (key: "value")')
   })
 })
 

@@ -170,13 +170,12 @@ No añadas trabajo antes de esa búsqueda.
 - Los valores `undefined` explícitos se representan con `UNDEFINED_MARKER`; no
   reintroduzcas una segunda búsqueda `cache.has(key)` en la ruta de acierto de
   caché.
-- `_disposed`, la búsqueda en el registro local, la búsqueda en el padre,
-  `lookupCache`, las comprobaciones de ciclos, las comprobaciones de tiempo de
-  vida y la mutación del singleton-stack viven todas después de la ruta rápida de
-  caché.
-- Los registros locales deben comprobarse antes que la búsqueda en la cadena de
-  padres. `lookupCache` es un memo de ruta fría solo para los aciertos en el
-  padre.
+- `_disposed`, la búsqueda de registros, la búsqueda en el padre, las
+  comprobaciones de ciclos, las comprobaciones de tiempo de vida y la mutación
+  del singleton-stack viven todas después de la ruta rápida de caché.
+- Los árboles strict deben comprobar los registros locales antes de recorrer la
+  cadena exacta de padres. No conservan instantáneas de búsqueda, de modo que
+  las mutaciones siguen visibles sin invalidación ni metadatos por scope.
 - La invocación del constructor se mantiene desplegada por aridad para 0-7
   argumentos. La ruta de 8 o más usa `Reflect.construct` con un array compacto
   construido mediante `push`.
@@ -184,8 +183,9 @@ No añadas trabajo antes de esa búsqueda.
   `singletonStack` funcionan únicamente porque una resolución se ejecuta de forma
   atómica en la pila de llamadas.
 - `strict: false` puede eliminar las comprobaciones de ciclos y tiempo de vida en
-  runtime tras la ruta rápida de caché. No debe cambiar la semántica observable
-  de acierto de caché.
+  runtime tras la ruta rápida de caché local. Los scopes rápidos pueden leer
+  directamente el registro raíz inmutable y reflejar singletons delegados en su
+  caché local. Un árbol fast es inmutable tras su primera resolución o scope.
 
 `packages/inferdi/__tests__/container.bench.ts` no está impuesto por CI. Quienes
 revisan deben exigir salida de benchmark para los cambios en `get()`, en la forma
@@ -230,12 +230,12 @@ justificación explícita en el PR.
 ### Ruta caliente y forma en runtime
 
 - [ ] ¿Se añadió trabajo antes de `cache.get(key)` en `get()`?
-- [ ] ¿Cambió la forma de `UNDEFINED_MARKER`, `cache`, `regs`, `lookupCache` o
-      `Registration`?
+- [ ] ¿Cambió la forma de `UNDEFINED_MARKER`, `cache`, `regs`, la búsqueda en
+      padres o `Registration`?
 - [ ] ¿Cambió el orden de las propiedades de `Registration` respecto de
       `{kind, lazy, fn, owned}`?
-- [ ] ¿Se movió la búsqueda en el registro local después de la búsqueda en el
-      padre?
+- [ ] ¿Se movió la búsqueda en el registro local del árbol strict después de la
+      búsqueda en el padre?
 - [ ] ¿Se añadió `Proxy`, `Reflect.get`, `Object.defineProperty` o una búsqueda
       de metadatos a la resolución?
 - [ ] ¿Se convirtió `get()` en `async`?
@@ -268,7 +268,9 @@ justificación explícita en el PR.
 - [ ] ¿`dispose()` o `[Symbol.dispose]()` dejaron de establecer `_disposed` antes
       de invocar a los disposers?
 - [ ] ¿Se movió la limpieza de estado después de la invocación de los disposers?
-- [ ] ¿Se eliminó el desacoplamiento del padre o la limpieza de `lookupCache`?
+- [ ] ¿Se eliminó el desacoplamiento del padre?
+- [ ] ¿La deduplicación de instancias owned dejó de preservar el orden LIFO de
+      la primera creación?
 - [ ] ¿Cambió el orden de liberación LIFO?
 - [ ] ¿Cambió el orden de sondeo de los disposers de `Symbol.asyncDispose` a
       `Symbol.dispose` a `.dispose()`?

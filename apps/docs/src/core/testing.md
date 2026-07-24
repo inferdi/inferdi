@@ -82,7 +82,7 @@ const logger = c.get('logger')
 c.override('logger', mockLogger)
 ```
 
-The second line throws because the singleton value is already cached on this container. The guard is deliberately cache-based: it also catches scoped values cached on the current scope, `registerValue`, and repeated overrides. Transient resolutions and ancestor-owned values resolved through a child are not cached locally, so they are not tracked. A previously returned transient remains with its caller while later resolves return the mock. Treat this as part of the contract, not permission for late overrides: applying every override before graph resolution avoids split graphs.
+The second line throws because the singleton value is already cached on this container. The guard is deliberately cache-based: it also catches scoped values cached on the current scope, `registerValue`, and repeated overrides. In strict mode, transient resolutions and ancestor-owned values resolved through a child are not cached locally, so they are not tracked. Fast scopes may mirror delegated singletons locally and do not support mutation after activation. A previously returned transient remains with its caller while later resolves return the mock. Treat this as part of the contract, not permission for late overrides: applying every override before graph resolution avoids split graphs.
 
 ## Ownership
 

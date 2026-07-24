@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/es/reference/errors"
       "inLanguage": "es-ES"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, errores, excepciones, clave desconocida, ciclo detectado, violación de tiempo de vida, contenedor liberado, inyección de dependencias"
@@ -65,6 +65,7 @@ InferDI lanza errores explícitos ante el uso indebido del grafo y del ciclo de 
 | Resolver con un ancestro liberado | `Ancestor container is disposed (key: "k")` |
 | `createScope()` después de liberar | `Cannot create scope from a disposed container` |
 | Registro después de liberar | `Cannot register on a disposed container (key: "k")` |
+| Clave scoped resuelta desde la raíz en modo estricto | `Scoped "k" cannot be resolved from the root container. Use createScope().` |
 | Violación del tiempo de vida singleton | `Singleton "x" cannot depend on scoped "y"...` |
 | Ciclo síncrono | `Circular dependency detected: a -> b -> a...` |
 | Liberación síncrona sobre un recurso asíncrono | `Sync [Symbol.dispose] called on a resource whose .dispose() returned a Promise...` |

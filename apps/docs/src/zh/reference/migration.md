@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/zh/reference/migration"
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, 迁移, 破坏性变更, 升级, 5.0, 主版本, 依赖注入"
@@ -60,7 +60,7 @@ InferDI 按主版本记录破坏性变更。权威来源仍然是 [`packages/inf
 
 ## 迁移到 5.0
 
-v5 是一次适配器版本发布。核心软件包未发生变化。此次版本号提升用于保持所有已发布软件包的版本一致，并使各框架适配器统一到同一套清理契约上。
+最初的 v5 版本仅涉及适配器。此次版本号提升用于保持所有已发布软件包的版本一致，并使各框架适配器统一到同一套清理契约上。后续 v5 构建还会强制子作用域所有权，并收紧下述快速模式契约。
 
 适配器契约现在共享以下规则：
 
@@ -70,6 +70,21 @@ v5 是一次适配器版本发布。核心软件包未发生变化。此次版�
 - 在 setup 清理过程中发生的清理失败会被路由到 `onDisposeError` 或适配器接收器。
 - 失败的请求即使在调用 `skipInferdiDispose` 之后，仍会释放其作用域，但已记录的 Express 限制除外。
 - 清理钩子在运行期间能看到公开的作用域槽位。
+
+### Scoped 解析需要子作用域
+
+在默认的 `strict: true` 模式下，从根容器解析 scoped 键现在会抛出 `Scoped "key" cannot be resolved from the root container. Use createScope().`。请通过 `const scope = root.createScope()` 创建子容器，再调用 `scope.get(scopedKey)`，并在对应的生命周期边界释放该子容器。快速模式会跳过这项运行时检查，但 scoped 服务仍应从子作用域解析。
+
+### 快速模式的不可变依赖图契约
+
+`new Container({ strict: false })` 现在会从 scope 直接读取不可变的根
+注册表，避免遍历父链，并把委托解析的 singleton 镜像到 scope 缓存中。
+strict scope 不再保留父级查找快照，而是在每次本地未命中时遍历精确的
+父链，因此无需失效记账或每个 scope 的查找元数据，也能立即看到依赖树
+变更。owned 实例的身份去重在两种模式下都于 disposal 阶段执行。请通过
+单一线性 fluent 链对每个运行时键只注册一次，在首次解析或创建 scope
+前完成注册，激活后保持依赖树不可变，并先释放子 scope，再释放其祖先。
+热重载以及任何激活后仍会变更的依赖树都应使用 `strict: true`。
 
 ### 适配器说明
 

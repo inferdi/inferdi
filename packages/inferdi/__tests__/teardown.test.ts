@@ -146,6 +146,23 @@ describe('Phase 3 — duplicate dispose (Set deduplication)', () => {
 
     expect(shared.asyncDisposeCalls).toBe(1)
   })
+
+  it('duplicate identity preserves first-creation LIFO order', async () => {
+    const log: string[] = []
+    const shared = new OrderedDisposable('A', log)
+    const c = new Container()
+      .registerFactory('a', () => shared)
+      .registerFactory('b', () => new OrderedDisposable('B', log))
+      .registerFactory('aAlias', () => shared)
+
+    c.get('a')
+    c.get('b')
+    c.get('aAlias')
+
+    await c.dispose()
+
+    expect(log).toEqual(['B', 'A'])
+  })
 })
 
 describe('Phase 3 — ownership boundaries', () => {
@@ -246,6 +263,17 @@ describe('Phase 3 — scope hierarchy', () => {
 })
 
 describe('Phase 3 — idempotency and blocking', () => {
+  it('empty async dispose completes after clearing container state', async () => {
+    const c = new Container()
+
+    const first = c.dispose()
+    const second = c.dispose()
+
+    await expect(Promise.all([first, second])).resolves.toEqual([undefined, undefined])
+    expect(c.disposed).toBe(true)
+    expect(c.has('missing')).toBe(false)
+  })
+
   it('double dispose() — the second is a no-op', async () => {
     const inst = new TrackableAsync()
     const c = new Container().registerFactory('r', () => inst)
@@ -380,6 +408,14 @@ describe('Phase 3 — sync [Symbol.dispose]', () => {
 
   afterEach(() => {
     process.off('unhandledRejection', handler)
+  })
+
+  it('empty sync dispose completes after clearing container state', () => {
+    const c = new Container()
+
+    expect(() => c[Symbol.dispose]()).not.toThrow()
+    expect(c.disposed).toBe(true)
+    expect(c.has('missing')).toBe(false)
   })
 
   it('sync dispose only invokes sync [Symbol.dispose] / plain dispose', () => {

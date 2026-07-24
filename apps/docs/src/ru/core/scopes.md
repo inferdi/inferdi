@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ru/core/scopes"
       "inLanguage": "ru-RU"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, скоупы, очистка, освобождение ресурсов, дочерний scope, using, await using, LIFO, внедрение зависимостей"
@@ -70,6 +70,8 @@ async function handle(request: Request) {
 ```
 
 `db` является корневым singleton. `request` создаётся один раз на scope и освобождается при dispose этого scope.
+
+`scoped`-регистрации принадлежат дочерним scope. При `strict: true` (по умолчанию) вызов `root.get('request')` выбрасывает `Scoped "request" cannot be resolved from the root container. Use createScope().` Получайте ключ из контейнера, который вернул `createScope()`. Режим `strict: false` отключает эту runtime-проверку.
 
 ## Владение
 

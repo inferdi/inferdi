@@ -118,11 +118,11 @@ if (cached !== undefined) return ...
 不要在此查找之前添加任何工作。
 
 - 显式的 `undefined` 值通过 `UNDEFINED_MARKER` 表示；不要在缓存命中路径上重新引入第二次 `cache.has(key)` 查找。
-- `_disposed`、本地注册查找、父级查找、`lookupCache`、循环检查、生命周期检查以及单例栈（singleton-stack）的变更，全部位于缓存快速路径之后。
-- 本地注册必须在父链查找之前被检查。`lookupCache` 是仅用于父级命中的冷路径备忘录。
+- `_disposed`、注册查找、父级查找、循环检查、生命周期检查以及单例栈（singleton-stack）的变更，全部位于缓存快速路径之后。
+- strict 依赖树必须在遍历精确的父链之前检查本地注册。它们不保留父级查找快照，因此无需失效处理或每个 scope 的元数据，也能立即看到变更。
 - 构造函数调用对 0-7 个参数保持按参数个数展开。8 个及以上的路径使用 `Reflect.construct`，并配合通过 `push` 构建的紧凑数组（packed array）。
 - `get()` 保持同步。共享的 `resolving` 数组和 `singletonStack` 之所以能正常工作，仅仅是因为一次解析会在调用栈上原子地运行。
-- `strict: false` 可以在缓存快速路径之后移除运行时的循环与生命周期检查。它不得改变可观察的缓存命中语义。
+- `strict: false` 可以在本地缓存快速路径之后移除运行时的循环与生命周期检查。快速 scope 可以直接读取不可变的根注册表，并把委托解析的 singleton 镜像到本地缓存。fast 依赖树在首次解析或创建 scope 后必须保持不可变。
 
 `packages/inferdi/__tests__/container.bench.ts` 不受 CI 强制约束。对于触及 `get()`、注册对象形态、缓存表示、作用域查找、惰性伴生项或构造函数调用的改动，评审者必须要求提供基准测试输出。在相关场景中超过 5% 的本地性能回退会阻止合并，除非该 PR 包含一份范围明确、书面的理由说明。
 
@@ -149,9 +149,9 @@ if (cached !== undefined) return ...
 ### 热路径与运行时形态
 
 - [ ] 在 `get()` 中的 `cache.get(key)` 之前添加了工作？
-- [ ] `UNDEFINED_MARKER`、`cache`、`regs`、`lookupCache` 或 `Registration` 的形态发生了变化？
+- [ ] `UNDEFINED_MARKER`、`cache`、`regs`、父级查找或 `Registration` 的形态发生了变化？
 - [ ] `Registration` 的属性顺序从 `{kind, lazy, fn, owned}` 发生了改变？
-- [ ] 本地注册表查找被移到了父级查找之后？
+- [ ] strict 依赖树的本地注册表查找被移到了父级查找之后？
 - [ ] 在解析过程中添加了 `Proxy`、`Reflect.get`、`Object.defineProperty` 或元数据查找？
 - [ ] `get()` 被改为 `async`？
 - [ ] 移除或重塑了针对 0-7 个构造函数参数的按参数个数展开分支？
@@ -176,7 +176,8 @@ if (cached !== undefined) return ...
 
 - [ ] `dispose()` 或 `[Symbol.dispose]()` 不再在调用 disposer 之前设置 `_disposed`？
 - [ ] 状态清理被移到了 disposer 调用之后？
-- [ ] 移除了父级分离（detach）或 `lookupCache` 清理？
+- [ ] 移除了父级分离（detach）？
+- [ ] owned 实例去重不再保持首次创建顺序的 LIFO？
 - [ ] 改变了 LIFO 的释放顺序？
 - [ ] disposer 的探测顺序从 `Symbol.asyncDispose` 到 `Symbol.dispose` 再到 `.dispose()` 发生了改变？
 - [ ] 多个清理失败不再聚合为 `AggregateError`？

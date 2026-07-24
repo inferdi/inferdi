@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ja/core/lifetime-guards"
       "inLanguage": "ja-JP"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, ライフタイム, singleton, scoped, transient, ライフタイムガード, キャプティブ依存, 依存性注入"
@@ -61,8 +61,10 @@ InferDI には 3 つのライフタイムがあります:
 | 種類 | 生成タイミング | キャッシュ先 | コンテナによる破棄 |
 | --- | --- | --- | --- |
 | `singleton` | 所有コンテナごとに 1 回 | 所有コンテナ | あり |
-| `scoped` | スコープごとに 1 回 | スコープ | あり |
+| `scoped` | 子スコープごとに 1 回 | 子スコープ | あり |
 | `transient` | 解決のたびに | キャッシュしない | なし |
+
+`strict: true` では、ルートコンテナから `scoped` キーを解決すると `Scoped "key" cannot be resolved from the root container. Use createScope().` がスローされます。scoped サービスは `createScope()` が返した子コンテナから解決してください。
 
 ## ライフタイムのルール
 
@@ -80,6 +82,7 @@ new Container()
 
 `strict: true` がデフォルトです。次のものを捕捉します:
 
+- ルートコンテナからの scoped キーの直接解決
 - キャストによって持ち込まれた singleton から scoped、または singleton から transient への違反
 - キャプチャされた外側のコンテナによるファクトリーのリーク
 - 同期的なシングルトンの循環
@@ -98,6 +101,6 @@ const root = new Container({ strict: true })
 const root = new Container({ strict: false })
 ```
 
-fast モードは、解決パスからランタイムの循環およびライフタイムの記録処理を取り除きます。型レベルの契約は変更しませんが、不正なキャスト、キャプチャされた外側のコンテナ、循環に対しては防御できません。
+fast モードは、解決パスからランタイムの循環およびライフタイムの記録処理を取り除きます。scope は不変のルートレジストリを直接参照して親チェーンの走査を避け、委譲された singleton を scope のキャッシュへ反映します。strict scope はローカルミスのたびに正確な親チェーンを走査するため、保持されたルックアップメタデータなしで変更が反映されます。owned インスタンスの同一性による重複排除は両モードとも disposal 時に実行されます。型レベルの契約は変更しませんが、不正なキャスト、キャプチャされた外側のコンテナ、循環に対しては防御できません。ルートの scoped ガードも省略されるため、アプリケーションコードはルートから scoped キーを解決しないでください。
 
-推奨されるワークフロー: strict モードで開発・テストを行い、監査の後にパフォーマンスが重要なプロダクションのグラフだけを切り替えます。
+推奨されるワークフロー: strict モードで開発・テストを行い、単一の線形 fluent チェーンで各ランタイムキーを一度だけ登録し、最初の解決または scope 作成前に登録を完了します。その後、監査済みで不変のプロダクショングラフだけを切り替え、祖先より先に子 scope を破棄してください。

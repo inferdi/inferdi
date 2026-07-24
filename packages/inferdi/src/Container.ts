@@ -189,14 +189,15 @@ type NoKeyOverlap<A, B> = keyof A & keyof B extends never
  * const root = new Container()
  *
  * // Opt out of the runtime guards. Applications that fully trust the v3
- * // compile-time guard (`AllowedDeps<T, Kind>`) can use this for a faster
- * // hot path. The flag is inherited by every scope spawned via createScope()
+ * // compile-time guard (`AllowedDeps<T, Kind>`) and freeze the graph before
+ * // its first resolve can use this for a faster hot path. The flag is inherited
+ * // by every scope spawned via createScope()
  * const fast = new Container({ strict: false })
  * ```
  */
 export interface ContainerOptions {
   /**
-   * Toggle runtime cycle detection and lifetime guard inside `get()`.
+   * Toggle runtime cycle and lifetime guards.
    *
    * - `true` (default) — cycle detection and the singleton lifetime guard
    *   fire on every resolve. Errors are precise (`Circular dependency detected:
@@ -204,13 +205,25 @@ export interface ContainerOptions {
    * - `false` — both checks are skipped. `get()` for `transient` becomes a bare
    *   `fn(this)` call; the non-transient path skips the cycle bookkeeping and
    *   the singleton-stack push/pop, dropping a `try`/`finally` block and an
-   *   `Array#includes` scan from the hot path.
+   *   `Array#includes` scan from the hot path. Scopes read the immutable root
+   *   registry directly without a parent walk, delegated singletons are mirrored
+   *   into the scope cache, and registration skips defensive cache invalidation.
+   *   Owned-instance identity de-duplication runs on the cold disposal path in
+   *   both modes.
    *
    * Trade-off when `strict: false`: a cycle introduced via an `as`-cast or a
    * dynamically built factory closure becomes a `RangeError: Maximum call
    * stack size exceeded` instead of the precise diagnostic. A lifetime
    * violation introduced the same way silently freezes a short-lived value
    * inside a singleton.
+   *
+   * Fast mode treats the graph as immutable once scopes or resolutions exist.
+   * Register each runtime key once through one linear fluent chain, finish every
+   * `register*` call before the first `.get()` / `.createScope()`, do not call
+   * `.override()` on an activated tree, and dispose children before their
+   * ancestors. Breaking this contract may leave a child using a stale locally
+   * cached singleton or make a post-activation registration invisible to
+   * descendants.
    *
    * The compile-time guard catches both classes of bug for any code that
    * passes through `tsc`, so the runtime guard is only material against
@@ -292,23 +305,6 @@ interface Registration<T extends DependenciesMap, K extends keyof T> {
 }
 
 /*
- * Snapshot of "where does this key live" cached on the resolving container.
- * Stored only after a successful walk-up (this.parent → ... → owner.regs.get(key) hit).
- * `treeVersion` snapshots a mutation counter shared by the whole container tree.
- * Any registration or disposal increments it, including a nearer ancestor that
- * starts shadowing the cached owner or detaches the path through disposal
- */
-interface LookupEntry<T extends DependenciesMap, K extends keyof T = keyof T> {
-  readonly owner: Container<T>
-  readonly reg: Registration<T, K>
-  readonly treeVersion: number
-}
-
-interface MutationEpoch {
-  value: number
-}
-
-/*
  * Projects the constructor parameter types onto the allowed DI-map keys.
  * Prevents passing a deps key whose value is not assignable to the corresponding argument.
  * Reads `T[K]['type']` because each entry of the map is a Spec<V, Kind>
@@ -383,37 +379,19 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   /** @internal */
   private readonly cache = new Map<keyof T, unknown>()
   /*
-   * Shared by the whole tree. A mutation anywhere invalidates parent-walk snapshots;
-   * registration and disposal are cold operations, so tree-wide invalidation avoids
-   * child tracking while keeping lookup validation to one integer comparison
-   */
-  /** @internal */
-  private readonly mutationEpoch: MutationEpoch
-  /*
-   * Memoizes the result of the parent-chain walk-up: key → { owner, reg, version }.
-   * Lazily allocated on first miss (a brand-new container that never resolves
-   * through a parent — typical for root or for build-only intermediates — pays
-   * zero allocation). Entries cover ONLY parent-chain hits; the local-regs hit
-   * is served by a direct `this.regs.get(key)` fast-path before consulting this
-   * map. Negative lookups (key not found anywhere) are not cached.
-   * Declared as `Map | undefined` (not `lookupCache?: Map`) to satisfy
-   * exactOptionalPropertyTypes when reset to undefined in dispose()
-   */
-  /** @internal */
-  private lookupCache: Map<keyof T, LookupEntry<T>> | undefined = undefined
-  /*
    * Teardown queue. Only instances created by THIS container land here
    * (not registerValue — external ownership; not transient — owned by the caller).
-   * Guards against double dispose when the same instance is registered under
-   * multiple keys (registerFactory('a', () => shared); registerFactory('b', () => shared)).
-   * Array preserves insertion order — on dispose we iterate in reverse for LIFO
+   * Resolution appends without an identity scan; teardown de-duplicates the
+   * snapshot once on the cold disposal path. Array preserves insertion order —
+   * on dispose we iterate in reverse for LIFO
    */
   /** @internal */
-  private readonly owned: unknown[] = []
+  private owned: unknown[] = []
   /*
    * resolving and singletonStack are shared across the whole tree — children inherit
-   * references from the parent. resolving catches cycles, singletonStack catches an
-   * attempt by a singleton to take a scoped dependency.
+   * references from the parent. In strict mode resolving catches cycles and
+   * singletonStack catches an attempt by a singleton to take a scoped dependency.
+   * Fast mode leaves both arrays untouched.
    * A separate `root` field is unnecessary: these two collections already span the chain.
    *
    * INVARIANT: get() MUST stay synchronous. resolving works as a precise projection of
@@ -433,16 +411,16 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   /** @internal */
   private disposePromise: Promise<void> | undefined = undefined
   /*
-   * parent is mutable: dispose nulls the reference so a disposed child does not hold
-   * the live root through the chain. Otherwise an externally-stored reference to a
-   * disposed scope would block GC of the root with all of its caches and factories.
+   * Strict children retain the exact parent chain. Fast children point directly to
+   * the immutable registry owner. dispose nulls the reference so a disposed child
+   * does not hold the live root with all of its caches and factories.
    * Declared as `T | undefined` (not `parent?: T`) to satisfy exactOptionalPropertyTypes
    * when assigning undefined in dispose()
    */
   /** @internal */
   private parent: Container<T> | undefined
   /*
-   * Opt-out toggle for the runtime cycle detection and lifetime guard.
+   * Opt-out toggle for runtime guards.
    * Stored per-container; inherited from `parent` when this is a scope child,
    * otherwise read from the ContainerOptions argument. A single readonly
    * boolean read on the hot path — predictable for V8's branch predictor
@@ -454,8 +432,8 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   /**
    * Creates a new container.
    *
-   * @param options - Optional construction options. Currently `strict?: boolean`
-   *                  toggles the runtime cycle / lifetime guard (default `true`).
+   * @param options - Optional construction options. `strict?: boolean` toggles
+   *                  runtime guards (default `true`).
    *
    * @example
    * ```ts
@@ -469,17 +447,22 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   public constructor(parent: Container<T>)
   public constructor(arg?: ContainerOptions | Container<T>) {
     if (arg instanceof Container) {
-      this.parent = arg
       this.strict = arg.strict
+      /*
+       * A fast tree is immutable after activation, so every reachable registration
+       * lives on the original registry owner. Flatten nested scopes to that owner:
+       * parent misses become one direct registry lookup. Strict trees retain the
+       * exact chain because local registration and override mutations must remain
+       * observable
+       */
+      this.parent = !this.strict && arg.parent !== undefined ? arg.parent : arg
       this.resolving = arg.resolving
       this.singletonStack = arg.singletonStack
-      this.mutationEpoch = arg.mutationEpoch
     } else {
       this.parent = undefined
       this.strict = arg?.strict ?? true
       this.resolving = []
       this.singletonStack = []
-      this.mutationEpoch = {value: 0}
     }
   }
 
@@ -678,17 +661,9 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
      * per registration is far cheaper than a PIC bucket miss on the hot path
      */
     this.regs.set(key as keyof T, {kind, lazy: false, fn, owned: true} as Registration<T, keyof T>)
-    this.cache.delete(key as unknown as keyof T)
-    this.mutationEpoch.value++
-    /*
-     * Local lookupCache holds (owner, reg) pairs found via walk-up — re-registering
-     * anything on this container can change which `reg` a previous walk-up should
-     * have returned (if the new key shadows a parent registration). Descendants
-     * that cached an entry pointing to this container are invalidated through the
-     * version bump above, so we only need to clear our own
-     */
-    if (this.lookupCache !== undefined) {
-      this.lookupCache.clear()
+
+    if (this.strict) {
+      this.cache.delete(key as unknown as keyof T)
     }
 
     /*
@@ -852,10 +827,9 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
         owned: true
       }
     )
-    this.cache.delete(key as unknown as keyof T)
-    this.mutationEpoch.value++
-    if (this.lookupCache !== undefined) {
-      this.lookupCache.clear()
+
+    if (this.strict) {
+      this.cache.delete(key as unknown as keyof T)
     }
 
     if (lazyKey !== undefined) {
@@ -924,10 +898,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       /* v8 ignore next */
       {kind: 'singleton', lazy: false, fn: () => value as unknown as T[keyof T]['type'], owned: false}
     )
-    this.mutationEpoch.value++
-    if (this.lookupCache !== undefined) {
-      this.lookupCache.clear()
-    }
+
     return this as unknown as Container<T & Record<K, Spec<V, 'singleton'>>>
   }
 
@@ -1049,10 +1020,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       /* v8 ignore next */
       {kind: existingKind, lazy: existingLazy, fn: () => value as unknown as T[keyof T]['type'], owned: false}
     )
-    this.mutationEpoch.value++
-    if (this.lookupCache !== undefined) {
-      this.lookupCache.clear()
-    }
+
     return this
   }
 
@@ -1112,9 +1080,10 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   }
 
   /**
-   * Resolves a registered service by key with full type safety. Walks up the
-   * scope chain to find the registration, then honours the registered lifetime
-   * (singleton / scoped / transient).
+   * Resolves a registered service by key with full type safety. Strict scopes
+   * walk the parent chain to find the registration; Fast Mode scopes read their
+   * immutable registry owner directly. The registered lifetime
+   * (singleton / scoped / transient) is honoured in both modes.
    *
    * @template K - One of the keys registered on this container or any ancestor.
    *               Restricted to `keyof T`, so unknown keys fail at compile time.
@@ -1134,7 +1103,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
      *    Single Map.get covers ≥99.9% of resolves. `UNDEFINED_MARKER` covers the
      *    rare deliberately-registered `undefined`. Note that `_disposed` is checked
      *    AFTER the cache lookup — dispose() clears `cache`, so a disposed container
-     *    falls through to the explicit check below; observable semantics unchanged
+     *    falls through to the precise diagnostic below
      */
     const cached = this.cache.get(key)
 
@@ -1147,9 +1116,41 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     }
 
     /*
+     * Fast scopes point directly at the immutable registry owner. Bypass the
+     * guaranteed-empty local registry and parent walk. Delegated singletons are
+     * mirrored into the scope cache after the first resolve, but remain owned and
+     * disposed exclusively by the registry owner
+     */
+    if (!this.strict && this.parent !== undefined) {
+      const owner = this.parent
+      const reg = owner.regs.get(key) as Registration<T, K> | undefined
+
+      if (reg === undefined) {
+        if (owner._disposed) {
+          throw new Error(`Ancestor container is disposed (key: "${String(key)}")`)
+        }
+
+        throw new Error(`Key "${String(key)}" not found`)
+      }
+
+      if (reg.kind === 'transient') {
+        return reg.fn(this)
+      }
+
+      const target = reg.kind === 'singleton' ? owner : this
+      const instance = this.resolveWithOwnerAndReg(target, reg, key)
+
+      if (reg.kind === 'singleton') {
+        this.cache.set(key, instance === undefined ? UNDEFINED_MARKER : instance)
+      }
+
+      return instance
+    }
+
+    /*
      * 2. Local fast-path: registration on THIS container.
      *    Most common case in flat (non-scope-tree) DI graphs and in scope-tree DI
-     *    for child-owned services. Skips lookupCache + entry deconstruction
+     *    for child-owned services. Skips the parent-chain walk
      */
     const localReg = this.regs.get(key) as Registration<T, K> | undefined
 
@@ -1174,6 +1175,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
           }
 
           this.resolving.push(key)
+
           try {
             return localReg.fn(this)
           } finally {
@@ -1188,70 +1190,56 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
         return localReg.fn(this)
       }
 
+      if (localReg.kind === 'scoped' && this.strict && this.parent === undefined) {
+        throw new Error(
+          `Scoped "${String(key)}" cannot be resolved from the root container. ` +
+          `Use createScope().`
+        )
+      }
+
       // Self-resolve: owner === this for every kind, so target === this
       return this.resolveWithOwnerAndReg(this, localReg, key)
     }
 
-    /*
-     * 3. Walk-up across the parent chain, with a per-container memoization of the
-     *    found (owner, reg) pair. The cache is invalidated lazily through the
-     *    tree-wide mutation epoch, so registrations and disposal anywhere in the
-     *    tree are observed on the next parent lookup
-     */
+    // 3. Strict-mode walk-up across the exact parent chain
     let owner: Container<T> | undefined
     let reg: Registration<T, K> | undefined
 
-    const cachedEntry = this.lookupCache?.get(key)
-    if (cachedEntry !== undefined && cachedEntry.treeVersion === this.mutationEpoch.value) {
-      owner = cachedEntry.owner
-      reg = cachedEntry.reg as Registration<T, K>
-    } else {
-      let cur: Container<T> | undefined = this.parent
+    let cur: Container<T> | undefined = this.parent
 
-      while (cur !== undefined) {
-        const r = cur.regs.get(key) as Registration<T, K> | undefined
+    while (cur !== undefined) {
+      const r = cur.regs.get(key) as Registration<T, K> | undefined
 
-        if (r !== undefined) {
-          owner = cur
-          reg = r
-          break
+      if (r !== undefined) {
+        owner = cur
+        reg = r
+        break
+      }
+
+      cur = cur.parent
+    }
+
+    /*
+     * Cold error path: nothing was found anywhere up the chain. Before throwing the
+     * generic "Key not found", surface a more actionable message if any ancestor was
+     * already disposed. dispose() runs `regs.clear()` + `cache.clear()`, so the lookup
+     * above silently slides past a disposed ancestor as if the key were missing — that
+     * hides a real bug ("you are reaching into a torn-down container") behind a
+     * misleading "Key not found". The extra walk is safe to do here because we are
+     * already on the error path; the hot path is untouched
+     */
+    if (reg === undefined) {
+      let ancestor: Container<T> | undefined = this.parent
+
+      while (ancestor !== undefined) {
+        if (ancestor._disposed) {
+          throw new Error(`Ancestor container is disposed (key: "${String(key)}")`)
         }
 
-        cur = cur.parent
+        ancestor = ancestor.parent
       }
 
-      /*
-       * Cold error path: nothing was found anywhere up the chain. Before throwing the
-       * generic "Key not found", surface a more actionable message if any ancestor was
-       * already disposed. dispose() runs `regs.clear()` + `cache.clear()`, so the lookup
-       * above silently slides past a disposed ancestor as if the key were missing — that
-       * hides a real bug ("you are reaching into a torn-down container") behind a
-       * misleading "Key not found". The extra walk is safe to do here because we are
-       * already on the error path; the hot path is untouched
-       */
-      if (reg === undefined) {
-        let ancestor: Container<T> | undefined = this.parent
-
-        while (ancestor !== undefined) {
-          if (ancestor._disposed) {
-            throw new Error(`Ancestor container is disposed (key: "${String(key)}")`)
-          }
-
-          ancestor = ancestor.parent
-        }
-
-        throw new Error(`Key "${String(key)}" not found`)
-      }
-
-      // Memoize the successful walk-up. Negative results are not cached
-      if (this.lookupCache === undefined) {
-        this.lookupCache = new Map()
-      }
-      this.lookupCache.set(key, {
-        owner: owner as Container<T>,
-        reg,
-        treeVersion: this.mutationEpoch.value
-      })
+      throw new Error(`Key "${String(key)}" not found`)
     }
 
     /*
@@ -1268,10 +1256,10 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
 
   /**
    * Type-guard predicate: returns `true` if `key` is registered on this
-   * container or any ancestor scope, `false` otherwise. Walks the parent
-   * chain exactly like {@link Container.get}, but does not consult
-   * `lookupCache` — `.has()` is a cold-path query, so the extra read is not
-   * worth populating a cache designed for hot resolves.
+   * container or any ancestor scope, `false` otherwise. Strict scopes walk the
+   * parent chain; Fast Mode scopes already point directly at their immutable
+   * registry owner. Like a strict `.get()` miss, strict `.has()` walks the exact
+   * parent chain.
    *
    * **Behaviour on a disposed container.** A disposed container clears `regs`
    * and nulls `parent`, so `.has()` returns `false` for every key after
@@ -1283,10 +1271,10 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * compiler narrows `'x'` to `keyof T`, so a subsequent `c.get('x')` type-
    * checks even when the static `T` did not statically include `'x'`.
    *
-   * Note that calling `.has(k)` immediately before `.get(k)` walks the
-   * parent chain twice. For statically-known keys (the common case), prefer
-   * a direct `.get()` — TypeScript already rejects unknown keys at compile
-   * time. The type-guard is intended for genuinely dynamic key construction.
+   * Note that calling `.has(k)` immediately before `.get(k)` repeats the
+   * registration lookup. For statically-known keys (the common case), prefer a
+   * direct `.get()` — TypeScript already rejects unknown keys at compile time.
+   * The type-guard is intended for genuinely dynamic key construction.
    *
    * @template K - Any string-or-symbol key. The guard narrows it to `keyof T`.
    *
@@ -1308,13 +1296,16 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     if (this.regs.has(key as unknown as keyof T)) {
       return true
     }
+
     let cur: Container<T> | undefined = this.parent
+
     while (cur !== undefined) {
       if (cur.regs.has(key as unknown as keyof T)) {
         return true
       }
       cur = cur.parent
     }
+
     return false
   }
 
@@ -1333,11 +1324,12 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     /*
      * Cache check on the owning container. For self-resolves the get() hot-path
      * already cleared `this.cache`, so this branch is reachable only when the
-     * singleton is delegated from a child scope (this !== target). Unconditional
-     * because it serves correctness (avoid re-running a singleton factory) — not
-     * a "guard" that strict-mode would gate
+     * singleton is delegated from a child scope (this !== target). `target !== this`
+     * already implies `reg.kind === 'singleton'` by the dispatch in get().
+     * Unconditional because it serves correctness (avoid re-running a singleton
+     * factory) — not a "guard" that strict-mode would gate
      */
-    if (target !== this && reg.kind !== 'transient') {
+    if (target !== this) {
       const cached = target.cache.get(key)
 
       if (cached !== undefined) {
@@ -1383,10 +1375,12 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
 
         if (reg.kind !== 'transient') {
           target.cache.set(key, instance === undefined ? UNDEFINED_MARKER : instance)
-          if (reg.owned && !target.owned.includes(instance)) {
+
+          if (reg.owned) {
             target.owned.push(instance)
           }
         }
+
         return instance
       } finally {
         this.resolving.pop()
@@ -1399,17 +1393,17 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
 
     /*
      * strict=false bare path: drop cycle bookkeeping, the singleton-stack
-     * push/pop, and the surrounding try/finally. A real cycle here loops the
-     * call stack until V8 throws RangeError
+     * push/pop, and the surrounding try/finally. Transients return directly
+     * from get(), so this path always caches a singleton or scoped instance.
+     * A real cycle here loops the call stack until V8 throws RangeError
      */
     const instance = reg.fn(target)
+    target.cache.set(key, instance === undefined ? UNDEFINED_MARKER : instance)
 
-    if (reg.kind !== 'transient') {
-      target.cache.set(key, instance === undefined ? UNDEFINED_MARKER : instance)
-      if (reg.owned && !target.owned.includes(instance)) {
-        target.owned.push(instance)
-      }
+    if (reg.owned) {
+      target.owned.push(instance)
     }
+
     return instance
   }
 
@@ -1422,6 +1416,38 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     return this._disposed
   }
 
+  /*
+   * Preserve exactly-once teardown and first-creation LIFO order without an O(n)
+   * identity scan on every owned-instance creation. Replace the live queue before
+   * compaction so re-entrant work observes an already-empty container-owned list
+   */
+  /** @internal */
+  private takeOwnedInstances(): readonly (DisposableLike | null | undefined)[] {
+    const instances = this.owned
+    this.owned = []
+
+    if (instances.length < 2) {
+      return instances as readonly (DisposableLike | null | undefined)[]
+    }
+
+    const seen = new Set<unknown>()
+    let write = 0
+
+    for (let read = 0; read < instances.length; read++) {
+      const instance = instances[read]
+
+      if (seen.has(instance)) {
+        continue
+      }
+
+      seen.add(instance)
+      instances[write++] = instance
+    }
+
+    instances.length = write
+    return instances as readonly (DisposableLike | null | undefined)[]
+  }
+
   /**
    * Async teardown. Walks created instances in reverse order (LIFO), trying
    * Symbol.asyncDispose → Symbol.dispose → plain .dispose().
@@ -1429,8 +1455,8 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * against the resolved instance; a rejection joins the same error stream.
    * Errors do not break the chain — they are collected and re-thrown as an
    * AggregateError at the end, so a single failing resource does not leave the
-   * rest unclosed. Concurrent calls share the same completion Promise; repeated
-   * calls after teardown are a no-op.
+   * rest unclosed. Concurrent calls while teardown is active share the same
+   * completion Promise; repeated calls after teardown are a no-op.
    */
   public dispose(): Promise<void> {
     if (this.disposePromise !== undefined) {
@@ -1442,10 +1468,9 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     }
 
     this._disposed = true
-    this.mutationEpoch.value++
 
     // Snapshot in LIFO order
-    const instances = this.owned.splice(0) as readonly (DisposableLike | null | undefined)[]
+    const instances = this.takeOwnedInstances()
 
     /*
      * Clear state BEFORE invoking disposers: re-entrancy safety (if a disposer tries
@@ -1455,16 +1480,14 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     this.cache.clear()
     this.regs.clear()
     /*
-     * Drop the lookupCache outright: a disposed container is unusable, and the Map
-     * would otherwise hold strong refs to ancestor containers through cached entries,
-     * blocking GC of the parent chain
-     */
-    this.lookupCache = undefined
-    /*
      * Detach the parent: otherwise an externally-held reference to a disposed scope
      * would keep the entire parent chain (root and all of its caches/factories) from GC
      */
     this.parent = undefined
+
+    if (instances.length === 0) {
+      return Promise.resolve()
+    }
 
     let resolveDisposal!: () => void
     let rejectDisposal!: (reason: unknown) => void
@@ -1491,8 +1514,8 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   private async disposeInstances(
     instances: readonly (DisposableLike | null | undefined)[]
   ): Promise<void> {
-    const errors: unknown[] = []
-    const disposedInstances = new Set<unknown>()
+    let errors: unknown[] | undefined
+    const disposedInstances = instances.length > 1 ? new Set<unknown>() : undefined
 
     for (let i = instances.length - 1; i >= 0; i--) {
       let inst = instances[i] as DisposableLike | PromiseLike<DisposableLike | null | undefined> | null | undefined
@@ -1521,8 +1544,10 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
          * resolve to the same resource. Deduplicate after unwrapping as well as
          * at enqueue time so a shared resource is closed exactly once
          */
-        if (disposedInstances.has(inst)) continue
-        disposedInstances.add(inst)
+        if (disposedInstances !== undefined) {
+          if (disposedInstances.has(inst)) continue
+          disposedInstances.add(inst)
+        }
 
         if (typeof (inst as DisposableLike)[Symbol.asyncDispose] === 'function') {
           await (inst as DisposableLike)[Symbol.asyncDispose]!()
@@ -1535,17 +1560,19 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
           }
         }
       } catch (err) {
-        errors.push(err)
+        (errors ??= []).push(err)
       }
+    }
+
+    if (errors === undefined) {
+      return
     }
 
     if (errors.length === 1) {
       throw errors[0]
     }
 
-    if (errors.length > 1) {
-      throw new AggregateError(errors, 'Container.dispose: multiple teardown errors')
-    }
+    throw new AggregateError(errors, 'Container.dispose: multiple teardown errors')
   }
 
   /**
@@ -1579,20 +1606,22 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     }
 
     this._disposed = true
-    this.mutationEpoch.value++
 
-    const instances = this.owned.splice(0) as readonly (DisposableLike | null | undefined)[]
+    const instances = this.takeOwnedInstances()
 
     this.cache.clear()
     this.regs.clear()
-    this.lookupCache = undefined
     /*
      * Detach the parent: otherwise an externally-held reference to a disposed scope
      * would keep the entire parent chain (root and all of its caches/factories) from GC
      */
     this.parent = undefined
 
-    const errors: unknown[] = []
+    if (instances.length === 0) {
+      return
+    }
+
+    let errors: unknown[] | undefined
 
     for (let i = instances.length - 1; i >= 0; i--) {
       const inst = instances[i]
@@ -1611,7 +1640,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
          * "silently fix the misuse", which hides the bug
          */
         if (typeof (inst as { then?: unknown }).then === 'function') {
-          errors.push(new Error(
+          (errors ??= []).push(new Error(
             `Sync [Symbol.dispose] called on a container that cached a Promise from an ` +
             `async factory. Use \`await using\` / container.dispose() for async teardown.`
           ))
@@ -1633,7 +1662,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
            * Promise, in case of polyfills and custom PromiseLike
            */
           if (r != null && typeof (r as { then?: unknown }).then === 'function') {
-            errors.push(new Error(
+            (errors ??= []).push(new Error(
               `Sync [Symbol.dispose] called on a resource whose .dispose() returned a Promise. ` +
               `Use \`await using\` / container.dispose() for async teardown.`
             ))
@@ -1641,17 +1670,19 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
           }
         }
       } catch (err) {
-        errors.push(err)
+        (errors ??= []).push(err)
       }
+    }
+
+    if (errors === undefined) {
+      return
     }
 
     if (errors.length === 1) {
       throw errors[0]
     }
 
-    if (errors.length > 1) {
-      throw new AggregateError(errors, 'Container[Symbol.dispose]: multiple teardown errors')
-    }
+    throw new AggregateError(errors, 'Container[Symbol.dispose]: multiple teardown errors')
   }
 
 }

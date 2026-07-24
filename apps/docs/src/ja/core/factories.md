@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ja/core/factories"
       "inLanguage": "ja-JP"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-21"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, ファクトリー, registerFactory, 非同期ファクトリー, 設定, サードパーティクライアント, 依存性注入"
@@ -150,4 +150,4 @@ await c.dispose()
 
 `.get()` は同期的なままです。登録が非同期である場合、呼び出し元は返された値を await します。
 
-循環ガードとライフタイムガードが追跡するのは、ファクトリーの同期コールスタックだけです。`await` の後も通常の型付きコードは `AllowedDeps` で保護されますが、`as` キャストやキャプチャした外部コンテナはランタイムガードのコンテキスト外になります。依存関係は最初の `await` より前の同期部分で読み取ってください。
+ランタイム循環ガードと `singletonStack` が追跡するのは、ファクトリーの同期コールスタックだけです。`await` の後は、transient の読み取りや、キャプチャした子スコープを通じた scoped の読み取りを検出できません。独立したルートスコープガードは strict モードで `root.get(scopedKey)` を引き続き拒否し、`AllowedDeps` は通常の型付きコードを保護します。依存関係は最初の `await` より前の同期部分で読み取ってください。

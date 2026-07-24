@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/core/lifetime-guards"
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-15"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, lifetimes, singleton, scoped, transient, lifetime guard, captive dependency, dependency injection"
@@ -61,8 +61,10 @@ InferDI has three lifetimes:
 | Kind | Created | Cached on | Disposed by container |
 | --- | --- | --- | --- |
 | `singleton` | once per owning container | owner container | yes |
-| `scoped` | once per scope | scope | yes |
+| `scoped` | once per child scope | child scope | yes |
 | `transient` | every resolve | never | no |
+
+With `strict: true`, resolving a `scoped` key from the root throws `Scoped "key" cannot be resolved from the root container. Use createScope().` Call `createScope()`, then resolve scoped services from its result.
 
 ## The Lifetime Rule
 
@@ -80,6 +82,7 @@ That registration is rejected by TypeScript. In strict mode, the same shape is r
 
 `strict: true` is the default. It catches:
 
+- direct resolution of a scoped key from the root container
 - singleton-to-scoped or singleton-to-transient violations introduced by casts
 - captured outer-container factory leaks
 - synchronous singleton cycles
@@ -98,6 +101,6 @@ Use `strict: false` only after tests prove the graph shape:
 const root = new Container({ strict: false })
 ```
 
-Fast mode removes runtime cycle and lifetime bookkeeping from the resolve path. It does not change the type-level contract, but it also cannot defend against dishonest casts, captured outer containers, or cycles.
+Fast mode removes runtime cycle and lifetime bookkeeping from the resolve path. Scopes read the immutable root registry directly instead of walking the parent chain, and delegated singletons are mirrored into the scope cache. Strict scopes walk their exact parent chain on every local miss, so mutations remain observable without retained lookup metadata. Owned-instance identity de-duplication runs during disposal in both modes. Fast mode does not change the type-level contract, but it cannot defend against dishonest casts, captured outer containers, or cycles. It also skips the root-scoped guard. Application code must resolve scoped keys from child scopes.
 
-Recommended workflow: develop and test in strict mode, then switch only performance-sensitive production graphs after an audit.
+Recommended workflow: develop and test in strict mode, register each runtime key once through one linear fluent chain, and complete registration before the first resolve or scope. Then switch only audited, immutable production graphs and dispose child scopes before their ancestors.

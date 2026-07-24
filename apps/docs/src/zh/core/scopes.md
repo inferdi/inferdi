@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/zh/core/scopes"
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, 作用域, 清理, 销毁, 子作用域, using, await using, LIFO, 依赖注入"
@@ -70,6 +70,8 @@ async function handle(request: Request) {
 ```
 
 `db` 是一个根单例。`request` 在每个作用域创建一次，并在作用域被释放时释放。
+
+`scoped` 注册属于子作用域。在默认的 `strict: true` 模式下，`root.get('request')` 会抛出 `Scoped "request" cannot be resolved from the root container. Use createScope().`。请从 `createScope()` 返回的容器解析该键。`strict: false` 会跳过这项运行时检查。
 
 ## 所有权
 

@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/reference/migration"
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, migration, breaking changes, upgrade, 5.0, major version, dependency injection"
@@ -60,7 +60,7 @@ InferDI records breaking changes by major version. The source of truth remains [
 
 ## Migration to 5.0
 
-v5 is an adapter release. The core package did not change. The version bump keeps all published packages in lockstep and aligns framework adapters around one cleanup contract.
+The initial v5 release was adapter-only. The version bump keeps all published packages in lockstep and aligns framework adapters around one cleanup contract. Later v5 builds also enforce child-scope ownership and tighten the Fast Mode contract described below.
 
 Adapter contracts now share these rules:
 
@@ -70,6 +70,23 @@ Adapter contracts now share these rules:
 - Cleanup failures during setup teardown go to `onDisposeError` or the adapter sink.
 - A failed request disposes its scope even after `skipInferdiDispose`, except for the documented Express limitation.
 - Cleanup hooks see the public scope slot while they run.
+
+### Scoped Resolution Requires a Child Scope
+
+With the default `strict: true`, resolving a scoped key from the root now throws `Scoped "key" cannot be resolved from the root container. Use createScope().` Create a child with `const scope = root.createScope()`, call `scope.get(scopedKey)`, and dispose the child at its lifecycle boundary. Fast Mode skips this runtime guard. Application code must resolve scoped keys from child scopes.
+
+### Fast Mode Immutable Graph Contract
+
+`new Container({ strict: false })` now reads the immutable root registry
+directly from scopes, avoids parent walks, and mirrors delegated singletons
+into the scope cache. Strict scopes walk their exact parent chain on every
+local miss instead of retaining parent-lookup snapshots, so mutations stay
+visible without invalidation bookkeeping or per-scope lookup metadata.
+Owned-instance identity de-duplication runs during disposal in both modes.
+Register each runtime key once through one linear fluent chain, complete
+registration before the first resolve or scope, keep the activated tree
+immutable, and dispose child scopes before their ancestors. Use `strict: true`
+for hot reload or any tree that changes after activation.
 
 ### Adapter Notes
 

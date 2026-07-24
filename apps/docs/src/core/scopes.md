@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/core/scopes"
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, scopes, teardown, disposal, child scope, using, await using, LIFO, dependency injection"
@@ -70,6 +70,8 @@ async function handle(request: Request) {
 ```
 
 `db` is a root singleton. `request` is created once per scope and disposed when the scope is disposed.
+
+`scoped` registrations belong to child scopes. With `strict: true` (the default), `root.get('request')` throws `Scoped "request" cannot be resolved from the root container. Use createScope().` Call `createScope()`, then resolve the key from its result. `strict: false` skips this runtime guard.
 
 ## Ownership
 

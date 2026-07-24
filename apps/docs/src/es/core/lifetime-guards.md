@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/es/core/lifetime-guards"
       "inLanguage": "es-ES"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, tiempos de vida, singleton, scoped, transient, guard de tiempo de vida, dependencia cautiva, inyección de dependencias"
@@ -61,8 +61,10 @@ InferDI tiene tres tiempos de vida:
 | Clase | Creado | Cacheado en | Liberado por el contenedor |
 | --- | --- | --- | --- |
 | `singleton` | una vez por contenedor propietario | contenedor propietario | sí |
-| `scoped` | una vez por scope | scope | sí |
+| `scoped` | una vez por scope hijo | scope hijo | sí |
 | `transient` | en cada resolución | nunca | no |
+
+Con `strict: true`, resolver una clave `scoped` desde la raíz lanza `Scoped "key" cannot be resolved from the root container. Use createScope().` Resuelve los servicios scoped desde un contenedor hijo devuelto por `createScope()`.
 
 ## La regla del tiempo de vida
 
@@ -80,6 +82,7 @@ Ese registro lo rechaza TypeScript. En modo estricto, la misma forma se rechaza 
 
 `strict: true` es el valor por defecto. Atrapa:
 
+- resolución directa de una clave scoped desde el contenedor raíz
 - violaciones de singleton a scoped o de singleton a transient introducidas por casts
 - fugas de factorías que capturan un contenedor externo
 - ciclos síncronos de singletons
@@ -98,6 +101,6 @@ Usa `strict: false` solo después de que las pruebas demuestren la forma del gra
 const root = new Container({ strict: false })
 ```
 
-El modo rápido elimina del camino de resolución la contabilidad de ciclos y tiempos de vida en runtime. No cambia el contrato a nivel de tipos, pero tampoco puede defenderse frente a casts deshonestos, contenedores externos capturados o ciclos.
+El modo rápido elimina del camino de resolución la contabilidad de ciclos y tiempos de vida en runtime. Los scopes leen directamente el registro raíz inmutable, sin recorrer la cadena de padres, y reflejan los singletons delegados en la caché del scope. Los scopes strict recorren su cadena exacta de padres en cada fallo local, por lo que las mutaciones siguen visibles sin conservar metadatos de búsqueda. La deduplicación por identidad de instancias owned se ejecuta durante el disposal en ambos modos. El modo rápido no cambia el contrato a nivel de tipos, pero tampoco puede defenderse frente a casts deshonestos, contenedores externos capturados o ciclos. También omite el guard de scoped en la raíz, por lo que el código de la aplicación no debe resolver claves scoped desde el contenedor raíz.
 
-Flujo de trabajo recomendado: desarrolla y prueba en modo estricto, y luego cambia únicamente los grafos de producción sensibles al rendimiento tras una auditoría.
+Flujo de trabajo recomendado: desarrolla y prueba en modo estricto, registra cada clave de runtime una sola vez mediante una cadena fluent lineal y completa el registro antes de la primera resolución o creación de scope. Cambia únicamente grafos de producción auditados e inmutables y elimina los scopes hijos antes que sus ancestros.

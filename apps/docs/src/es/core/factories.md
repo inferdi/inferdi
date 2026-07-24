@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/es/core/factories"
       "inLanguage": "es-ES"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-21"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, factorías, registerFactory, factoría asíncrona, configuración, clientes de terceros, inyección de dependencias"
@@ -150,4 +150,4 @@ await c.dispose()
 
 `.get()` se mantiene síncrono. Los llamantes esperan (await) el valor devuelto cuando el registro es asíncrono.
 
-Los guards de ciclos y tiempos de vida solo reflejan la pila síncrona de la factoría. Después de `await`, `AllowedDeps` sigue protegiendo el código tipado normal, pero un cast con `as` o un contenedor externo capturado queda fuera del contexto del guard en runtime. Lee las dependencias en el preámbulo síncrono de la factoría.
+El guard de ciclos en runtime y `singletonStack` solo reflejan la pila síncrona de la factoría. Después de `await`, no pueden detectar una lectura transient ni una lectura scoped mediante un scope hijo capturado. El guard separado del scope raíz sigue rechazando `root.get(scopedKey)` en modo estricto, y `AllowedDeps` protege el código tipado normal. Lee las dependencias en el preámbulo síncrono de la factoría.

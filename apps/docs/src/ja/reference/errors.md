@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ja/reference/errors"
       "inLanguage": "ja-JP"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, エラー, 例外, 未知のキー, 循環検出, ライフタイム違反, 破棄済みコンテナ, 依存性注入"
@@ -65,6 +65,7 @@ InferDI は、依存グラフやライフサイクルの誤用に対して明示
 | 破棄された祖先コンテナでの解決 | `Ancestor container is disposed (key: "k")` |
 | 破棄後の `createScope()` | `Cannot create scope from a disposed container` |
 | 破棄後の登録 | `Cannot register on a disposed container (key: "k")` |
+| strict モードでルートから scoped キーを解決 | `Scoped "k" cannot be resolved from the root container. Use createScope().` |
 | シングルトンのライフタイム違反 | `Singleton "x" cannot depend on scoped "y"...` |
 | 同期的な循環 | `Circular dependency detected: a -> b -> a...` |
 | 非同期リソースに対する同期破棄 | `Sync [Symbol.dispose] called on a resource whose .dispose() returned a Promise...` |

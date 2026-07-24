@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/zh/core/factories"
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-21"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, 工厂, registerFactory, 异步工厂, 配置, 第三方客户端, 依赖注入"
@@ -150,4 +150,4 @@ await c.dispose()
 
 `.get()` 始终保持同步。当注册是异步的时候，调用方对返回的值进行 await。
 
-循环与生命周期守卫只跟踪工厂的同步调用栈。`await` 之后，`AllowedDeps` 仍会保护普通的类型化代码，但通过 `as` 强制转换或捕获的外部容器会处于运行时守卫上下文之外。请在第一次 `await` 之前的同步阶段读取依赖项。
+运行时循环守卫和 `singletonStack` 只跟踪工厂的同步调用栈。`await` 之后，它们无法检测 transient 读取，也无法检测通过捕获的子作用域进行的 scoped 读取。独立的根作用域守卫在严格模式下仍会拒绝 `root.get(scopedKey)`，而 `AllowedDeps` 会保护普通的类型化代码。请在第一次 `await` 之前的同步阶段读取依赖项。

@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/es/reference/migration"
       "inLanguage": "es-ES"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, migración, cambios incompatibles, actualización, 5.0, versión major, inyección de dependencias"
@@ -60,7 +60,7 @@ InferDI registra los cambios incompatibles por versión major. La fuente de verd
 
 ## Migración a 5.0
 
-v5 es una release de adaptadores. El paquete core no cambió. El incremento de versión mantiene todos los paquetes publicados en lockstep y alinea los adaptadores de frameworks alrededor de un único contrato de limpieza.
+La release inicial de v5 solo afectó a los adaptadores. El incremento de versión mantiene todos los paquetes publicados en lockstep y alinea los adaptadores de frameworks alrededor de un único contrato de limpieza. Las builds posteriores de v5 también aplican la propiedad del scope hijo y endurecen el contrato de modo rápido descrito a continuación.
 
 Los contratos de los adaptadores ahora comparten estas reglas:
 
@@ -70,6 +70,25 @@ Los contratos de los adaptadores ahora comparten estas reglas:
 - Los fallos de limpieza durante la liberación del setup van a `onDisposeError` o al sink del adaptador.
 - Una petición fallida libera su scope incluso después de `skipInferdiDispose`, salvo por la limitación documentada de Express.
 - Los hooks de limpieza ven el slot público del scope mientras se ejecutan.
+
+### La resolución scoped requiere un scope hijo
+
+Con el valor predeterminado `strict: true`, resolver una clave scoped desde la raíz ahora lanza `Scoped "key" cannot be resolved from the root container. Use createScope().` Crea un contenedor hijo con `const scope = root.createScope()`, llama a `scope.get(scopedKey)` y libera el hijo en su límite de ciclo de vida. El modo rápido omite este guard en runtime, pero los servicios scoped deben seguir resolviéndose desde scopes hijos.
+
+### Contrato de grafo inmutable del modo rápido
+
+`new Container({ strict: false })` ahora lee el registro raíz inmutable
+directamente desde los scopes, evita recorrer los padres y refleja los
+singletons delegados en la caché del scope. Los scopes strict recorren su cadena
+exacta de padres en cada fallo local en lugar de conservar instantáneas de
+búsqueda, por lo que las mutaciones siguen visibles sin contabilidad de
+invalidación ni metadatos por scope. La deduplicación por identidad de
+instancias owned se ejecuta durante el disposal en ambos modos. Registra cada
+clave de runtime una sola vez mediante una cadena fluent lineal, completa el
+registro antes de la primera resolución o creación de scope, mantén inmutable
+el árbol activado y elimina los scopes hijos antes que sus ancestros. Usa
+`strict: true` para hot reload o cualquier árbol que cambie después de
+activarse.
 
 ### Notas de los adaptadores
 

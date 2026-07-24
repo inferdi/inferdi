@@ -105,17 +105,19 @@ Do not add work before that lookup.
 
 - Explicit `undefined` values are represented with `UNDEFINED_MARKER`; do not
   reintroduce a second `cache.has(key)` lookup on the cache-hit path.
-- `_disposed`, local registration lookup, parent lookup, `lookupCache`, cycle
-  checks, lifetime checks, and singleton-stack mutation all live after the cache
-  fast path.
-- Local registrations must be checked before parent-chain lookup. `lookupCache`
-  is a cold-path memo for parent hits only.
+- `_disposed`, registration lookup, parent lookup, cycle checks, lifetime
+  checks, and singleton-stack mutation all live after the cache fast path.
+- Strict trees check local registrations before walking the exact parent chain.
+  They do not retain parent-lookup snapshots, so mutations remain observable
+  without invalidation bookkeeping or per-scope lookup metadata.
 - Constructor invocation stays arity-unrolled for 0-7 args. The 8+ path uses
   `Reflect.construct` with a packed array built by `push`.
 - `get()` stays synchronous. The shared `resolving` array and `singletonStack`
   work only because one resolve runs atomically on the call stack.
-- `strict: false` may remove runtime cycle and lifetime checks after the cache
-  fast path. It must not change observable cache-hit semantics.
+- `strict: false` may remove runtime cycle and lifetime checks after the local
+  cache fast path. Fast scopes may read the immutable root registry directly
+  and mirror delegated singletons into their local cache. A fast tree is
+  immutable after its first resolve or scope.
 
 `packages/inferdi/__tests__/container.bench.ts` is not CI-enforced. Reviewers
 must demand benchmark output for changes to `get()`, registration object shape,
@@ -154,10 +156,10 @@ Any change matching an item below needs explicit PR justification.
 ### Hot Path And Runtime Shape
 
 - [ ] Work added before `cache.get(key)` in `get()`?
-- [ ] `UNDEFINED_MARKER`, `cache`, `regs`, `lookupCache`, or `Registration`
+- [ ] `UNDEFINED_MARKER`, `cache`, `regs`, parent lookup, or `Registration`
       shape changed?
 - [ ] `Registration` property order changed from `{kind, lazy, fn, owned}`?
-- [ ] Local-registry lookup moved after parent lookup?
+- [ ] Strict local-registry lookup moved after parent lookup?
 - [ ] `Proxy`, `Reflect.get`, `Object.defineProperty`, or metadata lookup added
       to resolve?
 - [ ] `get()` converted to `async`?
@@ -184,7 +186,8 @@ Any change matching an item below needs explicit PR justification.
 - [ ] `dispose()` or `[Symbol.dispose]()` stops setting `_disposed` before
       invoking disposers?
 - [ ] State clearing moved after disposer invocation?
-- [ ] Parent detachment or `lookupCache` clearing removed?
+- [ ] Parent detachment removed?
+- [ ] Owned-instance de-duplication no longer preserves first-creation LIFO order?
 - [ ] LIFO disposal order changed?
 - [ ] Disposer probe order changed from `Symbol.asyncDispose` to
       `Symbol.dispose` to `.dispose()`?

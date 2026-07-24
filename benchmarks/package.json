@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "inversify": "^8.2.1",
+    "inversify": "^8.2.3",
     "awilix": "^13.0.5",
     "tsyringe": "^4.10.0",
     "typedi": "^0.10.0",

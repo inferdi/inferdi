@@ -555,6 +555,16 @@ async function handle(request: Request) {
 await root[Symbol.asyncDispose]()           // or: await root.dispose()
 ```
 
+`createScope()` returns a child that owns scoped values. With the default
+`strict: true`, resolving one from the root throws:
+
+```
+Error: Scoped "reqCtx" cannot be resolved from the root container. Use createScope().
+```
+
+Call `scope.get('reqCtx')`, as in the example above. `strict: false` skips this
+runtime guard together with the cycle and lifetime guards.
+
 The container probes each owned instance in order: `Symbol.asyncDispose` → `Symbol.dispose` → plain `.dispose()`. If multiple disposers throw, all errors are collected into a single `AggregateError` so one failing resource never leaves the rest unclosed.
 
 > **What gets disposed by which container.** Each container disposes only the instances it created. `root.dispose()` does **not** propagate into already-created child scopes — give scopes their own `await using` (or `dispose()` call) to release their resources. Forgetting to dispose a scope leaks every singleton/scoped instance it created.
@@ -591,15 +601,19 @@ await c.dispose() // unwraps the cached Promise and closes the pool
 
 > ⚠️ **Cycles between async factories are not detected and produce a silent Promise deadlock.** The runtime cycle detector projects the *synchronous* call stack only — the `resolving` set is cleared by the time an `async` factory's `await` continuation runs. If two async factories depend on each other (`a` awaits `c.get('b')`, `b` awaits `c.get('a')`), each one's pending Promise gets cached during the synchronous prelude, and the resumed continuations find that cached Promise on every reentry. `await c.get('a')` then hangs forever with no error, no rejection, no diagnostic. Fixing this in the runtime would require an async-aware cycle tracker on the resolve fast-path, which is incompatible with the 1-`Map.get()` hot-path contract — so the recommendation is architectural: keep one side synchronous (split the cycle, hoist the shared init), or break it with a `Lazy<singleton>` companion if both sides are singletons. If you suspect a cycle in async code, wrap the top-level `await c.get(...)` with a watchdog timeout during development.
 
-> The same synchronous boundary applies to the strict runtime lifetime guard. `AllowedDeps` still rejects scoped/transient reads in a typed singleton factory, but an `as`-cast or captured outer container used after `await` is outside the runtime `singletonStack`. Keep dependency reads in the synchronous factory prelude; code that deliberately bypasses the type system after an async boundary is not runtime-guarded.
+> The same synchronous boundary applies to `singletonStack`. After `await`, it cannot detect a transient read or a scoped read through a captured child scope. The separate root-scope guard still rejects `root.get(scopedKey)` in strict mode. `AllowedDeps` protects normal typed code in both cases. Keep dependency reads in the synchronous factory prelude.
 
 ## Strict Lifetime Guards
 
 | Kind        | Created                                         | Cached on                | Disposed by container |
 | ----------- | ----------------------------------------------- | ------------------------ | --------------------- |
 | `singleton` | once per container that owns the registration | the owner container      | yes |
-| `scoped`    | once per scope                                  | the scope                | yes |
+| `scoped`    | once per child scope                            | the child scope          | yes |
 | `transient` | every time requested                            | never                    | no (caller owns it)   |
+
+With `strict: true`, `root.get(scopedKey)` throws because the root does not
+represent a scope. Resolve the key from a child returned by `createScope()`.
+Fast mode skips this runtime check.
 
 **The Lifetime Rule:** A singleton cannot directly depend on a scoped or transient service. That would freeze a short-lived value inside a long-lived cache. `InferDI` enforces this **at compile time**:
 
@@ -646,10 +660,15 @@ const root = new Container({ strict: false })
 In `strict: false` mode `get()` drops the cycle bookkeeping (`resolving`
 push/pop + `Array#includes`), the singleton-stack push/pop, and the
 surrounding `try`/`finally` from the resolve path. Local transient resolves
-collapse to a bare `fn(this)` call — measured ~30% faster on a flat
-transient graph; cached singleton/scoped resolves are unaffected because
-the cache fast-path runs upstream of any guard. The flag is inherited by
-every child created via `createScope()`.
+collapse to a bare `fn(this)` call. Fast scopes read the immutable root
+registry directly instead of walking the parent chain; a delegated singleton
+is mirrored into the scope cache after its first resolve. Strict scopes walk
+their exact parent chain on each local miss, so tree mutations remain visible
+without retaining per-scope lookup metadata. Registration skips defensive
+cache invalidation in Fast Mode. Owned-instance identity de-duplication runs
+once on the cold disposal path in both modes instead of scanning the queue
+during instance creation. The flag is inherited by every child created via
+`createScope()`.
 
 **`strict: true` is a floor under two independent problem classes — not
 just "type-substitution defense".** The compile-time guard covers a strict
@@ -657,6 +676,7 @@ subset of what the runtime guard catches:
 
 | Problem | Compile-time | Runtime (`strict: true`) |
 |---|---|---|
+| Root container resolves a scoped key | ✗ | ✓ |
 | Singleton depends on scoped/transient directly via `deps` or the narrowed `c` parameter | ✓ | ✓ |
 | Singleton depends on scoped/transient via a **captured outer container reference** inside a factory body | ✗ | ✓ |
 | Singleton ↔ Singleton cycle | ✗ | ✓ |
@@ -680,11 +700,12 @@ const root = new Container().registerClass('req', ReqCtx, [], 'scoped')
 root.registerFactory('logger', () => {
   // `root` here is the wide Container<T>, NOT the narrowed AllowedDeps view.
   // TypeScript happily compiles this:
-  return new Logger(root.get('req'))   // 💀 leaks scoped into singleton
+  return new Logger(root.get('req'))   // strict mode throws before construction
 }, 'singleton')
 ```
 
-`strict: true` catches this at runtime; `strict: false` does not.
+`strict: true` stops this at `root.get('req')` with the root-scope diagnostic.
+`strict: false` allows the read and may retain request state on the root.
 
 **Use `strict: false` only when you're certain that:**
 
@@ -694,12 +715,22 @@ root.registerFactory('logger', () => {
 - All registrations go through the fluent API without `as`-casts to bypass
   `AllowedDeps`.
 - Any `Module<TIn, TOut>` declarations honestly describe their input shape.
+- Each runtime key is registered once through one linear fluent chain; older
+  pre-widening container aliases are not reused for duplicate registration.
+- Every `register*` call finishes before the first `.get()` or `.createScope()`.
+- The activated tree is immutable: do not call `register*` or `.override()`
+  while scopes are live.
+- Child scopes are disposed before their ancestors.
+
+Fast mode deliberately trusts those lifecycle rules. Breaking them can leave a
+child using a stale locally cached singleton or make a post-activation
+registration invisible to descendants.
 
 **Recommended workflow.** Develop and test in `strict: true` (the default).
 Your runtime tests transitively prove the graph is cycle-free and that no
 factory leaks short-lived state through a captured closure. Only after that
-audit, switch to `strict: false` for production builds where the ~30%
-transient-path speed-up matters.
+audit, freeze the graph, and switch to `strict: false` for performance-sensitive
+production builds.
 
 ## Lazy Injection
 
@@ -882,7 +913,7 @@ c.get('userRepo').save(/* ... */)         // uses the mocks
 **Strict guarantees:**
 
 - 🛡️ **Type-safe.** `value` must satisfy the originally registered type (`T[K]`). Mocks have to structurally implement the production interface — no `as any` escape hatch.
-- ⛔ **Local-cache guard.** `.override()` throws if the key already has a value in this container's local cache. This catches locally resolved singleton/scoped registrations, `registerValue`, and repeated overrides. Transient resolutions and ancestor-owned values resolved through a child are not cached locally, so the guard cannot observe them. Always override **before** resolving the dependency graph; otherwise existing consumers can retain the original value while later resolves see the mock.
+- ⛔ **Local-cache guard.** `.override()` throws if the key already has a value in this container's local cache. This catches locally resolved singleton/scoped registrations, `registerValue`, and repeated overrides. In strict mode, transient resolutions and ancestor-owned values resolved through a child are not cached locally, so the guard cannot observe them. Fast scopes may mirror delegated singletons locally and do not support mutation after activation. Always override **before** resolving the dependency graph; otherwise existing consumers can retain the original value while later resolves see the mock.
 - 💥 **Disposed-container guard.** Throws on a disposed container.
 - 🧹 **Externally owned.** Like `registerValue`, the override value is **not** added to the container's disposal queue. The test suite owns the mock's lifetime.
 - 🔒 **Scope-local.** `.override()` mutates only the container it was called on. `root.createScope().override('db', mock)` leaves `root` untouched and is invisible to sibling scopes; a parent-level override propagates via the standard parent walk-up.
@@ -946,6 +977,7 @@ The container throws structured errors with actionable messages — surface thes
 | Trigger | Message |
 |---|---|
 | `.get(k)` on unregistered key | `Key "k" not found` |
+| Root resolves a scoped key in strict mode | `Scoped "k" cannot be resolved from the root container. Use createScope().` |
 | Singleton depends on scoped/transient | `Singleton "x" cannot depend on scoped "y". Use Lazy<T> ...` |
 | Resolution loop (synchronous) | `Circular dependency detected: a -> b -> a. Consider breaking the cycle with Lazy<T> ...` |
 | Resolution loop (between async factories) | _Not detected._ Produces a silent Promise deadlock — see the warning under [Async Factories](#async-factories). |
@@ -1041,6 +1073,7 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 
   // Scopes & resolution
   createScope(): Container<T>
+  // In strict mode, scoped keys must be resolved from a child scope.
   get<K extends keyof T>(key: K): T[K]['type']
   // Type-guard: narrows the key to keyof T inside the truthy branch.
   // Returns false on a disposed container (regs is empty).

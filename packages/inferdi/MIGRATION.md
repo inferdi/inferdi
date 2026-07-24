@@ -37,6 +37,51 @@ declared graph to differ from runtime behavior:
   a zero-argument `.get()` method now remains that service type instead of being
   structurally mistaken for `Lazy<T>`.
 
+### Scoped resolution requires a child scope
+
+With the default `strict: true`, resolving a `scoped` key from the root now
+throws `Scoped "key" cannot be resolved from the root container. Use
+createScope().` Replace a direct root read with a child scope:
+
+```ts
+// Before
+const request = root.get('request')
+
+// After
+const scope = root.createScope()
+const request = scope.get('request')
+```
+
+Dispose the child at the matching application or request lifecycle boundary.
+Fast Mode skips this runtime guard, but application code must still keep scoped
+resolution on child scopes.
+
+### Fast Mode immutable graph contract
+
+`new Container({ strict: false })` now resolves scope misses directly against
+the immutable root registry instead of walking the parent chain. Delegated
+singletons are mirrored into the scope cache after their first resolve, and
+registration-time defensive cache invalidation is removed together with the
+cycle and lifetime guards. Strict scopes now walk their exact parent chain on
+every local miss instead of retaining parent-lookup snapshots. This removes
+invalidation bookkeeping and per-scope lookup metadata while keeping
+post-resolve tree mutations immediately visible. Owned-instance identity
+de-duplication now runs during disposal in both modes, preserving exactly-once
+teardown without the linear scan on every owned instance creation.
+
+If you use Fast Mode:
+
+- Register each runtime key once through one linear fluent chain; do not reuse
+  older pre-widening container aliases for duplicate registration.
+- Complete all `register*` calls before the first `.get()` or `.createScope()`.
+- Do not call `register*` or `.override()` after the tree is activated.
+- Dispose child scopes before their ancestors.
+- Use the default `strict: true` for hot reload, mutable test fixtures, or any
+  container tree that changes after activation.
+
+Breaking this contract can leave a child using a stale locally cached
+singleton or make a post-activation registration invisible to descendants.
+
 Three contracts are now identical across the adapters:
 
 - **Setup-failure errors.** When `setupScope` fails, only the original setup
@@ -51,7 +96,8 @@ Three contracts are now identical across the adapters:
   `onDisposeError` observe the scope under the framework-native slot (`request.di`,
   `ctx.state[key]`, `c.var[key]`, Elysia context key) during cleanup.
 
-If you use only the core container, no changes are required. Adapter changes:
+Core-only applications need changes only if they resolve scoped keys from the
+root or mutate an activated Fast Mode tree. Adapter changes:
 
 ### `@inferdi/fastify`
 

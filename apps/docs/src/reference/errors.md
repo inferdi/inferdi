@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/reference/errors"
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, errors, exceptions, unknown key, cycle detected, lifetime violation, disposed container, dependency injection"
@@ -65,6 +65,7 @@ InferDI throws explicit errors for graph and lifecycle misuse. Keep these messag
 | Disposed ancestor resolve | `Ancestor container is disposed (key: "k")` |
 | `createScope()` after dispose | `Cannot create scope from a disposed container` |
 | Registration after dispose | `Cannot register on a disposed container (key: "k")` |
+| Root resolves a scoped key in strict mode | `Scoped "k" cannot be resolved from the root container. Use createScope().` |
 | Singleton lifetime violation | `Singleton "x" cannot depend on scoped "y"...` |
 | Synchronous cycle | `Circular dependency detected: a -> b -> a...` |
 | Sync dispose over async resource | `Sync [Symbol.dispose] called on a resource whose .dispose() returned a Promise...` |

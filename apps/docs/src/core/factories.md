@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/core/factories"
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-21"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, factories, registerFactory, async factory, configuration, third-party clients, dependency injection"
@@ -150,4 +150,4 @@ await c.dispose()
 
 `.get()` stays synchronous. Callers await the returned value when the registration is async.
 
-The runtime cycle and lifetime guards project only the synchronous factory call stack. After `await`, `AllowedDeps` still protects normal typed code, but an `as`-cast or captured outer container is outside runtime guard context. Keep dependency reads in the synchronous factory prelude.
+The runtime cycle guard and `singletonStack` project only the synchronous factory call stack. After `await`, they cannot detect a transient read or a scoped read through a captured child scope. The separate root-scope guard still rejects `root.get(scopedKey)` in strict mode, and `AllowedDeps` protects normal typed code. Keep dependency reads in the synchronous factory prelude.

@@ -64,7 +64,7 @@ A warm resolve reads `Map.get(key)` and calls `new Ctor(...)` directly when cons
 | Cached singleton and scoped services | A warm resolve reads from `cache.get(key)` before cycle and lifetime bookkeeping runs. The `cache.has(key)` fallback exists only for explicit `undefined` values. |
 | Direct constructor calls | Classes with 0-7 dependencies use a direct `new Ctor(...)` path. Larger constructors fall back to `Reflect.construct`. |
 | Async factories | The factory's `Promise` is cached verbatim, so concurrent callers share one in-flight initialization while `.get()` stays synchronous. |
-| Strict mode boundary | `strict: true` catches cycles and lifetime leaks. `strict: false` removes that bookkeeping for audited hot transient graphs. |
+| Strict mode boundary | `strict: true` catches cycles and lifetime leaks and walks the exact parent chain so tree mutations remain immediately visible. `strict: false` trusts an audited, immutable production graph. |
 
 ![Benchmark results](/benchmarking_results.png)
 
@@ -95,11 +95,11 @@ All numbers are operations per second on Node 22. Higher is better.
 
 ## Fast Mode
 
-`new Container({ strict: false })` removes runtime cycle bookkeeping, singleton-stack tracking, and the `try`/`finally` around the guarded resolve path. The package README reports about 30% faster local transient resolves on a flat transient graph. Cached singleton and scoped resolves do not change, because they return before those guards run.
+`new Container({ strict: false })` removes runtime cycle bookkeeping, singleton-stack tracking, and the `try`/`finally` around the guarded resolve path. Fast scopes read the immutable root registry directly instead of walking the parent chain, then mirror delegated singletons into the scope cache. Strict scopes walk their exact parent chain on every local miss, keeping mutations observable without per-scope lookup metadata or invalidation bookkeeping. Registration skips defensive invalidation in Fast Mode. Owned-instance identity de-duplication runs once during disposal in both modes rather than scanning the queue during creation.
 
-Use fast mode only after tests have exercised the graph in default strict mode. TypeScript cannot see singleton cycles, transient cycles, dynamic keys, `as`-casts, or factories that close over a wider outer container.
+Use fast mode only after tests have exercised the graph in default strict mode. TypeScript cannot see singleton cycles, transient cycles, dynamic keys, `as`-casts, or factories that close over a wider outer container. Register each runtime key once through one linear fluent chain, complete registration before the first resolve or scope, keep the activated tree immutable, and dispose child scopes before their ancestors.
 
-For a profiled, transient-heavy production path, `{ strict: false }` is the fastest supported configuration after that verification. Keep strict mode for development and test runs. It does not improve cached singleton or scoped resolves.
+For a profiled production path, `{ strict: false }` is the fastest supported configuration after that verification. Keep strict mode for development, tests, hot reload, and any tree that is mutated after activation.
 
 ## Small Hot-Path Details
 

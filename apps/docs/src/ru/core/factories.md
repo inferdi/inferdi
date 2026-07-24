@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ru/core/factories"
       "inLanguage": "ru-RU"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-21"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, фабрики, registerFactory, асинхронная фабрика, конфигурация, сторонние клиенты, внедрение зависимостей"
@@ -150,4 +150,4 @@ await c.dispose()
 
 `.get()` остаётся синхронным. Вызывающий код делает `await` в месте использования, если регистрация асинхронная.
 
-Runtime-проверки циклов и времени жизни отражают только синхронный стек вызова фабрики. После `await` обычный типизированный код по-прежнему защищён `AllowedDeps`, но `as`-cast или захваченный внешний контейнер уже находятся вне контекста runtime-проверки. Читайте зависимости в синхронной части фабрики до первого `await`.
+Runtime-проверка циклов и `singletonStack` отражают только синхронный стек вызова фабрики. После `await` они не обнаружат transient-зависимость или scoped-зависимость, полученную через захваченный дочерний scope. Отдельный root-scope guard по-прежнему отклоняет `root.get(scopedKey)` в strict mode, а `AllowedDeps` защищает обычный типизированный код. Читайте зависимости в синхронной части фабрики до первого `await`.

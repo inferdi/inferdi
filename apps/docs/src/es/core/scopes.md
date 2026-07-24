@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/es/core/scopes"
       "inLanguage": "es-ES"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
+      "dateModified": "2026-07-31"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, scopes, limpieza, disposal, scope hijo, using, await using, LIFO, inyección de dependencias"
@@ -70,6 +70,8 @@ async function handle(request: Request) {
 ```
 
 `db` es un singleton de raíz. `request` se crea una vez por scope y se libera cuando el scope se libera.
+
+Los registros `scoped` pertenecen a scopes hijos. Con `strict: true` (el valor predeterminado), `root.get('request')` lanza `Scoped "request" cannot be resolved from the root container. Use createScope().` Resuelve la clave desde el contenedor que devuelve `createScope()`. `strict: false` omite esta comprobación en tiempo de ejecución.
 
 ## Propiedad
 
