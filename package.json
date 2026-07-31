@@ -28,6 +28,7 @@
       "esbuild": "0.28.1",
       "body-parser": "2.3.0",
       "find-my-way": "9.7.0",
+      "postcss": "8.5.18",
       "fast-uri": "3.1.4"
     }
   }
