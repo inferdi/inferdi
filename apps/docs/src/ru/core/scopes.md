@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ru/core/scopes"
       "inLanguage": "ru-RU"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-31"
+      "dateModified": "2026-08-09"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, скоупы, очистка, освобождение ресурсов, дочерний scope, using, await using, LIFO, внедрение зависимостей"
@@ -72,6 +72,60 @@ async function handle(request: Request) {
 `db` является корневым singleton. `request` создаётся один раз на scope и освобождается при dispose этого scope.
 
 `scoped`-регистрации принадлежат дочерним scope. При `strict: true` (по умолчанию) вызов `root.get('request')` выбрасывает `Scoped "request" cannot be resolved from the root container. Use createScope().` Получайте ключ из контейнера, который вернул `createScope()`. Режим `strict: false` отключает эту runtime-проверку.
+
+## Scope inputs и профили
+
+Scope inputs описывают внешние значения, которые появляются при создании scope: request, auth context, tenant или данные job. `declareScopeInputs()` добавляет эти ключи только в типовой граф и не создаёт runtime-регистраций:
+
+```ts
+const root = new Container()
+  .declareScopeInputs<{
+    request: RequestContext
+    auth: AuthContext
+  }>()
+  .registerClass('publicService', PublicService, ['request'], 'scoped')
+  .registerClass('accountService', AccountService, ['request', 'auth'], 'scoped')
+```
+
+Declaration map принимает обязательные конечные string- и symbol-ключи. Optional- и numeric-ключи, `__proto__`, широкие string/symbol index signatures и union-варианты с разными наборами ключей не компилируются. Объявлять inputs можно на root и на существующем child, но само объявление не предоставляет значение.
+
+`createScope(inputs)` принимает любое подмножество недостающих inputs. InferDI переносит требования через class-регистрации, lazy companions и factories с явным tuple зависимостей:
+
+```ts
+const publicScope = root.createScope({request})
+publicScope.get('publicService')
+
+// @ts-expect-error: auth ещё не предоставлен
+publicScope.get('accountService')
+
+const authenticatedScope = publicScope.createScope({auth})
+authenticatedScope.get('accountService')
+
+root.registerFactory(
+  'userId',
+  ['auth'],
+  (c) => c.get('auth').userId,
+  'scoped'
+)
+```
+
+Tuple factory влияет только на типы. Callback получает resolver с `.get()` для перечисленных ключей и `.has()` для проверок. В runtime InferDI вызывает `factory(container)`.
+
+Именованные профили остаются обычными функциями:
+
+```ts
+const publicScope = (request: RequestContext) =>
+  root.createScope({request})
+
+const authenticatedScope = (
+  request: RequestContext,
+  auth: AuthContext
+) => root.createScope({request, auth})
+```
+
+Child делает shallow snapshot собственных enumerable string- и symbol-свойств record. Вложенные children наследуют input values, но создают отдельные scoped-инстансы. Input values принадлежат приложению. При уточнении через новый child сначала освобождайте уточнённый child, затем parent.
+
+Runtime не хранит input schema. JavaScript, `any` или cast могут добавить неизвестный ключ либо затенить регистрацию в cache child. Передавайте пассивный record: object spread вызывает getters и Proxy traps, а реентрантные мутации из них не входят в контракт. В Strict Mode регистрация на partial child видна его refined child. Fast Mode поддерживает уточнение inputs, но сохраняет правило неизменяемого графа: завершите регистрации до первого `.get()` или `.createScope()`.
 
 ## Владение
 

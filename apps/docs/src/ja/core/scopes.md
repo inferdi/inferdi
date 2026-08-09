@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ja/core/scopes"
       "inLanguage": "ja-JP"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-31"
+      "dateModified": "2026-08-09"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, スコープ, クリーンアップ, 破棄, 子スコープ, using, await using, LIFO, 依存性注入"
@@ -72,6 +72,60 @@ async function handle(request: Request) {
 `db` はルートのシングルトンです。`request` はスコープごとに 1 回生成され、スコープが破棄されるときに破棄されます。
 
 `scoped` 登録は子スコープに属します。デフォルトの `strict: true` では、`root.get('request')` が `Scoped "request" cannot be resolved from the root container. Use createScope().` をスローします。`createScope()` が返したコンテナからキーを解決してください。`strict: false` はこのランタイムガードを省略します。
+
+## Scope input とプロファイル
+
+Scope input は、スコープを開くときに存在する外部値を表します。対象には request、認証コンテキスト、tenant、job データなどがあります。`declareScopeInputs()` はキーを型グラフへ追加し、ランタイム登録は作りません。
+
+```ts
+const root = new Container()
+  .declareScopeInputs<{
+    request: RequestContext
+    auth: AuthContext
+  }>()
+  .registerClass('publicService', PublicService, ['request'], 'scoped')
+  .registerClass('accountService', AccountService, ['request', 'auth'], 'scoped')
+```
+
+Declaration map が受け付けるのは、必須かつ有限な string キーと symbol キーです。optional キー、numeric キー、`__proto__`、広い string/symbol index signature、バリアントごとにキー集合が異なる union はコンパイルエラーになります。Root と既存 child のどちらでも input を宣言できますが、宣言だけでは値を提供しません。
+
+`createScope(inputs)` は未提供 input の部分集合を受け取ります。InferDI は class 登録、lazy companion、依存 tuple を明示した factory へ要件を伝播します。
+
+```ts
+const publicScope = root.createScope({request})
+publicScope.get('publicService')
+
+// @ts-expect-error: auth は未提供
+publicScope.get('accountService')
+
+const authenticatedScope = publicScope.createScope({auth})
+authenticatedScope.get('accountService')
+
+root.registerFactory(
+  'userId',
+  ['auth'],
+  (c) => c.get('auth').userId,
+  'scoped'
+)
+```
+
+Factory の tuple は型検査にのみ使われます。Callback は、列挙したキーを受け付ける `.get()` と probe 用の `.has()` を持つ resolver を受け取ります。ランタイムでは `factory(container)` を呼び出します。
+
+名前付きプロファイルには通常の関数を使います。
+
+```ts
+const publicScope = (request: RequestContext) =>
+  root.createScope({request})
+
+const authenticatedScope = (
+  request: RequestContext,
+  auth: AuthContext
+) => root.createScope({request, auth})
+```
+
+Child は enumerable な own string/symbol プロパティの shallow snapshot を取ります。Nested child は input value を継承しますが、scoped instance は別に生成します。Input value の所有者はアプリケーションです。新しい child で scope を絞り込む場合は、絞り込んだ child を parent より先に破棄してください。
+
+ランタイムは input schema を保持しません。JavaScript、`any`、cast を使うと未知のキーを追加でき、child cache 内で登録を隠すこともできます。Object spread は getter と Proxy trap を実行するため、副作用のない data record を渡してください。これらの hook から行う再入的な変更は契約外です。Strict Mode では partial child に追加した登録が refined child から見えます。Fast Mode でも input を絞り込めますが、最初の `.get()` または `.createScope()` より前に登録を完了する必要があります。
 
 ## 所有権
 

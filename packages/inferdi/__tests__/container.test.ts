@@ -1,4 +1,4 @@
-import {describe, it, expect} from 'vitest'
+import {describe, it, expect, vi} from 'vitest'
 import {Container, type DependenciesMap, type Lazy} from '../src/Container'
 import {
   AppConfig,
@@ -1680,6 +1680,203 @@ describe('Phase 10 — has', () => {
   it('returns true for registerValue with an explicit undefined value', () => {
     const c = new Container().registerValue('maybe', undefined)
     expect(c.has('maybe')).toBe(true)
+  })
+})
+
+describe.each([true, false])('scope inputs — strict: %s', (strict) => {
+  interface RequestContext {
+    readonly requestId: string
+  }
+
+  interface AuthContext {
+    readonly userId: string
+  }
+
+  const AUTH = Symbol('auth')
+
+  class PublicService {
+    constructor(readonly request: RequestContext) {}
+  }
+
+  class AccountService {
+    constructor(
+      readonly request: RequestContext,
+      readonly auth: AuthContext
+    ) {}
+  }
+
+  it('seeds string, symbol, and explicit undefined inputs', () => {
+    const request = {requestId: 'request'}
+    const auth = {userId: 'user'}
+    const root = new Container({strict})
+      .declareScopeInputs<{
+        request: RequestContext
+        [AUTH]: AuthContext
+        optional: string | undefined
+      }>()
+    const scope = root.createScope({
+      request,
+      [AUTH]: auth,
+      optional: undefined
+    })
+
+    expect(scope.get('request')).toBe(request)
+    expect(scope.get(AUTH)).toBe(auth)
+    expect(scope.get('optional')).toBeUndefined()
+  })
+
+  it('refines a partial child while isolating scoped instances', () => {
+    const request = {requestId: 'request'}
+    const auth = {userId: 'user'}
+    const root = new Container({strict})
+      .declareScopeInputs<{
+        request: RequestContext
+        auth: AuthContext
+      }>()
+      .registerClass('publicService', PublicService, ['request'], 'scoped')
+      .registerClass(
+        'accountService',
+        AccountService,
+        ['request', 'auth'],
+        'scoped'
+      )
+    const requestScope = root.createScope({request})
+    const firstPublic = requestScope.get('publicService')
+    const authScope = requestScope.createScope({auth})
+
+    expect(authScope.get('request')).toBe(request)
+    expect(authScope.get('auth')).toBe(auth)
+    expect(authScope.get('publicService')).not.toBe(firstPublic)
+    expect(authScope.get('accountService').request).toBe(request)
+  })
+
+  it('takes a shallow snapshot of the invocation record', () => {
+    const request = {requestId: 'request'}
+    const another = {requestId: 'another'}
+    const values = {request}
+    const root = new Container({strict})
+      .declareScopeInputs<{request: RequestContext}>()
+    const scope = root.createScope(values)
+
+    values.request = another
+
+    expect(scope.get('request')).toBe(request)
+  })
+
+  it('inherits inputs through zero-argument nested scopes', () => {
+    const request = {requestId: 'request'}
+    const root = new Container({strict})
+      .declareScopeInputs<{request: RequestContext}>()
+    const nested = root.createScope({request}).createScope()
+
+    expect(nested.get('request')).toBe(request)
+  })
+
+  it('does not expose inputs through has()', () => {
+    const root = new Container({strict})
+      .declareScopeInputs<{request: RequestContext}>()
+    const scope = root.createScope({request: {requestId: 'request'}})
+
+    expect(scope.get('request').requestId).toBe('request')
+    expect(scope.has('request')).toBe(false)
+  })
+
+  it('keeps input values externally owned and disposes dependent services', async () => {
+    class Input extends TrackableAsync {}
+    class OwnedService extends TrackableAsync {
+      constructor(readonly input: Input) {
+        super()
+      }
+    }
+
+    const input = new Input()
+    const root = new Container({strict})
+      .declareScopeInputs<{input: Input}>()
+      .registerClass('service', OwnedService, ['input'], 'scoped')
+    const scope = root.createScope({input})
+    const service = scope.get('service')
+
+    await scope.dispose()
+
+    expect(input.asyncDisposeCalls).toBe(0)
+    expect(service.asyncDisposeCalls).toBe(1)
+  })
+
+  it('disposal of one child does not mutate a shared inherited snapshot', async () => {
+    const request = {requestId: 'request'}
+    const root = new Container({strict})
+      .declareScopeInputs<{request: RequestContext}>()
+    const parent = root.createScope({request})
+    const first = parent.createScope()
+    const second = parent.createScope()
+
+    await first.dispose()
+
+    expect(second.createScope().get('request')).toBe(request)
+  })
+
+  it('dispatches deps-aware factories without resolving the deps tuple', () => {
+    const root = new Container({strict})
+      .declareScopeInputs<{request: RequestContext}>()
+      .registerFactory(
+        'requestId',
+        ['request'],
+        (c) => c.get('request').requestId,
+        'scoped',
+        'requestIdLazy'
+      )
+    const scope = root.createScope({request: {requestId: 'request'}})
+
+    expect(scope.get('requestId')).toBe('request')
+    expect(scope.get('requestIdLazy').get()).toBe('request')
+  })
+})
+
+describe('scope-input snapshot paths', () => {
+  it('keeps zero-input scope creation off the enumeration path', () => {
+    const ownKeys = vi.spyOn(Reflect, 'ownKeys')
+
+    try {
+      new Container().createScope().createScope()
+      expect(ownKeys).not.toHaveBeenCalled()
+    } finally {
+      ownKeys.mockRestore()
+    }
+  })
+
+  it('normalizes createScope({}) back to the zero-input path', () => {
+    const ownKeys = vi.spyOn(Reflect, 'ownKeys')
+
+    try {
+      const empty = new Container().createScope({})
+      empty.createScope()
+      expect(ownKeys).toHaveBeenCalledTimes(1)
+      expect((empty as unknown as {scopeInputs?: object}).scopeInputs).toBeUndefined()
+    } finally {
+      ownKeys.mockRestore()
+    }
+  })
+
+  it('keeps partial-child registrations visible after strict refinement', () => {
+    class AuthService {
+      constructor(readonly auth: {userId: string}) {}
+    }
+
+    const requestScope = new Container()
+      .declareScopeInputs<{
+        request: {requestId: string}
+        auth: {userId: string}
+      }>()
+      .createScope({request: {requestId: 'request'}})
+    const extended = requestScope.registerClass(
+      'authService',
+      AuthService,
+      ['auth'],
+      'scoped'
+    )
+    const refined = extended.createScope({auth: {userId: 'user'}})
+
+    expect(refined.get('authService').auth.userId).toBe('user')
   })
 })
 

@@ -152,6 +152,57 @@ describe('scoped lifetime', () => {
   })
 })
 
+describe('scope-input creation and cache paths', () => {
+  const noInputRoot = new Container()
+  const inputRoot = new Container()
+    .declareScopeInputs<{
+      one: number
+      two: number
+      three: number
+      four: number
+      five: number
+      six: number
+    }>()
+  const inputScope = inputRoot.createScope({one: 1})
+  const inheritedFive = inputRoot.createScope({
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5
+  })
+
+  bench('createScope() without inputs', () => {
+    noInputRoot.createScope()
+  })
+
+  bench('createScope({}) then createScope()', () => {
+    noInputRoot.createScope({}).createScope()
+  })
+
+  bench('createScope({one})', () => {
+    inputRoot.createScope({one: 1})
+  })
+
+  bench('createScope({five inputs})', () => {
+    inputRoot.createScope({
+      one: 1,
+      two: 2,
+      three: 3,
+      four: 4,
+      five: 5
+    })
+  })
+
+  bench('nested refinement with five inherited inputs and one new input', () => {
+    inheritedFive.createScope({six: 6})
+  })
+
+  bench('get input cache hit', () => {
+    inputScope.get('one')
+  })
+})
+
 /*
  * ────────────────────────────────────────────────────────────────────────────
  * Scope lookup modes and deferred ownership de-duplication

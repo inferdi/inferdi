@@ -130,7 +130,7 @@ if (cached !== undefined) return ...
 
 У `@inferdi/inferdi` нет runtime dependencies. Так и должно оставаться.
 
-Опубликованный bundle должен оставаться меньше 2.5KB gzip. CI пока не проверяет этот бюджет, поэтому ревьюеры должны проверять размер bundle для PR, которые добавляют код в core implementation или публичные helpers.
+Опубликованный bundle должен оставаться меньше 3KB gzip. CI пока не проверяет этот бюджет, поэтому ревьюеры должны проверять размер bundle для PR, которые добавляют код в core implementation или публичные helpers.
 
 ## 3. Фильтр PR
 

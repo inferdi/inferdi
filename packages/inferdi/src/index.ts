@@ -4,8 +4,10 @@ export type {
   DependenciesMap,
   Module,
   RegistrationKind,
+  ScopeInputMap,
   Spec,
   SpecMap,
   LazySpec,
-  ContainerOptions
+  ContainerOptions,
+  WithRequirements
 } from './Container'

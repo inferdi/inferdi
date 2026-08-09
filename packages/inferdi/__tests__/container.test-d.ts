@@ -1,5 +1,15 @@
 import {describe, it, expectTypeOf} from 'vitest'
-import {Container, type Lazy, type Module, type Spec, type SpecMap} from '../src/Container'
+import {
+  Container,
+  type DependenciesMap,
+  type Lazy,
+  type LazySpec,
+  type Module,
+  type ScopeInputMap,
+  type Spec,
+  type SpecMap,
+  type WithRequirements
+} from '../src/Container'
 
 /*
  * ────────────────────────────────────────────────────────────────────────────
@@ -687,5 +697,475 @@ describe('Phase 4 — Container.Providers', () => {
 
   it('Providers<C> resolves to never for non-Container types', () => {
     expectTypeOf<Container.Providers<string>>().toEqualTypeOf<never>()
+  })
+})
+
+describe('scope inputs — declarations and provision', () => {
+  interface RequestContext {
+    readonly requestId: string
+  }
+
+  interface AuthContext {
+    readonly userId: string
+  }
+
+  const INPUT = Symbol('input')
+  const request = {requestId: 'request'} satisfies RequestContext
+  const auth = {userId: 'user'} satisfies AuthContext
+
+  it('accepts finite required string and symbol declarations', () => {
+    new Container()
+      .declareScopeInputs<{
+        request: RequestContext
+        '0': string
+        [INPUT]: AuthContext
+        optionalValue: AuthContext | undefined
+      }>()
+  })
+
+  it('accepts unions with the same key set and different values', () => {
+    type Context =
+      | {context: RequestContext}
+      | {context: AuthContext}
+
+    expectTypeOf<ScopeInputMap<Context>>().not.toEqualTypeOf<never>()
+  })
+
+  it('rejects invalid declaration maps', () => {
+    // @ts-expect-error — numeric keys are not scope-input keys
+    new Container().declareScopeInputs<{0: RequestContext}>()
+    // @ts-expect-error — __proto__ is excluded from declarations
+    new Container().declareScopeInputs<{'__proto__': RequestContext}>()
+    // @ts-expect-error — optional declaration keys are not allowed
+    new Container().declareScopeInputs<{request?: RequestContext}>()
+    // @ts-expect-error — broad string index signatures are not finite
+    new Container().declareScopeInputs<Record<string, RequestContext>>()
+    // @ts-expect-error — broad symbol index signatures are not finite
+    new Container().declareScopeInputs<Record<symbol, RequestContext>>()
+    // @ts-expect-error — union variants must have the same key set
+    new Container().declareScopeInputs<
+      {request: RequestContext} | {auth: AuthContext}
+    >()
+  })
+
+  it('rejects repeated declarations and collisions with graph keys', () => {
+    const declared = new Container()
+      .declareScopeInputs<{request: RequestContext}>()
+
+    // @ts-expect-error — request is already declared
+    declared.declareScopeInputs<{request: RequestContext}>()
+
+    const registered = new Container().registerValue('request', request)
+    // @ts-expect-error — request already exists as a registration
+    registered.declareScopeInputs<{request: RequestContext}>()
+
+    // @ts-expect-error — input keys participate in the duplicate-key guard
+    declared.registerValue('request', request)
+    // @ts-expect-error — input keys participate in the class duplicate-key guard
+    declared.registerClass('request', L, [])
+    // @ts-expect-error — input keys participate in the factory duplicate-key guard
+    declared.registerFactory('request', () => request)
+    // @ts-expect-error — a lazy companion cannot collide with an input
+    declared.registerClass('logger', L, [], 'singleton', 'request')
+  })
+
+  it('provides only required keys and preserves the parent type-state', () => {
+    const root = new Container()
+      .declareScopeInputs<{
+        request: RequestContext
+        auth: AuthContext
+      }>()
+
+    // @ts-expect-error — root inputs are not ready
+    root.get('request')
+
+    const requestScope = root.createScope({request})
+    expectTypeOf(requestScope.get('request')).toEqualTypeOf<RequestContext>()
+    // @ts-expect-error — auth has not been provided
+    requestScope.get('auth')
+    // @ts-expect-error — child refinement does not mutate the parent type-state
+    root.get('request')
+
+    const authScope = requestScope.createScope({auth})
+    expectTypeOf(authScope.get('request')).toEqualTypeOf<RequestContext>()
+    expectTypeOf(authScope.get('auth')).toEqualTypeOf<AuthContext>()
+
+    // @ts-expect-error — ready inputs cannot be provided again
+    authScope.createScope({request})
+    // @ts-expect-error — unknown keys are rejected
+    requestScope.createScope({unknown: true})
+    // @ts-expect-error — input values must match the declared slot type
+    root.createScope({request: {requestId: 42}})
+  })
+
+  it('accepts an empty record without changing type-state', () => {
+    const root = new Container().declareScopeInputs<{request: RequestContext}>()
+    const scope = root.createScope({})
+
+    // @ts-expect-error — an empty record provides no input
+    scope.get('request')
+  })
+
+  it('counts only properties required in every invocation-record branch', () => {
+    const root = new Container()
+      .declareScopeInputs<{
+        request: RequestContext
+        auth: AuthContext
+      }>()
+
+    const optional: {request: RequestContext; auth?: AuthContext} = {request}
+    const optionalScope = root.createScope(optional)
+    optionalScope.get('request')
+    // @ts-expect-error — optional auth does not open the slot
+    optionalScope.get('auth')
+
+    const union: {request: RequestContext} | {request: RequestContext; auth: AuthContext} =
+      Math.random() > 0.5 ? {request} : {request, auth}
+    const unionScope = root.createScope(union)
+    unionScope.get('request')
+    // @ts-expect-error — auth is not required in every union branch
+    unionScope.get('auth')
+  })
+
+  it('treats a required undefined value as provided', () => {
+    const root = new Container()
+      .declareScopeInputs<{auth: AuthContext | undefined}>()
+    const scope = root.createScope({auth: undefined})
+
+    expectTypeOf(scope.get('auth')).toEqualTypeOf<AuthContext | undefined>()
+  })
+
+  it('rejects extra keys in variables and union branches', () => {
+    const root = new Container().declareScopeInputs<{request: RequestContext}>()
+    const extra = {request, extra: true}
+
+    // @ts-expect-error — exactness applies to pre-typed variables
+    root.createScope(extra)
+
+    const union: {request: RequestContext} | {request: RequestContext; extra: true} =
+      Math.random() > 0.5 ? {request} : {request, extra: true}
+    // @ts-expect-error — extra is present in one union branch
+    root.createScope(union)
+  })
+
+  it('allows declarations on an existing child without providing the value', () => {
+    const requestScope = new Container()
+      .declareScopeInputs<{request: RequestContext}>()
+      .createScope({request})
+    const declaredChild = requestScope
+      .declareScopeInputs<{auth: AuthContext}>()
+
+    // @ts-expect-error — declaration alone does not seed the receiver cache
+    declaredChild.get('auth')
+    expectTypeOf(
+      declaredChild.createScope({auth}).get('auth')
+    ).toEqualTypeOf<AuthContext>()
+  })
+
+  it('keeps ordinary Spec and LazySpec identity on the no-requirement path', () => {
+    expectTypeOf<
+      WithRequirements<Spec<L, 'singleton'>, never>
+    >().toEqualTypeOf<Spec<L, 'singleton'>>()
+    expectTypeOf<
+      WithRequirements<LazySpec<L, 'scoped'>, never>
+    >().toEqualTypeOf<LazySpec<L, 'scoped'>>()
+  })
+})
+
+describe('scope inputs — requirement propagation', () => {
+  interface RequestContext {
+    readonly requestId: string
+  }
+
+  interface AuthContext {
+    readonly userId: string
+  }
+
+  class PublicService {
+    constructor(readonly request: RequestContext) {}
+  }
+
+  class AccountService {
+    constructor(
+      readonly request: RequestContext,
+      readonly auth: AuthContext
+    ) {}
+  }
+
+  class Controller {
+    constructor(
+      readonly account: AccountService,
+      readonly logger: L
+    ) {}
+  }
+
+  class AuthService {
+    constructor(readonly auth: AuthContext) {}
+  }
+
+  class Dashboard {
+    constructor(
+      readonly publicService: PublicService,
+      readonly authService: AuthService
+    ) {}
+  }
+
+  const request = {requestId: 'request'} satisfies RequestContext
+  const auth = {userId: 'user'} satisfies AuthContext
+
+  it('propagates requirements through linear and multi-input graphs', () => {
+    const root = new Container()
+      .declareScopeInputs<{
+        request: RequestContext
+        auth: AuthContext
+      }>()
+      .registerClass('logger', L, [])
+      .registerClass('publicService', PublicService, ['request'], 'scoped')
+      .registerClass('authService', AuthService, ['auth'], 'scoped')
+      .registerClass(
+        'accountService',
+        AccountService,
+        ['request', 'auth'],
+        'scoped'
+      )
+      .registerClass(
+        'dashboard',
+        Dashboard,
+        ['publicService', 'authService'],
+        'scoped'
+      )
+      .registerClass(
+        'controller',
+        Controller,
+        ['accountService', 'logger'],
+        'scoped'
+      )
+
+    // @ts-expect-error — request is blocked on root
+    root.get('publicService')
+    // @ts-expect-error — request and auth are blocked on root
+    root.get('controller')
+
+    const publicScope = root.createScope({request})
+    expectTypeOf(publicScope.get('publicService')).toEqualTypeOf<PublicService>()
+    // @ts-expect-error — accountService transitively requires auth
+    publicScope.get('accountService')
+    // @ts-expect-error — controller inherits accountService requirements
+    publicScope.get('controller')
+    // @ts-expect-error — the diamond still requires auth through authService
+    publicScope.get('dashboard')
+
+    const authenticatedScope = publicScope.createScope({auth})
+    expectTypeOf(authenticatedScope.get('accountService')).toEqualTypeOf<AccountService>()
+    expectTypeOf(authenticatedScope.get('controller')).toEqualTypeOf<Controller>()
+    expectTypeOf(authenticatedScope.get('dashboard')).toEqualTypeOf<Dashboard>()
+  })
+
+  it('propagates requirements to class lazy companions', () => {
+    const root = new Container()
+      .declareScopeInputs<{request: RequestContext}>()
+      .registerClass(
+        'publicService',
+        PublicService,
+        ['request'],
+        'scoped',
+        'publicServiceLazy'
+      )
+
+    // @ts-expect-error — the companion is blocked with its target
+    root.get('publicServiceLazy')
+
+    const scope = root.createScope({request})
+    expectTypeOf(scope.get('publicServiceLazy')).toEqualTypeOf<Lazy<PublicService>>()
+  })
+
+  it('prevents singletons from selecting scope inputs', () => {
+    const root = new Container().declareScopeInputs<{request: RequestContext}>()
+
+    // @ts-expect-error — a singleton class cannot depend on a scoped input
+    root.registerClass('publicService', PublicService, ['request'])
+    // @ts-expect-error — a default singleton deps-aware factory cannot select it
+    root.registerFactory('requestId', ['request'], (c) => c.get('request').requestId)
+  })
+
+  it('gives deps-aware factories a resolver-only selection view', () => {
+    const root = new Container()
+      .registerValue('logger', new L())
+      .registerValue('other', 1 as const)
+
+    const built = root.registerFactory('message', ['logger'], (c) => {
+      expectTypeOf(c.get('logger')).toEqualTypeOf<L>()
+      expectTypeOf(c.has('other')).toEqualTypeOf<boolean>()
+      // @ts-expect-error — an unlisted ready dependency is hidden
+      c.get('other')
+      // @ts-expect-error — the resolver cannot mutate the graph
+      c.registerValue('x', 1)
+      // @ts-expect-error — the resolver cannot create scopes
+      c.createScope()
+      // @ts-expect-error — the resolver has no disposal API
+      c.dispose()
+      return 'message' as const
+    })
+
+    expectTypeOf(built.get('message')).toEqualTypeOf<'message'>()
+    // @ts-expect-error — duplicate-key guards still apply to the result key
+    built.registerValue('message', 'other')
+
+    const transientRoot = root.registerClass('transient', L, [], 'transient')
+    // @ts-expect-error — the default singleton overload keeps the lifetime filter
+    transientRoot.registerFactory('invalid', ['transient'], () => 'invalid')
+  })
+
+  it('propagates scoped factory requirements to result and lazy companion', () => {
+    const root = new Container()
+      .declareScopeInputs<{auth: AuthContext}>()
+      .registerFactory(
+        'userId',
+        ['auth'],
+        (c) => c.get('auth').userId,
+        'scoped',
+        'userIdLazy'
+      )
+
+    // @ts-expect-error — factory result requires auth
+    root.get('userId')
+    // @ts-expect-error — lazy companion carries the same requirement
+    root.get('userIdLazy')
+
+    const scope = root.createScope({auth})
+    expectTypeOf(scope.get('userId')).toEqualTypeOf<string>()
+    expectTypeOf(scope.get('userIdLazy')).toEqualTypeOf<Lazy<string>>()
+  })
+
+  it('keeps blocked dependencies hidden from callback-only factories', () => {
+    const root = new Container().declareScopeInputs<{auth: AuthContext}>()
+
+    root.registerFactory('userId', (c) => {
+      // @ts-expect-error — callback-only factories cannot declare the input edge
+      c.get('auth')
+      return 'unknown'
+    }, 'scoped')
+
+    const requirementFree = root.registerFactory(
+      'constant',
+      () => 'constant' as const,
+      'scoped'
+    )
+    expectTypeOf(
+      requirementFree.createScope().get('constant')
+    ).toEqualTypeOf<'constant'>()
+  })
+
+  it('supports strict child registration followed by refinement', () => {
+    const requestScope = new Container()
+      .declareScopeInputs<{
+        request: RequestContext
+        auth: AuthContext
+      }>()
+      .createScope({request})
+    const extended = requestScope.registerClass(
+      'accountService',
+      AccountService,
+      ['request', 'auth'],
+      'scoped'
+    )
+
+    // @ts-expect-error — the new service remains blocked until refinement
+    extended.get('accountService')
+    expectTypeOf(
+      extended.createScope({auth}).get('accountService')
+    ).toEqualTypeOf<AccountService>()
+  })
+})
+
+describe('scope inputs — helpers and compatibility', () => {
+  interface RequestContext {
+    readonly requestId: string
+  }
+
+  class Handler {
+    constructor(readonly request: RequestContext) {}
+  }
+
+  it('exposes Container.ReadyKeys for generic resolvers', () => {
+    function legacyResolve<
+      T extends DependenciesMap,
+      K extends keyof T
+    >(container: Container<T>, key: K) {
+      // @ts-expect-error — keyof T may include a blocked entry
+      return container.get(key)
+    }
+
+    function resolveReady<
+      T extends DependenciesMap,
+      K extends Container.ReadyKeys<Container<T>>
+    >(container: Container<T>, key: K): T[K]['type'] {
+      return container.get(key)
+    }
+
+    const ordinary = new Container().registerValue('answer', 42 as const)
+    expectTypeOf(resolveReady(ordinary, 'answer')).toEqualTypeOf<42>()
+    void legacyResolve
+  })
+
+  it('keeps has-to-get narrowing for ordinary graphs but not partial scopes', () => {
+    const key = 'value' as string | symbol
+    const ordinary = new Container().registerValue('value', 1)
+
+    if (ordinary.has(key)) {
+      ordinary.get(key)
+    }
+
+    const partial = new Container()
+      .declareScopeInputs<{request: RequestContext}>()
+
+    if (partial.has(key)) {
+      // @ts-expect-error — a registration probe does not prove readiness
+      partial.get(key)
+    }
+  })
+
+  it('excludes scope inputs from override and Providers', () => {
+    const root = new Container()
+      .declareScopeInputs<{request: RequestContext}>()
+      .registerValue('logger', new L())
+
+    // @ts-expect-error — inputs are external values, not registrations
+    root.override('request', {requestId: 'request'})
+
+    type Providers = Container.Providers<typeof root>
+    expectTypeOf<keyof Providers>().toEqualTypeOf<'logger'>()
+    expectTypeOf<Providers['logger']>().toEqualTypeOf<() => L>()
+  })
+
+  it('keeps full-graph extraction helpers', () => {
+    const root = new Container()
+      .declareScopeInputs<{request: RequestContext}>()
+      .registerClass('handler', Handler, ['request'], 'scoped')
+
+    type Resolved = Container.Resolve<typeof root>
+    type Unwrapped = Container.ResolveUnwrapped<typeof root>
+    expectTypeOf<Resolved['request']>().toEqualTypeOf<RequestContext>()
+    expectTypeOf<Resolved['handler']>().toEqualTypeOf<Handler>()
+    expectTypeOf<Unwrapped['request']>().toEqualTypeOf<RequestContext>()
+  })
+
+  it('supports named modules with public scope-input helpers', () => {
+    type Inputs = ScopeInputMap<{request: RequestContext}>
+    type Output = {
+      handler: WithRequirements<Spec<Handler, 'scoped'>, 'request'>
+    }
+    const module: Module<Inputs, Output> = (c) => c.registerClass(
+      'handler',
+      Handler,
+      ['request'],
+      'scoped'
+    )
+
+    const root = new Container()
+      .declareScopeInputs<{request: RequestContext}>()
+      .use(module)
+    const scope = root.createScope({request: {requestId: 'request'}})
+    expectTypeOf(scope.get('handler')).toEqualTypeOf<Handler>()
   })
 })

@@ -37,6 +37,31 @@ declared graph to differ from runtime behavior:
   a zero-argument `.get()` method now remains that service type instead of being
   structurally mistaken for `Lazy<T>`.
 
+### Generic resolver helpers use ready keys
+
+`.get()` now accepts keys whose scope-input requirements have been provided.
+Concrete containers without scope inputs keep the same key set. Generic helpers
+that use `K extends keyof T` must switch to `Container.ReadyKeys` because a
+generic `T extends DependenciesMap` may contain blocked entries.
+
+```ts
+// Before
+function resolve<T extends DependenciesMap, K extends keyof T>(
+  container: Container<T>,
+  key: K
+) {
+  return container.get(key)
+}
+
+// After
+function resolve<
+  T extends DependenciesMap,
+  K extends Container.ReadyKeys<Container<T>>
+>(container: Container<T>, key: K) {
+  return container.get(key)
+}
+```
+
 ### Scoped resolution requires a child scope
 
 With the default `strict: true`, resolving a `scoped` key from the root now

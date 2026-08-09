@@ -37,7 +37,35 @@ const root = new Container()
 type RootContainer = typeof root
 type RequestContainer = ReturnType<RootContainer['createScope']>
 
+class InputUserService {
+  constructor(readonly request: RequestContext) {}
+}
+
+const inputRoot = new Container()
+  .declareScopeInputs<{requestInput: RequestContext}>()
+  .registerClass('inputUsers', InputUserService, ['requestInput'], 'scoped')
+
 describe('@inferdi/elysia types', () => {
+  it('keeps the default createScope path in the unrefined type-state', () => {
+    const scope = inputRoot.createScope()
+
+    expectTypeOf<InferdiScopeOf<typeof inputRoot>>().toEqualTypeOf<typeof scope>()
+    // @ts-expect-error — default adapter scope creation provides no inputs
+    scope.get('inputUsers')
+  })
+
+  it('infers a refined scope from the custom createScope hook', () => {
+    inferdiElysia({
+      container: inputRoot,
+      createScope: (receivedRoot) => receivedRoot.createScope({
+        requestInput: new RequestContext()
+      }),
+      setupScope: (scope) => {
+        expectTypeOf(scope.get('inputUsers')).toEqualTypeOf<InputUserService>()
+      }
+    })
+  })
+
   it('accepts InferDI containers through structural root and scope types', () => {
     expectTypeOf<RequestContainer>().toMatchTypeOf<InferdiScope>()
     expectTypeOf<RootContainer>().toMatchTypeOf<InferdiRoot<RequestContainer>>()

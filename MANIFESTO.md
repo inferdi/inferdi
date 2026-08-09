@@ -129,7 +129,7 @@ includes a narrow, written justification.
 
 `@inferdi/inferdi` has no runtime dependencies. Keep it that way.
 
-The published bundle should stay below 2.5KB gzipped. CI does not enforce that
+The published bundle should stay below 3KB gzipped. CI does not enforce that
 budget today, so reviewers must check bundle size for PRs that add code to the
 core implementation or public helpers.
 

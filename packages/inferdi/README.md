@@ -46,6 +46,7 @@ A zero-dependency, **decorator-free**, strongly typed DI container for modern Ty
   - [Binding Interfaces](#binding-interfaces)
   - [Compiler-enforced Signatures](#compiler-enforced-signatures)
   - [Scopes & Native Teardown](#scopes--native-teardown)
+    - [Scope Inputs and Profiles](#scope-inputs-and-profiles)
     - [Async Factories](#async-factories)
   - [Strict Lifetime Guards](#strict-lifetime-guards)
     - [Fast Mode: `new Container({ strict: false })`](#fast-mode-new-container-strict-false)
@@ -478,6 +479,19 @@ const container = new Container()
 
 Factories follow the same lifetime rules as classes — pass the kind as the third argument: `registerFactory('cache', factory, 'scoped')`. An optional fourth `lazyKey` registers the same lifetime-preserving `Lazy<V>` companion as `registerClass`: `registerFactory('cache', factory, 'scoped', 'cacheLazy')`. To use the default singleton lifetime with a companion, pass `undefined` as the kind. Inside a **singleton** factory the container parameter is narrowed via `AllowedDeps<T, 'singleton'>`, so `c.get(...)` will only autocomplete (and accept) singleton keys and `Lazy<singleton>` companions. A `scoped`/`transient` key (or `Lazy<scoped>` / `Lazy<transient>`) inside a singleton factory body is a TypeScript error, not a runtime exception.
 
+Factories that read scope inputs declare those edges with a dependency tuple. The tuple narrows the callback to a resolver-only view and carries input requirements to the result:
+
+```ts
+root.registerFactory(
+  'userId',
+  ['auth'],
+  (c) => c.get('auth').userId,
+  'scoped'
+)
+```
+
+The tuple serves the type system. InferDI still calls `factory(container)` and does not resolve the tuple into an argument array.
+
 ## Binding Interfaces
 
 TypeScript interfaces do not exist at runtime, so you cannot pass them to `registerClass` — the key would be inferred as the concrete class, not the abstraction. To bind an interface to a concrete implementation, use `registerFactory` with an explicit type argument:
@@ -564,6 +578,47 @@ Error: Scoped "reqCtx" cannot be resolved from the root container. Use createSco
 
 Call `scope.get('reqCtx')`, as in the example above. `strict: false` skips this
 runtime guard together with the cycle and lifetime guards.
+
+### Scope Inputs and Profiles
+
+Declare request data, authentication state, tenant context, or job metadata as scope inputs. A declaration adds type information and no runtime registration:
+
+```ts
+const root = new Container()
+  .declareScopeInputs<{
+    request: RequestContext
+    auth: AuthContext
+  }>()
+  .registerClass('publicService', PublicService, ['request'], 'scoped')
+  .registerClass('accountService', AccountService, ['request', 'auth'], 'scoped')
+
+const publicScope = root.createScope({request})
+publicScope.get('publicService')
+
+// @ts-expect-error — auth has not been provided
+publicScope.get('accountService')
+
+const authenticatedScope = publicScope.createScope({auth})
+authenticatedScope.get('accountService')
+```
+
+Use ordinary functions as named profiles:
+
+```ts
+const openPublicScope = (request: RequestContext) =>
+  root.createScope({request})
+
+const openAuthenticatedScope = (
+  request: RequestContext,
+  auth: AuthContext
+) => root.createScope({request, auth})
+```
+
+`createScope(inputs)` copies enumerable own string and symbol properties into the child cache. A nested child inherits input values but gets a separate cache for scoped services. Input values remain application-owned; disposing the scope does not dispose them. If you refine a scope through another child, dispose the refined child before its parent.
+
+The input schema exists only in TypeScript. JavaScript, `any`, or a cast can seed unknown keys or shadow registrations. Pass a passive data record; getters and Proxy traps run during the shallow snapshot, and reentrant side effects are outside the API contract. Fast Mode supports input refinement, but its existing immutable-graph rule still requires registration to finish before the first `.get()` or `.createScope()`.
+
+Named modules can describe input slots with `ScopeInputMap<M>` and carry requirements in their output with `WithRequirements<Spec<V, Kind>, Keys>`. Generic resolver helpers should constrain keys with `Container.ReadyKeys<Container<T>>`; see [MIGRATION.md](./MIGRATION.md) for the `keyof T` migration.
 
 The container probes each owned instance in order: `Symbol.asyncDispose` → `Symbol.dispose` → plain `.dispose()`. If multiple disposers throw, all errors are collected into a single `AggregateError` so one failing resource never leaves the rest unclosed.
 

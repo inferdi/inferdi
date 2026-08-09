@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/zh/core/scopes"
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-31"
+      "dateModified": "2026-08-09"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, 作用域, 清理, 销毁, 子作用域, using, await using, LIFO, 依赖注入"
@@ -72,6 +72,60 @@ async function handle(request: Request) {
 `db` 是一个根单例。`request` 在每个作用域创建一次，并在作用域被释放时释放。
 
 `scoped` 注册属于子作用域。在默认的 `strict: true` 模式下，`root.get('request')` 会抛出 `Scoped "request" cannot be resolved from the root container. Use createScope().`。请从 `createScope()` 返回的容器解析该键。`strict: false` 会跳过这项运行时检查。
+
+## Scope 输入与配置函数
+
+Scope 输入表示创建作用域时才存在的外部值，例如请求、认证上下文、租户或任务数据。`declareScopeInputs()` 把这些键加入类型图，不创建运行时注册：
+
+```ts
+const root = new Container()
+  .declareScopeInputs<{
+    request: RequestContext
+    auth: AuthContext
+  }>()
+  .registerClass('publicService', PublicService, ['request'], 'scoped')
+  .registerClass('accountService', AccountService, ['request', 'auth'], 'scoped')
+```
+
+声明映射接受必填且有限的字符串键和 symbol 键。可选键、数字键、`__proto__`、宽泛的 string/symbol 索引签名，以及各分支键集合不同的联合类型都会产生编译错误。你可以在根容器或现有子容器上声明输入，但声明本身不会提供值。
+
+`createScope(inputs)` 接受尚未提供的输入子集。InferDI 会把需求传递到 class 注册、lazy companion，以及带显式依赖元组的 factory：
+
+```ts
+const publicScope = root.createScope({request})
+publicScope.get('publicService')
+
+// @ts-expect-error: auth 尚未提供
+publicScope.get('accountService')
+
+const authenticatedScope = publicScope.createScope({auth})
+authenticatedScope.get('accountService')
+
+root.registerFactory(
+  'userId',
+  ['auth'],
+  (c) => c.get('auth').userId,
+  'scoped'
+)
+```
+
+Factory 元组只参与类型检查。回调获得一个 resolver，其中 `.get()` 只接受列出的键，`.has()` 用于探测。运行时仍调用 `factory(container)`。
+
+普通函数可以充当具名配置：
+
+```ts
+const publicScope = (request: RequestContext) =>
+  root.createScope({request})
+
+const authenticatedScope = (
+  request: RequestContext,
+  auth: AuthContext
+) => root.createScope({request, auth})
+```
+
+子容器对可枚举的自有字符串和 symbol 属性做浅层快照。嵌套子容器继承输入值，但会创建自己的 scoped 实例。输入值仍由应用管理。通过新子容器细化 scope 时，请先释放细化后的子容器，再释放父容器。
+
+运行时不保存输入 schema。JavaScript、`any` 或类型断言可以加入未知键，也可以在子容器 cache 中遮蔽注册。请传入被动的数据 record；对象展开会调用 getter 和 Proxy trap，由这些钩子触发的重入修改不属于 API 契约。Strict Mode 会让 partial child 上新增的注册对 refined child 可见。Fast Mode 支持输入细化，但仍要求不可变依赖图：第一次 `.get()` 或 `.createScope()` 前必须完成注册。
 
 ## 所有权
 

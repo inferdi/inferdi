@@ -70,6 +70,24 @@ async function allocateSymbolKeyedSingletonAndDispose(): Promise<WeakRef<object>
   return ref
 }
 
+async function allocateScopeInputAndDispose(
+  mode: 'async' | 'sync'
+): Promise<{scope: object; inputRef: WeakRef<object>}> {
+  const input = {payload: new Array(1000).fill(0)}
+  const inputRef = new WeakRef(input)
+  const scope = new Container()
+    .declareScopeInputs<{input: {payload: number[]}}>()
+    .createScope({input})
+
+  if (mode === 'async') {
+    await scope.dispose()
+  } else {
+    scope[Symbol.dispose]()
+  }
+
+  return {scope, inputRef}
+}
+
 describe.skipIf(!hasGc)('Phase 5 — memory leaks', () => {
   it('singleton instance is released after dispose (WeakRef.deref() → undefined)', async () => {
     const ref = await allocateSingletonAndDispose()
@@ -85,6 +103,16 @@ describe.skipIf(!hasGc)('Phase 5 — memory leaks', () => {
     const ref = await allocateSymbolKeyedSingletonAndDispose()
     expect(await waitForGC(ref)).toBe(true)
   })
+
+  it.each(['async', 'sync'] as const)(
+    '%s disposal releases the scope-input snapshot while the scope stays reachable',
+    async (mode) => {
+      const {scope, inputRef} = await allocateScopeInputAndDispose(mode)
+
+      expect(await waitForGC(inputRef)).toBe(true)
+      void scope
+    }
+  )
 
   it('scoped instance from child is released after child.dispose (parent stays alive)', async () => {
     class Leaf {

@@ -13,6 +13,9 @@
 
 const UNDEFINED_MARKER = Symbol('UNDEFINED_MARKER')
 
+declare const requiredInputs: unique symbol
+declare const scopeInputMarker: unique symbol
+
 /**
  * A deferred reference to a value of type `T`. Calling `.get()` resolves the
  * underlying value on demand, without capturing the instance at construction time.
@@ -113,6 +116,79 @@ export interface LazySpec<V, TargetKind extends RegistrationKind>
   readonly lazyOf: TargetKind
 }
 
+interface RequiredInputs<K extends string | symbol> {
+  readonly [requiredInputs]: K
+}
+
+interface ScopeInputSpec<V, K extends string | symbol>
+  extends Spec<V, 'scoped'> {
+  readonly [scopeInputMarker]: true
+  readonly [requiredInputs]: K
+}
+
+type KeysOfUnion<T> = T extends unknown ? keyof T : never
+
+type HasVariantKeys<M> = Exclude<KeysOfUnion<M>, keyof M> extends never
+  ? false
+  : true
+
+/**
+ * Maps a finite record of externally provided scope values onto InferDI's
+ * type-level graph. Prefer {@link Container.declareScopeInputs} for fluent
+ * builders; use this helper when describing a named {@link Module}.
+ *
+ * Declaration keys must be required, finite string or symbol keys. Numeric
+ * keys, `__proto__`, broad string/symbol index signatures, optional keys, and
+ * unions with different key sets are rejected.
+ *
+ * @example
+ * ```ts
+ * type RequestInputs = ScopeInputMap<{
+ *   request: RequestContext
+ *   auth: AuthContext
+ * }>
+ * ```
+ */
+export type ScopeInputMap<M extends object> =
+  HasVariantKeys<M> extends true
+    ? never
+    : string extends keyof M
+      ? never
+      : symbol extends keyof M
+        ? never
+        : Exclude<keyof M, string | symbol> extends never
+          ? '__proto__' extends keyof M
+            ? never
+            : [M] extends [Required<M>]
+              ? {
+                  [K in keyof M]: ScopeInputSpec<M[K], Extract<K, string | symbol>>
+                }
+              : never
+          : never
+
+type RequirementsOf<S> = S extends RequiredInputs<infer K> ? K : never
+
+type WithoutRequirements<S> = S extends RequiredInputs<string | symbol>
+  ? Omit<S, typeof requiredInputs>
+  : S
+
+/**
+ * Attaches a normalized union of required scope-input keys to a graph entry.
+ * Supplying `never` removes an existing requirement while preserving the
+ * identity of ordinary {@link Spec} and {@link LazySpec} entries.
+ *
+ * @example
+ * ```ts
+ * type RequestHandler = WithRequirements<
+ *   Spec<Handler, 'scoped'>,
+ *   'request'
+ * >
+ * ```
+ */
+export type WithRequirements<S, K extends string | symbol> = [K] extends [never]
+  ? WithoutRequirements<S>
+  : WithoutRequirements<S> & RequiredInputs<K>
+
 /**
  * Upper bound for the type-level "registry" carried by a {@link Container} —
  * a string-or-symbol-keyed map of {@link Spec} entries. Used as the constraint
@@ -175,6 +251,89 @@ type AllowedDeps<T extends DependenciesMap, TargetKind extends RegistrationKind>
         ]: T[K]
       }
     : T
+
+type RequirementsOfDeps<
+  T extends DependenciesMap,
+  D extends readonly (keyof T)[]
+> = RequirementsOf<Extract<T[D[number]], RequiredInputs<string | symbol>>>
+
+type WithRequirementsOfDeps<
+  S,
+  T extends DependenciesMap,
+  D extends readonly (keyof T)[]
+> = [Extract<T[D[number]], RequiredInputs<string | symbol>>] extends [never]
+  ? S
+  : WithRequirements<S, RequirementsOfDeps<T, D>>
+
+type ReadyKeysOf<T extends DependenciesMap> =
+  [Extract<T[keyof T], RequiredInputs<string | symbol>>] extends [never]
+    ? keyof T
+    : {
+        [K in keyof T]: [RequirementsOf<T[K]>] extends [never] ? K : never
+      }[keyof T]
+
+type InputKeys<T extends DependenciesMap> = {
+  [K in keyof T]: T[K] extends {readonly [scopeInputMarker]: true} ? K : never
+}[keyof T]
+
+type MissingInputKeys<T extends DependenciesMap> = {
+  [K in InputKeys<T>]: [RequirementsOf<T[K]>] extends [never] ? never : K
+}[InputKeys<T>]
+
+type InputValues<T extends DependenciesMap> = {
+  [K in MissingInputKeys<T>]: T[K]['type']
+}
+
+type RequiredKeys<T> = {
+  [K in KeysOfUnion<T>]: [T] extends [Record<K, unknown>] ? K : never
+}[KeysOfUnion<T>]
+
+type NoExtraKeys<Inputs, Allowed extends PropertyKey> =
+  Exclude<KeysOfUnion<Inputs>, Allowed> extends infer Extra
+    ? [Extra] extends [never]
+      ? Inputs
+      : Inputs & {readonly 'Invalid scope input keys': Extra}
+    : never
+
+type Provide<
+  T extends DependenciesMap,
+  Provided extends string | symbol
+> = {
+  [K in keyof T]: WithRequirements<
+    T[K],
+    Exclude<RequirementsOf<T[K]>, Provided>
+  >
+}
+
+type RegistrationKeys<T extends DependenciesMap> = {
+  [K in keyof T]: T[K] extends {readonly [scopeInputMarker]: true} ? never : K
+}[keyof T]
+
+type ScopeInputDeclarationCheck<T, Inputs extends object> =
+  ScopeInputMap<Inputs> extends never
+    ? {
+        readonly 'Invalid scope input declaration: use required finite string or symbol keys': never
+      }
+    : [keyof T & keyof Inputs] extends [never]
+      ? unknown
+      : {readonly 'Scope input key already exists': keyof T & keyof Inputs}
+
+interface FactoryResolver<T extends DependenciesMap> {
+  get<K extends ReadyKeysOf<T>>(key: K): T[K]['type']
+  has(key: string | symbol): boolean
+}
+
+type FactoryDependencyKeys<
+  T extends DependenciesMap,
+  Kind extends RegistrationKind
+> = keyof T & keyof AllowedDeps<T, Kind>
+
+type FactorySelection<
+  T extends DependenciesMap,
+  D extends readonly PropertyKey[]
+> = {
+  [K in Extract<D[number], keyof T>]: WithRequirements<T[K], never>
+}
 
 type NoKeyOverlap<A, B> = keyof A & keyof B extends never
   ? B
@@ -378,6 +537,8 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   private readonly regs = new Map<keyof T, Registration<T, keyof T>>()
   /** @internal */
   private readonly cache = new Map<keyof T, unknown>()
+  /** @internal */
+  private scopeInputs: Record<string | symbol, unknown> | undefined = undefined
   /*
    * Teardown queue. Only instances created by THIS container land here
    * (not registerValue — external ownership; not transient — owned by the caller).
@@ -467,6 +628,31 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   }
 
   /**
+   * Declares external values that may be supplied when opening child scopes.
+   * The declaration is type-only: it does not register values or mutate this
+   * container. Call {@link Container.createScope} with any required subset to
+   * make those inputs and their dependent services ready in the new child.
+   *
+   * @example
+   * ```ts
+   * const root = new Container()
+   *   .declareScopeInputs<{
+   *     request: RequestContext
+   *     auth: AuthContext
+   *   }>()
+   *
+   * const publicScope = root.createScope({request})
+   * const authenticatedScope = publicScope.createScope({auth})
+   * ```
+   */
+  public declareScopeInputs<Inputs extends object>(
+    this: Container<T> & ScopeInputDeclarationCheck<T, Inputs>
+  ): Container<T & ScopeInputMap<Inputs>>
+  public declareScopeInputs(): any {
+    return this
+  }
+
+  /**
    * Registers a class constructor under a specific key.
    *
    * The container automatically infers the created type and adds it to the
@@ -519,7 +705,12 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     Ctor: new (...args: A) => V,
     deps: D,
     kind?: undefined
-  ): Container<T & Record<K, Spec<V, 'singleton'>>>
+  ): Container<
+    T & Record<
+      K,
+      WithRequirementsOfDeps<Spec<V, 'singleton'>, T, D>
+    >
+  >
 
   public registerClass<
     const K extends string | symbol,
@@ -532,7 +723,9 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     Ctor: new (...args: A) => V,
     deps: D,
     kind: Kind
-  ): Container<T & Record<K, Spec<V, Kind>>>
+  ): Container<
+    T & Record<K, WithRequirementsOfDeps<Spec<V, Kind>, T, D>>
+  >
 
   public registerClass<
     const K extends string | symbol,
@@ -546,7 +739,15 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     deps: D,
     kind: undefined,
     lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
-  ): Container<T & Record<K, Spec<V, 'singleton'>> & Record<LK, LazySpec<V, 'singleton'>>>
+  ): Container<
+    T & Record<
+      K,
+      WithRequirementsOfDeps<Spec<V, 'singleton'>, T, D>
+    > & Record<
+      LK,
+      WithRequirementsOfDeps<LazySpec<V, 'singleton'>, T, D>
+    >
+  >
 
   public registerClass<
     const K extends string | symbol,
@@ -561,7 +762,10 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     deps: D,
     kind: Kind,
     lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
-  ): Container<T & Record<K, Spec<V, Kind>> & Record<LK, LazySpec<V, Kind>>>
+  ): Container<
+    T & Record<K, WithRequirementsOfDeps<Spec<V, Kind>, T, D>> &
+    Record<LK, WithRequirementsOfDeps<LazySpec<V, Kind>, T, D>>
+  >
 
   public registerClass<V>(
     key: string | symbol,
@@ -601,36 +805,45 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       fn = () => new (Ctor as unknown as new () => V)()
     } else if (len === 1) {
       const k0 = keys[0]!
-      fn = (c) => new (Ctor as unknown as new (a0: unknown) => V)(c.get(k0))
+      fn = (c) => new (Ctor as unknown as new (a0: unknown) => V)(c.get(k0 as ReadyKeysOf<T>))
     } else if (len === 2) {
       const k0 = keys[0]!, k1 = keys[1]!
       fn = (c) => new (Ctor as unknown as new (a0: unknown, a1: unknown) => V)(
-        c.get(k0), c.get(k1)
+        c.get(k0 as ReadyKeysOf<T>), c.get(k1 as ReadyKeysOf<T>)
       )
     } else if (len === 3) {
       const k0 = keys[0]!, k1 = keys[1]!, k2 = keys[2]!
       fn = (c) => new (Ctor as unknown as new (a0: unknown, a1: unknown, a2: unknown) => V)(
-        c.get(k0), c.get(k1), c.get(k2)
+        c.get(k0 as ReadyKeysOf<T>), c.get(k1 as ReadyKeysOf<T>),
+        c.get(k2 as ReadyKeysOf<T>)
       )
     } else if (len === 4) {
       const k0 = keys[0]!, k1 = keys[1]!, k2 = keys[2]!, k3 = keys[3]!
       fn = (c) => new (Ctor as unknown as new (a0: unknown, a1: unknown, a2: unknown, a3: unknown) => V)(
-        c.get(k0), c.get(k1), c.get(k2), c.get(k3)
+        c.get(k0 as ReadyKeysOf<T>), c.get(k1 as ReadyKeysOf<T>),
+        c.get(k2 as ReadyKeysOf<T>), c.get(k3 as ReadyKeysOf<T>)
       )
     } else if (len === 5) {
       const k0 = keys[0]!, k1 = keys[1]!, k2 = keys[2]!, k3 = keys[3]!, k4 = keys[4]!
       fn = (c) => new (Ctor as unknown as new (a0: unknown, a1: unknown, a2: unknown, a3: unknown, a4: unknown) => V)(
-        c.get(k0), c.get(k1), c.get(k2), c.get(k3), c.get(k4)
+        c.get(k0 as ReadyKeysOf<T>), c.get(k1 as ReadyKeysOf<T>),
+        c.get(k2 as ReadyKeysOf<T>), c.get(k3 as ReadyKeysOf<T>),
+        c.get(k4 as ReadyKeysOf<T>)
       )
     } else if (len === 6) {
       const k0 = keys[0]!, k1 = keys[1]!, k2 = keys[2]!, k3 = keys[3]!, k4 = keys[4]!, k5 = keys[5]!
       fn = (c) => new (Ctor as unknown as new (a0: unknown, a1: unknown, a2: unknown, a3: unknown, a4: unknown, a5: unknown) => V)(
-        c.get(k0), c.get(k1), c.get(k2), c.get(k3), c.get(k4), c.get(k5)
+        c.get(k0 as ReadyKeysOf<T>), c.get(k1 as ReadyKeysOf<T>),
+        c.get(k2 as ReadyKeysOf<T>), c.get(k3 as ReadyKeysOf<T>),
+        c.get(k4 as ReadyKeysOf<T>), c.get(k5 as ReadyKeysOf<T>)
       )
     } else if (len === 7) {
       const k0 = keys[0]!, k1 = keys[1]!, k2 = keys[2]!, k3 = keys[3]!, k4 = keys[4]!, k5 = keys[5]!, k6 = keys[6]!
       fn = (c) => new (Ctor as unknown as new (a0: unknown, a1: unknown, a2: unknown, a3: unknown, a4: unknown, a5: unknown, a6: unknown) => V)(
-        c.get(k0), c.get(k1), c.get(k2), c.get(k3), c.get(k4), c.get(k5), c.get(k6)
+        c.get(k0 as ReadyKeysOf<T>), c.get(k1 as ReadyKeysOf<T>),
+        c.get(k2 as ReadyKeysOf<T>), c.get(k3 as ReadyKeysOf<T>),
+        c.get(k4 as ReadyKeysOf<T>), c.get(k5 as ReadyKeysOf<T>),
+        c.get(k6 as ReadyKeysOf<T>)
       )
     } else {
       /*
@@ -643,7 +856,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
         const args: unknown[] = []
 
         for (let i = 0; i < len; i++) {
-          args.push(c.get(keys[i]!))
+          args.push(c.get(keys[i]! as ReadyKeysOf<T>))
         }
 
         return Reflect.construct(Ctor, args)
@@ -700,7 +913,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       this.regs.set(lazyKey as unknown as keyof T, {
         kind: 'transient',
         lazy: kind === 'singleton',
-        fn: (c) => ({get: () => c.get(targetKey)} as unknown as T[keyof T]['type']),
+        fn: (c) => ({get: () => c.get(targetKey as ReadyKeysOf<T>)} as unknown as T[keyof T]['type']),
         owned: false
       })
     }
@@ -720,6 +933,11 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * Passing a `lazyKey` additionally registers a `Lazy<V>` wrapper under that
    * companion identifier, with the same lifetime-preserving behavior as
    * {@link Container.registerClass}.
+   *
+   * A factory that reads scope inputs must use the deps-aware overload:
+   * `registerFactory(key, deps, factory, kind)`. The tuple declares type-level
+   * edges and limits the callback to a resolver-only view of those keys. InferDI
+   * does not resolve the tuple into callback arguments at runtime.
    *
    * @template K - The string-or-symbol key to register the factory under. Must not be already registered.
    * @template V - The return type of the factory.
@@ -765,6 +983,18 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    *   })
    * const db = await c.get('db')
    * ```
+   *
+   * @example
+   * ```ts
+   * const root = new Container()
+   *   .declareScopeInputs<{auth: AuthContext}>()
+   *   .registerFactory(
+   *     'userId',
+   *     ['auth'],
+   *     (c) => c.get('auth').userId,
+   *     'scoped'
+   *   )
+   * ```
    */
   public registerFactory<
     const K extends string | symbol,
@@ -788,7 +1018,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   public registerFactory<
     const K extends string | symbol,
     V,
-    const LK extends string | symbol,
+    const LK extends string | symbol
   >(
     key: K & ([K] extends [keyof T] ? never : unknown),
     factory: (c: Container<AllowedDeps<T, 'singleton'>>) => V,
@@ -800,7 +1030,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     const K extends string | symbol,
     V,
     const Kind extends RegistrationKind,
-    const LK extends string | symbol,
+    const LK extends string | symbol
   >(
     key: K & ([K] extends [keyof T] ? never : unknown),
     factory: (c: Container<AllowedDeps<T, Kind>>) => V,
@@ -808,15 +1038,101 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
   ): Container<T & Record<K, Spec<V, Kind>> & Record<LK, LazySpec<V, Kind>>>
 
+  public registerFactory<
+    const K extends string | symbol,
+    V,
+    const D extends readonly FactoryDependencyKeys<T, 'singleton'>[]
+  >(
+    key: K & ([K] extends [keyof T] ? never : unknown),
+    deps: D,
+    factory: (
+      c: FactoryResolver<
+        FactorySelection<AllowedDeps<T, 'singleton'>, D>
+      >
+    ) => V,
+    kind?: undefined
+  ): Container<
+    T & Record<
+      K,
+      WithRequirementsOfDeps<Spec<V, 'singleton'>, T, D>
+    >
+  >
+
+  public registerFactory<
+    const K extends string | symbol,
+    V,
+    const Kind extends RegistrationKind,
+    const D extends readonly FactoryDependencyKeys<T, Kind>[]
+  >(
+    key: K & ([K] extends [keyof T] ? never : unknown),
+    deps: D,
+    factory: (
+      c: FactoryResolver<FactorySelection<AllowedDeps<T, Kind>, D>>
+    ) => V,
+    kind: Kind
+  ): Container<
+    T & Record<K, WithRequirementsOfDeps<Spec<V, Kind>, T, D>>
+  >
+
+  public registerFactory<
+    const K extends string | symbol,
+    V,
+    const LK extends string | symbol,
+    const D extends readonly FactoryDependencyKeys<T, 'singleton'>[]
+  >(
+    key: K & ([K] extends [keyof T] ? never : unknown),
+    deps: D,
+    factory: (
+      c: FactoryResolver<
+        FactorySelection<AllowedDeps<T, 'singleton'>, D>
+      >
+    ) => V,
+    kind: undefined,
+    lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
+  ): Container<
+    T & Record<
+      K,
+      WithRequirementsOfDeps<Spec<V, 'singleton'>, T, D>
+    > & Record<
+      LK,
+      WithRequirementsOfDeps<LazySpec<V, 'singleton'>, T, D>
+    >
+  >
+
+  public registerFactory<
+    const K extends string | symbol,
+    V,
+    const Kind extends RegistrationKind,
+    const LK extends string | symbol,
+    const D extends readonly FactoryDependencyKeys<T, Kind>[]
+  >(
+    key: K & ([K] extends [keyof T] ? never : unknown),
+    deps: D,
+    factory: (
+      c: FactoryResolver<FactorySelection<AllowedDeps<T, Kind>, D>>
+    ) => V,
+    kind: Kind,
+    lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
+  ): Container<
+    T & Record<K, WithRequirementsOfDeps<Spec<V, Kind>, T, D>> &
+    Record<LK, WithRequirementsOfDeps<LazySpec<V, Kind>, T, D>>
+  >
+
   public registerFactory(
     key: string | symbol,
-    factory: (c: any) => any,
-    kind: RegistrationKind = 'singleton',
-    lazyKey?: string | symbol
+    depsOrFactory: readonly (string | symbol)[] | ((c: any) => any),
+    factoryOrKind?: ((c: any) => any) | RegistrationKind,
+    kindOrLazyKey?: RegistrationKind | string | symbol,
+    depsLazyKey?: string | symbol
   ): any {
     if (this._disposed) {
       throw new Error(`Cannot register on a disposed container (key: "${String(key)}")`)
     }
+
+    const depsAware = Array.isArray(depsOrFactory)
+    const factory = (depsAware ? factoryOrKind : depsOrFactory) as (c: any) => any
+    const kind = ((depsAware ? kindOrLazyKey : factoryOrKind) ?? 'singleton') as RegistrationKind
+    const lazyKey = depsAware ? depsLazyKey : kindOrLazyKey as string | symbol | undefined
 
     this.regs.set(
       key as unknown as keyof T,
@@ -842,7 +1158,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       this.regs.set(lazyKey as unknown as keyof T, {
         kind: 'transient',
         lazy: kind === 'singleton',
-        fn: (c) => ({get: () => c.get(targetKey)} as unknown as T[keyof T]['type']),
+        fn: (c) => ({get: () => c.get(targetKey as ReadyKeysOf<T>)} as unknown as T[keyof T]['type']),
         owned: false
       })
     }
@@ -962,7 +1278,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * c.get('logger') // MockLogger
    * ```
    */
-  public override<K extends keyof T>(key: K, value: T[K]['type']): this {
+  public override<K extends RegistrationKeys<T>>(key: K, value: T[K]['type']): this {
     if (this._disposed) {
       throw new Error(`Cannot override on a disposed container (key: "${String(key)}")`)
     }
@@ -1057,12 +1373,18 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * Creates a child scope that inherits every registration from this container.
    * Resolutions through the child cache `scoped` services per-scope; singletons
    * remain on their owning container; transients stay caller-owned.
+   * Declared scope inputs may be supplied as a partial record. A nested child
+   * inherits inputs already supplied to its parent and may add missing inputs.
+   * Input values are shallow-snapshotted into the child cache and remain
+   * application-owned.
    *
    * Each scope owns the instances it creates and disposes them when the scope
    * itself is disposed (`using` / `await using` / explicit `.dispose()`).
    *
    * @throws {Error} If this container has already been disposed.
-   * @returns A new child container with the same `T` and an isolated cache.
+   * @param inputs - Missing scope inputs to provide on the new child.
+   * @returns A new child container with an isolated cache and the provided
+   *          input requirements removed from its type-state.
    *
    * @example
    * ```ts
@@ -1072,11 +1394,41 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * }
    * ```
    */
-  public createScope(): Container<T> {
+  public createScope<const Inputs extends object>(
+    inputs: NoExtraKeys<Inputs, MissingInputKeys<T>> & Partial<InputValues<T>>
+  ): Container<
+    Provide<T, Extract<RequiredKeys<Inputs>, string | symbol>>
+  >
+  public createScope(): Container<T>
+  public createScope(inputs?: Record<string | symbol, unknown>): any {
     if (this._disposed) {
       throw new Error('Cannot create scope from a disposed container')
     }
-    return new Container<T>(this)
+
+    const child = new Container<T>(this)
+    const values = inputs === undefined
+      ? this.scopeInputs
+      : this.scopeInputs === undefined
+        ? {...inputs}
+        : {...this.scopeInputs, ...inputs}
+
+    if (values !== undefined) {
+      const keys = Reflect.ownKeys(values)
+
+      if (keys.length !== 0) {
+        child.scopeInputs = values
+
+        for (const key of keys) {
+          const value = values[key]
+          child.cache.set(
+            key as keyof T,
+            value === undefined ? UNDEFINED_MARKER : value
+          )
+        }
+      }
+    }
+
+    return child
   }
 
   /**
@@ -1097,7 +1449,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * @throws {Error} On a lifetime violation
    *                 (`Singleton "..." cannot depend on scoped "..."`).
    */
-  public get<K extends keyof T>(key: K): T[K]['type'] {
+  public get<K extends ReadyKeysOf<T>>(key: K): T[K]['type'] {
     /*
      * 1. Hot path: local cache hit.
      *    Single Map.get covers ≥99.9% of resolves. `UNDEFINED_MARKER` covers the
@@ -1479,6 +1831,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
      */
     this.cache.clear()
     this.regs.clear()
+    this.scopeInputs = undefined
     /*
      * Detach the parent: otherwise an externally-held reference to a disposed scope
      * would keep the entire parent chain (root and all of its caches/factories) from GC
@@ -1611,6 +1964,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
 
     this.cache.clear()
     this.regs.clear()
+    this.scopeInputs = undefined
     /*
      * Detach the parent: otherwise an externally-held reference to a disposed scope
      * would keep the entire parent chain (root and all of its caches/factories) from GC
@@ -1693,6 +2047,25 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
  * from a fully-built container.
  */
 export namespace Container {
+  /**
+   * Extracts the keys currently resolvable through {@link Container.get}.
+   * Use it when writing generic resolver helpers for graphs that may contain
+   * scope inputs that have not been provided yet.
+   *
+   * @example
+   * ```ts
+   * function resolve<
+   *   T extends DependenciesMap,
+   *   K extends Container.ReadyKeys<Container<T>>
+   * >(container: Container<T>, key: K) {
+   *   return container.get(key)
+   * }
+   * ```
+   */
+  export type ReadyKeys<C> = C extends Container<infer U>
+    ? ReadyKeysOf<U>
+    : never
+
   /**
    * Extracts the registered key map from a fully-built container type as a
    * **flat** `{ key: ServiceType }` view — the lifetime kind from each {@link Spec}
@@ -1796,6 +2169,6 @@ export namespace Container {
    * ```
    */
   export type Providers<C> = C extends Container<infer U>
-    ? { [K in keyof U]: () => U[K]['type'] }
+    ? { [K in RegistrationKeys<U>]: () => U[K]['type'] }
     : never
 }
