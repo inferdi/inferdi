@@ -100,7 +100,7 @@ irrepresentables allí donde TypeScript pueda expresar la regla.
   parámetros del constructor por posición y por asignabilidad estructural.
 - `AllowedDeps<T, Kind>` estrecha el contenedor pasado a las factorías. Dentro de
   una factoría singleton, `c.get('scoped')` es un error de tipo.
-- `Spec`, `LazySpec`, `SpecMap`, `Module`, `Container.Resolve`,
+- `Spec`, `AsyncSpec`, `LazySpec`, `SpecMap`, `Module`, `Container.Resolve`,
   `Container.ResolveUnwrapped`, `Container.UnwrappedValue` y
   `Container.Providers` forman parte del contrato. Trata los cambios en ellos
   como cambios de la API pública.
@@ -180,8 +180,13 @@ No añadas trabajo antes de esa búsqueda.
   argumentos. La ruta de 8 o más usa `Reflect.construct` con un array compacto
   construido mediante `push`.
 - `get()` se mantiene síncrono. El array compartido `resolving` y el
-  `singletonStack` funcionan únicamente porque una resolución se ejecuta de forma
-  atómica en la pila de llamadas.
+  `singletonStack` son seguros porque una resolución y la fase previa de sus
+  dependencias asíncronas declarativas se ejecutan de forma atómica en la pila.
+  `getAsync()` añade un límite de Promise al mismo resolver y no modifica esas
+  pilas desde una continuación.
+- Los registros asíncronos declarativos comparten `regs`, `cache`, búsqueda de
+  scope, propiedad y liberación con los registros síncronos. `Registration.async`
+  es metadato frío para clasificar dependencias al registrar; `get()` no lo lee.
 - `strict: false` puede eliminar las comprobaciones de ciclos y tiempo de vida en
   runtime tras la ruta rápida de caché local. Los scopes rápidos pueden leer
   directamente el registro raíz inmutable y reflejar singletons delegados en su
@@ -198,10 +203,10 @@ incluya una justificación escrita y acotada.
 
 `@inferdi/inferdi` no tiene dependencias en runtime. Mantenlo así.
 
-El bundle publicado debería mantenerse por debajo de 3KB gzipped. CI no impone
-ese presupuesto hoy, así que quienes revisan deben comprobar el tamaño del bundle
-en los PR que añaden código a la implementación del core o a los helpers
-públicos.
+El bundle publicado debe mantenerse por debajo de 3KB gzipped. CI impone ese
+presupuesto con `pnpm run test:bundle-size`; quienes revisan deben seguir
+comprobando los cambios de tamaño en los PR que añaden código a la implementación
+del core o a los helpers públicos.
 
 ## 3. Filtro de PR
 
@@ -297,8 +302,8 @@ Documenta estas decisiones en lugar de "arreglarlas".
 | Sin API de decoradores | La DI basada en decoradores es una biblioteca distinta. |
 | Sin metadatos en runtime | Las firmas de los constructores y las tuplas explícitas `deps` proporcionan el grafo. La introspección en runtime añadiría dependencias y modos de fallo más débiles. |
 | Sin distinción nominal para dependencias estructurales idénticas | TypeScript usa asignabilidad estructural. Si dos claves exponen la misma forma, `DepsOf` no puede conocer la intención semántica del usuario. Usa tipos con marca o claves `unique symbol` cuando el orden importe entre servicios de la misma forma. |
-| Sin `get()` asíncrono | Los guards actuales de ciclos y tiempos de vida usan estado de pila de llamadas síncrono compartido. Una API de resolución asíncrona necesitaría una contabilidad separada por cada resolución. |
-| Sin detección de ciclos entre factorías asíncronas | Tras un `await`, la pila de resolución síncrona ya no existe y las promesas pendientes pueden satisfacer llamadas `c.get()` posteriores. Detectar esto añadiría seguimiento asíncrono a la resolución. Separa el ciclo, eleva la inicialización compartida o usa `Lazy<singleton>` donde sea legal. |
+| Sin `get()` asíncrono | `get()` sigue siendo síncrono. `getAsync()` envuelve el mismo resolver síncrono en una Promise sin crear otro registro, caché o carril de resolución. |
+| Sin detección de ciclos dinámicos tras un límite de Promise | Las dependencias asíncronas declarativas pasan por una fase previa síncrona y usan el detector de ciclos existente. Las llamadas posteriores a `await` desde factorías antiguas que devuelven Promise o contenedores capturados ocurren después de limpiar la pila de resolución. Separa ese ciclo o eleva la inicialización compartida. |
 | Sin detección de tiempo de vida en runtime tras un límite asíncrono | `AllowedDeps` bloquea las factorías tipadas inválidas, pero los casts con `as` y los contenedores externos capturados después de `await` se ejecutan tras limpiar `singletonStack`. La defensa completa requeriría seguimiento de contexto asíncrono. Lee las dependencias en el preámbulo síncrono. |
 | Sin ruptura automática de ciclos | Los ciclos son defectos arquitectónicos a menos que uno de los lados sea un companion singleton lazy explícito. InferDI detecta los ciclos de runtime soportados y los reporta; no inventa proxies ni instancias parciales. |
 | Sin módulos genéricos `<T>(c: Container<T>) => ...` | `keyof T` colapsa al límite superior `DependenciesMap` dentro del cuerpo genérico. Usa lambdas `.use()` en línea o `Module<TIn, TOut>` con una forma de entrada conocida. |

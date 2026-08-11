@@ -21,15 +21,15 @@ schema:
       "@id": "https://inferdi.com/ru/core/factories#article"
       "headline": "Фабрики в InferDI — registerFactory"
       "name": "Фабрики"
-      "description": "Используйте registerFactory, когда создание требует большего, чем new Ctor(...deps): чтение нескольких значений, адаптация сторонних клиентов, сборка объектов конфигурации или возврат promise, который InferDI кеширует как есть."
+      "description": "Используйте registerFactory для синхронного создания и registerAsyncFactory для декларативного асинхронного графа зависимостей."
       "url": "https://inferdi.com/ru/core/factories"
       "mainEntityOfPage": "https://inferdi.com/ru/core/factories"
       "inLanguage": "ru-RU"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-31"
+      "dateModified": "2026-08-09"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, фабрики, registerFactory, асинхронная фабрика, конфигурация, сторонние клиенты, внедрение зависимостей"
+      "keywords": "InferDI, фабрики, registerFactory, registerAsyncFactory, getAsync, AsyncSpec, внедрение зависимостей"
       "articleSection": "Базовые принципы"
       "isPartOf":
         "@type": "WebSite"
@@ -131,23 +131,57 @@ const container = new Container()
 
 Потребители ключа `'mailer'` видят `Mailer`, а не конкретный класс.
 
-## Асинхронные фабрики
+## Синхронные фабрики со значением Promise
 
-Фабрики могут возвращать promises. Сам promise кешируется, поэтому параллельные вызовы разделяют одну и ту же инициализацию:
+`registerFactory` считает возвращённый Promise значением сервиса. Ключ остаётся синхронным, `get()` возвращает Promise, а другая фабрика получает тот же объект.
 
 ```ts
 const c = new Container()
-  .registerValue('dsn', 'postgres://localhost/app')
-  .registerFactory('db', async (c) => {
-    const pool = new Pool({ connectionString: c.get('dsn') })
-    await pool.connect()
-    return pool
-  })
+  .registerFactory('dbPromise', () => connectDatabase())
 
-const [a, b] = await Promise.all([c.get('db'), c.get('db')])
-await c.dispose()
+const promise = c.get('dbPromise') // Promise<Database>
 ```
 
-`.get()` остаётся синхронным. Вызывающий код делает `await` в месте использования, если регистрация асинхронная.
+Эта форма сохраняет single-flight кеширование. Цикл, созданный после `await` через захваченный контейнер, находится вне синхронных проверок циклов и времени жизни.
 
-Runtime-проверка циклов и `singletonStack` отражают только синхронный стек вызова фабрики. После `await` они не обнаружат transient-зависимость или scoped-зависимость, полученную через захваченный дочерний scope. Отдельный root-scope guard по-прежнему отклоняет `root.get(scopedKey)` в strict mode, а `AllowedDeps` защищает обычный типизированный код. Читайте зависимости в синхронной части фабрики до первого `await`.
+## Декларативный асинхронный граф
+
+`registerAsyncFactory` хранит итоговый тип сервиса в `AsyncSpec` и получает позиционные значения зависимостей. `registerClass` распространяет async status по графу классов.
+
+```ts
+class Repository {
+  constructor(readonly db: Database) {}
+}
+
+const root = new Container()
+  .registerValue('config', {url: 'postgres://localhost/app'})
+  .declareScopeInputs<{request: RequestContext}>()
+  .registerAsyncFactory(
+    'db',
+    async (config) => connectDatabase(config.url),
+    ['config']
+  )
+  .registerAsyncFactory(
+    'session',
+    async (request) => loadSession(request),
+    ['request'],
+    'scoped'
+  )
+  .registerClass('repository', Repository, ['db'])
+
+const scope = root.createScope({request})
+const repository = await scope.getAsync('repository')
+
+// @ts-expect-error — ключи async-графа требуют getAsync()
+scope.get('repository')
+```
+
+`getAsync()` принимает готовые sync- и async-ключи и возвращает Promise. TypeScript отклоняет `get()`, если ключ или union ключей может содержать `AsyncSpec`. `has()` подтверждает только наличие регистрации: он не доказывает, что ключ синхронный, и не предоставляет недостающие scope inputs.
+
+Контейнер запускает объявленные зависимости по порядку кортежа и ожидает только помеченные async-регистрации. Singleton и scoped регистрации кешируют один native Promise. Transient запускается при каждом вызове и остаётся во владении вызывающего кода. Декларативные циклы и cold lifetime violations завершаются ошибкой во время синхронного preflight.
+
+Async callback не получает контейнер. Вызовы через захваченный контейнер после Promise boundary создают динамические рёбра, которые граф не анализирует. InferDI не добавляет async `Lazy<T>`, retry, cancellation или rollback. Если следующий sibling падает во время preflight, уже начатые инициализации сохраняют прежний cache и ownership; async transient может продолжить работу без teardown handle.
+
+Owned async singleton и scoped регистрации сохраняют Promise в кеше после выполнения. Закрывайте их контейнеры через `await using`, `await container.dispose()` или `Symbol.asyncDispose`. Синхронный `using` сообщает, что кешированный Promise нельзя развернуть.
+
+Передавайте readonly-кортежи зависимостей в `registerAsyncFactory` и в `registerClass`, если кортеж может выбрать async-ключ. InferDI сохраняет ссылку на кортеж и один раз классифицирует async-позиции; литералы автоматически выводятся как readonly.

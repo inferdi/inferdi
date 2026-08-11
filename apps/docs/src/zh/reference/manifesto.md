@@ -79,7 +79,7 @@ InferDI 证明 TypeScript 的依赖注入可以在不放弃静态保证的前提
 - `register*` 使用 `K & ([K] extends [keyof T] ? never : unknown)`，使重复的键在编译期失败，且出错的键在错误信息中保持可见。
 - `DepsOf<AllowedDeps<T, Kind>, A>` 会按位置和结构可赋值性，将 `deps` 元组与构造函数参数进行核对。
 - `AllowedDeps<T, Kind>` 会收窄传入工厂的容器。在单例工厂内部，`c.get('scoped')` 是一个类型错误。
-- `Spec`、`LazySpec`、`SpecMap`、`Module`、`Container.Resolve`、`Container.ResolveUnwrapped`、`Container.UnwrappedValue` 和 `Container.Providers` 都属于契约的一部分。对它们的改动应视为公开 API 的变更。
+- `Spec`、`AsyncSpec`、`LazySpec`、`SpecMap`、`Module`、`Container.Resolve`、`Container.ResolveUnwrapped`、`Container.UnwrappedValue` 和 `Container.Providers` 都属于契约的一部分。对它们的改动应视为公开 API 的变更。
 - 新增或改动的公开类型接口需要在 `packages/inferdi/__tests__/container.test-d.ts` 中提供正向类型测试和负向的 `// @ts-expect-error` 测试。
 
 已知的 TypeScript 限制必须被记录，而非被隐藏。例如，两个具有相同结构类型的依赖仍然可以互换，除非用户引入名义上的区分，例如 `unique symbol` 键或带品牌（branded）的值类型。
@@ -121,7 +121,8 @@ if (cached !== undefined) return ...
 - `_disposed`、注册查找、父级查找、循环检查、生命周期检查以及单例栈（singleton-stack）的变更，全部位于缓存快速路径之后。
 - strict 依赖树必须在遍历精确的父链之前检查本地注册。它们不保留父级查找快照，因此无需失效处理或每个 scope 的元数据，也能立即看到变更。
 - 构造函数调用对 0-7 个参数保持按参数个数展开。8 个及以上的路径使用 `Reflect.construct`，并配合通过 `push` 构建的紧凑数组（packed array）。
-- `get()` 保持同步。共享的 `resolving` 数组和 `singletonStack` 之所以能正常工作，仅仅是因为一次解析会在调用栈上原子地运行。
+- `get()` 保持同步。共享的 `resolving` 数组和 `singletonStack` 之所以安全，是因为一次解析及其声明式异步依赖预检会在调用栈上原子地运行。`getAsync()` 只在同一个解析器外增加 Promise 边界，不会在 continuation 中修改这些栈。
+- 声明式异步注册与同步注册共用 `regs`、`cache`、作用域查找、所有权和释放逻辑。`Registration.async` 只是注册阶段用于依赖分类的冷元数据；`get()` 不读取它。
 - `strict: false` 可以在本地缓存快速路径之后移除运行时的循环与生命周期检查。快速 scope 可以直接读取不可变的根注册表，并把委托解析的 singleton 镜像到本地缓存。fast 依赖树在首次解析或创建 scope 后必须保持不可变。
 
 `packages/inferdi/__tests__/container.bench.ts` 不受 CI 强制约束。对于触及 `get()`、注册对象形态、缓存表示、作用域查找、惰性伴生项或构造函数调用的改动，评审者必须要求提供基准测试输出。在相关场景中超过 5% 的本地性能回退会阻止合并，除非该 PR 包含一份范围明确、书面的理由说明。
@@ -130,7 +131,7 @@ if (cached !== undefined) return ...
 
 `@inferdi/inferdi` 没有运行时依赖。请保持这一点。
 
-已发布的产物应保持在 gzip 压缩后 3KB 以下。CI 目前尚未强制执行这一预算，因此对于向核心实现或公开辅助函数添加代码的 PR，评审者必须检查产物大小。
+已发布的产物必须保持在 gzip 压缩后 3KB 以下。CI 通过 `pnpm run test:bundle-size` 强制执行这一预算；对于向核心实现或公开辅助函数添加代码的 PR，评审者仍应检查体积变化。
 
 ## 3. PR 过滤器
 
@@ -201,8 +202,8 @@ if (cached !== undefined) return ...
 | 没有装饰器 API | 基于装饰器的 DI 是另一个库。 |
 | 没有运行时元数据 | 构造函数签名和显式的 `deps` 元组提供了依赖图。运行时自省会引入依赖以及更弱的失败模式。 |
 | 对相同结构的依赖不做名义区分 | TypeScript 使用结构可赋值性。如果两个键暴露相同的形态，`DepsOf` 无法得知用户的语义意图。当相同形态的服务之间顺序重要时，请使用带品牌的类型或 `unique symbol` 键。 |
-| 没有异步 `get()` | 当前的循环与生命周期守卫使用共享的同步调用栈状态。异步解析 API 将需要独立的逐次解析记账。 |
-| 不检测异步工厂之间的循环 | 在一次 `await` 之后，同步解析栈已不复存在，待定的 promise 可能满足后续的 `c.get()` 调用。检测这一点会向解析引入异步追踪。请拆分循环、提升共享初始化逻辑，或在合法的地方使用 `Lazy<singleton>`。 |
+| 没有异步 `get()` | `get()` 保持同步。`getAsync()` 用 Promise 包装同一个同步解析器，不会创建另一套注册表、缓存或解析通道。 |
+| 不检测 Promise 边界之后的动态循环 | 声明式异步依赖经过同步预检，并使用现有的循环守卫。返回 Promise 的旧式工厂或捕获容器在 `await` 后发起的调用发生在解析栈清空之后。请拆分此类循环或提升共享初始化逻辑。 |
 | 不在异步边界后进行运行时生命周期检测 | `AllowedDeps` 仍会阻止无效的类型化工厂，但 `await` 后通过 `as` 强制转换或捕获的外部容器会在 `singletonStack` 清理后运行。完整防护需要异步上下文跟踪。请在同步阶段读取依赖项。 |
 | 没有自动断环 | 循环属于架构缺陷，除非其中一端是显式的惰性单例伴生项。InferDI 会检测受支持的运行时循环并报告它们；它不会臆造 proxy 或部分构造的实例。 |
 | 不支持泛型 `<T>(c: Container<T>) => ...` 模块 | 在泛型函数体内部，`keyof T` 会坍缩为 `DependenciesMap` 的上界。请使用内联的 `.use()` lambda，或带有已知输入形态的 `Module<TIn, TOut>`。 |

@@ -79,7 +79,7 @@ Resolve с попаданием в кеш остаётся быстрым пут
 - `register*` использует `K & ([K] extends [keyof T] ? never : unknown)`, чтобы повторные ключи падали при компиляции, а проблемный ключ оставался виден в ошибке.
 - `DepsOf<AllowedDeps<T, Kind>, A>` проверяет кортеж `deps` по позициям конструктора и структурной совместимости.
 - `AllowedDeps<T, Kind>` сужает контейнер, переданный в фабрики. Внутри singleton-фабрики `c.get('scoped')` является ошибкой типов.
-- `Spec`, `LazySpec`, `SpecMap`, `Module`, `Container.Resolve`, `Container.ResolveUnwrapped`, `Container.UnwrappedValue` и `Container.Providers` входят в контракт. Их изменение считается изменением публичного API.
+- `Spec`, `AsyncSpec`, `LazySpec`, `SpecMap`, `Module`, `Container.Resolve`, `Container.ResolveUnwrapped`, `Container.UnwrappedValue` и `Container.Providers` входят в контракт. Их изменение считается изменением публичного API.
 - Новая или изменённая публичная поверхность типов требует позитивных тестов типов и негативных `// @ts-expect-error` tests в `packages/inferdi/__tests__/container.test-d.ts`.
 
 Известные ограничения TypeScript нужно документировать, а не прятать. Например, две зависимости с одинаковой структурной формой остаются взаимозаменяемыми, пока пользователь не добавит номинальное различие через `unique symbol` keys или branded-типы значений.
@@ -121,7 +121,8 @@ if (cached !== undefined) return ...
 - `_disposed`, поиск регистрации, поиск родителя, проверки циклов, проверки времени жизни и мутация singleton-stack находятся после быстрого пути кеша.
 - Strict-деревья проверяют локальные регистрации до прохода по точной цепочке родителей. Они не хранят снимки parent lookup, поэтому мутации видны без инвалидации и метаданных на каждом scope.
 - Вызов конструктора остаётся развёрнутым по arity для 0-7 аргументов. Путь 8+ использует `Reflect.construct` с packed array, собранным через `push`.
-- `get()` остаётся синхронным. Общие `resolving` array и `singletonStack` работают только потому, что один resolve атомарно выполняется на call stack.
+- `get()` остаётся синхронным. Общие `resolving` array и `singletonStack` работают только потому, что resolve и preflight декларативных async-зависимостей атомарно выполняются на call stack. `getAsync()` добавляет Promise-границу вокруг того же resolver и не меняет эти стеки из continuation.
+- Декларативные async-регистрации используют те же `regs`, `cache`, scope lookup, ownership и disposal, что и синхронные. `Registration.async` — холодная метаинформация для классификации зависимостей при регистрации; `get()` её не читает.
 - `strict: false` может убрать runtime-проверки циклов и времени жизни после быстрого пути локального кеша. Fast scope может читать неизменяемый root registry напрямую и зеркалировать delegated singleton в локальный cache. Fast-дерево становится неизменяемым после первого resolve или создания scope.
 
 `packages/inferdi/__tests__/container.bench.ts` не проверяется в CI. Ревьюеры должны требовать вывод бенчмарка для изменений в `get()`, форме объекта регистрации, представлении кеша, поиске scope, lazy companions или вызове конструктора. Локальная регрессия больше 5% в релевантном сценарии блокирует merge, если PR не содержит узкого письменного обоснования.
@@ -130,7 +131,7 @@ if (cached !== undefined) return ...
 
 У `@inferdi/inferdi` нет runtime dependencies. Так и должно оставаться.
 
-Опубликованный bundle должен оставаться меньше 3KB gzip. CI пока не проверяет этот бюджет, поэтому ревьюеры должны проверять размер bundle для PR, которые добавляют код в core implementation или публичные helpers.
+Опубликованный bundle должен оставаться меньше 3KB gzip. CI проверяет этот бюджет командой `pnpm run test:bundle-size`; ревьюерам всё равно следует оценивать изменение размера в PR, которые добавляют код в core implementation или публичные helpers.
 
 ## 3. Фильтр PR
 
@@ -201,8 +202,8 @@ if (cached !== undefined) return ...
 | Нет decorator API                                                 | DI на декораторах - это другая библиотека.                                                                                                                                                                                                                        |
 | Нет runtime metadata                                              | Сигнатуры конструкторов и явные кортежи `deps` задают граф. Runtime introspection добавил бы зависимости и более слабые режимы отказа.                                                                                                                            |
 | Нет номинального различия для одинаковых структурных зависимостей | TypeScript использует структурную совместимость. Если два ключа имеют одну форму, `DepsOf` не знает семантический смысл пользователя. Используйте branded-типы или `unique symbol` keys, когда порядок важен между сервисами одинаковой формы.                    |
-| Нет async `get()`                                                 | Текущие проверки циклов и времени жизни используют общее синхронное состояние call stack. Асинхронному resolve API нужен отдельный per-resolve bookkeeping.                                                                                                       |
-| Нет детекта циклов между async-фабриками                          | После `await` синхронный resolve stack исчезает, а pending promises могут удовлетворять последующие `c.get()`. Детект добавил бы async tracking в resolve. Разделите цикл, поднимите общую инициализацию или используйте `Lazy<singleton>` там, где это легально. |
+| Нет async `get()`                                                 | `get()` остаётся синхронным. `getAsync()` оборачивает тот же синхронный resolver в Promise и не создаёт отдельный registry, cache или resolve lane.                                                                                                                |
+| Нет детекта динамических циклов после Promise-границы             | Декларативные async-зависимости проходят синхронный preflight и используют существующий cycle guard. Вызовы из legacy Promise-valued фабрик или захваченных контейнеров после `await` выполняются после очистки resolve stack. Разделите такой цикл или поднимите общую инициализацию. |
 | Нет runtime-проверки времени жизни после async-границы            | `AllowedDeps` блокирует неверные типизированные фабрики, но `as`-cast и захваченные внешние контейнеры после `await` выполняются уже после очистки `singletonStack`. Полная защита потребовала бы async-context tracking. Читайте зависимости в синхронной части фабрики. |
 | Нет auto-cycle-breaking                                           | Циклы - архитектурные дефекты, если одна сторона не является явным lazy singleton companion. InferDI детектирует поддерживаемые runtime cycles и сообщает о них; он не создаёт proxies или partial instances.                                                     |
 | Нет generic `<T>(c: Container<T>) => ...` modules                 | `keyof T` схлопывается до верхней границы `DependenciesMap` внутри generic body. Используйте inline `.use()` lambdas или `Module<TIn, TOut>` с известной input shape.                                                                                             |

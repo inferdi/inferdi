@@ -21,18 +21,18 @@ schema:
       "@id": "https://inferdi.com/reference/api#article"
       "headline": "InferDI Core API Summary"
       "name": "API Summary"
-      "description": "A summary of the public @inferdi/inferdi core API: the Container class, register, registerFactory, registerValue, get, has, scopes, override, dispose, and the Lazy, DependenciesMap, and Module types."
+      "description": "A summary of the @inferdi/inferdi core API, including registerAsyncFactory, getAsync, AsyncSpec, scopes, overrides, and disposal."
       "url": "https://inferdi.com/reference/api"
       "mainEntityOfPage": "https://inferdi.com/reference/api"
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-21"
+      "dateModified": "2026-08-09"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "executableLibraryName": "@inferdi/inferdi"
       "programmingModel": "Explicit registration, fluent builder"
       "targetPlatform": "Node.js, Bun, Deno, Browser"
-      "keywords": "InferDI, API, Container, register, registerFactory, get, scope, override, dispose, Lazy, Module"
+      "keywords": "InferDI, API, Container, registerFactory, registerAsyncFactory, getAsync, AsyncSpec, scope, dispose"
       "articleSection": "Reference"
       "isPartOf":
         "@type": "WebSite"
@@ -70,6 +70,7 @@ import {
   type DependenciesMap,
   type Lazy,
   type LazySpec,
+  type AsyncSpec,
   type Module,
   type RegistrationKind,
   type Spec,
@@ -83,12 +84,14 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 
   registerClass(key, Ctor, deps, kind?, lazyKey?)
   registerFactory(key, factory, kind?, lazyKey?)
+  registerAsyncFactory(key, factory, deps, kind?)
   registerValue(key, value)
   override(key, value)
   use(fn)
 
   createScope()
   get(key)
+  getAsync(key): Promise
   has(key)
 
   get disposed(): boolean
@@ -104,13 +107,16 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 | --- | --- |
 | `registerClass` | Register a constructor and dependency tuple. |
 | `registerFactory` | Register custom construction logic. |
+| `registerAsyncFactory` | Register positional dependencies in the declarative async graph. |
 | `registerValue` | Register an externally owned singleton value. |
 | `override` | Replace an existing registration; rejects a key already cached locally. |
 | `use` | Apply a module builder. |
 
 `registerClass` and `registerFactory` accept `singleton`, `scoped`, and `transient` lifetimes, plus an optional `lazyKey` companion. `registerValue` is always singleton and externally owned.
 
-Treat the dependency tuple passed to `registerClass` as immutable after registration. The optimized constructor paths do not add a defensive copy.
+`registerAsyncFactory` accepts the same lifetimes without `lazyKey`. It records the final service type as `AsyncSpec`, and dependent classes inherit async status. Use `getAsync()` for these keys. `get()` remains available for sync keys, including Promise-valued `registerFactory` services.
+
+`registerAsyncFactory` and any `registerClass` call whose tuple may select an async key require readonly dependencies. InferDI classifies async positions once and retains the tuple reference. Inline literals infer readonly tuples; sync-only `registerClass` calls keep mutable-tuple compatibility.
 
 The `override` timing guard checks only the current container's cache. It catches locally cached singleton/scoped values, `registerValue`, and repeated overrides, but it does not record transient resolutions or ancestor-owned values resolved through a child. Apply overrides before resolving the dependency graph.
 
@@ -118,6 +124,8 @@ The `override` timing guard checks only the current container's cache. It catche
 
 ```ts
 namespace Container {
+  type ReadyKeys<C>
+  type SyncReadyKeys<C>
   type Resolve<C>
   type ResolveUnwrapped<C>
   type UnwrappedValue<C, K>
@@ -127,6 +135,8 @@ namespace Container {
 
 | Type | Use |
 | --- | --- |
+| `Container.ReadyKeys<C>` | Extract keys whose scope-input requirements have been provided; generic resolvers can pass them to `getAsync`. |
+| `Container.SyncReadyKeys<C>` | Extract ready non-async keys that generic resolvers can pass to `get`. |
 | `Container.Resolve<C>` | Extract a flat `{ key: Value }` map from a built container. |
 | `Container.ResolveUnwrapped<C>` | Like `Resolve`, but unwraps managed `LazySpec` companion entries to `T`; ordinary services with a `.get()` method stay unchanged. |
 | `Container.UnwrappedValue<C, K>` | Look up one unwrapped service type. |
@@ -145,6 +155,11 @@ interface ContainerOptions {
 interface Spec<V, K extends RegistrationKind = 'singleton'> {
   readonly type: V
   readonly kind: K
+}
+
+interface AsyncSpec<V, K extends RegistrationKind = 'singleton'>
+  extends Spec<V, K> {
+  readonly async: true
 }
 
 type SpecMap<M, K extends RegistrationKind = 'singleton'> = {

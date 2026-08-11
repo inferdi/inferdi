@@ -74,13 +74,15 @@ InferDI lanza errores explícitos ante el uso indebido del grafo y del ciclo de 
 
 ## Ciclos entre factorías asíncronas
 
-Los ciclos entre factorías asíncronas no se detectan. Una factoría que hace `await` sobre otra factoría asíncrona puede reanudarse después de que la pila de ciclos síncrona se haya vaciado. Si ambos lados acaban esperándose mutuamente, quien llama observa una promesa pendiente que nunca se resuelve.
+Las dependencias declaradas en `registerAsyncFactory(..., deps, ...)` pasan por una fase previa síncrona. El detector de ciclos existente rechaza el ciclo antes de ejecutar el cuerpo de cualquier factoría.
+
+No se detectan los ciclos creados después de un límite de Promise. Esto incluye callbacks de `registerFactory` que devuelven una Promise y contenedores capturados que se usan después de `await`. Si ambos lados se esperan mutuamente, quien llama recibe una Promise que nunca se resuelve.
 
 Corrige los ciclos asíncronos a nivel arquitectónico:
 
 - separa la inicialización compartida
 - eleva uno de los lados a un servicio anterior
-- usa `Lazy<singleton>` solo cuando ambos lados son singletons
+- usa `Lazy<singleton>` solo para dependencias singleton síncronas
 - añade un watchdog de desarrollo con timeout alrededor de los `await` de nivel superior sospechosos
 
 ## Errores de limpieza en los adaptadores

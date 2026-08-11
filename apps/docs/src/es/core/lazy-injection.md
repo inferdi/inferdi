@@ -102,4 +102,4 @@ Los consumidores con scope y transitorios pueden usar acompañantes perezosos pa
 
 ## Dependencias circulares
 
-InferDI detecta los ciclos; no los rompe automáticamente. Para dos servicios singleton, pon `Lazy<singleton>` en un lado y mantén el otro directo. Para ciclos de factorías asíncronas, la solución recomendada es arquitectónica: divide la inicialización compartida, eleva uno de los lados o evita el ciclo.
+InferDI detecta los ciclos síncronos, incluidas las dependencias asíncronas declarativas durante la fase previa, pero no los rompe automáticamente. `Lazy<singleton>` puede cortar una dependencia singleton síncrona; los registros asíncronos declarativos no tienen acompañante lazy. Los ciclos dinámicos creados tras un límite de Promise requieren una solución arquitectónica: divide la inicialización compartida, eleva uno de los lados o elimina el ciclo.

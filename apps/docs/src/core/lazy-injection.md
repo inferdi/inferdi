@@ -102,4 +102,4 @@ Scoped and transient consumers may use lazy companions for any lifetime because 
 
 ## Circular Dependencies
 
-InferDI detects cycles; it does not auto-break them. For two singleton services, put `Lazy<singleton>` on one side and keep the other side direct. For async factory cycles, the recommended fix is architectural: split shared initialization, hoist one side, or avoid the cycle.
+InferDI detects synchronous cycles, including declarative async dependencies during preflight; it does not auto-break them. `Lazy<singleton>` can break a synchronous singleton edge, but declarative async registrations have no lazy companion. Dynamic cycles created after a Promise boundary require an architectural fix: split shared initialization, hoist one side, or remove the cycle.

@@ -39,10 +39,12 @@ declared graph to differ from runtime behavior:
 
 ### Generic resolver helpers use ready keys
 
-`.get()` now accepts keys whose scope-input requirements have been provided.
-Concrete containers without scope inputs keep the same key set. Generic helpers
-that use `K extends keyof T` must switch to `Container.ReadyKeys` because a
-generic `T extends DependenciesMap` may contain blocked entries.
+`.get()` now accepts ready sync keys whose scope-input requirements have been
+provided. Concrete containers without scope inputs keep the same sync key set.
+Generic sync helpers that use `K extends keyof T` must switch to
+`Container.SyncReadyKeys`; async-capable helpers for `getAsync()` should use
+`Container.ReadyKeys` because a generic `T extends DependenciesMap` may contain
+blocked entries.
 
 ```ts
 // Before
@@ -56,7 +58,7 @@ function resolve<T extends DependenciesMap, K extends keyof T>(
 // After
 function resolve<
   T extends DependenciesMap,
-  K extends Container.ReadyKeys<Container<T>>
+  K extends Container.SyncReadyKeys<Container<T>>
 >(container: Container<T>, key: K) {
   return container.get(key)
 }

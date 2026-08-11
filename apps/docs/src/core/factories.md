@@ -21,15 +21,15 @@ schema:
       "@id": "https://inferdi.com/core/factories#article"
       "headline": "Factories in InferDI — registerFactory"
       "name": "Factories"
-      "description": "Use registerFactory when construction needs more than new Ctor(...deps): reading multiple values, adapting third-party clients, building configuration objects, or returning a promise that InferDI caches verbatim."
+      "description": "Use registerFactory for custom synchronous construction and registerAsyncFactory for a declarative async dependency graph."
       "url": "https://inferdi.com/core/factories"
       "mainEntityOfPage": "https://inferdi.com/core/factories"
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-31"
+      "dateModified": "2026-08-09"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, factories, registerFactory, async factory, configuration, third-party clients, dependency injection"
+      "keywords": "InferDI, factories, registerFactory, registerAsyncFactory, getAsync, AsyncSpec, dependency injection"
       "articleSection": "Core Concepts"
       "isPartOf":
         "@type": "WebSite"
@@ -131,23 +131,57 @@ const container = new Container()
 
 Consumers of `'mailer'` see the `Mailer` abstraction, not the concrete class.
 
-## Async Factories
+## Promise-valued sync factories
 
-Factories may return promises. The promise itself is cached, so concurrent callers share initialization:
+`registerFactory` treats a returned Promise as the service value. The key remains synchronous, `get()` returns that Promise, and another factory receives it by identity.
 
 ```ts
 const c = new Container()
-  .registerValue('dsn', 'postgres://localhost/app')
-  .registerFactory('db', async (c) => {
-    const pool = new Pool({ connectionString: c.get('dsn') })
-    await pool.connect()
-    return pool
-  })
+  .registerFactory('dbPromise', () => connectDatabase())
 
-const [a, b] = await Promise.all([c.get('db'), c.get('db')])
-await c.dispose()
+const promise = c.get('dbPromise') // Promise<Database>
 ```
 
-`.get()` stays synchronous. Callers await the returned value when the registration is async.
+This legacy form supports single-flight caching. A cycle created after `await` through captured container calls falls outside the synchronous cycle and lifetime guards.
 
-The runtime cycle guard and `singletonStack` project only the synchronous factory call stack. After `await`, they cannot detect a transient read or a scoped read through a captured child scope. The separate root-scope guard still rejects `root.get(scopedKey)` in strict mode, and `AllowedDeps` protects normal typed code. Keep dependency reads in the synchronous factory prelude.
+## Declarative async graphs
+
+`registerAsyncFactory` stores the final service type in `AsyncSpec` and receives positional dependency values. A dependent `registerClass` entry inherits async status through the graph.
+
+```ts
+class Repository {
+  constructor(readonly db: Database) {}
+}
+
+const root = new Container()
+  .registerValue('config', {url: 'postgres://localhost/app'})
+  .declareScopeInputs<{request: RequestContext}>()
+  .registerAsyncFactory(
+    'db',
+    async (config) => connectDatabase(config.url),
+    ['config']
+  )
+  .registerAsyncFactory(
+    'session',
+    async (request) => loadSession(request),
+    ['request'],
+    'scoped'
+  )
+  .registerClass('repository', Repository, ['db'])
+
+const scope = root.createScope({request})
+const repository = await scope.getAsync('repository')
+
+// @ts-expect-error — async graph keys require getAsync()
+scope.get('repository')
+```
+
+`getAsync()` accepts ready sync and async keys and returns a Promise. TypeScript rejects `get()` when a key or key union may contain an `AsyncSpec`. `has()` proves registration existence only; it does not prove a sync key or provide missing scope inputs.
+
+The container starts declared dependencies in tuple order and waits only for entries marked as declarative async. Singleton and scoped registrations cache one native Promise. Transient registrations start per call and stay caller-owned. Declarative cycles and cold lifetime violations fail during synchronous preflight.
+
+The async callback receives no container. Calls through captured containers after the Promise boundary create dynamic edges outside graph analysis. InferDI does not add async `Lazy<T>` companions, retry, cancellation, or rollback. If a later sibling fails during preflight, earlier initializations keep their existing cache and ownership state; an orphaned async transient may continue without a teardown handle.
+
+Owned async singleton and scoped entries keep the Promise in cache after fulfillment. Close their containers with `await using`, `await container.dispose()`, or `Symbol.asyncDispose`. Sync `using` reports that it cannot unwrap the cached Promise.
+
+Pass readonly dependency tuples to `registerAsyncFactory` and to `registerClass` when the tuple may select an async key. InferDI retains the tuple and classifies async positions once; inline literals infer readonly automatically.

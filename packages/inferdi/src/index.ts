@@ -6,6 +6,7 @@ export type {
   RegistrationKind,
   ScopeInputMap,
   Spec,
+  AsyncSpec,
   SpecMap,
   LazySpec,
   ContainerOptions,

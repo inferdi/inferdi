@@ -21,18 +21,18 @@ schema:
       "@id": "https://inferdi.com/ja/reference/api#article"
       "headline": "InferDI コア API サマリー"
       "name": "API サマリー"
-      "description": "@inferdi/inferdi コアの公開 API のまとめです。Container クラス、register、registerFactory、registerValue、get、has、スコープ、override、dispose、そして Lazy・DependenciesMap・Module の各型を解説します。"
+      "description": "registerAsyncFactory、getAsync、AsyncSpec、スコープ、オーバーライド、破棄を含む @inferdi/inferdi コア API のまとめです。"
       "url": "https://inferdi.com/ja/reference/api"
       "mainEntityOfPage": "https://inferdi.com/ja/reference/api"
       "inLanguage": "ja-JP"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-21"
+      "dateModified": "2026-08-09"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "executableLibraryName": "@inferdi/inferdi"
       "programmingModel": "明示的な登録、フルエントビルダー"
       "targetPlatform": "Node.js, Bun, Deno, Browser"
-      "keywords": "InferDI, API, Container, register, registerFactory, get, scope, override, dispose, Lazy, Module"
+      "keywords": "InferDI, API, Container, registerFactory, registerAsyncFactory, getAsync, AsyncSpec, scope, dispose"
       "articleSection": "リファレンス"
       "isPartOf":
         "@type": "WebSite"
@@ -70,6 +70,7 @@ import {
   type DependenciesMap,
   type Lazy,
   type LazySpec,
+  type AsyncSpec,
   type Module,
   type RegistrationKind,
   type Spec,
@@ -83,12 +84,14 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 
   registerClass(key, Ctor, deps, kind?, lazyKey?)
   registerFactory(key, factory, kind?, lazyKey?)
+  registerAsyncFactory(key, factory, deps, kind?)
   registerValue(key, value)
   override(key, value)
   use(fn)
 
   createScope()
   get(key)
+  getAsync(key): Promise
   has(key)
 
   get disposed(): boolean
@@ -104,13 +107,16 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 | --- | --- |
 | `registerClass` | コンストラクターと依存関係のタプルを登録します。 |
 | `registerFactory` | カスタムの構築ロジックを登録します。 |
+| `registerAsyncFactory` | 宣言的な非同期グラフへ位置依存を登録します。 |
 | `registerValue` | 外部が所有するシングルトン値を登録します。 |
 | `override` | 既存の登録を置き換えます。キーがローカルキャッシュ済みなら拒否します。 |
 | `use` | モジュールビルダーを適用します。 |
 
 `registerClass` と `registerFactory` は `singleton`、`scoped`、`transient` のライフタイムと、省略可能な `lazyKey` コンパニオンを受け付けます。`registerValue` は常にシングルトンで、外部が所有します。
 
-`registerClass` に渡した依存関係タプルは、登録後に変更しないでください。最適化されたコンストラクター経路では防御的コピーを作成しません。
+`registerAsyncFactory` は同じライフタイムを受け付けますが、`lazyKey` はありません。最終サービス型を `AsyncSpec` として記録し、依存するクラスは非同期状態を引き継ぎます。これらのキーは `getAsync()` で解決してください。`get()` は、`registerFactory` が作る Promise 値サービスを含む同期キーに使用します。
+
+`registerAsyncFactory` と、依存関係タプルが非同期キーを選ぶ可能性のある `registerClass` では readonly タプルが必要です。InferDI は登録時に非同期位置を一度だけ分類し、タプルへの参照を保持します。インラインリテラルは readonly として推論され、同期専用の `registerClass` は変更可能なタプルも受け付けます。
 
 `override` のタイミングガードが確認するのは現在のコンテナのキャッシュだけです。ローカルにキャッシュされた singleton/scoped 値、`registerValue`、2 回目のオーバーライドは検出しますが、transient の解決や、子コンテナ経由で解決された祖先所有の値は記録しません。依存関係グラフを解決する前にオーバーライドを適用してください。
 
@@ -118,6 +124,8 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 
 ```ts
 namespace Container {
+  type ReadyKeys<C>
+  type SyncReadyKeys<C>
   type Resolve<C>
   type ResolveUnwrapped<C>
   type UnwrappedValue<C, K>
@@ -127,6 +135,8 @@ namespace Container {
 
 | 型 | 用途 |
 | --- | --- |
+| `Container.ReadyKeys<C>` | 必要なスコープ入力が提供済みのキーを抽出します。汎用リゾルバーはそのキーを `getAsync` に渡せます。 |
+| `Container.SyncReadyKeys<C>` | 汎用リゾルバーが `get` に渡せる、準備済みの非同期ではないキーを抽出します。 |
 | `Container.Resolve<C>` | 構築済みのコンテナからフラットな `{ key: Value }` マップを抽出します。 |
 | `Container.ResolveUnwrapped<C>` | `Resolve` と同様ですが、管理対象の `LazySpec` コンパニオンだけを `T` に展開します。通常の `.get()` メソッドを持つサービスは変更しません。 |
 | `Container.UnwrappedValue<C, K>` | アンラップされた 1 つのサービス型を参照します。 |
@@ -145,6 +155,11 @@ interface ContainerOptions {
 interface Spec<V, K extends RegistrationKind = 'singleton'> {
   readonly type: V
   readonly kind: K
+}
+
+interface AsyncSpec<V, K extends RegistrationKind = 'singleton'>
+  extends Spec<V, K> {
+  readonly async: true
 }
 
 type SpecMap<M, K extends RegistrationKind = 'singleton'> = {

@@ -121,6 +121,9 @@ importers:
       '@vitest/coverage-v8':
         specifier: ^4.1.5
         version: 4.1.5(vitest@4.1.5)
+      esbuild:
+        specifier: 0.28.1
+        version: 0.28.1
       tsup:
         specifier: ^8.3.0
         version: 8.5.1(postcss@8.5.18)(typescript@5.9.3)

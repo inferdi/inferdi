@@ -1,5 +1,6 @@
 import {
   Container,
+  type AsyncSpec,
   type DependenciesMap,
   type Module,
   type ScopeInputMap,
@@ -48,14 +49,45 @@ const requestScope = requestRoot.createScope({
 })
 const handler: Handler = requestScope.get('handler')
 
-function resolveReady<
+function resolveSync<
   T extends DependenciesMap,
-  K extends Container.ReadyKeys<Container<T>>
+  K extends Container.SyncReadyKeys<Container<T>>
 >(container: Container<T>, key: K): T[K]['type'] {
   return container.get(key)
 }
 
-const resolvedHandler: Handler = resolveReady(requestScope, 'handler')
+const syncHandler: Handler = resolveSync(requestScope, 'handler')
+
+function resolveReady<
+  T extends DependenciesMap,
+  K extends Container.ReadyKeys<Container<T>>
+>(container: Container<T>, key: K): Promise<Awaited<T[K]['type']>> {
+  return container.getAsync(key)
+}
+
+const resolvedHandler: Handler = await resolveReady(requestScope, 'handler')
+
+class Database {}
+class Repository {
+  constructor(readonly database: Database) {}
+}
+
+type AsyncOutput = {database: AsyncSpec<Database>}
+const databaseModule: Module<Record<never, never>, AsyncOutput> = (c) =>
+  c.registerAsyncFactory('database', async () => new Database(), [])
+const asyncContainer = new Container()
+  .use(databaseModule)
+  .registerClass('repository', Repository, ['database'])
+const database: Database = await asyncContainer.getAsync('database')
+const repository: Repository = await asyncContainer.getAsync('repository')
+
+// @ts-expect-error — declarative async keys are not accepted by get()
+asyncContainer.get('database')
+// @ts-expect-error — async status propagates through registerClass()
+asyncContainer.get('repository')
 
 void handler
+void syncHandler
 void resolvedHandler
+void database
+void repository

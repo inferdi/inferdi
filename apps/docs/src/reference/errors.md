@@ -74,13 +74,15 @@ InferDI throws explicit errors for graph and lifecycle misuse. Keep these messag
 
 ## Async Factory Cycles
 
-Cycles between async factories are not detected. A factory that awaits another async factory can resume after the synchronous cycle stack has been cleared. If both sides eventually await each other, callers observe a pending promise that never resolves.
+Declarative edges listed in `registerAsyncFactory(..., deps, ...)` are resolved by a synchronous preflight, so the existing cycle guard rejects cycles before any factory body starts.
+
+Cycles created after a Promise boundary are not detected. This includes calls from Promise-valued `registerFactory` callbacks and captured containers used after `await`. If both sides wait for each other, callers observe a pending Promise that never resolves.
 
 Fix async cycles architecturally:
 
 - split shared initialization
 - hoist one side into an earlier service
-- use `Lazy<singleton>` only when both sides are singletons
+- use `Lazy<singleton>` only for synchronous singleton edges
 - add a development watchdog timeout around suspicious top-level awaits
 
 ## Adapter Cleanup Errors

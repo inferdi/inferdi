@@ -87,6 +87,27 @@ export interface Spec<V, K extends RegistrationKind = 'singleton'> {
 }
 
 /**
+ * A declarative asynchronous registration. `V` is the final service type,
+ * not the Promise used while initializing it. Resolve these keys through
+ * {@link Container.getAsync}; classes that declare an `AsyncSpec` dependency
+ * are classified as async automatically.
+ *
+ * @example
+ * ```ts
+ * const c = new Container()
+ *   .registerAsyncFactory('db', async () => Database.connect(), [])
+ *
+ * const db = await c.getAsync('db')
+ * ```
+ */
+export interface AsyncSpec<
+  V,
+  K extends RegistrationKind = 'singleton'
+> extends Spec<V, K> {
+  readonly async: true
+}
+
+/**
  * Companion registration produced by the `lazyKey` parameter of `register*`.
  * Carries the target service's lifetime in `lazyOf` so the type-level
  * lifetime guard ({@link AllowedDeps}) can permit only `Lazy<singleton>`
@@ -272,6 +293,48 @@ type ReadyKeysOf<T extends DependenciesMap> =
         [K in keyof T]: [RequirementsOf<T[K]>] extends [never] ? K : never
       }[keyof T]
 
+type RejectAsyncKey<
+  T extends DependenciesMap,
+  K extends keyof T
+> = Extract<T[K], AsyncSpec<unknown, RegistrationKind>> extends never
+  ? unknown
+  : never
+
+type SyncReadyKeysOf<T extends DependenciesMap> = {
+  [K in ReadyKeysOf<T>]: RejectAsyncKey<T, K> extends never ? never : K
+}[ReadyKeysOf<T>]
+
+type RequireReadonlyDeps<D extends readonly unknown[]> =
+  D extends unknown[] ? never : unknown
+
+type RequireReadonlyAsyncDeps<
+  T extends DependenciesMap,
+  D extends readonly (keyof T)[]
+> = ContainsAsyncDep<T, D> extends true ? RequireReadonlyDeps<D> : unknown
+
+type RejectAsyncDeps<
+  T extends DependenciesMap,
+  D extends readonly (keyof T)[]
+> = Extract<T[D[number]], AsyncSpec<unknown, RegistrationKind>> extends never
+  ? unknown
+  : never
+
+type ContainsAsyncDep<
+  T extends DependenciesMap,
+  D extends readonly (keyof T)[]
+> = Extract<T[D[number]], AsyncSpec<unknown, RegistrationKind>> extends never
+  ? false
+  : true
+
+type ClassSpec<
+  T extends DependenciesMap,
+  D extends readonly (keyof T)[],
+  V,
+  Kind extends RegistrationKind
+> = ContainsAsyncDep<T, D> extends true
+  ? AsyncSpec<V, Kind>
+  : Spec<V, Kind>
+
 type InputKeys<T extends DependenciesMap> = {
   [K in keyof T]: T[K] extends {readonly [scopeInputMarker]: true} ? K : never
 }[keyof T]
@@ -319,7 +382,9 @@ type ScopeInputDeclarationCheck<T, Inputs extends object> =
       : {readonly 'Scope input key already exists': keyof T & keyof Inputs}
 
 interface FactoryResolver<T extends DependenciesMap> {
-  get<K extends ReadyKeysOf<T>>(key: K): T[K]['type']
+  get<K extends ReadyKeysOf<T>>(
+    key: K & RejectAsyncKey<T, K>
+  ): T[K]['type']
   has(key: string | symbol): boolean
 }
 
@@ -461,6 +526,8 @@ interface Registration<T extends DependenciesMap, K extends keyof T> {
    * Registration shape. Read only after a non-transient factory has run
    */
   readonly owned: boolean
+  /* Cold-path marker for declarative async injection; get() never reads it */
+  readonly async?: true
 }
 
 /*
@@ -509,13 +576,18 @@ interface DisposableLike {
  * tuple. The runtime guard in `get()` remains as defense-in-depth against
  * `as`-cast bypasses; its error message names the offending keys.
  *
+ * **Declarative async graph.** {@link Container.registerAsyncFactory} stores a
+ * final service type in {@link AsyncSpec}; dependent classes inherit async
+ * status and resolve through {@link Container.getAsync}. Sync registrations
+ * keep using {@link Container.get} and its one-lookup cache-hit path.
+ *
  * **Resource management.** `Container` itself implements `Symbol.dispose` and
  * `Symbol.asyncDispose`, so it composes with `using` / `await using`. Owned
  * instances are torn down in reverse-creation (LIFO) order; multiple disposer
  * failures are surfaced as a single `AggregateError`.
  *
- * @template T - The map of registered keys to {@link Spec} entries. Accumulates
- *               automatically through the fluent `register*` methods.
+ * @template T - The map of registered keys to {@link Spec} or {@link AsyncSpec}
+ *               entries. Fluent `register*` methods accumulate it.
  *
  * @example
  * ```ts
@@ -556,12 +628,9 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * A separate `root` field is unnecessary: these two collections already span the chain.
    *
    * INVARIANT: get() MUST stay synchronous. resolving works as a precise projection of
-   * the call stack only because a single get() runs atomically before returning to the
-   * event loop. If async factories are ever added and get() becomes async — concurrent
-   * resolves (different HTTP requests) will start mutating the shared resolving array /
-   * singletonStack at the same time, raising false cycles and false lifetime violations.
-   * Async factories require either a per-resolve local resolving (not shared), or a
-   * separate two-phase API (resolveAsync on top of a sync get with pre-warming)
+   * the call stack only because declared dependency preflight completes atomically before
+   * returning a Promise. Async factory and constructor continuations run after these
+   * stacks are cleared and never mutate them
    */
   /** @internal */
   private readonly resolving: (keyof T)[]
@@ -652,6 +721,70 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     return this
   }
 
+  /** @internal */
+  private asyncDependencyIndices(
+    keys: readonly (keyof T)[]
+  ): number[] | undefined {
+    let indices: number[] | undefined
+
+    for (let i = 0; i < keys.length; i++) {
+      let cur: Container<T> | undefined = this
+
+      while (cur !== undefined) {
+        const reg = cur.regs.get(keys[i]!)
+
+        if (reg !== undefined) {
+          if (reg.async === true) {
+            (indices ??= []).push(i)
+          }
+          break
+        }
+
+        cur = cur.parent
+      }
+    }
+
+    return indices
+  }
+
+  /** @internal */
+  private resolveAsyncDependencies(
+    keys: readonly (keyof T)[],
+    asyncIndices: readonly number[],
+    invoke: (args: unknown[]) => unknown
+  ): Promise<unknown> {
+    const values: unknown[] = []
+
+    try {
+      for (let i = 0; i < keys.length; i++) {
+        values.push(this.get(keys[i]! as never))
+      }
+    } catch (error) {
+      /* Observe already-started native Promises without assimilating legacy thenables */
+      for (const value of values) {
+        if (value instanceof Promise) {
+          void value.catch(() => {})
+        }
+      }
+
+      throw error
+    }
+
+    const pending: unknown[] = []
+
+    for (const index of asyncIndices) {
+      pending.push(values[index])
+    }
+
+    return Promise.all(pending).then((resolved) => {
+      for (let i = 0; i < resolved.length; i++) {
+        values[asyncIndices[i]!] = resolved[i]
+      }
+
+      return invoke(values)
+    })
+  }
+
   /**
    * Registers a class constructor under a specific key.
    *
@@ -703,12 +836,12 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   >(
     key: K & ([K] extends [keyof T] ? never : unknown),
     Ctor: new (...args: A) => V,
-    deps: D,
+    deps: D & RequireReadonlyAsyncDeps<T, D>,
     kind?: undefined
   ): Container<
     T & Record<
       K,
-      WithRequirementsOfDeps<Spec<V, 'singleton'>, T, D>
+      WithRequirementsOfDeps<ClassSpec<T, D, V, 'singleton'>, T, D>
     >
   >
 
@@ -721,10 +854,10 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   >(
     key: K & ([K] extends [keyof T] ? never : unknown),
     Ctor: new (...args: A) => V,
-    deps: D,
+    deps: D & RequireReadonlyAsyncDeps<T, D>,
     kind: Kind
   ): Container<
-    T & Record<K, WithRequirementsOfDeps<Spec<V, Kind>, T, D>>
+    T & Record<K, WithRequirementsOfDeps<ClassSpec<T, D, V, Kind>, T, D>>
   >
 
   public registerClass<
@@ -738,7 +871,9 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     Ctor: new (...args: A) => V,
     deps: D,
     kind: undefined,
-    lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
+    lazyKey: LK &
+      ([LK] extends [keyof T | K] ? never : unknown) &
+      (ContainsAsyncDep<T, D> extends true ? never : unknown)
   ): Container<
     T & Record<
       K,
@@ -761,7 +896,9 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     Ctor: new (...args: A) => V,
     deps: D,
     kind: Kind,
-    lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
+    lazyKey: LK &
+      ([LK] extends [keyof T | K] ? never : unknown) &
+      (ContainsAsyncDep<T, D> extends true ? never : unknown)
   ): Container<
     T & Record<K, WithRequirementsOfDeps<Spec<V, Kind>, T, D>> &
     Record<LK, WithRequirementsOfDeps<LazySpec<V, Kind>, T, D>>
@@ -784,6 +921,33 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
      */
     const keys = deps as readonly (keyof T)[]
     const len = keys.length
+    const asyncIndices = this.asyncDependencyIndices(keys)
+
+    if (asyncIndices !== undefined) {
+      if (lazyKey !== undefined) {
+        throw new Error(
+          `Cannot create a synchronous Lazy companion for async dependency "${String(key)}"`
+        )
+      }
+
+      this.regs.set(key as keyof T, {
+        kind,
+        lazy: false,
+        fn: ((c: Container<T>) => c.resolveAsyncDependencies(
+          keys,
+          asyncIndices,
+          (args) => Reflect.construct(Ctor, args) as V
+        )) as unknown as (c: Container<T>) => T[keyof T]['type'],
+        owned: true,
+        async: true
+      })
+
+      if (this.strict) {
+        this.cache.delete(key as keyof T)
+      }
+
+      return this
+    }
 
     /*
      * Arity unrolling. V8 JITs a direct `new Ctor(a, b)` with an inline cache keyed on
@@ -805,45 +969,45 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       fn = () => new (Ctor as unknown as new () => V)()
     } else if (len === 1) {
       const k0 = keys[0]!
-      fn = (c) => new (Ctor as unknown as new (a0: unknown) => V)(c.get(k0 as ReadyKeysOf<T>))
+      fn = (c) => new (Ctor as unknown as new (a0: unknown) => V)(c.get(k0 as never))
     } else if (len === 2) {
       const k0 = keys[0]!, k1 = keys[1]!
       fn = (c) => new (Ctor as unknown as new (a0: unknown, a1: unknown) => V)(
-        c.get(k0 as ReadyKeysOf<T>), c.get(k1 as ReadyKeysOf<T>)
+        c.get(k0 as never), c.get(k1 as never)
       )
     } else if (len === 3) {
       const k0 = keys[0]!, k1 = keys[1]!, k2 = keys[2]!
       fn = (c) => new (Ctor as unknown as new (a0: unknown, a1: unknown, a2: unknown) => V)(
-        c.get(k0 as ReadyKeysOf<T>), c.get(k1 as ReadyKeysOf<T>),
-        c.get(k2 as ReadyKeysOf<T>)
+        c.get(k0 as never), c.get(k1 as never),
+        c.get(k2 as never)
       )
     } else if (len === 4) {
       const k0 = keys[0]!, k1 = keys[1]!, k2 = keys[2]!, k3 = keys[3]!
       fn = (c) => new (Ctor as unknown as new (a0: unknown, a1: unknown, a2: unknown, a3: unknown) => V)(
-        c.get(k0 as ReadyKeysOf<T>), c.get(k1 as ReadyKeysOf<T>),
-        c.get(k2 as ReadyKeysOf<T>), c.get(k3 as ReadyKeysOf<T>)
+        c.get(k0 as never), c.get(k1 as never),
+        c.get(k2 as never), c.get(k3 as never)
       )
     } else if (len === 5) {
       const k0 = keys[0]!, k1 = keys[1]!, k2 = keys[2]!, k3 = keys[3]!, k4 = keys[4]!
       fn = (c) => new (Ctor as unknown as new (a0: unknown, a1: unknown, a2: unknown, a3: unknown, a4: unknown) => V)(
-        c.get(k0 as ReadyKeysOf<T>), c.get(k1 as ReadyKeysOf<T>),
-        c.get(k2 as ReadyKeysOf<T>), c.get(k3 as ReadyKeysOf<T>),
-        c.get(k4 as ReadyKeysOf<T>)
+        c.get(k0 as never), c.get(k1 as never),
+        c.get(k2 as never), c.get(k3 as never),
+        c.get(k4 as never)
       )
     } else if (len === 6) {
       const k0 = keys[0]!, k1 = keys[1]!, k2 = keys[2]!, k3 = keys[3]!, k4 = keys[4]!, k5 = keys[5]!
       fn = (c) => new (Ctor as unknown as new (a0: unknown, a1: unknown, a2: unknown, a3: unknown, a4: unknown, a5: unknown) => V)(
-        c.get(k0 as ReadyKeysOf<T>), c.get(k1 as ReadyKeysOf<T>),
-        c.get(k2 as ReadyKeysOf<T>), c.get(k3 as ReadyKeysOf<T>),
-        c.get(k4 as ReadyKeysOf<T>), c.get(k5 as ReadyKeysOf<T>)
+        c.get(k0 as never), c.get(k1 as never),
+        c.get(k2 as never), c.get(k3 as never),
+        c.get(k4 as never), c.get(k5 as never)
       )
     } else if (len === 7) {
       const k0 = keys[0]!, k1 = keys[1]!, k2 = keys[2]!, k3 = keys[3]!, k4 = keys[4]!, k5 = keys[5]!, k6 = keys[6]!
       fn = (c) => new (Ctor as unknown as new (a0: unknown, a1: unknown, a2: unknown, a3: unknown, a4: unknown, a5: unknown, a6: unknown) => V)(
-        c.get(k0 as ReadyKeysOf<T>), c.get(k1 as ReadyKeysOf<T>),
-        c.get(k2 as ReadyKeysOf<T>), c.get(k3 as ReadyKeysOf<T>),
-        c.get(k4 as ReadyKeysOf<T>), c.get(k5 as ReadyKeysOf<T>),
-        c.get(k6 as ReadyKeysOf<T>)
+        c.get(k0 as never), c.get(k1 as never),
+        c.get(k2 as never), c.get(k3 as never),
+        c.get(k4 as never), c.get(k5 as never),
+        c.get(k6 as never)
       )
     } else {
       /*
@@ -856,7 +1020,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
         const args: unknown[] = []
 
         for (let i = 0; i < len; i++) {
-          args.push(c.get(keys[i]! as ReadyKeysOf<T>))
+          args.push(c.get(keys[i]! as never))
         }
 
         return Reflect.construct(Ctor, args)
@@ -913,7 +1077,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       this.regs.set(lazyKey as unknown as keyof T, {
         kind: 'transient',
         lazy: kind === 'singleton',
-        fn: (c) => ({get: () => c.get(targetKey as ReadyKeysOf<T>)} as unknown as T[keyof T]['type']),
+        fn: (c) => ({get: () => c.get(targetKey as never)} as unknown as T[keyof T]['type']),
         owned: false
       })
     }
@@ -967,13 +1131,9 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    *
    * @example
    * ```ts
-   * // Async factories are first-class. The factory's returned Promise is cached
-   * // verbatim, so `c.get(key)` synchronously returns the same Promise to every
-   * // concurrent caller — the initialization runs exactly once. Callers await it
-   * // On `dispose()` the container unwraps the Promise and probes the resolved
-   * // instance for [Symbol.asyncDispose] / [Symbol.dispose] / .dispose(). Sync
-   * // teardown (`using`) on an async-cached resource is a misuse and throws —
-   * // use `await using` / `await container.dispose()`
+   * // registerFactory keeps a returned Promise as the sync service value.
+   * // Use registerAsyncFactory when dependent classes should receive the
+   * // resolved service and the graph should expose its final type.
    * const c = new Container()
    *   .registerValue('dsn', 'postgres://localhost/app')
    *   .registerFactory('db', async (c) => {
@@ -1044,7 +1204,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     const D extends readonly FactoryDependencyKeys<T, 'singleton'>[]
   >(
     key: K & ([K] extends [keyof T] ? never : unknown),
-    deps: D,
+    deps: D & RejectAsyncDeps<T, D>,
     factory: (
       c: FactoryResolver<
         FactorySelection<AllowedDeps<T, 'singleton'>, D>
@@ -1065,7 +1225,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     const D extends readonly FactoryDependencyKeys<T, Kind>[]
   >(
     key: K & ([K] extends [keyof T] ? never : unknown),
-    deps: D,
+    deps: D & RejectAsyncDeps<T, D>,
     factory: (
       c: FactoryResolver<FactorySelection<AllowedDeps<T, Kind>, D>>
     ) => V,
@@ -1081,7 +1241,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     const D extends readonly FactoryDependencyKeys<T, 'singleton'>[]
   >(
     key: K & ([K] extends [keyof T] ? never : unknown),
-    deps: D,
+    deps: D & RejectAsyncDeps<T, D>,
     factory: (
       c: FactoryResolver<
         FactorySelection<AllowedDeps<T, 'singleton'>, D>
@@ -1107,7 +1267,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     const D extends readonly FactoryDependencyKeys<T, Kind>[]
   >(
     key: K & ([K] extends [keyof T] ? never : unknown),
-    deps: D,
+    deps: D & RejectAsyncDeps<T, D>,
     factory: (
       c: FactoryResolver<FactorySelection<AllowedDeps<T, Kind>, D>>
     ) => V,
@@ -1158,9 +1318,99 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       this.regs.set(lazyKey as unknown as keyof T, {
         kind: 'transient',
         lazy: kind === 'singleton',
-        fn: (c) => ({get: () => c.get(targetKey as ReadyKeysOf<T>)} as unknown as T[keyof T]['type']),
+        fn: (c) => ({get: () => c.get(targetKey as never)} as unknown as T[keyof T]['type']),
         owned: false
       })
+    }
+
+    return this
+  }
+
+  /**
+   * Registers a declarative async factory with positional dependencies. The
+   * type-level graph stores the final service type, while singleton and scoped
+   * registrations cache one native Promise for single-flight initialization.
+   * Async dependencies are awaited before the factory runs; ordinary
+   * Promise-valued sync registrations are passed through unchanged.
+   *
+   * The `deps` tuple is retained by reference. It must be readonly because
+   * async dependency positions are classified once during registration.
+   *
+   * @example
+   * ```ts
+   * const c = new Container()
+   *   .registerValue('config', {url: 'postgres://localhost/app'})
+   *   .registerAsyncFactory(
+   *     'db',
+   *     async (config) => Database.connect(config.url),
+   *     ['config']
+   *   )
+   *
+   * const db = await c.getAsync('db')
+   * ```
+   */
+  public registerAsyncFactory<
+    const K extends string | symbol,
+    A extends readonly unknown[],
+    R,
+    const D extends DepsOf<AllowedDeps<T, 'singleton'>, A> = DepsOf<AllowedDeps<T, 'singleton'>, A>
+  >(
+    key: K & ([K] extends [keyof T] ? never : unknown),
+    factory: (...args: A) => R,
+    deps: D & RequireReadonlyDeps<D>,
+    kind?: undefined
+  ): Container<
+    T & Record<
+      K,
+      WithRequirementsOfDeps<AsyncSpec<Awaited<R>, 'singleton'>, T, D>
+    >
+  >
+
+  public registerAsyncFactory<
+    const K extends string | symbol,
+    A extends readonly unknown[],
+    R,
+    const Kind extends RegistrationKind,
+    const D extends DepsOf<AllowedDeps<T, Kind>, A> = DepsOf<AllowedDeps<T, Kind>, A>
+  >(
+    key: K & ([K] extends [keyof T] ? never : unknown),
+    factory: (...args: A) => R,
+    deps: D & RequireReadonlyDeps<D>,
+    kind: Kind
+  ): Container<
+    T & Record<
+      K,
+      WithRequirementsOfDeps<AsyncSpec<Awaited<R>, Kind>, T, D>
+    >
+  >
+
+  public registerAsyncFactory(
+    key: string | symbol,
+    factory: (...args: any[]) => unknown,
+    deps: readonly (string | symbol)[],
+    kind: RegistrationKind = 'singleton'
+  ): any {
+    if (this._disposed) {
+      throw new Error(`Cannot register on a disposed container (key: "${String(key)}")`)
+    }
+
+    const keys = deps as readonly (keyof T)[]
+    const asyncIndices = this.asyncDependencyIndices(keys) ?? []
+
+    this.regs.set(key as keyof T, {
+      kind,
+      lazy: false,
+      fn: ((c: Container<T>) => c.resolveAsyncDependencies(
+        keys,
+        asyncIndices,
+        (args) => factory(...args)
+      )) as unknown as (c: Container<T>) => T[keyof T]['type'],
+      owned: true,
+      async: true
+    })
+
+    if (this.strict) {
+      this.cache.delete(key as keyof T)
     }
 
     return this
@@ -1311,11 +1561,13 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     let cur: Container<T> | undefined = this
     let existingKind: RegistrationKind | undefined
     let existingLazy = false
+    let existingAsync: true | undefined
     while (cur !== undefined) {
       const existing = cur.regs.get(key)
       if (existing !== undefined) {
         existingKind = existing.kind
         existingLazy = existing.lazy
+        existingAsync = existing.async
         break
       }
       cur = cur.parent
@@ -1331,11 +1583,25 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
      * overrides, where it returns the same externally owned value. The field
      * order stays uniform with every other Registration
      */
-    this.regs.set(
-      key,
-      /* v8 ignore next */
-      {kind: existingKind, lazy: existingLazy, fn: () => value as unknown as T[keyof T]['type'], owned: false}
-    )
+    if (existingAsync === true) {
+      this.regs.set(
+        key,
+        /* v8 ignore next */
+        {
+          kind: existingKind,
+          lazy: existingLazy,
+          fn: () => value as unknown as T[keyof T]['type'],
+          owned: false,
+          async: true
+        }
+      )
+    } else {
+      this.regs.set(
+        key,
+        /* v8 ignore next */
+        {kind: existingKind, lazy: existingLazy, fn: () => value as unknown as T[keyof T]['type'], owned: false}
+      )
+    }
 
     return this
   }
@@ -1449,6 +1715,10 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * @throws {Error} On a lifetime violation
    *                 (`Singleton "..." cannot depend on scoped "..."`).
    */
+  public get<K extends ReadyKeysOf<T>>(
+    key: K & RejectAsyncKey<T, K>
+  ): T[K]['type']
+  public get<K extends SyncReadyKeysOf<T>>(key: K): T[K]['type']
   public get<K extends ReadyKeysOf<T>>(key: K): T[K]['type'] {
     /*
      * 1. Hot path: local cache hit.
@@ -1604,6 +1874,32 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
      */
     const target = reg.kind === 'singleton' ? (owner as Container<T>) : this
     return this.resolveWithOwnerAndReg(target, reg, key)
+  }
+
+  /**
+   * Resolves a ready sync or declarative async registration and always returns
+   * a Promise. Synchronous lookup, cycle, lifetime, and disposal failures are
+   * converted into rejections. Promise-valued sync services follow ordinary
+   * JavaScript await semantics at this top-level boundary.
+   *
+   * @example
+   * ```ts
+   * const c = new Container()
+   *   .registerAsyncFactory('db', loadDatabase, [])
+   *
+   * const db = await c.getAsync('db')
+   * ```
+   */
+  public getAsync<K extends ReadyKeysOf<T>>(
+    key: K
+  ): Promise<Awaited<T[K]['type']>> {
+    try {
+      return Promise.resolve(this.get(key as never)) as Promise<
+        Awaited<T[K]['type']>
+      >
+    } catch (error) {
+      return Promise.reject(error)
+    }
   }
 
   /**
@@ -2048,7 +2344,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
  */
 export namespace Container {
   /**
-   * Extracts the keys currently resolvable through {@link Container.get}.
+   * Extracts the keys currently resolvable through {@link Container.getAsync}.
    * Use it when writing generic resolver helpers for graphs that may contain
    * scope inputs that have not been provided yet.
    *
@@ -2058,12 +2354,30 @@ export namespace Container {
    *   T extends DependenciesMap,
    *   K extends Container.ReadyKeys<Container<T>>
    * >(container: Container<T>, key: K) {
-   *   return container.get(key)
+   *   return container.getAsync(key)
    * }
    * ```
    */
   export type ReadyKeys<C> = C extends Container<infer U>
     ? ReadyKeysOf<U>
+    : never
+
+  /**
+   * Extracts ready synchronous keys accepted by {@link Container.get}. Async
+   * registrations and entries with missing scope inputs are excluded.
+   *
+   * @example
+   * ```ts
+   * function resolveSync<
+   *   T extends DependenciesMap,
+   *   K extends Container.SyncReadyKeys<Container<T>>
+   * >(container: Container<T>, key: K) {
+   *   return container.get(key)
+   * }
+   * ```
+   */
+  export type SyncReadyKeys<C> = C extends Container<infer U>
+    ? SyncReadyKeysOf<U>
     : never
 
   /**

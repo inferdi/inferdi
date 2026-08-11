@@ -205,7 +205,7 @@ const container = new Container()
 container.get('userRepo').find('42')
 ```
 
-`.get(key)` is the only way to resolve a registration: it is fully typed (`K extends keyof T`), throws synchronously on a missing key, and stays out of the way at runtime — there is no Proxy overhead.
+Use `.get(key)` for synchronous registrations and `.getAsync(key)` for graphs that may contain declarative async registrations. Both are fully typed and use the same registry, cache, scope lookup, and lifetime routing; there is no Proxy overhead.
 
 ## Examples
 
@@ -492,6 +492,8 @@ root.registerFactory(
 
 The tuple serves the type system. InferDI still calls `factory(container)` and does not resolve the tuple into an argument array.
 
+`registerFactory` remains a synchronous graph surface even when its return value happens to be a Promise. Its resolver and deps-aware tuple cannot read keys created by `registerAsyncFactory`; use the declarative async API below when downstream classes should receive final resolved services.
+
 ## Binding Interfaces
 
 TypeScript interfaces do not exist at runtime, so you cannot pass them to `registerClass` — the key would be inferred as the concrete class, not the abstraction. To bind an interface to a concrete implementation, use `registerFactory` with an explicit type argument:
@@ -515,7 +517,7 @@ Now any consumer that depends on `'mailer'` sees the `Mailer` abstraction, and y
 In traditional DI frameworks, injection errors — like swapping the argument order, passing the wrong type, or forgetting a dependency entirely — only surface as runtime crashes.
 **InferDI validates your dependency graph at compile time.** Thanks to advanced TypeScript mapping (`DepsOf`), the array of dependency keys is strictly checked against the types and positional order of the target class's constructor arguments.
 
-Treat the dependency tuple passed to `registerClass` as immutable after registration. The optimized constructor paths retain its registration-time contents without adding a defensive copy.
+`registerAsyncFactory` and any `registerClass` call whose tuple may select an async key require readonly dependencies. InferDI classifies async positions once and retains the tuple reference. Inline literals infer readonly tuples; sync-only `registerClass` calls keep mutable-tuple compatibility.
 
 ```typescript
 class Logger {
@@ -618,7 +620,7 @@ const openAuthenticatedScope = (
 
 The input schema exists only in TypeScript. JavaScript, `any`, or a cast can seed unknown keys or shadow registrations. Pass a passive data record; getters and Proxy traps run during the shallow snapshot, and reentrant side effects are outside the API contract. Fast Mode supports input refinement, but its existing immutable-graph rule still requires registration to finish before the first `.get()` or `.createScope()`.
 
-Named modules can describe input slots with `ScopeInputMap<M>` and carry requirements in their output with `WithRequirements<Spec<V, Kind>, Keys>`. Generic resolver helpers should constrain keys with `Container.ReadyKeys<Container<T>>`; see [MIGRATION.md](./MIGRATION.md) for the `keyof T` migration.
+Named modules can describe input slots with `ScopeInputMap<M>` and carry requirements in their output with `WithRequirements<Spec<V, Kind>, Keys>`. Generic async-capable resolvers should use `Container.ReadyKeys<Container<T>>`; synchronous resolvers should use `Container.SyncReadyKeys<Container<T>>`. See [MIGRATION.md](./MIGRATION.md) for the `keyof T` migration.
 
 The container probes each owned instance in order: `Symbol.asyncDispose` → `Symbol.dispose` → plain `.dispose()`. If multiple disposers throw, all errors are collected into a single `AggregateError` so one failing resource never leaves the rest unclosed.
 
@@ -637,26 +639,58 @@ try {
 
 ### Async Factories
 
-Factories can be async without any special API. The factory's `Promise` is cached verbatim, so every concurrent `c.get(key)` sees the same in-flight Promise — initialization runs exactly once even under request bursts (Edge functions, serverless cold starts). Callers `await` the value at the use site. On `await container.dispose()` the container unwraps the Promise and probes the resolved instance for the disposer protocol; rejections fold into the same `AggregateError` as any other teardown error. Sync `using` on a container that cached a Promise is a misuse — use `await using` / `await container.dispose()`.
+InferDI supports two Promise models with separate contracts.
+
+Use `registerAsyncFactory` for a declarative async dependency graph. It receives positional dependency values, stores the final service type in `AsyncSpec<V, Kind>`, and propagates async status through dependent classes. Resolve the graph with `getAsync()`; TypeScript rejects `get()` for an async key or a union that may contain one.
 
 ```ts
-const c = new Container()
-  .registerValue('dsn', 'postgres://localhost/app')
-  .registerFactory('db', async (c) => {
-    const pool = new Pool({ connectionString: c.get('dsn') })
+class Repository {
+  constructor(readonly db: Pool) {}
+}
+
+const root = new Container()
+  .registerValue('config', {dsn: 'postgres://localhost/app'})
+  .registerAsyncFactory('db', async (config) => {
+    const pool = new Pool({connectionString: config.dsn})
     await pool.connect()
     return pool
-  })
+  }, ['config'])
+  .registerClass('repository', Repository, ['db'], 'scoped')
 
-// Concurrent callers share the same in-flight Promise — no race, one connect.
-const [a, b] = await Promise.all([c.get('db'), c.get('db')])
+await using scope = root.createScope()
+const repository = await scope.getAsync('repository')
 
-await c.dispose() // unwraps the cached Promise and closes the pool
+// @ts-expect-error — repository is part of the async graph
+scope.get('repository')
 ```
 
-> ⚠️ **Cycles between async factories are not detected and produce a silent Promise deadlock.** The runtime cycle detector projects the *synchronous* call stack only — the `resolving` set is cleared by the time an `async` factory's `await` continuation runs. If two async factories depend on each other (`a` awaits `c.get('b')`, `b` awaits `c.get('a')`), each one's pending Promise gets cached during the synchronous prelude, and the resumed continuations find that cached Promise on every reentry. `await c.get('a')` then hangs forever with no error, no rejection, no diagnostic. Fixing this in the runtime would require an async-aware cycle tracker on the resolve fast-path, which is incompatible with the 1-`Map.get()` hot-path contract — so the recommendation is architectural: keep one side synchronous (split the cycle, hoist the shared init), or break it with a `Lazy<singleton>` companion if both sides are singletons. If you suspect a cycle in async code, wrap the top-level `await c.get(...)` with a watchdog timeout during development.
+Declared dependencies are started synchronously in tuple order, then only keys marked as declarative async dependencies are awaited. Singleton and scoped registrations cache one native Promise, so concurrent callers share initialization and a rejection remains the stable failed state. Transients start once per call and remain caller-owned. Scope-input requirements and lifetime checks propagate through `AsyncSpec` the same way they do through `Spec`.
 
-> The same synchronous boundary applies to `singletonStack`. After `await`, it cannot detect a transient read or a scoped read through a captured child scope. The separate root-scope guard still rejects `root.get(scopedKey)` in strict mode. `AllowedDeps` protects normal typed code in both cases. Keep dependency reads in the synchronous factory prelude.
+`getAsync()` also accepts sync keys and always returns a Promise. For a traditional sync registration whose service type itself is `Promise<T>`, the top-level call follows normal JavaScript await semantics and returns `Promise<T>`.
+
+`registerFactory` keeps the legacy Promise-valued model. The Promise is the service value, remains a sync key, and is injected by identity rather than awaited:
+
+```ts
+const legacy = new Container()
+  .registerFactory('dbPromise', () => connectDatabase())
+  .registerAsyncFactory(
+    'monitor',
+    (dbPromise: Promise<Database>) => new Monitor(dbPromise),
+    ['dbPromise']
+  )
+
+const promise = legacy.get('dbPromise')
+```
+
+Owned async singleton/scoped registrations keep their Promise in the cache for the container lifetime. Use `await using`, `await container.dispose()`, or `container[Symbol.asyncDispose]()` even after initialization has fulfilled. Sync `using` cannot unwrap the cached Promise and reports a misuse.
+
+Declarative cycles are detected during synchronous dependency preflight. Dynamic edges created later from a captured container are outside graph analysis, as are calls made after the Promise boundary. There is no async `Lazy<T>` companion: `registerAsyncFactory` has no `lazyKey`, and a class with a potentially async dependency cannot request one.
+
+If dependency preflight fails after earlier initializations started, InferDI returns the original structural error and observes already-returned native Promise rejections. It does not roll back, cancel, or take ownership of an orphaned async transient. `registerAsyncFactory` and any `registerClass` call whose tuple may select an async key require readonly dependencies because InferDI classifies async positions once. Inline literals infer readonly tuples; sync-only classes keep mutable-tuple compatibility.
+
+> ⚠️ **Cycles created between Promise-valued `registerFactory` callbacks after `await` are not detected and can deadlock.** The runtime cycle detector projects the synchronous call stack only. Break the cycle, hoist shared initialization, or use a synchronous `Lazy<singleton>` edge where legal.
+
+> The same boundary applies to lifetime checks after `await` in legacy factories or captured-container continuations. `AllowedDeps` protects normal typed code; keep dynamic dependency reads in the synchronous prelude.
 
 ## Strict Lifetime Guards
 
@@ -817,6 +851,8 @@ const c = new Container()
   .registerFactory('clock', () => new Clock(), 'singleton', 'clockLazy')
 ```
 
+Declarative async registrations do not support lazy companions. `Lazy<T>.get()` is synchronous and cannot represent the Promise boundary of an `AsyncSpec`.
+
 **Lazy preserves the target's lifetime; it is not a lifetime escape hatch.** A singleton consumer may inject only `Lazy<singleton>` companions. `Lazy<scoped>` and `Lazy<transient>` are rejected by the compile-time `AllowedDeps` filter inside a singleton, and the strict-mode runtime guard rejects the same shape if you bypass the type system with an `as`-cast. For scoped or transient consumers, every `Lazy<*>` variant remains legal.
 
 ```ts
@@ -927,7 +963,7 @@ const fixture = new Container()
 
 ## Querying with `.has()`
 
-`.has(key)` is a type-guard predicate: it returns `true` if `key` is registered on this container or any ancestor scope, and narrows the key to `keyof T` inside the truthy branch. The walk-up matches `.get()` exactly, but `.has()` is a pure observer — it never resolves the value and never throws. On a disposed container, `.has()` returns `false` for every key (the container's `regs` map is cleared by `dispose()`, so this is the literal truth).
+`.has(key)` is a type-guard predicate: it returns `true` if `key` is registered on this container or any ancestor scope, and narrows the key to `keyof T` inside the truthy branch. The walk-up matches resolution, but `.has()` is a pure observer — it never resolves the value and never throws. On a disposed container, `.has()` returns `false` for every key.
 
 ```ts
 declare const c: Container<{ logger: Spec<Logger> }>
@@ -939,7 +975,7 @@ if (c.has('logger')) {
 c.has('missing')   // false — does not throw
 ```
 
-For statically known keys, you don't need `.has()` — TypeScript already rejects unknown keys at compile time, so `.get()` is the direct path. Reach for `.has()` when the key is genuinely dynamic (e.g., constructed from runtime input) and you need a safe probe.
+For a dynamic graph that may include async keys, use `getAsync()` after the guard. `.has()` does not prove that a key is synchronous and does not provide missing scope inputs; `get()` still requires additional narrowing to a ready sync key.
 
 ## Test Overrides
 
@@ -1035,7 +1071,8 @@ The container throws structured errors with actionable messages — surface thes
 | Root resolves a scoped key in strict mode | `Scoped "k" cannot be resolved from the root container. Use createScope().` |
 | Singleton depends on scoped/transient | `Singleton "x" cannot depend on scoped "y". Use Lazy<T> ...` |
 | Resolution loop (synchronous) | `Circular dependency detected: a -> b -> a. Consider breaking the cycle with Lazy<T> ...` |
-| Resolution loop (between async factories) | _Not detected._ Produces a silent Promise deadlock — see the warning under [Async Factories](#async-factories). |
+| Resolution loop (declarative async graph) | Rejected with the same synchronous circular-dependency diagnostic during preflight. |
+| Resolution loop after `await` in legacy/captured code | _Not detected._ May produce a Promise deadlock — see [Async Factories](#async-factories). |
 | Use of disposed container | `Container is disposed (key: "k")` |
 | Resolving across a disposed ancestor | `Ancestor container is disposed (key: "k")` |
 | `createScope()` after dispose | `Cannot create scope from a disposed container` |
@@ -1055,6 +1092,7 @@ import {
   Container,
   type Lazy,
   type LazySpec,
+  type AsyncSpec,
   type Module,
   type DependenciesMap,
   type RegistrationKind,
@@ -1112,6 +1150,20 @@ class Container<T extends DependenciesMap = Record<never, never>> {
   // Both registerFactory overloads also have a four-argument lazyKey form.
   // The return type additionally contains Record<LK, LazySpec<V, Kind>>.
 
+  registerAsyncFactory<K, A, R>(
+    key: Exclude<K, keyof T>,
+    factory: (...args: A) => R,
+    deps: DepsOf<AllowedDeps<T, 'singleton'>, A>,
+    kind?: undefined
+  ): Container<T & Record<K, AsyncSpec<Awaited<R>, 'singleton'>>>
+
+  registerAsyncFactory<K, A, R, Kind extends RegistrationKind>(
+    key: Exclude<K, keyof T>,
+    factory: (...args: A) => R,
+    deps: DepsOf<AllowedDeps<T, Kind>, A>,
+    kind: Kind
+  ): Container<T & Record<K, AsyncSpec<Awaited<R>, Kind>>>
+
   registerValue<K extends string | symbol, V>(
     key: Exclude<K, keyof T>,
     value: V,
@@ -1128,8 +1180,10 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 
   // Scopes & resolution
   createScope(): Container<T>
-  // In strict mode, scoped keys must be resolved from a child scope.
+  // Sync-ready keys only. In strict mode, scoped keys require a child scope.
   get<K extends keyof T>(key: K): T[K]['type']
+  // Ready sync and declarative async keys; synchronous errors become rejections.
+  getAsync<K extends keyof T>(key: K): Promise<Awaited<T[K]['type']>>
   // Type-guard: narrows the key to keyof T inside the truthy branch.
   // Returns false on a disposed container (regs is empty).
   has<K extends string | symbol>(key: K): key is K & keyof T
@@ -1142,6 +1196,12 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 }
 
 namespace Container {
+  // Ready keys accepted by getAsync(), including declarative async entries.
+  type ReadyKeys<C>
+
+  // Ready synchronous keys accepted by get().
+  type SyncReadyKeys<C>
+
   // Extract the registered map from a built container as a **flat**
   // `{ key: ServiceType }` view — the Spec wrapper is unwrapped, so consumers
   // see the same shape they always did pre-v3.
@@ -1186,6 +1246,11 @@ interface ContainerOptions {
 interface Spec<V, K extends RegistrationKind = 'singleton'> {
   readonly type: V
   readonly kind: K
+}
+
+interface AsyncSpec<V, K extends RegistrationKind = 'singleton'>
+  extends Spec<V, K> {
+  readonly async: true
 }
 
 // Brand a flat `{ key: ServiceType }` map as a SpecMap (defaults to singleton).

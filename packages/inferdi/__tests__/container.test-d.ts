@@ -1087,7 +1087,7 @@ describe('scope inputs — helpers and compatibility', () => {
     constructor(readonly request: RequestContext) {}
   }
 
-  it('exposes Container.ReadyKeys for generic resolvers', () => {
+  it('exposes Container.ReadyKeys for generic async-capable resolvers', () => {
     function legacyResolve<
       T extends DependenciesMap,
       K extends keyof T
@@ -1099,12 +1099,12 @@ describe('scope inputs — helpers and compatibility', () => {
     function resolveReady<
       T extends DependenciesMap,
       K extends Container.ReadyKeys<Container<T>>
-    >(container: Container<T>, key: K): T[K]['type'] {
-      return container.get(key)
+    >(container: Container<T>, key: K): Promise<Awaited<T[K]['type']>> {
+      return container.getAsync(key)
     }
 
     const ordinary = new Container().registerValue('answer', 42 as const)
-    expectTypeOf(resolveReady(ordinary, 'answer')).toEqualTypeOf<42>()
+    expectTypeOf(resolveReady(ordinary, 'answer')).toEqualTypeOf<Promise<42>>()
     void legacyResolve
   })
 

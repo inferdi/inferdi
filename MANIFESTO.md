@@ -41,7 +41,7 @@ TypeScript can express the rule.
   parameters by position and structural assignability.
 - `AllowedDeps<T, Kind>` narrows the container passed into factories. Inside a
   singleton factory, `c.get('scoped')` is a type error.
-- `Spec`, `LazySpec`, `SpecMap`, `Module`, `Container.Resolve`,
+- `Spec`, `AsyncSpec`, `LazySpec`, `SpecMap`, `Module`, `Container.Resolve`,
   `Container.ResolveUnwrapped`, `Container.UnwrappedValue`, and
   `Container.Providers` are part of the contract. Treat changes to them as
   public API changes.
@@ -113,7 +113,12 @@ Do not add work before that lookup.
 - Constructor invocation stays arity-unrolled for 0-7 args. The 8+ path uses
   `Reflect.construct` with a packed array built by `push`.
 - `get()` stays synchronous. The shared `resolving` array and `singletonStack`
-  work only because one resolve runs atomically on the call stack.
+  work only because one resolve and every declarative async dependency preflight
+  run atomically on the call stack. `getAsync()` adds a Promise boundary around
+  the same resolver and never mutates these stacks from a continuation.
+- Declarative async registrations share `regs`, `cache`, scope lookup, ownership,
+  and disposal with sync registrations. `Registration.async` is cold metadata
+  used during registration-time dependency classification. `get()` never reads it.
 - `strict: false` may remove runtime cycle and lifetime checks after the local
   cache fast path. Fast scopes may read the immutable root registry directly
   and mirror delegated singletons into their local cache. A fast tree is
@@ -129,9 +134,9 @@ includes a narrow, written justification.
 
 `@inferdi/inferdi` has no runtime dependencies. Keep it that way.
 
-The published bundle should stay below 3KB gzipped. CI does not enforce that
-budget today, so reviewers must check bundle size for PRs that add code to the
-core implementation or public helpers.
+The published bundle must stay below 3KB gzipped. CI enforces this budget with
+`pnpm run test:bundle-size`; reviewers should still inspect size changes in PRs
+that add code to the core implementation or public helpers.
 
 ## 3. PR Filter
 
@@ -213,8 +218,8 @@ Document these choices instead of "fixing" them.
 | No decorator API | Decorator-based DI is a different library. |
 | No runtime metadata | Constructor signatures and explicit `deps` tuples provide the graph. Runtime introspection would add dependencies and weaker failure modes. |
 | No nominal distinction for identical structural deps | TypeScript uses structural assignability. If two keys expose the same shape, `DepsOf` cannot know the user's semantic intent. Use branded types or `unique symbol` keys when order matters between same-shape services. |
-| No async `get()` | The current cycle and lifetime guards use shared synchronous call-stack state. An async resolve API would need separate per-resolve bookkeeping. |
-| No detection of cycles between async factories | After an `await`, the synchronous resolve stack is gone and pending promises may satisfy later `c.get()` calls. Detecting this would add async tracking to resolve. Split the cycle, hoist shared initialization, or use `Lazy<singleton>` where legal. |
+| No async `get()` | `get()` remains synchronous. `getAsync()` wraps the same synchronous resolver and returns a Promise without creating another registry, cache, or resolution lane. |
+| No detection of dynamic cycles after a Promise boundary | Declarative async edges run through synchronous preflight and use the existing cycle guard. Calls from legacy Promise-valued factories or captured containers after `await` run after the resolve stack is cleared. Split that cycle or hoist shared initialization. |
 | No runtime lifetime detection after an async boundary | `AllowedDeps` still blocks invalid typed factories, but `as`-casts and captured outer containers used after `await` run after `singletonStack` has been cleared. Full defense-in-depth would require async-context tracking. Keep dependency reads in the synchronous factory prelude. |
 | No auto-cycle-breaking | Cycles are architectural defects unless one side is an explicit lazy singleton companion. InferDI detects supported runtime cycles and reports them; it does not invent proxies or partial instances. |
 | No generic `<T>(c: Container<T>) => ...` modules | `keyof T` collapses to the `DependenciesMap` upper bound inside the generic body. Use inline `.use()` lambdas or `Module<TIn, TOut>` with a known input shape. |
