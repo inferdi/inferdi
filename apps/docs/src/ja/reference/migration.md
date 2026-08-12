@@ -84,6 +84,19 @@ function resolve<
 
 `getAsync()` を呼ぶジェネリック helper では `Container.ReadyKeys<Container<T>>` を使います。ジェネリックな `T extends DependenciesMap` は、宣言的 async エントリーや不足するスコープ入力によってブロックされたサービスを含む場合があります。
 
+### Lazy コンパニオンでは named spec を使う
+
+`LazySpec` は private な type-only mode brand を持つようになり、v6 では
+`AsyncLazySpec` も追加されました。明示的な `Container` / `Module` shape
+では `{type, kind, lazyOf}` を再現せず、これらの named export を使います。
+brand に runtime field はありません。
+
+`registerAsyncFactory` の第 5 引数 `lazyKey` は `AsyncLazy<T>` を生成します。
+Async クラスも同じ wrapper を使い、sync/async mixed クラスは
+`Lazy<T> | AsyncLazy<T>` を公開します。Promise-valued `registerFactory` は
+`Lazy<Promise<T>>` のままです。`Container.ResolveUnwrapped` は管理対象の各
+mode を distributive に展開します。
+
 新しいキー集合は [API サマリー](./api)、[スコープ入力とプロファイル](../core/scope-inputs)、[非同期依存グラフ](../core/async-dependency-graph)を参照してください。
 
 ## 5.0 へのマイグレーション

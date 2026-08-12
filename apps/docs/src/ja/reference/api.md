@@ -69,7 +69,9 @@ import {
   type ContainerOptions,
   type DependenciesMap,
   type Lazy,
+  type AsyncLazy,
   type LazySpec,
+  type AsyncLazySpec,
   type AsyncSpec,
   type Module,
   type RegistrationKind,
@@ -88,7 +90,7 @@ class Container<T extends DependenciesMap = Record<never, never>> {
   registerClass(key, Ctor, deps, kind?, lazyKey?)
   registerFactory(key, factory, kind?, lazyKey?)
   registerFactory(key, deps, factory, kind?, lazyKey?)
-  registerAsyncFactory(key, factory, deps, kind?)
+  registerAsyncFactory(key, factory, deps, kind?, lazyKey?)
   registerValue(key, value)
   override(key, value)
   use(fn)
@@ -117,7 +119,7 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 
 `registerClass` と `registerFactory` は `singleton`、`scoped`、`transient` のライフタイムと、省略可能な `lazyKey` コンパニオンを受け付けます。`registerValue` は常にシングルトンで、外部が所有します。
 
-`registerAsyncFactory` は同じライフタイムを受け付けますが、`lazyKey` はありません。最終サービス型を `AsyncSpec` として記録し、依存するクラスは非同期状態を引き継ぎます。これらのキーは `getAsync()` で解決してください。`get()` は、`registerFactory` が作る Promise 値サービスを含む同期キーに使用します。
+`registerAsyncFactory` は同じライフタイムと省略可能な第 5 引数 `lazyKey` を受け付けます。主登録は最終型を `AsyncSpec` に保持し、コンパニオン型は `AsyncLazySpec<Awaited<ReturnType>, Kind>` です。ターゲットは `getAsync()`、ラッパーは `get()` で解決します。
 
 `registerAsyncFactory` と、依存関係タプルが非同期キーを選ぶ可能性のある `registerClass` では readonly タプルが必要です。InferDI は登録時に非同期位置を一度だけ分類し、タプルへの参照を保持します。インラインリテラルは readonly として推論され、同期専用の `registerClass` は変更可能なタプルも受け付けます。
 
@@ -125,7 +127,7 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 
 ```ts
 registerFactory(key, deps, resolverFactory, kind, lazyKey)
-registerAsyncFactory(key, valueFactory, deps, kind)
+registerAsyncFactory(key, valueFactory, deps, kind, lazyKey)
 ```
 
 `override` は既存登録を置き換え、`use` は module builder を適用します。`override` のタイミングガードが確認するのは現在のコンテナのキャッシュだけです。ローカルにキャッシュされた singleton/scoped 値、`registerValue`、2 回目のオーバーライドは検出しますが、transient の解決や、子コンテナ経由で解決された祖先所有の値は記録しません。依存関係グラフを解決する前にオーバーライドを適用してください。
@@ -160,7 +162,7 @@ namespace Container {
 | `Container.ReadyKeys<C>` | 必要なスコープ入力が提供済みのキーを抽出します。汎用リゾルバーはそのキーを `getAsync` に渡せます。 |
 | `Container.SyncReadyKeys<C>` | 汎用リゾルバーが `get` に渡せる、準備済みの非同期ではないキーを抽出します。 |
 | `Container.Resolve<C>` | 構築済みのコンテナからフラットな `{ key: Value }` マップを抽出します。 |
-| `Container.ResolveUnwrapped<C>` | `Resolve` と同様ですが、管理対象の `LazySpec` コンパニオンだけを `T` に展開します。通常の `.get()` メソッドを持つサービスは変更しません。 |
+| `Container.ResolveUnwrapped<C>` | `Resolve` と同様ですが、管理対象の `LazySpec` と `AsyncLazySpec` を distributive に展開します。通常のラッパーサービスは変更しません。 |
 | `Container.UnwrappedValue<C, K>` | アンラップされた 1 つのサービス型を参照します。 |
 | `Container.Providers<C>` | テスト用にプロバイダーのサンクのマップを作成します。 |
 
@@ -170,6 +172,7 @@ v6 のジェネリック resolver は受け付けるキー集合を保持する�
 
 ```ts
 type Lazy<T> = { readonly get: () => T }
+type AsyncLazy<T> = { readonly get: () => Promise<T> }
 type RegistrationKind = 'singleton' | 'transient' | 'scoped'
 type DependenciesMap = Record<
   string | symbol,
@@ -195,6 +198,11 @@ interface LazySpec<V, TargetKind extends RegistrationKind>
   readonly lazyOf: TargetKind
 }
 
+interface AsyncLazySpec<V, TargetKind extends RegistrationKind>
+  extends Spec<AsyncLazy<V>, 'transient'> {
+  readonly lazyOf: TargetKind
+}
+
 type SpecMap<M, K extends RegistrationKind = 'singleton'> = {
   [P in keyof M]: Spec<M[P], K>
 }
@@ -202,6 +210,10 @@ type SpecMap<M, K extends RegistrationKind = 'singleton'> = {
 type Module<TIn extends DependenciesMap, TOut extends DependenciesMap> =
   (c: Container<TIn>) => Container<TIn & TOut>
 ```
+
+`LazySpec` と `AsyncLazySpec` は private な type-only discriminant を持ちます。
+明示的な `Container` / `Module` shape では、この named interface を使ってください。
+discriminant に runtime field はなく、export もされません。
 
 `ScopeInputMap<M>` は必須かつ有限な string/symbol プロパティを scoped input エントリーへ変換します。optional キー、数値キー、`__proto__`、広い index signature、キー集合が異なる union は拒否します。`WithRequirements<S, K>` は名前付きモジュールの出力に必要な input keys を保持します。正確な conditional type 定義は公開 TypeScript declarations を参照してください。
 

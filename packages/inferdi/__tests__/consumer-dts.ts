@@ -1,12 +1,18 @@
 import {
   Container,
+  type AsyncLazy,
+  type AsyncLazySpec,
   type AsyncSpec,
   type DependenciesMap,
+  type Lazy,
   type Module,
+  type LazySpec,
   type ScopeInputMap,
   type Spec,
   type WithRequirements
 } from '../dist/index.js'
+// @ts-expect-error — the companion mode discriminant stays package-internal
+import type {lazyMode} from '../dist/index.js'
 
 using container = new Container().registerValue('answer', 42)
 
@@ -81,6 +87,47 @@ const asyncContainer = new Container()
 const database: Database = await asyncContainer.getAsync('database')
 const repository: Repository = await asyncContainer.getAsync('repository')
 
+type LazyOutput = {
+  database: AsyncSpec<Database>
+  databaseLazy: AsyncLazySpec<Database, 'singleton'>
+}
+const lazyDatabaseModule: Module<Record<never, never>, LazyOutput> = (c) =>
+  c.registerAsyncFactory(
+    'database',
+    async () => new Database(),
+    [],
+    undefined,
+    'databaseLazy'
+  )
+const lazyContainer = new Container().use(lazyDatabaseModule)
+const databaseLazy: AsyncLazy<Database> = lazyContainer.get('databaseLazy')
+const lazyDatabase: Database = await databaseLazy.get()
+
+const mixedDatabaseKey: 'localDatabase' | 'remoteDatabase' = Math.random() > 0.5
+  ? 'localDatabase'
+  : 'remoteDatabase'
+const mixedContainer = new Container()
+  .registerValue('localDatabase', new Database())
+  .registerAsyncFactory('remoteDatabase', async () => new Database(), [])
+  .registerClass(
+    'repository',
+    Repository,
+    [mixedDatabaseKey],
+    'singleton',
+    'repositoryLazy'
+  )
+const mixedRepositoryLazy: Lazy<Repository> | AsyncLazy<Repository> =
+  mixedContainer.get('repositoryLazy')
+
+function acceptsSyncCompanion(
+  container: Container<{
+    clock: Spec<Database, 'singleton'>
+    clockLazy: LazySpec<Database, 'singleton'>
+  }>
+): void {
+  container.get('clockLazy')
+}
+
 // @ts-expect-error — declarative async keys are not accepted by get()
 asyncContainer.get('database')
 // @ts-expect-error — async status propagates through registerClass()
@@ -91,3 +138,6 @@ void syncHandler
 void resolvedHandler
 void database
 void repository
+void lazyDatabase
+void mixedRepositoryLazy
+void acceptsSyncCompanion

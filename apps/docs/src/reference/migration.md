@@ -84,6 +84,19 @@ function resolve<
 
 Use `Container.ReadyKeys<Container<T>>` in generic helpers that call `getAsync()`. A generic `T extends DependenciesMap` may contain declarative async entries or services blocked by missing scope inputs.
 
+### Named Specs for Lazy Companions
+
+`LazySpec` now carries a private type-only mode brand, and v6 adds
+`AsyncLazySpec`. Explicit `Container` and `Module` shapes must use these named
+exports instead of reproducing `{type, kind, lazyOf}`. The brand has no runtime
+field.
+
+`registerAsyncFactory` accepts a fifth `lazyKey` and produces `AsyncLazy<T>`.
+Async-propagated classes use the same wrapper; mixed sync/async classes expose
+`Lazy<T> | AsyncLazy<T>`. Promise-valued `registerFactory` companions remain
+`Lazy<Promise<T>>`. `Container.ResolveUnwrapped` unwraps managed sync, async,
+and mixed companions distributively.
+
 The [API Summary](./api), [Scope Inputs and Profiles](../core/scope-inputs), and [Async Dependency Graph](../core/async-dependency-graph) describe the new key sets.
 
 ## Migration to 5.0

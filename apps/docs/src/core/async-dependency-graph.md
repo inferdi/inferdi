@@ -69,6 +69,10 @@ InferDI supports two contracts because a Promise can be either the service itsel
 
 Use `registerAsyncFactory` when downstream services need the fulfilled value. Keep a Promise-valued `registerFactory` only when the Promise itself belongs in your synchronous graph.
 
+The distinction also controls lazy companions. A Promise-valued
+`registerFactory(..., lazyKey)` produces `Lazy<Promise<T>>`; a declarative
+`registerAsyncFactory(..., lazyKey)` produces `AsyncLazy<T>`.
+
 ## Build an Async Request Graph
 
 The following graph initializes one database for the root and one session per authenticated scope. Classes become async when any declared dependency is async.
@@ -153,6 +157,30 @@ Concurrent callers share singleton and scoped initialization. A rejected cached 
 
 `has()` checks registration without starting initialization. It does not prove that a key is synchronous and does not provide missing scope inputs.
 
+## AsyncLazy Companions
+
+Pass a fifth `lazyKey` to defer a declarative async target:
+
+```ts
+const root = new Container()
+  .registerAsyncFactory('db', openDatabase, [], undefined, 'dbLazy')
+
+const dbLazy = root.get('dbLazy') // AsyncLazy<Database>
+const first = dbLazy.get()
+const second = dbLazy.get()
+
+first === second // true for this singleton target
+```
+
+Wrapper creation stays synchronous, so a class that injects `AsyncLazy<T>`
+does not inherit async status from that dependency. An async-propagated class
+with its own `lazyKey` produces `AsyncLazy<Class>`. A class dependency key that
+may choose a sync or async registration produces a
+`Lazy<Class> | AsyncLazy<Class>` companion.
+
+The wrapper captures the resolving container. Scoped targets stay isolated by
+that captured scope. Transients start per call and remain caller-owned.
+
 ## Async Resource Teardown
 
 Singleton and scoped registrations keep their Promise in the cache after fulfillment. Dispose their container asynchronously so InferDI can await initialization and probe the resolved resource.
@@ -191,8 +219,8 @@ At the top-level, `getAsync('dbPromise')` follows JavaScript await semantics and
 
 - Pass readonly dependency tuples to `registerAsyncFactory` and to `registerClass` when the tuple may select an async key. InferDI classifies async positions once and retains the tuple reference. Inline literals infer readonly tuples.
 - Declarative cycles and cold lifetime violations fail during synchronous preflight. Calls through a captured container after a Promise boundary create dynamic edges outside that analysis.
-- InferDI does not provide async `Lazy<T>`, retry, cancellation, or rollback. Split a cycle or move shared initialization into a separate service.
+- `AsyncLazy<T>` defers resolution; it does not add retry, cancellation, or rollback.
 - If a later dependency fails during preflight, earlier initializations keep their cache and ownership state. An already-started async transient may continue without a teardown handle.
-- A class with an async dependency cannot receive a synchronous lazy companion. `registerAsyncFactory` has no `lazyKey` parameter.
+- A dynamic cycle through `AsyncLazy.get()` after a Promise boundary can wait on its own cached pending Promise. The synchronous cycle detector cannot report that deadlock.
 
 See [Factories](./factories) for synchronous construction and [Scopes and Teardown](./scopes) for the ownership model.

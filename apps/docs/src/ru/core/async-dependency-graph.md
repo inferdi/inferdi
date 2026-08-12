@@ -69,6 +69,11 @@ InferDI поддерживает два контракта: Promise может �
 
 Используйте `registerAsyncFactory`, когда зависимым сервисам нужно готовое значение. Promise-valued `registerFactory` подходит только для графа, где сервисом служит сам Promise.
 
+Это различие действует и для companion: Promise-valued `registerFactory`
+создаёт `Lazy<Promise<T>>`, а декларативный `registerAsyncFactory` с пятым
+`lazyKey` создаёт `AsyncLazy<T>`. Получение wrapper остаётся синхронным и не
+распространяет async status на его потребителя.
+
 ## Async-граф запроса
 
 В этом графе один database создаётся для root, а отдельная session — для каждого авторизованного скоупа. Класс получает async-статус, если хотя бы одна объявленная зависимость асинхронна.
@@ -191,8 +196,9 @@ const monitor = await legacy.getAsync('monitor')
 
 - Передавайте readonly-кортежи в `registerAsyncFactory` и в `registerClass`, если кортеж может выбрать async-ключ. InferDI один раз определяет async-позиции и сохраняет ссылку на кортеж. Для inline-литерала TypeScript выводит readonly-тип.
 - Декларативные циклы и холодные lifetime-нарушения завершаются на синхронном preflight. Вызовы через захваченный контейнер после Promise boundary создают динамические рёбра вне этого анализа.
-- InferDI не реализует async `Lazy<T>`, retry, cancellation и rollback. Разорвите цикл или вынесите общую инициализацию в отдельный сервис.
+- `AsyncLazy<T>` откладывает resolve, но не добавляет retry, cancellation или rollback.
 - Если поздняя зависимость падает во время preflight, ранние инициализации сохраняют кеш и владение. Уже запущенный async transient может продолжить работу без teardown handle.
-- Для класса с async-зависимостью нельзя создать синхронный lazy companion. У `registerAsyncFactory` нет параметра `lazyKey`.
+- Async-класс с `lazyKey` получает `AsyncLazy<Class>`, а mixed sync/async class — `Lazy<Class> | AsyncLazy<Class>`.
+- Динамический цикл через `AsyncLazy.get()` после Promise boundary может ждать собственный cached pending Promise без runtime-ошибки.
 
 Синхронное создание описано в разделе [Фабрики](./factories), а модель владения — в [Скоупах и очистке](./scopes).

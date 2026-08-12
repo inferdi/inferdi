@@ -1,6 +1,7 @@
 export { Container } from './Container'
 export type {
   Lazy,
+  AsyncLazy,
   DependenciesMap,
   Module,
   RegistrationKind,
@@ -9,6 +10,7 @@ export type {
   AsyncSpec,
   SpecMap,
   LazySpec,
+  AsyncLazySpec,
   ContainerOptions,
   WithRequirements
 } from './Container'

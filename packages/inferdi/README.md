@@ -477,7 +477,7 @@ const container = new Container()
   .registerClass('userRepo', UserRepo, ['pgPool'])
 ```
 
-Factories follow the same lifetime rules as classes — pass the kind as the third argument: `registerFactory('cache', factory, 'scoped')`. An optional fourth `lazyKey` registers the same lifetime-preserving `Lazy<V>` companion as `registerClass`: `registerFactory('cache', factory, 'scoped', 'cacheLazy')`. To use the default singleton lifetime with a companion, pass `undefined` as the kind. Inside a **singleton** factory the container parameter is narrowed via `AllowedDeps<T, 'singleton'>`, so `c.get(...)` will only autocomplete (and accept) singleton keys and `Lazy<singleton>` companions. A `scoped`/`transient` key (or `Lazy<scoped>` / `Lazy<transient>`) inside a singleton factory body is a TypeScript error, not a runtime exception.
+Factories follow the same lifetime rules as classes — pass the kind as the third argument: `registerFactory('cache', factory, 'scoped')`. An optional fourth `lazyKey` registers the same lifetime-preserving `Lazy<V>` companion as `registerClass`: `registerFactory('cache', factory, 'scoped', 'cacheLazy')`. To use the default singleton lifetime with a companion, pass `undefined` as the kind. Inside a **singleton** factory the container parameter is narrowed via `AllowedDeps<T, 'singleton'>`, so `c.get(...)` accepts singleton keys and singleton-target `Lazy` or `AsyncLazy` companions. Scoped, transient, and possibly short-lived companions are TypeScript errors in that factory body.
 
 Factories that read scope inputs declare those edges with a dependency tuple. The tuple narrows the callback to a resolver-only view and carries input requirements to the result:
 
@@ -493,6 +493,8 @@ root.registerFactory(
 The tuple serves the type system. InferDI still calls `factory(container)` and does not resolve the tuple into an argument array.
 
 `registerFactory` remains a synchronous graph surface even when its return value happens to be a Promise. Its resolver and deps-aware tuple cannot read keys created by `registerAsyncFactory`; use the declarative async API below when downstream classes should receive final resolved services.
+
+A `lazyKey` on a Promise-valued `registerFactory` preserves that model: the companion is `Lazy<Promise<T>>`. InferDI creates `AsyncLazy<T>` only for declarative async targets.
 
 ## Binding Interfaces
 
@@ -684,11 +686,23 @@ const promise = legacy.get('dbPromise')
 
 Owned async singleton/scoped registrations keep their Promise in the cache for the container lifetime. Use `await using`, `await container.dispose()`, or `container[Symbol.asyncDispose]()` even after initialization has fulfilled. Sync `using` cannot unwrap the cached Promise and reports a misuse.
 
-Declarative cycles are detected during synchronous dependency preflight. Dynamic edges created later from a captured container are outside graph analysis, as are calls made after the Promise boundary. There is no async `Lazy<T>` companion: `registerAsyncFactory` has no `lazyKey`, and a class with a potentially async dependency cannot request one.
+Pass a fifth `lazyKey` to `registerAsyncFactory` to create an `AsyncLazy<T>` companion. Resolving or injecting the wrapper does not start the factory. `wrapper.get()` returns the native Promise cached by singleton and scoped targets, so concurrent calls keep the same single-flight identity. Transient targets start once per call and remain caller-owned.
+
+```ts
+const c = new Container()
+  .registerAsyncFactory('db', connectDatabase, [], undefined, 'dbLazy')
+
+const dbLazy = c.get('dbLazy') // AsyncLazy<Database>; connectDatabase has not run
+const db = await dbLazy.get()
+```
+
+Classes receive a mode-matched companion. A sync class produces `Lazy<T>`, an async-propagated class produces `AsyncLazy<T>`, and a dependency key union that may choose either path produces `Lazy<T> | AsyncLazy<T>`. Injecting `AsyncLazy<T>` into a class does not make that consumer async because wrapper creation is synchronous.
+
+Declarative cycles are detected during synchronous dependency preflight. Dynamic edges created later from a captured container, including `AsyncLazy.get()` calls after a Promise boundary, are outside graph analysis.
 
 If dependency preflight fails after earlier initializations started, InferDI returns the original structural error and observes already-returned native Promise rejections. It does not roll back, cancel, or take ownership of an orphaned async transient. `registerAsyncFactory` and any `registerClass` call whose tuple may select an async key require readonly dependencies because InferDI classifies async positions once. Inline literals infer readonly tuples; sync-only classes keep mutable-tuple compatibility.
 
-> ⚠️ **Cycles created between Promise-valued `registerFactory` callbacks after `await` are not detected and can deadlock.** The runtime cycle detector projects the synchronous call stack only. Break the cycle, hoist shared initialization, or use a synchronous `Lazy<singleton>` edge where legal.
+> ⚠️ **A dynamic cycle created after a Promise boundary can deadlock.** This includes captured-container calls and `AsyncLazy.get()`. The runtime cycle detector projects the synchronous call stack; reaching a cached pending Promise from its own initialization waits forever. Break the cycle or hoist shared initialization.
 
 > The same boundary applies to lifetime checks after `await` in legacy factories or captured-container continuations. `AllowedDeps` protects normal typed code; keep dynamic dependency reads in the synchronous prelude.
 
@@ -823,7 +837,13 @@ production builds.
 
 ## Lazy Injection
 
-`Lazy<T>` is a deferred-resolution primitive — useful when two services would otherwise have to be constructed in a precise order (or when the type system would reject a forward reference). Pass a `lazyKey` to `registerClass` or `registerFactory` and the container creates a companion `Lazy<T>` under that explicit key (string or symbol):
+`Lazy<T>` and `AsyncLazy<T>` defer target resolution. Pass a `lazyKey` to `registerClass`, `registerFactory`, or `registerAsyncFactory`; the target decides the wrapper mode:
+
+- sync target: `Lazy<T>` with `get(): T`
+- declarative async target: `AsyncLazy<T>` with `get(): Promise<T>`
+- class whose dependency key may select sync or async: `Lazy<T> | AsyncLazy<T>`
+
+The example below creates a synchronous companion under an explicit string or symbol key:
 
 ```ts
 import { Container, type Lazy } from '@inferdi/inferdi'
@@ -851,9 +871,28 @@ const c = new Container()
   .registerFactory('clock', () => new Clock(), 'singleton', 'clockLazy')
 ```
 
-Declarative async registrations do not support lazy companions. `Lazy<T>.get()` is synchronous and cannot represent the Promise boundary of an `AsyncSpec`.
+Declarative async factories use a fifth argument because their dependency tuple occupies the third position:
 
-**Lazy preserves the target's lifetime; it is not a lifetime escape hatch.** A singleton consumer may inject only `Lazy<singleton>` companions. `Lazy<scoped>` and `Lazy<transient>` are rejected by the compile-time `AllowedDeps` filter inside a singleton, and the strict-mode runtime guard rejects the same shape if you bypass the type system with an `as`-cast. For scoped or transient consumers, every `Lazy<*>` variant remains legal.
+```ts
+import { type AsyncLazy } from '@inferdi/inferdi'
+
+const c = new Container()
+  .registerAsyncFactory('db', connectDatabase, [], undefined, 'dbLazy')
+
+const dbLazy: AsyncLazy<Database> = c.get('dbLazy')
+const db = await dbLazy.get()
+```
+
+Promise-valued `registerFactory` keeps its synchronous graph contract:
+
+```ts
+const legacy = new Container()
+  .registerFactory('db', () => connectDatabase(), undefined, 'dbLazy')
+
+legacy.get('dbLazy') // Lazy<Promise<Database>>
+```
+
+**Lazy companions preserve the target's lifetime.** A singleton consumer may inject only `Lazy<singleton>` and `AsyncLazy<singleton>` companions. The compile-time filter rejects scoped, transient, mixed-lifetime, and managed-plus-unmanaged unions. Strict mode rejects the same short-lived wrapper after a cast bypass. Scoped and transient consumers may use companions for any target lifetime.
 
 ```ts
 new Container()
@@ -862,7 +901,9 @@ new Container()
   .registerClass('app', AppService, ['reqLazy'], 'singleton')
 ```
 
-Need a fresh per-request view of a short-lived service inside a singleton? Use [`AsyncLocalStorage`](https://nodejs.org/api/async_context.html) — a DI container with captured scope cannot model "dynamic scope" on its own. The runtime diagnostic for a Lazy-companion leak still reads `Singleton "X" cannot depend on transient "<lazyKey>"` because the wrapper itself is transient; treat that as "this Lazy resolves a non-singleton target — not safe here".
+Each wrapper captures the container that resolved it. A wrapper obtained from one child scope keeps resolving through that child after another scope exists; disposal of the captured scope makes a later `AsyncLazy.get()` return a rejected Promise. Dispose singleton and scoped targets through their owning container. A wrapper that has not started its target owns no resource.
+
+Use [`AsyncLocalStorage`](https://nodejs.org/api/async_context.html) when a singleton needs a dynamic per-request view. Captured-scope wrappers cannot select the current request scope. The runtime diagnostic names the transient companion key because the wrapper itself is transient.
 
 > **Note on circular dependencies.** True mutual recursion (A's constructor needs B, B's constructor needs A) cannot be expressed in fluent registration — both sides would forward-reference each other's keys, which the type system rejects by design. Between two singletons, you can break the cycle with `Lazy<singleton>` on one side. For factory-introduced cycles the runtime detector reports them precisely; it never "breaks" cycles automatically.
 
@@ -1091,7 +1132,9 @@ Upgrading from a previous major version? See **[MIGRATION.md](https://github.com
 import {
   Container,
   type Lazy,
+  type AsyncLazy,
   type LazySpec,
+  type AsyncLazySpec,
   type AsyncSpec,
   type Module,
   type DependenciesMap,
@@ -1109,8 +1152,8 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 
   // Registration — each call returns a Container widened by Record<K, Spec<V, Kind>>.
   // The `deps` tuple and the factory `c` are narrowed via `AllowedDeps<T, Kind>`:
-  // for a singleton target, only singleton entries and `LazySpec<*, 'singleton'>`
-  // companions are visible.
+  // for a singleton target, only singleton entries and managed Lazy/AsyncLazy
+  // companions whose target kind is exactly 'singleton' are visible.
   registerClass<
     K extends string | symbol,
     V,
@@ -1129,8 +1172,8 @@ class Container<T extends DependenciesMap = Record<never, never>> {
     kind: Kind,
   ): Container<T & Record<K, Spec<V, Kind>>>
 
-  // Both registerClass overloads also have a five-argument lazyKey form. Passing undefined
-  // as kind produces Spec<V, 'singleton'> and LazySpec<V, 'singleton'>.
+  // Both registerClass overloads also have a five-argument lazyKey form. The
+  // companion is LazySpec, AsyncLazySpec, or their union based on ClassSpec.
 
   registerFactory<
     K extends string | symbol,
@@ -1163,6 +1206,9 @@ class Container<T extends DependenciesMap = Record<never, never>> {
     deps: DepsOf<AllowedDeps<T, Kind>, A>,
     kind: Kind
   ): Container<T & Record<K, AsyncSpec<Awaited<R>, Kind>>>
+
+  // Both registerAsyncFactory overloads also have a five-argument lazyKey form.
+  // The return type adds Record<LK, AsyncLazySpec<Awaited<R>, Kind>>.
 
   registerValue<K extends string | symbol, V>(
     key: Exclude<K, keyof T>,
@@ -1209,10 +1255,10 @@ namespace Container {
     ? { [K in keyof U]: U[K]['type'] }
     : never
 
-  // Same as Resolve, but unwraps only managed LazySpec companion entries.
-  // Ordinary services that happen to expose get(): T remain unchanged.
+  // Same as Resolve, but distributively unwraps managed LazySpec and
+  // AsyncLazySpec companion entries. Ordinary wrapper services remain unchanged.
   type ResolveUnwrapped<C> = C extends Container<infer U>
-    ? { [K in keyof U]: U[K] extends LazySpec<infer V, infer _Kind> ? V : U[K]['type'] }
+    ? { [K in keyof U]: UnwrapSpec<U[K]> }
     : never
 
   // Look up a single key's unwrapped service type.
@@ -1223,7 +1269,7 @@ namespace Container {
   type UnwrappedValue<C, K extends keyof Resolve<C>> = ResolveUnwrapped<C>[K]
 
   // Flatten a built container into a record of zero-arg provider thunks,
-  // one per registered key. Lazy<V> companion entries keep the wrapper shape.
+  // one per registered key. Lazy and AsyncLazy companions keep the wrapper shape.
   // Useful for typing mock-factory fixtures in tests.
   type Providers<C> = C extends Container<infer U>
     ? { [K in keyof U]: () => U[K]['type'] }
@@ -1232,6 +1278,7 @@ namespace Container {
 
 // Public types
 type Lazy<T> = { readonly get: () => T }
+type AsyncLazy<T> = { readonly get: () => Promise<T> }
 type RegistrationKind = 'singleton' | 'transient' | 'scoped'
 
 // Construction options.
@@ -1251,6 +1298,18 @@ interface Spec<V, K extends RegistrationKind = 'singleton'> {
 interface AsyncSpec<V, K extends RegistrationKind = 'singleton'>
   extends Spec<V, K> {
   readonly async: true
+}
+
+// Both managed companion specs also carry a private type-only mode brand.
+// Use these named exports in explicit Container and Module shapes.
+interface LazySpec<V, TargetKind extends RegistrationKind>
+  extends Spec<Lazy<V>, 'transient'> {
+  readonly lazyOf: TargetKind
+}
+
+interface AsyncLazySpec<V, TargetKind extends RegistrationKind>
+  extends Spec<AsyncLazy<V>, 'transient'> {
+  readonly lazyOf: TargetKind
 }
 
 // Brand a flat `{ key: ServiceType }` map as a SpecMap (defaults to singleton).

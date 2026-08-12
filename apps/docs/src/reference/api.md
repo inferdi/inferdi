@@ -69,7 +69,9 @@ import {
   type ContainerOptions,
   type DependenciesMap,
   type Lazy,
+  type AsyncLazy,
   type LazySpec,
+  type AsyncLazySpec,
   type AsyncSpec,
   type Module,
   type RegistrationKind,
@@ -88,7 +90,7 @@ class Container<T extends DependenciesMap = Record<never, never>> {
   registerClass(key, Ctor, deps, kind?, lazyKey?)
   registerFactory(key, factory, kind?, lazyKey?)
   registerFactory(key, deps, factory, kind?, lazyKey?)
-  registerAsyncFactory(key, factory, deps, kind?)
+  registerAsyncFactory(key, factory, deps, kind?, lazyKey?)
   registerValue(key, value)
   override(key, value)
   use(fn)
@@ -117,7 +119,7 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 
 `registerClass` and `registerFactory` accept `singleton`, `scoped`, and `transient` lifetimes, plus an optional `lazyKey` companion. `registerValue` is always singleton and externally owned.
 
-`registerAsyncFactory` accepts the same lifetimes without `lazyKey`. It records the final service type as `AsyncSpec`, and dependent classes inherit async status. Use `getAsync()` for these keys. `get()` remains available for sync keys, including Promise-valued `registerFactory` services.
+`registerAsyncFactory` accepts the same lifetimes and an optional fifth `lazyKey`. It records the final service type as `AsyncSpec`; the companion is `AsyncLazySpec<Awaited<ReturnType>, Kind>`. Dependent classes inherit async status from the target key, while a consumer of the wrapper remains synchronous. Use `getAsync()` for the target and `get()` for the wrapper.
 
 `registerAsyncFactory` and any `registerClass` call whose tuple may select an async key require readonly dependencies. InferDI classifies async positions once and retains the tuple reference. Inline literals infer readonly tuples; sync-only `registerClass` calls keep mutable-tuple compatibility.
 
@@ -125,7 +127,7 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 
 ```ts
 registerFactory(key, deps, resolverFactory, kind, lazyKey)
-registerAsyncFactory(key, valueFactory, deps, kind)
+registerAsyncFactory(key, valueFactory, deps, kind, lazyKey)
 ```
 
 `override` replaces an existing registration and `use` applies a module builder. The `override` timing guard checks only the current container's cache. It catches locally cached singleton/scoped values, `registerValue`, and repeated overrides, but it does not record transient resolutions or ancestor-owned values resolved through a child. Apply overrides before resolving the dependency graph.
@@ -160,7 +162,7 @@ namespace Container {
 | `Container.ReadyKeys<C>` | Extract keys whose scope-input requirements have been provided; generic resolvers can pass them to `getAsync`. |
 | `Container.SyncReadyKeys<C>` | Extract ready non-async keys that generic resolvers can pass to `get`. |
 | `Container.Resolve<C>` | Extract a flat `{ key: Value }` map from a built container. |
-| `Container.ResolveUnwrapped<C>` | Like `Resolve`, but unwraps managed `LazySpec` companion entries to `T`; ordinary services with a `.get()` method stay unchanged. |
+| `Container.ResolveUnwrapped<C>` | Like `Resolve`, but distributively unwraps managed `LazySpec` and `AsyncLazySpec` entries to `T`; unmanaged wrapper services stay unchanged. |
 | `Container.UnwrappedValue<C, K>` | Look up one unwrapped service type. |
 | `Container.Providers<C>` | Create a map of provider thunks for tests. |
 
@@ -170,6 +172,7 @@ Generic v6 resolvers must preserve the accepted key set. Use `Container.SyncRead
 
 ```ts
 type Lazy<T> = { readonly get: () => T }
+type AsyncLazy<T> = { readonly get: () => Promise<T> }
 type RegistrationKind = 'singleton' | 'transient' | 'scoped'
 type DependenciesMap = Record<
   string | symbol,
@@ -195,6 +198,11 @@ interface LazySpec<V, TargetKind extends RegistrationKind>
   readonly lazyOf: TargetKind
 }
 
+interface AsyncLazySpec<V, TargetKind extends RegistrationKind>
+  extends Spec<AsyncLazy<V>, 'transient'> {
+  readonly lazyOf: TargetKind
+}
+
 type SpecMap<M, K extends RegistrationKind = 'singleton'> = {
   [P in keyof M]: Spec<M[P], K>
 }
@@ -202,6 +210,11 @@ type SpecMap<M, K extends RegistrationKind = 'singleton'> = {
 type Module<TIn extends DependenciesMap, TOut extends DependenciesMap> =
   (c: Container<TIn>) => Container<TIn & TOut>
 ```
+
+`LazySpec` and `AsyncLazySpec` carry a private type-only mode discriminant in
+the published declarations. Use the named interfaces for managed companions in
+explicit `Container` and `Module` shapes. The discriminant has no runtime field
+and is not exported.
 
 `ScopeInputMap<M>` maps required finite string and symbol properties to scoped input entries. It rejects optional or numeric keys, `__proto__`, broad index signatures, and unions with different key sets. `WithRequirements<S, K>` carries required input keys on a named module output. Exact conditional definitions remain in the published TypeScript declarations.
 

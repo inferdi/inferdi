@@ -40,6 +40,40 @@ function resolve<
 }
 ```
 
+### Managed lazy companions use named branded specs
+
+`LazySpec` now carries a private type-only mode brand, and v6 adds the matching
+`AsyncLazySpec`. Explicit container and module shapes must use the exported
+named interfaces instead of reproducing `{type, kind, lazyOf}` structurally.
+The private discriminant has no runtime field and cannot be imported.
+
+```ts
+// Before
+type Output = {
+  clockLazy: {
+    readonly type: Lazy<Clock>
+    readonly kind: 'transient'
+    readonly lazyOf: 'singleton'
+  }
+}
+
+// After
+type Output = {
+  clockLazy: LazySpec<Clock, 'singleton'>
+  dbLazy: AsyncLazySpec<Database, 'singleton'>
+}
+```
+
+`registerAsyncFactory` accepts a fifth `lazyKey` and produces
+`AsyncLazy<Awaited<R>>`. Async-propagated classes produce the same wrapper. A
+class whose dependency key may choose a sync or async registration exposes
+`Lazy<T> | AsyncLazy<T>`. Promise-valued `registerFactory` keeps the previous
+`Lazy<Promise<T>>` contract.
+
+`Container.ResolveUnwrapped` now unwraps managed sync, async, and mixed
+companions distributively. Hand-written `Spec<Lazy<T>, 'transient'>` and
+`Spec<AsyncLazy<T>, 'transient'>` values remain wrapped.
+
 ## Migration to 5.0
 
 The initial v5 release was **adapter-only**. Its version bump kept the published

@@ -69,6 +69,10 @@ Promise 可以是服务本身，也可以表示服务的初始化边界。InferD
 
 下游服务需要完成后的值时使用 `registerAsyncFactory`。只有同步依赖图需要 Promise 对象本身时才使用 Promise-valued `registerFactory`。
 
+这个区别也决定伴随项类型。Promise-valued `registerFactory` 生成
+`Lazy<Promise<T>>`；带第五个 `lazyKey` 的声明式 `registerAsyncFactory`
+生成 `AsyncLazy<T>`。获取包装器是同步操作，不会把异步状态传播给消费者。
+
 ## 构建异步请求图
 
 下面的依赖图为 root 初始化一个数据库，并为每个已认证作用域初始化一个 session。某个类的声明依赖包含异步项时，该类也会成为异步项。
@@ -191,8 +195,9 @@ const monitor = await legacy.getAsync('monitor')
 
 - `registerAsyncFactory` 的依赖元组必须是 readonly。`registerClass` 的元组可能选择异步键时也要使用 readonly。InferDI 只分类一次异步位置并保留元组引用；内联字面量会推导为 readonly。
 - 声明式循环和冷生命周期违规会在同步 preflight 阶段失败。Promise 边界之后通过捕获容器发起的调用属于动态图边，不在该分析内。
-- InferDI 不提供异步 `Lazy<T>`、重试、取消或回滚。请拆开循环，或把共享初始化移入单独服务。
+- `AsyncLazy<T>` 延迟解析，但不提供重试、取消或回滚。
 - 后续依赖在 preflight 期间失败时，先启动的初始化会保留缓存和所有权状态。已经启动的异步 transient 可能继续运行，但没有 teardown handle。
-- 含异步依赖的类不能创建同步 lazy companion。`registerAsyncFactory` 没有 `lazyKey` 参数。
+- 带 `lazyKey` 的异步类生成 `AsyncLazy<Class>`；sync/async mixed 类生成 `Lazy<Class> | AsyncLazy<Class>`。
+- Promise 边界之后通过 `AsyncLazy.get()` 形成的动态循环可能等待自己的缓存 pending Promise，运行时不会报告循环错误。
 
 同步构造见[工厂](./factories)，所有权模型见[作用域与清理](./scopes)。

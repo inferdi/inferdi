@@ -56,7 +56,7 @@ schema:
 
 # Ленивое внедрение
 
-`Lazy<T>` - это небольшая обёртка с отложенным resolve. Она полезна, когда порядок создания нужно отложить или два singleton-сервиса должны ссылаться друг на друга без немедленного создания обоих объектов в конструкторах.
+`Lazy<T>` и `AsyncLazy<T>` откладывают resolve до вызова `.get()`. Для sync-цели метод возвращает `T`, для декларативной async-цели — `Promise<T>`. Класс с union-ключом, который может выбрать оба режима, получает `Lazy<T> | AsyncLazy<T>`.
 
 ```ts
 import { Container, type Lazy } from '@inferdi/inferdi'
@@ -80,16 +80,31 @@ const c = new Container()
   .registerClass('audit', Audit, ['clockLazy'], 'singleton')
 ```
 
-`lazyKey`, переданный в `registerClass` или `registerFactory`, создаёт companion-регистрацию со значением `{ get: () => target }`.
+`lazyKey`, переданный в `registerClass`, `registerFactory` или `registerAsyncFactory`, создаёт companion-регистрацию со значением `{ get: () => target }`.
 
 ```ts
 const c = new Container()
   .registerFactory('clock', () => new Clock(), 'singleton', 'clockLazy')
 ```
 
+Для `registerAsyncFactory` ключ companion передаётся пятым аргументом:
+
+```ts
+const c = new Container()
+  .registerAsyncFactory('db', connectDatabase, [], undefined, 'dbLazy')
+
+const dbLazy = c.get('dbLazy') // AsyncLazy<Database>
+const db = await dbLazy.get()
+```
+
+Получение и внедрение wrapper не запускает фабрику. Для singleton и scoped
+`.get()` возвращает закешированный native Promise, включая rejection. Transient
+запускается при каждом вызове и остаётся во владении caller. Promise-valued
+`registerFactory` сохраняет sync-контракт и создаёт `Lazy<Promise<T>>`.
+
 ## Время жизни сохраняется
 
-Lazy не является лазейкой вокруг времени жизни. Singleton может инжектить только `Lazy` companion для singleton-цели.
+Lazy companion сохраняет lifetime цели. Singleton может инжектить только `Lazy` или `AsyncLazy` для singleton-цели. TypeScript также отклоняет union с возможным short-lived lifetime и union управляемого и обычного wrapper.
 
 ```ts
 new Container()
@@ -99,6 +114,12 @@ new Container()
 
 Scoped- и transient-потребители могут использовать lazy companions для любого времени жизни, потому что они не кешируются глобально.
 
+Wrapper захватывает контейнер, в котором его получили. Wrapper из первого child
+scope продолжает работать через этот scope после создания второго. После
+disposal захваченного scope `AsyncLazy.get()` возвращает rejected Promise.
+Владелец освобождает разрешённые singleton/scoped-цели и ждёт уже запущенную
+инициализацию; незапущенная цель не создаёт ресурс.
+
 ## Циклические зависимости
 
-InferDI обнаруживает синхронные циклы, включая декларативные async-зависимости во время preflight, но не разрывает их автоматически. `Lazy<singleton>` может разорвать синхронное singleton-ребро, однако у декларативных async-регистраций нет lazy companion. Динамический цикл после Promise-границы требует архитектурного решения: вынести общую инициализацию, поднять одну сторону выше или убрать цикл. Async-граница описана в разделе [Асинхронный граф зависимостей](./async-dependency-graph).
+InferDI обнаруживает синхронные циклы, включая декларативные async-зависимости во время preflight. Динамический цикл через `AsyncLazy.get()` после Promise-границы не попадает в этот detector. Если инициализация снова получает собственный pending Promise, обе стороны ждут бесконечно. Вынесите общую инициализацию или уберите цикл. Async-граница описана в разделе [Асинхронный граф зависимостей](./async-dependency-graph).

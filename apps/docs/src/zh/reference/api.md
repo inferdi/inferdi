@@ -69,7 +69,9 @@ import {
   type ContainerOptions,
   type DependenciesMap,
   type Lazy,
+  type AsyncLazy,
   type LazySpec,
+  type AsyncLazySpec,
   type AsyncSpec,
   type Module,
   type RegistrationKind,
@@ -88,7 +90,7 @@ class Container<T extends DependenciesMap = Record<never, never>> {
   registerClass(key, Ctor, deps, kind?, lazyKey?)
   registerFactory(key, factory, kind?, lazyKey?)
   registerFactory(key, deps, factory, kind?, lazyKey?)
-  registerAsyncFactory(key, factory, deps, kind?)
+  registerAsyncFactory(key, factory, deps, kind?, lazyKey?)
   registerValue(key, value)
   override(key, value)
   use(fn)
@@ -117,7 +119,7 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 
 `registerClass` 和 `registerFactory` 接受 `singleton`、`scoped` 和 `transient` 三种生命周期，以及可选的 `lazyKey` 伴随项。`registerValue` 始终为单例，且由外部拥有。
 
-`registerAsyncFactory` 接受相同的生命周期，但没有 `lazyKey`。它用 `AsyncSpec` 记录最终服务类型，依赖它的类会继承异步状态。请用 `getAsync()` 解析这些键。`get()` 仍用于同步键，包括由 `registerFactory` 创建的 Promise 值服务。
+`registerAsyncFactory` 接受相同的生命周期和可选的第五个 `lazyKey`。主注册用 `AsyncSpec` 保存最终服务类型，伴随项类型为 `AsyncLazySpec<Awaited<ReturnType>, Kind>`。目标使用 `getAsync()`，包装器使用 `get()`。
 
 `registerAsyncFactory` 以及依赖元组可能选中异步键的 `registerClass` 调用都要求只读元组。InferDI 在注册时只分类一次异步位置，并保留该元组引用。内联字面量会推断为只读；仅同步的 `registerClass` 调用仍支持可变元组。
 
@@ -125,7 +127,7 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 
 ```ts
 registerFactory(key, deps, resolverFactory, kind, lazyKey)
-registerAsyncFactory(key, valueFactory, deps, kind)
+registerAsyncFactory(key, valueFactory, deps, kind, lazyKey)
 ```
 
 `override` 替换现有注册，`use` 应用模块构建器。`override` 的时机检查只查看当前容器的缓存。它能发现本地缓存的 singleton/scoped 值、`registerValue` 和重复覆盖，但不会记录 transient 解析，也不会记录通过子容器解析但由祖先容器拥有的值。请在解析依赖图之前应用覆盖。
@@ -160,7 +162,7 @@ namespace Container {
 | `Container.ReadyKeys<C>` | 提取已提供作用域输入的键；泛型解析器可将这些键传给 `getAsync`。 |
 | `Container.SyncReadyKeys<C>` | 提取可由泛型解析器传给 `get` 的已就绪非异步键。 |
 | `Container.Resolve<C>` | 从已构建的容器中提取一个扁平的 `{ key: Value }` 映射。 |
-| `Container.ResolveUnwrapped<C>` | 类似 `Resolve`，但只将受管理的 `LazySpec` 伴随项解包为 `T`；带有普通 `.get()` 方法的服务保持不变。 |
+| `Container.ResolveUnwrapped<C>` | 类似 `Resolve`，但以 distributive 方式解包受管理的 `LazySpec` 和 `AsyncLazySpec`；普通包装器服务保持不变。 |
 | `Container.UnwrappedValue<C, K>` | 查询单个已解包的服务类型。 |
 | `Container.Providers<C>` | 为测试创建一组 provider thunk 的映射。 |
 
@@ -170,6 +172,7 @@ v6 的泛型 resolver 必须保留可接受的键集合。`get()` 使用 `Contai
 
 ```ts
 type Lazy<T> = { readonly get: () => T }
+type AsyncLazy<T> = { readonly get: () => Promise<T> }
 type RegistrationKind = 'singleton' | 'transient' | 'scoped'
 type DependenciesMap = Record<
   string | symbol,
@@ -195,6 +198,11 @@ interface LazySpec<V, TargetKind extends RegistrationKind>
   readonly lazyOf: TargetKind
 }
 
+interface AsyncLazySpec<V, TargetKind extends RegistrationKind>
+  extends Spec<AsyncLazy<V>, 'transient'> {
+  readonly lazyOf: TargetKind
+}
+
 type SpecMap<M, K extends RegistrationKind = 'singleton'> = {
   [P in keyof M]: Spec<M[P], K>
 }
@@ -202,6 +210,9 @@ type SpecMap<M, K extends RegistrationKind = 'singleton'> = {
 type Module<TIn extends DependenciesMap, TOut extends DependenciesMap> =
   (c: Container<TIn>) => Container<TIn & TOut>
 ```
+
+`LazySpec` 和 `AsyncLazySpec` 带有私有的 type-only 判别字段。显式
+`Container` 或 `Module` 形状应使用这些具名类型。该字段没有运行时值，也不导出。
 
 `ScopeInputMap<M>` 把必填且有限的 string/symbol 属性映射为 scoped input 项。它会拒绝可选键、数字键、`__proto__`、宽泛索引签名以及键集合不同的联合类型。`WithRequirements<S, K>` 在具名模块输出上携带所需输入键。准确的条件类型定义以发布的 TypeScript 声明为准。
 

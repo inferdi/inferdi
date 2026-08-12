@@ -142,6 +142,8 @@ const c = new Container()
 const promise = c.get('dbPromise') // Promise<Database>
 ```
 
+Añadir `lazyKey` no cambia este modelo: `registerFactory('dbPromise', factory, undefined, 'dbLazy')` produce `Lazy<Promise<Database>>`.
+
 Esta forma conserva el caché single-flight. Un ciclo creado después de `await` mediante un contenedor capturado queda fuera de las comprobaciones síncronas de ciclos y tiempos de vida.
 
 ## Grafo asíncrono declarativo
@@ -158,6 +160,15 @@ const container = new Container()
   )
 
 const db = await container.getAsync('db')
+```
+
+El quinto `lazyKey` produce `AsyncLazy<Database>` y no inicia la factoría hasta `.get()`:
+
+```ts
+const container = new Container()
+  .registerAsyncFactory('db', connectDatabase, [], undefined, 'dbLazy')
+
+const db = await container.get('dbLazy').get()
 ```
 
 Consulta [Grafo de dependencias asíncrono](./async-dependency-graph) para los dos modelos Promise, la propagación async por las clases, la caché single-flight, los errores y el teardown async.

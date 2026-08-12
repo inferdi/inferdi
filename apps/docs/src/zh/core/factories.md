@@ -142,6 +142,8 @@ const c = new Container()
 const promise = c.get('dbPromise') // Promise<Database>
 ```
 
+添加 `lazyKey` 不会改变该模型：`registerFactory('dbPromise', factory, undefined, 'dbLazy')` 生成 `Lazy<Promise<Database>>`。
+
 这种形式仍提供 single-flight 缓存。通过捕获的容器在 `await` 之后形成的循环，不在同步循环和生命周期检查范围内。
 
 ## 声明式异步依赖图
@@ -158,6 +160,15 @@ const container = new Container()
   )
 
 const db = await container.getAsync('db')
+```
+
+第五个 `lazyKey` 会生成 `AsyncLazy<Database>`，工厂在 `.get()` 前不会启动：
+
+```ts
+const container = new Container()
+  .registerAsyncFactory('db', connectDatabase, [], undefined, 'dbLazy')
+
+const db = await container.get('dbLazy').get()
 ```
 
 两种 Promise 模型、类的异步状态传播、single-flight 缓存、失败语义和异步清理见[异步依赖图](./async-dependency-graph)。

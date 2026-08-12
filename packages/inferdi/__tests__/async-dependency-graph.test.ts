@@ -518,30 +518,28 @@ describe('compact async dependency graph — classes and guards', () => {
     expect(holder.lazy.get()).toBe(c.get('db'))
   })
 
-  it('rejects an actual async lazy companion atomically before registration', async () => {
-    const c = new Container().registerAsyncFactory('db', async () => new Database(), [])
-    const unsafe = c as unknown as {
-      registerClass(
-        key: string,
-        Ctor: new (...args: unknown[]) => unknown,
-        deps: string[],
-        kind: 'singleton',
-        lazyKey?: string
-      ): void
-    }
+  it('defers an async-propagated class behind AsyncLazy', async () => {
+    let calls = 0
+    const c = new Container()
+      .registerAsyncFactory('db', async () => {
+        calls++
+        return new Database()
+      }, [])
+      .registerClass(
+        'repository',
+        Repository,
+        ['db'],
+        'singleton',
+        'repositoryLazy'
+      )
 
-    expect(() => unsafe.registerClass(
-      'repository',
-      Repository as unknown as new (...args: unknown[]) => unknown,
-      ['db'],
-      'singleton',
-      'repositoryLazy'
-    )).toThrow(/Cannot create a synchronous Lazy companion/)
-    expect(c.has('repository')).toBe(false)
-    expect(c.has('repositoryLazy')).toBe(false)
+    const wrapper = c.get('repositoryLazy')
 
-    const completed = c.registerClass('repository', Repository, ['db'])
-    await expect(completed.getAsync('repository')).resolves.toBeInstanceOf(Repository)
+    expect(calls).toBe(0)
+    const pending = wrapper.get()
+    expect(pending).toBeInstanceOf(Promise)
+    await expect(pending).resolves.toBeInstanceOf(Repository)
+    expect(calls).toBe(1)
   })
 
   it('does not synthesize a runtime marker for a conservative sync union branch', () => {
@@ -569,10 +567,341 @@ describe('compact async dependency graph — classes and guards', () => {
 
     expect(c.has('repository')).toBe(true)
     expect(c.has('repositoryLazy')).toBe(true)
-    expect(
-      (c as unknown as {get(key: string): Repository}).get('repository')
-    ).toBeInstanceOf(Repository)
+    const wrapper = (c as unknown as {
+      get(key: string): {get(): Repository | Promise<Repository>}
+    }).get('repositoryLazy')
+    const repository = wrapper.get()
+
+    expect(repository).toBeInstanceOf(Repository)
+    expect(repository).not.toBeInstanceOf(Promise)
   })
+
+  it('uses the async runtime branch for a conservative mixed companion', async () => {
+    let calls = 0
+    const c = new Container()
+      .registerValue('localDb', new Database())
+      .registerAsyncFactory('remoteDb', async () => {
+        calls++
+        return new Database(2)
+      }, [])
+    const selected = 'remoteDb' as 'localDb' | 'remoteDb'
+    const mixed = c.registerClass(
+      'repository',
+      Repository,
+      [selected],
+      'singleton',
+      'repositoryLazy'
+    )
+    const wrapper = mixed.get('repositoryLazy')
+
+    expect(calls).toBe(0)
+    const repository = wrapper.get()
+    expect(repository).toBeInstanceOf(Promise)
+    await expect(repository).resolves.toBeInstanceOf(Repository)
+    expect(calls).toBe(1)
+  })
+})
+
+describe('AsyncLazy companions', () => {
+  it('injects a lazy async factory into a synchronous consumer without starting it', async () => {
+    class Holder {
+      constructor(
+        public readonly lazy: {get: () => Promise<Database>}
+      ) {}
+    }
+    let calls = 0
+    const c = new Container()
+      .registerAsyncFactory('db', async () => {
+        calls++
+        return new Database()
+      }, [], undefined, 'dbLazy')
+      .registerClass('holder', Holder, ['dbLazy'])
+
+    const wrapper = c.get('dbLazy')
+    const holder = c.get('holder')
+
+    expect(calls).toBe(0)
+    expect(holder.lazy).not.toBe(wrapper)
+    await expect(holder.lazy.get()).resolves.toBeInstanceOf(Database)
+    expect(calls).toBe(1)
+  })
+
+  it('preserves native Promise identity and singleton single-flight', async () => {
+    const gate = deferred<Database>()
+    let calls = 0
+    const c = new Container().registerAsyncFactory('db', () => {
+      calls++
+      return gate.promise
+    }, [], undefined, 'dbLazy')
+    const wrapper = c.get('dbLazy')
+
+    const first = wrapper.get()
+    const second = wrapper.get()
+
+    expect(first).toBe(second)
+    expect(calls).toBe(0)
+    await Promise.resolve()
+    expect(calls).toBe(1)
+
+    const db = new Database()
+    gate.resolve(db)
+    await expect(first).resolves.toBe(db)
+    expect(wrapper.get()).toBe(first)
+  })
+
+  it('keeps a rejected singleton Promise behind the wrapper', async () => {
+    const error = new Error('connect failed')
+    let calls = 0
+    const c = new Container().registerAsyncFactory('db', async () => {
+      calls++
+      throw error
+    }, [], undefined, 'dbLazy')
+    const wrapper = c.get('dbLazy')
+
+    const first = wrapper.get()
+    const second = wrapper.get()
+
+    expect(first).toBe(second)
+    await expect(first).rejects.toBe(error)
+    expect(wrapper.get()).toBe(first)
+    expect(calls).toBe(1)
+  })
+
+  it('isolates scoped targets and shares one initialization per captured scope', async () => {
+    let calls = 0
+    const root = new Container().registerAsyncFactory('db', async () => {
+      return new Database(++calls)
+    }, [], 'scoped', 'dbLazy')
+    const firstScope = root.createScope()
+    const firstWrapper = firstScope.get('dbLazy')
+    const firstPending = firstWrapper.get()
+    const samePending = firstWrapper.get()
+    const secondScope = root.createScope()
+    const secondPending = secondScope.get('dbLazy').get()
+
+    expect(firstPending).toBe(samePending)
+    const [first, same, second] = await Promise.all([
+      firstPending,
+      samePending,
+      secondPending
+    ])
+    expect(first).toBe(same)
+    expect(first).not.toBe(second)
+    expect(calls).toBe(2)
+  })
+
+  it('runs transient targets per call and leaves them caller-owned', async () => {
+    const resources: TrackableAsync[] = []
+    const c = new Container().registerAsyncFactory('resource', async () => {
+      const resource = new TrackableAsync()
+      resources.push(resource)
+      return resource
+    }, [], 'transient', 'resourceLazy')
+    const wrapper = c.get('resourceLazy')
+
+    const [first, second] = await Promise.all([
+      wrapper.get(),
+      wrapper.get()
+    ])
+    await c.dispose()
+
+    expect(first).not.toBe(second)
+    expect(resources).toHaveLength(2)
+    expect(resources.map((resource) => resource.asyncDisposeCalls)).toEqual([0, 0])
+  })
+
+  it('retains strict lifetime defense after a cast bypass', () => {
+    class Holder {
+      constructor(
+        public readonly lazy: {get: () => Promise<Database>}
+      ) {}
+    }
+    const c = new Container().registerAsyncFactory(
+      'db',
+      async () => new Database(),
+      [],
+      'transient',
+      'dbLazy'
+    )
+    const unsafe = c as unknown as {
+      registerClass(
+        key: string,
+        Ctor: new (lazy: {get: () => Promise<Database>}) => Holder,
+        deps: string[],
+        kind: 'singleton'
+      ): {get(key: string): Holder}
+    }
+    const registered = unsafe.registerClass('holder', Holder, ['dbLazy'], 'singleton')
+
+    expect(() => registered.get('holder')).toThrow(
+      /Singleton "holder" cannot depend on transient "dbLazy"/
+    )
+  })
+
+  it('keeps the same cast bypass branch-free in Fast Mode', async () => {
+    class Holder {
+      constructor(
+        public readonly lazy: {get: () => Promise<Database>}
+      ) {}
+    }
+    const c = new Container({strict: false}).registerAsyncFactory(
+      'db',
+      async () => new Database(),
+      [],
+      'transient',
+      'dbLazy'
+    )
+    const unsafe = c as unknown as {
+      registerClass(
+        key: string,
+        Ctor: new (lazy: {get: () => Promise<Database>}) => Holder,
+        deps: string[],
+        kind: 'singleton'
+      ): {get(key: string): Holder}
+    }
+    const holder = unsafe.registerClass(
+      'holder',
+      Holder,
+      ['dbLazy'],
+      'singleton'
+    ).get('holder')
+
+    await expect(holder.lazy.get()).resolves.toBeInstanceOf(Database)
+  })
+
+  it('observes target overrides before or after wrapper creation', async () => {
+    const beforeMock = new Database(1)
+    let beforeCalls = 0
+    const before = new Container()
+      .registerAsyncFactory('db', async () => {
+        beforeCalls++
+        return new Database(2)
+      }, [], undefined, 'dbLazy')
+      .override('db', beforeMock)
+
+    await expect(before.get('dbLazy').get()).resolves.toBe(beforeMock)
+    expect(beforeCalls).toBe(0)
+
+    const afterMock = new Database(3)
+    let afterCalls = 0
+    const after = new Container().registerAsyncFactory('db', async () => {
+      afterCalls++
+      return new Database(4)
+    }, [], undefined, 'dbLazy')
+    const wrapper = after.get('dbLazy')
+    after.override('db', afterMock)
+
+    await expect(wrapper.get()).resolves.toBe(afterMock)
+    expect(afterCalls).toBe(0)
+  })
+
+  it('leaves an issued wrapper unchanged when its companion key is overridden', async () => {
+    const original = new Database(1)
+    const replacement = new Database(2)
+    const c = new Container().registerAsyncFactory(
+      'db',
+      async () => original,
+      [],
+      undefined,
+      'dbLazy'
+    )
+    const issued = c.get('dbLazy')
+
+    c.override('dbLazy', {get: async () => replacement})
+
+    await expect(issued.get()).resolves.toBe(original)
+    await expect(c.get('dbLazy').get()).resolves.toBe(replacement)
+  })
+
+  it('keeps the first child scope captured after a second child is created', async () => {
+    let calls = 0
+    const root = new Container().registerAsyncFactory(
+      'db',
+      async () => new Database(++calls),
+      [],
+      'scoped',
+      'dbLazy'
+    )
+    const firstScope = root.createScope()
+    const firstWrapper = firstScope.get('dbLazy')
+    const secondScope = root.createScope()
+
+    const first = await firstWrapper.get()
+    const second = await secondScope.get('dbLazy').get()
+
+    expect(first.id).toBe(1)
+    expect(second.id).toBe(2)
+    expect(await firstWrapper.get()).toBe(first)
+  })
+
+  it('returns a rejected Promise after the captured scope is disposed', async () => {
+    const root = new Container().registerAsyncFactory(
+      'db',
+      async () => new Database(),
+      [],
+      'scoped',
+      'dbLazy'
+    )
+    const scope = root.createScope()
+    const wrapper = scope.get('dbLazy')
+    await scope.dispose()
+
+    await expect(wrapper.get()).rejects.toThrow('Container is disposed')
+  })
+
+  it('does not start a target when disposed before the first lazy access', async () => {
+    let calls = 0
+    const c = new Container().registerAsyncFactory('db', async () => {
+      calls++
+      return new Database()
+    }, [], undefined, 'dbLazy')
+    const wrapper = c.get('dbLazy')
+
+    await c.dispose()
+
+    expect(calls).toBe(0)
+    await expect(wrapper.get()).rejects.toThrow('Container is disposed')
+  })
+
+  it('waits for initialization started through AsyncLazy during disposal', async () => {
+    const gate = deferred<TrackableAsync>()
+    const resource = new TrackableAsync()
+    const c = new Container().registerAsyncFactory(
+      'resource',
+      () => gate.promise,
+      [],
+      undefined,
+      'resourceLazy'
+    )
+    const initialization = c.get('resourceLazy').get()
+    const disposal = c.dispose()
+
+    gate.resolve(resource)
+
+    await expect(initialization).resolves.toBe(resource)
+    await expect(disposal).resolves.toBeUndefined()
+    expect(resource.asyncDisposeCalls).toBe(1)
+  })
+
+  it.each(['singleton', 'scoped'] as const)(
+    'disposes a resolved %s target through its owning container',
+    async (kind) => {
+      const resource = new TrackableAsync()
+      const root = new Container().registerAsyncFactory(
+        'resource',
+        async () => resource,
+        [],
+        kind,
+        'resourceLazy'
+      )
+      const owner = kind === 'scoped' ? root.createScope() : root
+
+      await owner.get('resourceLazy').get()
+      await owner.dispose()
+
+      expect(resource.asyncDisposeCalls).toBe(1)
+    }
+  )
 })
 
 describe('compact async dependency graph — PromiseLike reentrancy', () => {

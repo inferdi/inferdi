@@ -142,6 +142,8 @@ const c = new Container()
 const promise = c.get('dbPromise') // Promise<Database>
 ```
 
+С `lazyKey` модель не меняется: `registerFactory('dbPromise', factory, undefined, 'dbLazy')` создаёт `Lazy<Promise<Database>>`.
+
 Эта форма сохраняет single-flight кеширование. Цикл, созданный после `await` через захваченный контейнер, находится вне синхронных проверок циклов и времени жизни.
 
 ## Декларативный асинхронный граф
@@ -158,6 +160,15 @@ const container = new Container()
   )
 
 const db = await container.getAsync('db')
+```
+
+Пятый `lazyKey` создаёт `AsyncLazy<Database>` и не запускает фабрику до `.get()`:
+
+```ts
+const container = new Container()
+  .registerAsyncFactory('db', connectDatabase, [], undefined, 'dbLazy')
+
+const db = await container.get('dbLazy').get()
 ```
 
 Две Promise-модели, распространение async status через классы, single-flight кеш, ошибки и async teardown описаны в разделе [Асинхронный граф зависимостей](./async-dependency-graph).

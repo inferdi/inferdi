@@ -144,6 +144,15 @@ const promise = c.get('dbPromise') // Promise<Database>
 
 This legacy form supports single-flight caching. A cycle created after `await` through captured container calls falls outside the synchronous cycle and lifetime guards.
 
+Adding a companion does not change this model:
+
+```ts
+const c = new Container()
+  .registerFactory('dbPromise', () => connectDatabase(), undefined, 'dbLazy')
+
+c.get('dbLazy') // Lazy<Promise<Database>>
+```
+
 ## Declarative async graphs
 
 `registerAsyncFactory` stores the final service type in `AsyncSpec`, resolves its dependency tuple, and passes positional values to the callback. Classes inherit async status from declared dependencies.
@@ -158,6 +167,17 @@ const container = new Container()
   )
 
 const db = await container.getAsync('db')
+```
+
+Pass a fifth `lazyKey` to expose `AsyncLazy<Database>` without starting the
+factory:
+
+```ts
+const container = new Container()
+  .registerAsyncFactory('db', connectDatabase, [], undefined, 'dbLazy')
+
+const dbLazy = container.get('dbLazy')
+const db = await dbLazy.get()
 ```
 
 Read [Async Dependency Graph](./async-dependency-graph) for the two Promise models, async propagation through classes, single-flight caching, failure semantics, and async teardown.

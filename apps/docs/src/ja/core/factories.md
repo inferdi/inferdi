@@ -142,6 +142,8 @@ const c = new Container()
 const promise = c.get('dbPromise') // Promise<Database>
 ```
 
+`lazyKey` を追加してもこのモデルは変わりません。`registerFactory('dbPromise', factory, undefined, 'dbLazy')` は `Lazy<Promise<Database>>` を生成します。
+
 この形式でも single-flight キャッシュを利用できます。キャプチャしたコンテナーを通じて `await` 後に作られた循環は、同期の循環およびライフタイム検査の対象外です。
 
 ## 宣言的な非同期依存グラフ
@@ -158,6 +160,15 @@ const container = new Container()
   )
 
 const db = await container.getAsync('db')
+```
+
+第 5 引数の `lazyKey` は `AsyncLazy<Database>` を生成し、`.get()` までファクトリーを開始しません。
+
+```ts
+const container = new Container()
+  .registerAsyncFactory('db', connectDatabase, [], undefined, 'dbLazy')
+
+const db = await container.get('dbLazy').get()
 ```
 
 2 つの Promise モデル、クラスへの async 状態の伝播、single-flight キャッシュ、失敗時の動作、async teardown は[非同期依存グラフ](./async-dependency-graph)を参照してください。

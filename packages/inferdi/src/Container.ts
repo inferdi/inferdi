@@ -15,6 +15,7 @@ const UNDEFINED_MARKER = Symbol('UNDEFINED_MARKER')
 
 declare const requiredInputs: unique symbol
 declare const scopeInputMarker: unique symbol
+declare const lazyMode: unique symbol
 
 /**
  * A deferred reference to a value of type `T`. Calling `.get()` resolves the
@@ -36,6 +37,28 @@ declare const scopeInputMarker: unique symbol
  * ```
  */
 export type Lazy<T> = { readonly get: () => T }
+
+/**
+ * A deferred reference to a declarative async service. Calling `.get()` starts
+ * or joins resolution of the underlying target and returns its native Promise.
+ * Merely resolving or injecting the wrapper does not start the target.
+ *
+ * Produced by the `lazyKey` overload of {@link Container.registerAsyncFactory}
+ * and by async-propagated class registrations. A Promise-valued
+ * `registerFactory` remains {@link Lazy}<Promise<T>> instead.
+ *
+ * @example
+ * ```ts
+ * import { Container, type AsyncLazy } from '@inferdi/inferdi'
+ *
+ * const c = new Container()
+ *   .registerAsyncFactory('db', async () => Database.connect(), [], undefined, 'dbLazy')
+ *
+ * const dbLazy: AsyncLazy<Database> = c.get('dbLazy')
+ * const db = await dbLazy.get()
+ * ```
+ */
+export type AsyncLazy<T> = { readonly get: () => Promise<T> }
 
 /**
  * The lifetime of a registration:
@@ -108,16 +131,19 @@ export interface AsyncSpec<
 }
 
 /**
- * Companion registration produced by the `lazyKey` parameter of `register*`.
+ * Synchronous companion registration produced by the `lazyKey` parameter of
+ * `registerClass` or `registerFactory`.
  * Carries the target service's lifetime in `lazyOf` so the type-level
- * lifetime guard ({@link AllowedDeps}) can permit only `Lazy<singleton>`
- * inside a singleton consumer — matching the runtime guard.
+ * lifetime guard can permit only singleton-target companions inside a
+ * singleton consumer, matching the runtime guard.
  *
  * The companion itself is always `'transient'` (the `{ get }` wrapper is
  * cheap and caller-owned). Manual `Spec<Lazy<V>, 'transient'>` registrations
  * (created by hand via `registerValue`/`registerFactory`) are *not*
  * `LazySpec` — the type system treats them as plain transient values, not
- * managed lazy companions.
+ * managed lazy companions. The private type-only mode discriminant makes
+ * named `LazySpec` annotations the supported way to describe managed
+ * companions in explicit container and module shapes.
  *
  * @template V          - The wrapped service type (the `T` in `Lazy<T>`).
  * @template TargetKind - The lifetime kind of the underlying target service.
@@ -135,6 +161,35 @@ export interface AsyncSpec<
 export interface LazySpec<V, TargetKind extends RegistrationKind>
   extends Spec<Lazy<V>, 'transient'> {
   readonly lazyOf: TargetKind
+  readonly [lazyMode]: 'sync'
+}
+
+/**
+ * Asynchronous companion registration produced by a declarative async target.
+ * The wrapper itself is transient and caller-owned; `lazyOf` records the
+ * target lifetime for compile-time and runtime lifetime guards.
+ *
+ * Manual `Spec<AsyncLazy<V>, 'transient'>` registrations are ordinary
+ * transient values, not managed companions. Use this exported interface for
+ * explicit `Container` and `Module` shapes.
+ *
+ * @template V          - The final service type returned by `AsyncLazy.get()`.
+ * @template TargetKind - The lifetime kind of the underlying target service.
+ *
+ * @example
+ * ```ts
+ * import { Container, type AsyncLazySpec, type AsyncSpec } from '@inferdi/inferdi'
+ *
+ * declare const c: Container<{
+ *   db: AsyncSpec<Database, 'singleton'>
+ *   dbLazy: AsyncLazySpec<Database, 'singleton'>
+ * }>
+ * ```
+ */
+export interface AsyncLazySpec<V, TargetKind extends RegistrationKind>
+  extends Spec<AsyncLazy<V>, 'transient'> {
+  readonly lazyOf: TargetKind
+  readonly [lazyMode]: 'async'
 }
 
 interface RequiredInputs<K extends string | symbol> {
@@ -196,7 +251,8 @@ type WithoutRequirements<S> = S extends RequiredInputs<string | symbol>
 /**
  * Attaches a normalized union of required scope-input keys to a graph entry.
  * Supplying `never` removes an existing requirement while preserving the
- * identity of ordinary {@link Spec} and {@link LazySpec} entries.
+ * identity of ordinary {@link Spec}, {@link LazySpec}, and
+ * {@link AsyncLazySpec} entries.
  *
  * @example
  * ```ts
@@ -251,23 +307,25 @@ export type SpecMap<
 /*
  * Filters T down to the keys that are legal to inject into a target with
  * the given TargetKind, per the runtime lifetime guard:
- *   - singleton target: only singleton entries and `LazySpec<*, 'singleton'>`
- *     companions are legal. `Lazy<scoped>` / `Lazy<transient>` companions
- *     remain available to scoped/transient consumers but are blocked here —
- *     `Lazy` preserves the target's lifetime, it does not lift short-lived
- *     services into singleton scope.
+ *   - singleton target: only singleton entries and managed sync/async
+ *     companions whose complete target-kind union is `'singleton'` are legal.
+ *     Short-lived or possibly short-lived companions remain available to
+ *     scoped/transient consumers but are blocked here — deferral preserves the
+ *     target's lifetime, it does not lift short-lived services into singleton scope.
  *   - scoped / transient target: any entry is legal (matches runtime in get()).
- * Managed lazy companions are identified by extending {@link LazySpec}, which
- * is produced only via the `lazyKey` parameter of `register*`. A hand-rolled
- * `Spec<Lazy<V>, 'transient'>` registered via registerValue/registerFactory is
- * treated as a plain transient and is *not* singleton-safe
+ * Managed companions are identified by their branded {@link LazySpec} or
+ * {@link AsyncLazySpec} shape. The whole entry is checked non-distributively so
+ * mixed target lifetimes and managed/unmanaged unions are not singleton-safe
  */
 type AllowedDeps<T extends DependenciesMap, TargetKind extends RegistrationKind> =
   TargetKind extends 'singleton'
     ? {
         [K in keyof T as
             T[K]['kind'] extends 'singleton' ? K
-          : T[K] extends LazySpec<unknown, 'singleton'> ? K
+          : [T[K]] extends [
+              LazySpec<unknown, 'singleton'> |
+              AsyncLazySpec<unknown, 'singleton'>
+            ] ? K
           : never
         ]: T[K]
       }
@@ -326,14 +384,48 @@ type ContainsAsyncDep<
   ? false
   : true
 
+type DepAsyncState<
+  T extends DependenciesMap,
+  K extends keyof T
+> = [T[K]] extends [AsyncSpec<unknown, RegistrationKind>]
+  ? 'async'
+  : Extract<T[K], AsyncSpec<unknown, RegistrationKind>> extends never
+    ? 'sync'
+    : 'mixed'
+
+type DepAsyncStates<
+  T extends DependenciesMap,
+  D extends readonly (keyof T)[]
+> = {
+  readonly [I in keyof D]: DepAsyncState<T, D[I]>
+}
+
 type ClassSpec<
   T extends DependenciesMap,
   D extends readonly (keyof T)[],
   V,
   Kind extends RegistrationKind
-> = ContainsAsyncDep<T, D> extends true
+> = 'async' extends DepAsyncStates<T, D>[number]
   ? AsyncSpec<V, Kind>
-  : Spec<V, Kind>
+  : 'mixed' extends DepAsyncStates<T, D>[number]
+    ? Spec<V, Kind> | AsyncSpec<V, Kind>
+    : Spec<V, Kind>
+
+type LazyCompanion<S> =
+  S extends AsyncSpec<infer V, infer Kind>
+    ? AsyncLazySpec<V, Kind>
+    : S extends Spec<infer V, infer Kind>
+      ? LazySpec<V, Kind>
+      : never
+
+type UnwrapSpec<S> =
+  S extends AsyncLazySpec<infer V, infer _Kind>
+    ? V
+    : S extends LazySpec<infer V, infer _Kind>
+      ? V
+      : S extends Spec<infer V, infer _Kind>
+        ? V
+        : never
 
 type InputKeys<T extends DependenciesMap> = {
   [K in keyof T]: T[K] extends {readonly [scopeInputMarker]: true} ? K : never
@@ -503,18 +595,17 @@ interface Registration<T extends DependenciesMap, K extends keyof T> {
   readonly kind: RegistrationKind
   /*
    * Marker that excludes the entry from the singleton lifetime guard. Set to
-   * `true` ONLY for lazy companions whose target kind is `'singleton'`:
-   *   - Lazy<singleton> companion: kind='transient', lazy=true → guard skipped,
+   * `true` ONLY for Lazy/AsyncLazy companions whose target kind is `'singleton'`:
+   *   - singleton-target companion: kind='transient', lazy=true → guard skipped,
    *     singleton consumer may legally inject the wrapper.
-   *   - Lazy<scoped|transient> companion: kind='transient', lazy=false → guard
+   *   - scoped/transient-target companion: kind='transient', lazy=false → guard
    *     fires when a singleton consumer tries to inject it, matching the
    *     compile-time `AllowedDeps<T, 'singleton'>` filter.
    *   - Every other registration: lazy=false.
-   * The wrapper's `fn` returns a closure `{ get: () => c.get(targetKey) }` —
-   * it does NOT call `c.get(targetKey)` synchronously. That deferral is what
-   * makes Lazy<singleton> safe to inject into a singleton; if the
-   * implementation is ever "simplified" to a direct c.get(targetKey), the
-   * protection collapses.
+   * The wrapper's `fn` returns a closure over `c.get(targetKey)` or
+   * `c.getAsync(targetKey)` — it does NOT resolve the target while creating the
+   * wrapper. That deferral is what makes singleton-target companions safe to
+   * inject into a singleton.
    * Always set (false for non-lazy entries) so every Registration object has the
    * same V8 Hidden Class / Shape — `localReg.lazy` reads on the hot path stay in
    * a monomorphic inline cache instead of falling into a PIC bucket lookup
@@ -571,7 +662,8 @@ interface DisposableLike {
  * **Compile-time lifetime guard.** Each entry in `T` carries its kind via
  * {@link Spec}. The container passed to a `registerFactory((c) => ...)` body
  * is structurally narrowed via `AllowedDeps<T, Kind>` so that the only `.get(...)`
- * keys visible inside a singleton factory are singletons and `Lazy<singleton>` companions.
+ * keys visible inside a singleton factory are singletons and singleton-target
+ * `Lazy`/`AsyncLazy` companions.
  * `registerClass(_, _, deps, kind)` enforces the same constraint on its `deps`
  * tuple. The runtime guard in `get()` remains as defense-in-depth against
  * `as`-cast bypasses; its error message names the offending keys.
@@ -792,24 +884,25 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * container's registry. The compiler strictly checks that the `deps` array
    * precisely matches the constructor's arguments by both type and position,
    * **and** that every dep is a legal lifetime for the target `kind` — a
-   * singleton target only accepts singleton deps or `Lazy<singleton>` companions.
-   * Passing a `lazyKey` additionally registers a `Lazy<V>` wrapper under that
-   * companion identifier — the user picks the wrapper key explicitly, which
-   * lets `string` and `symbol` keys coexist on equal footing.
+   * singleton target only accepts singleton deps or singleton-target lazy companions.
+   * Passing a `lazyKey` additionally registers a companion under that key. A
+   * sync class gets `Lazy<V>`, an async-propagated class gets `AsyncLazy<V>`,
+   * and a dependency key union that may select either branch produces
+   * `Lazy<V> | AsyncLazy<V>`.
    *
    * @template K - The string-or-symbol key to register the class under. Must not be already registered.
    * @template V - The instance type created by the constructor.
    * @template A - The tuple of constructor argument types.
    * @template Kind - The literal {@link RegistrationKind} of this registration.
-   * @template LK - The string-or-symbol companion key for the optional `Lazy<V>` wrapper.
+   * @template LK - The string-or-symbol key for the optional lazy companion.
    *
    * @param key - The unique string-or-symbol identifier for this dependency.
    * @param Ctor - The class constructor to instantiate.
    * @param deps - A tuple of dependency keys that map positionally to the constructor's parameters.
    * @param kind - The lifetime of the instance: `'singleton'` (default), `'scoped'`, or `'transient'`.
    * @param lazyKey - Optional companion key (string or symbol). When provided, registers a
-   *                  `Lazy<V>` wrapper under that key. Must differ from `key` and from any
-   *                  already-registered key.
+   *                  mode-matched wrapper under that key. Must differ from `key` and
+   *                  from any already-registered key.
    * @returns A new container reference typed with the additionally registered key(s).
    * @throws If the container has already been disposed.
    *
@@ -869,18 +962,20 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   >(
     key: K & ([K] extends [keyof T] ? never : unknown),
     Ctor: new (...args: A) => V,
-    deps: D,
+    deps: D & RequireReadonlyAsyncDeps<T, D>,
     kind: undefined,
-    lazyKey: LK &
-      ([LK] extends [keyof T | K] ? never : unknown) &
-      (ContainsAsyncDep<T, D> extends true ? never : unknown)
+    lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
   ): Container<
     T & Record<
       K,
-      WithRequirementsOfDeps<Spec<V, 'singleton'>, T, D>
+      WithRequirementsOfDeps<ClassSpec<T, D, V, 'singleton'>, T, D>
     > & Record<
       LK,
-      WithRequirementsOfDeps<LazySpec<V, 'singleton'>, T, D>
+      WithRequirementsOfDeps<
+        LazyCompanion<ClassSpec<T, D, V, 'singleton'>>,
+        T,
+        D
+      >
     >
   >
 
@@ -894,14 +989,17 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   >(
     key: K & ([K] extends [keyof T] ? never : unknown),
     Ctor: new (...args: A) => V,
-    deps: D,
+    deps: D & RequireReadonlyAsyncDeps<T, D>,
     kind: Kind,
-    lazyKey: LK &
-      ([LK] extends [keyof T | K] ? never : unknown) &
-      (ContainsAsyncDep<T, D> extends true ? never : unknown)
+    lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
   ): Container<
-    T & Record<K, WithRequirementsOfDeps<Spec<V, Kind>, T, D>> &
-    Record<LK, WithRequirementsOfDeps<LazySpec<V, Kind>, T, D>>
+    T & Record<
+      K,
+      WithRequirementsOfDeps<ClassSpec<T, D, V, Kind>, T, D>
+    > & Record<
+      LK,
+      WithRequirementsOfDeps<LazyCompanion<ClassSpec<T, D, V, Kind>>, T, D>
+    >
   >
 
   public registerClass<V>(
@@ -924,12 +1022,6 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     const asyncIndices = this.asyncDependencyIndices(keys)
 
     if (asyncIndices !== undefined) {
-      if (lazyKey !== undefined) {
-        throw new Error(
-          `Cannot create a synchronous Lazy companion for async dependency "${String(key)}"`
-        )
-      }
-
       this.regs.set(key as keyof T, {
         kind,
         lazy: false,
@@ -944,6 +1036,16 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
 
       if (this.strict) {
         this.cache.delete(key as keyof T)
+      }
+
+      if (lazyKey !== undefined) {
+        const targetKey = key as unknown as keyof T
+        this.regs.set(lazyKey as unknown as keyof T, {
+          kind: 'transient',
+          lazy: kind === 'singleton',
+          fn: (c) => ({get: () => c.getAsync(targetKey as never)} as unknown as T[keyof T]['type']),
+          owned: false
+        })
       }
 
       return this
@@ -1044,13 +1146,13 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     }
 
     /*
-     * Lazy alias: a thin { get } wrapper on top of the eager key. The instance itself
+     * Lazy alias: a thin { get } wrapper on top of the sync key. The instance itself
      * is not created until the consumer calls .get(). The wrapper is transient — it
      * takes the container in which it was requested, so scoped targets work correctly
      * when the wrapper is obtained in the right scope (e.g. a scoped consumer
      * injecting Lazy<otherScoped>).
      *
-     * INVARIANT: fn must NOT call c.get(key) synchronously — only return a closure.
+     * INVARIANT: fn must NOT call c.get(key) while building the wrapper — only return a closure.
      * The deferral is what makes Lazy<singleton> safe to inject into a singleton: at
      * the time the singleton factory runs, no resolution against the wrapped target
      * happens, so no short-lived value can be captured.
@@ -1332,6 +1434,9 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * registrations cache one native Promise for single-flight initialization.
    * Async dependencies are awaited before the factory runs; ordinary
    * Promise-valued sync registrations are passed through unchanged.
+   * Passing a fifth `lazyKey` registers an {@link AsyncLazy} companion whose
+   * `.get()` resolves through the container and therefore preserves target
+   * lifetime, single-flight, overrides, and captured-scope behavior.
    *
    * The `deps` tuple is retained by reference. It must be readonly because
    * async dependency positions are classified once during registration.
@@ -1384,11 +1489,57 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     >
   >
 
+  public registerAsyncFactory<
+    const K extends string | symbol,
+    A extends readonly unknown[],
+    R,
+    const LK extends string | symbol,
+    const D extends DepsOf<AllowedDeps<T, 'singleton'>, A> = DepsOf<AllowedDeps<T, 'singleton'>, A>
+  >(
+    key: K & ([K] extends [keyof T] ? never : unknown),
+    factory: (...args: A) => R,
+    deps: D & RequireReadonlyDeps<D>,
+    kind: undefined,
+    lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
+  ): Container<
+    T & Record<
+      K,
+      WithRequirementsOfDeps<AsyncSpec<Awaited<R>, 'singleton'>, T, D>
+    > & Record<
+      LK,
+      WithRequirementsOfDeps<AsyncLazySpec<Awaited<R>, 'singleton'>, T, D>
+    >
+  >
+
+  public registerAsyncFactory<
+    const K extends string | symbol,
+    A extends readonly unknown[],
+    R,
+    const Kind extends RegistrationKind,
+    const LK extends string | symbol,
+    const D extends DepsOf<AllowedDeps<T, Kind>, A> = DepsOf<AllowedDeps<T, Kind>, A>
+  >(
+    key: K & ([K] extends [keyof T] ? never : unknown),
+    factory: (...args: A) => R,
+    deps: D & RequireReadonlyDeps<D>,
+    kind: Kind,
+    lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
+  ): Container<
+    T & Record<
+      K,
+      WithRequirementsOfDeps<AsyncSpec<Awaited<R>, Kind>, T, D>
+    > & Record<
+      LK,
+      WithRequirementsOfDeps<AsyncLazySpec<Awaited<R>, Kind>, T, D>
+    >
+  >
+
   public registerAsyncFactory(
     key: string | symbol,
     factory: (...args: any[]) => unknown,
     deps: readonly (string | symbol)[],
-    kind: RegistrationKind = 'singleton'
+    kind: RegistrationKind = 'singleton',
+    lazyKey?: string | symbol
   ): any {
     if (this._disposed) {
       throw new Error(`Cannot register on a disposed container (key: "${String(key)}")`)
@@ -1411,6 +1562,16 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
 
     if (this.strict) {
       this.cache.delete(key as keyof T)
+    }
+
+    if (lazyKey !== undefined) {
+      const targetKey = key as unknown as keyof T
+      this.regs.set(lazyKey as unknown as keyof T, {
+        kind: 'transient',
+        lazy: kind === 'singleton',
+        fn: (c) => ({get: () => c.getAsync(targetKey as never)} as unknown as T[keyof T]['type']),
+        owned: false
+      })
     }
 
     return this
@@ -2407,9 +2568,9 @@ export namespace Container {
     : never
 
   /**
-   * Like {@link Resolve}, but unwraps `Lazy<T>` companion entries back to `T`.
-   * Useful when you want a "flat" view of the dependency map for typing mocks
-   * or test fixtures, where lazy wrappers only get in the way.
+   * Like {@link Resolve}, but distributively unwraps managed {@link Lazy} and
+   * {@link AsyncLazy} companion entries back to their target type. Ordinary
+   * manually registered wrapper values remain wrapped.
    *
    * @template C - A `Container<T>` type.
    *
@@ -2423,16 +2584,14 @@ export namespace Container {
    */
   export type ResolveUnwrapped<C> = C extends Container<infer U>
     ? {
-        [K in keyof U]: U[K] extends LazySpec<infer V, infer _TargetKind>
-          ? V
-          : U[K]['type']
+        [K in keyof U]: UnwrapSpec<U[K]>
       }
     : never
 
   /**
    * Gets the **unwrapped** service type (without the `Lazy<>` envelope) by key.
    * For non-lazy keys this equals `Resolve<C>[K]`; for keys registered as
-   * `Lazy<T>` it returns `T`.
+   * managed `Lazy<T>` or `AsyncLazy<T>` it returns `T`.
    *
    * Designed for typing the inner mock value when you intend to override a
    * `Lazy<T>`-registered key in a test — write the mock as the unwrapped

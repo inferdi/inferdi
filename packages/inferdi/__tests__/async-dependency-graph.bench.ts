@@ -122,6 +122,36 @@ describe('async graph resolution', () => {
   }, {iterations: 100})
 })
 
+describe('AsyncLazy overhead', () => {
+  bench('register async factory + get wrapper', () => {
+    new Container()
+      .registerAsyncFactory('db', () => new Database(), [], undefined, 'dbLazy')
+      .get('dbLazy')
+  })
+
+  bench('register async factory + first wrapper.get()', async () => {
+    const wrapper = new Container()
+      .registerAsyncFactory('db', () => new Database(), [], undefined, 'dbLazy')
+      .get('dbLazy')
+    await wrapper.get()
+  }, {iterations: 1000})
+
+  bench('register async factory + direct getAsync(target)', async () => {
+    const c = new Container()
+      .registerAsyncFactory('db', () => new Database(), [])
+    await c.getAsync('db')
+  }, {iterations: 1000})
+
+  const warm = new Container()
+    .registerAsyncFactory('db', () => new Database(), [], undefined, 'dbLazy')
+  const wrapper = warm.get('dbLazy')
+  wrapper.get()
+
+  bench('warm singleton AsyncLazy.get()', async () => {
+    await wrapper.get()
+  })
+})
+
 describe('registration-time async classification', () => {
   bench('register sync class with zero dependencies', () => {
     new Container().registerClass('db', Database, [])

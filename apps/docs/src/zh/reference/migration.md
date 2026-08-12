@@ -84,6 +84,17 @@ function resolve<
 
 调用 `getAsync()` 的泛型 helper 应使用 `Container.ReadyKeys<Container<T>>`。泛型 `T extends DependenciesMap` 可能包含声明式异步项，也可能包含因缺少作用域输入而不可用的服务。
 
+### Lazy 伴随项使用具名 spec
+
+`LazySpec` 现在包含私有的 type-only mode brand，v6 同时新增
+`AsyncLazySpec`。显式 `Container` 和 `Module` 形状必须使用这些具名导出，
+不能再结构化复写 `{type, kind, lazyOf}`。该 brand 没有运行时字段。
+
+`registerAsyncFactory` 的第五个 `lazyKey` 生成 `AsyncLazy<T>`。异步类使用同一
+wrapper，sync/async mixed 类生成 `Lazy<T> | AsyncLazy<T>`。Promise-valued
+`registerFactory` 仍生成 `Lazy<Promise<T>>`。`Container.ResolveUnwrapped`
+以 distributive 方式解包所有受管理模式。
+
 新的键集合见 [API 概览](./api)、[作用域输入与配置](../core/scope-inputs)和[异步依赖图](../core/async-dependency-graph)。
 
 ## 迁移到 5.0

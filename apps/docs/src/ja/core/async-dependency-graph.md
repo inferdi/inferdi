@@ -69,6 +69,10 @@ Promise はサービス自体を表す場合と、サービスの初期化境界
 
 下流サービスが初期化済みの値を必要とする場合は `registerAsyncFactory` を使います。同期グラフに Promise 自体を置く場合だけ Promise-valued `registerFactory` を使ってください。
 
+この違いはコンパニオン型にも適用されます。Promise-valued
+`registerFactory` は `Lazy<Promise<T>>`、第 5 引数に `lazyKey` を渡した
+宣言的 `registerAsyncFactory` は `AsyncLazy<T>` を生成します。ラッパー取得は同期処理なので、利用者へ async 状態を伝播しません。
+
 ## 非同期リクエストグラフを構築する
 
 次のグラフは root 用に database を 1 つ初期化し、認証済みスコープごとに session を 1 つ初期化します。宣言した依存に async 項目があれば、そのクラスも async になります。
@@ -191,8 +195,9 @@ const monitor = await legacy.getAsync('monitor')
 
 - `registerAsyncFactory` には readonly の依存タプルを渡します。async キーを選ぶ可能性がある `registerClass` でも readonly が必要です。InferDI は async 位置を一度だけ分類し、タプル参照を保持します。inline literal は readonly として推論されます。
 - 宣言的 cycle と cold lifetime 違反は同期 preflight 中に失敗します。Promise 境界の後で capture したコンテナを呼ぶと動的エッジになり、この分析の対象外です。
-- InferDI は async `Lazy<T>`、retry、cancellation、rollback を提供しません。cycle を分割するか、共有初期化を別サービスへ移してください。
+- `AsyncLazy<T>` は解決を遅延しますが、retry、cancellation、rollback は追加しません。
 - 後の依存が preflight 中に失敗しても、先に始まった初期化はキャッシュと所有権の状態を維持します。開始済み async transient は teardown handle なしで動き続ける場合があります。
-- async 依存を持つクラスに同期 lazy companion は作れません。`registerAsyncFactory` に `lazyKey` パラメーターはありません。
+- `lazyKey` を持つ async クラスは `AsyncLazy<Class>`、sync/async mixed クラスは `Lazy<Class> | AsyncLazy<Class>` を生成します。
+- Promise 境界後の `AsyncLazy.get()` による動的循環は、自身の cached pending Promise を待ち続ける可能性があります。
 
 同期構築は[ファクトリー](./factories)、所有権モデルは[スコープとクリーンアップ](./scopes)を参照してください。

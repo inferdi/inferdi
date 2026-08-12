@@ -69,6 +69,10 @@ Una Promise puede ser el propio servicio o el límite de inicialización de un s
 
 Usa `registerAsyncFactory` cuando los servicios dependientes necesiten el valor inicializado. Conserva una `registerFactory` que devuelve Promise solo si la propia Promise forma parte del grafo síncrono.
 
+La diferencia también decide el tipo acompañante. Un `registerFactory`
+Promise-valued produce `Lazy<Promise<T>>`; un `registerAsyncFactory` declarativo
+con un quinto `lazyKey` produce `AsyncLazy<T>`. Obtener el wrapper es síncrono y no propaga el estado async al consumidor.
+
 ## Construir un grafo async por petición
 
 Este grafo inicializa una base de datos para el root y una sesión por scope autenticado. Una clase pasa a ser async cuando alguna dependencia declarada es async.
@@ -191,8 +195,9 @@ En el nivel superior, `getAsync('dbPromise')` sigue la semántica await de JavaS
 
 - Pasa tuplas readonly a `registerAsyncFactory` y a `registerClass` cuando la tupla pueda seleccionar una clave async. InferDI clasifica las posiciones async una vez y conserva la referencia a la tupla. Los literales inline se infieren como readonly.
 - Los ciclos declarativos y las infracciones de lifetime en frío fallan durante el preflight síncrono. Las llamadas mediante un contenedor capturado después de un límite Promise crean aristas dinámicas fuera de ese análisis.
-- InferDI no implementa `Lazy<T>` async, reintentos, cancelación ni rollback. Divide el ciclo o mueve la inicialización compartida a otro servicio.
+- `AsyncLazy<T>` difiere la resolución; no añade reintentos, cancelación ni rollback.
 - Si una dependencia posterior falla durante el preflight, las inicializaciones anteriores conservan su caché y propiedad. Un transient async ya iniciado puede continuar sin un teardown handle.
-- Una clase con una dependencia async no puede tener un lazy companion síncrono. `registerAsyncFactory` no acepta `lazyKey`.
+- Una clase async con `lazyKey` produce `AsyncLazy<Class>`; una clase mixed sync/async produce `Lazy<Class> | AsyncLazy<Class>`.
+- Un ciclo dinámico mediante `AsyncLazy.get()` tras un límite Promise puede esperar su propia Promise pendiente en caché sin error de runtime.
 
 Consulta [Factorías](./factories) para la construcción síncrona y [Scopes y limpieza](./scopes) para el modelo de propiedad.

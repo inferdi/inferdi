@@ -1,12 +1,24 @@
 import {describe, it, expectTypeOf} from 'vitest'
 import {
   Container,
+  type AsyncLazy,
+  type AsyncLazySpec,
   type AsyncSpec,
   type DependenciesMap,
   type Lazy,
+  type LazySpec,
   type Module,
+  type Spec,
+  type WithRequirements,
   type SpecMap
 } from '../src/Container'
+import {
+  type AsyncLazy as PublicAsyncLazy,
+  type AsyncLazySpec as PublicAsyncLazySpec,
+  type LazySpec as PublicLazySpec
+} from '../src/index'
+// @ts-expect-error — the type-only companion discriminant is not a public export
+import type {lazyMode} from '../src/index'
 
 class Config {
   public readonly url = 'postgres://localhost/app'
@@ -23,6 +35,61 @@ class Repository {
 class Service {
   constructor(public readonly repository: Repository) {}
 }
+
+class Pair {
+  constructor(
+    public readonly first: Database,
+    public readonly second: Database
+  ) {}
+}
+
+class RepositoryService {
+  constructor(public readonly repository: Repository) {}
+}
+
+class AsyncLazyConsumer {
+  constructor(public readonly dbLazy: AsyncLazy<Database>) {}
+}
+
+class MixedLazyConsumer {
+  constructor(
+    public readonly dbLazy: Lazy<Database> | AsyncLazy<Database>
+  ) {}
+}
+
+class SyncLazyConsumer {
+  constructor(public readonly dbLazy: Lazy<Database>) {}
+}
+
+type GraphOf<C> = C extends Container<infer T> ? T : never
+
+type Assignable<A, B> = [A] extends [B] ? true : false
+
+type ExplicitMixedGraph = {
+  database: Spec<Database, 'singleton'> | AsyncSpec<Database, 'singleton'>
+}
+
+declare const explicitMixedContainer: Container<ExplicitMixedGraph>
+
+type UnwrapGraph = {
+  sync: LazySpec<Database, 'singleton'>
+  async: AsyncLazySpec<Database, 'singleton'>
+  mixed: LazySpec<Database, 'singleton'> | AsyncLazySpec<Database, 'singleton'>
+  promisedSync: LazySpec<Promise<Database>, 'singleton'>
+  unmanagedSync: Spec<Lazy<Database>, 'transient'>
+  unmanagedAsync: Spec<AsyncLazy<Database>, 'transient'>
+}
+
+declare const unwrapContainer: Container<UnwrapGraph>
+
+type UnsafeCompanionGraph = {
+  targetKindUnion: LazySpec<Database, 'singleton' | 'scoped'>
+  managedUnmanagedUnion:
+    LazySpec<Database, 'singleton'> |
+    Spec<Lazy<Database>, 'transient'>
+}
+
+declare const unsafeCompanionContainer: Container<UnsafeCompanionGraph>
 
 describe('async dependency graph types', () => {
   it('infers final service types for value, Promise, PromiseLike, and union results', () => {
@@ -119,22 +186,35 @@ describe('async dependency graph types', () => {
     c.registerClass('repository', Repository, mutableClassDeps)
     // @ts-expect-error — a union that may select an async key must also be readonly
     c.registerClass('unionRepository', Repository, mutableUnionDeps)
+    // @ts-expect-error — async lazy-class overloads retain the classified tuple
+    c.registerClass('lazyRepository', Repository, mutableClassDeps, 'singleton', 'repositoryLazy')
+    // @ts-expect-error — mixed lazy-class overloads retain the classified tuple
+    c.registerClass('lazyUnionRepository', Repository, mutableUnionDeps, 'singleton', 'unionRepositoryLazy')
 
     const readonlyDeps = ['remoteDb'] as const
     c.registerClass('readonlyRepository', Repository, readonlyDeps)
+    c.registerClass(
+      'readonlyLazyRepository',
+      Repository,
+      readonlyDeps,
+      'singleton',
+      'readonlyRepositoryLazy'
+    )
 
     const sync = new Container().registerValue('db', new Database())
     const mutableSyncDeps: ['db'] = ['db']
     sync.registerClass('syncRepository', Repository, mutableSyncDeps)
   })
 
-  it('rejects duplicate async keys and an async lazy companion form', () => {
+  it('rejects duplicate async keys and lazy-key collisions', () => {
     const c = new Container().registerAsyncFactory('db', async () => new Database(), [])
 
     // @ts-expect-error — duplicate keys remain forbidden
     c.registerAsyncFactory('db', async () => new Database(), [])
-    // @ts-expect-error — registerAsyncFactory has no lazyKey overload
-    new Container().registerAsyncFactory('other', async () => new Database(), [], 'singleton', 'otherLazy')
+    // @ts-expect-error — the companion cannot reuse its target key
+    new Container().registerAsyncFactory('other', async () => new Database(), [], 'singleton', 'other')
+    // @ts-expect-error — the companion cannot reuse an existing registration
+    c.registerAsyncFactory('other', async () => new Database(), [], 'singleton', 'db')
   })
 
   it('preserves lifetime filtering for async factories', () => {
@@ -185,15 +265,31 @@ describe('async dependency graph types', () => {
     expectTypeOf(c2.getAsync('repository')).toEqualTypeOf<Promise<Repository>>()
     // @ts-expect-error — the union may select remoteDb
     c2.get('repository')
-    // @ts-expect-error — a potentially async class cannot expose synchronous Lazy
-    c.registerClass('lazyRepository', Repository, [dbKey], 'singleton', 'repositoryLazy')
+    const lazy = c.registerClass(
+      'lazyRepository',
+      Repository,
+      [dbKey],
+      'singleton',
+      'repositoryLazy'
+    )
+    expectTypeOf(lazy.get('repositoryLazy')).toEqualTypeOf<
+      Lazy<Repository> | AsyncLazy<Repository>
+    >()
   })
 
-  it('rejects lazyKey when a class has an async dependency', () => {
+  it('creates AsyncLazy when a class has an async dependency', () => {
     const c = new Container().registerAsyncFactory('db', async () => new Database(), [])
+    const lazy = c.registerClass(
+      'repository',
+      Repository,
+      ['db'],
+      'singleton',
+      'repositoryLazy'
+    )
 
-    // @ts-expect-error — Lazy<T>.get() cannot represent an async target
-    c.registerClass('repository', Repository, ['db'], 'singleton', 'repositoryLazy')
+    expectTypeOf(lazy.get('repositoryLazy')).toEqualTypeOf<AsyncLazy<Repository>>()
+    // @ts-expect-error — async-propagated class remains unavailable through get()
+    lazy.get('repository')
   })
 
   it('keeps sync factories away from async keys', () => {
@@ -326,5 +422,336 @@ describe('async dependency graph types', () => {
     const unionContainer = new Container()
       .registerAsyncFactory(union, async () => new Database(), [])
     expectTypeOf(unionContainer.getAsync(union)).toEqualTypeOf<Promise<Database>>()
+  })
+})
+
+describe('AsyncLazy type model', () => {
+  it('classifies every dependency position before aggregating class state', () => {
+    const base = new Container()
+      .registerValue('localDb', new Database())
+      .registerAsyncFactory('remoteDb', async () => new Database(), [])
+      .registerAsyncFactory('backupDb', async () => new Database(), [])
+    const mixedKey: 'localDb' | 'remoteDb' = Math.random() > 0.5
+      ? 'localDb'
+      : 'remoteDb'
+    const asyncKey: 'remoteDb' | 'backupDb' = Math.random() > 0.5
+      ? 'remoteDb'
+      : 'backupDb'
+
+    const sync = base.registerClass(
+      'syncRepository',
+      Repository,
+      ['localDb'],
+      'singleton',
+      'syncRepositoryLazy'
+    )
+    expectTypeOf(sync.get('syncRepositoryLazy')).toEqualTypeOf<Lazy<Repository>>()
+
+    const async = base.registerClass(
+      'asyncRepository',
+      Repository,
+      ['remoteDb'],
+      'singleton',
+      'asyncRepositoryLazy'
+    )
+    expectTypeOf(async.get('asyncRepositoryLazy')).toEqualTypeOf<AsyncLazy<Repository>>()
+
+    const mixed = base.registerClass(
+      'mixedRepository',
+      Repository,
+      [mixedKey],
+      'singleton',
+      'mixedRepositoryLazy'
+    )
+    expectTypeOf(mixed.get('mixedRepositoryLazy')).toEqualTypeOf<
+      Lazy<Repository> | AsyncLazy<Repository>
+    >()
+
+    const explicitMixed = explicitMixedContainer.registerClass(
+      'repository',
+      Repository,
+      ['database'],
+      'singleton',
+      'repositoryLazy'
+    )
+    expectTypeOf(explicitMixed.get('repositoryLazy')).toEqualTypeOf<
+      Lazy<Repository> | AsyncLazy<Repository>
+    >()
+
+    const allAsync = base.registerClass(
+      'allAsyncRepository',
+      Repository,
+      [asyncKey],
+      'singleton',
+      'allAsyncRepositoryLazy'
+    )
+    expectTypeOf(allAsync.get('allAsyncRepositoryLazy')).toEqualTypeOf<
+      AsyncLazy<Repository>
+    >()
+
+    const asyncWins = base.registerClass(
+      'pair',
+      Pair,
+      [mixedKey, 'remoteDb'],
+      'singleton',
+      'pairLazy'
+    )
+    expectTypeOf(asyncWins.get('pairLazy')).toEqualTypeOf<AsyncLazy<Pair>>()
+
+    const severalMixed = base.registerClass(
+      'mixedPair',
+      Pair,
+      [mixedKey, mixedKey],
+      'singleton',
+      'mixedPairLazy'
+    )
+    expectTypeOf(severalMixed.get('mixedPairLazy')).toEqualTypeOf<
+      Lazy<Pair> | AsyncLazy<Pair>
+    >()
+
+    const downstream = mixed.registerClass(
+      'service',
+      RepositoryService,
+      ['mixedRepository'],
+      'singleton',
+      'serviceLazy'
+    )
+    expectTypeOf(downstream.get('serviceLazy')).toEqualTypeOf<
+      Lazy<RepositoryService> | AsyncLazy<RepositoryService>
+    >()
+  })
+
+  it('brands managed companions and keeps sync/async modes incompatible', () => {
+    type StructuralSync = {
+      readonly type: Lazy<Database>
+      readonly kind: 'transient'
+      readonly lazyOf: 'singleton'
+    }
+    type StructuralAsync = {
+      readonly type: AsyncLazy<Database>
+      readonly kind: 'transient'
+      readonly lazyOf: 'singleton'
+    }
+
+    expectTypeOf<Assignable<StructuralSync, LazySpec<Database, 'singleton'>>>()
+      .toEqualTypeOf<false>()
+    expectTypeOf<Assignable<StructuralAsync, AsyncLazySpec<Database, 'singleton'>>>()
+      .toEqualTypeOf<false>()
+    expectTypeOf<Assignable<LazySpec<Database, 'singleton'>, StructuralSync>>()
+      .toEqualTypeOf<true>()
+    expectTypeOf<Assignable<AsyncLazySpec<Database, 'singleton'>, StructuralAsync>>()
+      .toEqualTypeOf<true>()
+    expectTypeOf<
+      Assignable<LazySpec<Promise<Database>, 'singleton'>, AsyncLazySpec<Database, 'singleton'>>
+    >().toEqualTypeOf<false>()
+    expectTypeOf<
+      Assignable<AsyncLazySpec<Database, 'singleton'>, LazySpec<Promise<Database>, 'singleton'>>
+    >().toEqualTypeOf<false>()
+
+    expectTypeOf<PublicAsyncLazy<Database>>().toEqualTypeOf<AsyncLazy<Database>>()
+    expectTypeOf<PublicAsyncLazySpec<Database, 'singleton'>>()
+      .toEqualTypeOf<AsyncLazySpec<Database, 'singleton'>>()
+    expectTypeOf<PublicLazySpec<Database, 'singleton'>>()
+      .toEqualTypeOf<LazySpec<Database, 'singleton'>>()
+  })
+
+  it('unwraps managed companions distributively and preserves unmanaged wrappers', () => {
+    type Flat = Container.ResolveUnwrapped<typeof unwrapContainer>
+
+    expectTypeOf<Flat['sync']>().toEqualTypeOf<Database>()
+    expectTypeOf<Flat['async']>().toEqualTypeOf<Database>()
+    expectTypeOf<Flat['mixed']>().toEqualTypeOf<Database>()
+    expectTypeOf<Flat['promisedSync']>().toEqualTypeOf<Promise<Database>>()
+    expectTypeOf<Flat['unmanagedSync']>().toEqualTypeOf<Lazy<Database>>()
+    expectTypeOf<Flat['unmanagedAsync']>().toEqualTypeOf<AsyncLazy<Database>>()
+  })
+
+  it('keeps Promise-valued registerFactory companions synchronous', () => {
+    const c = new Container().registerFactory(
+      'legacy',
+      async () => new Database(),
+      undefined,
+      'legacyLazy'
+    )
+
+    expectTypeOf(c.get('legacyLazy')).toEqualTypeOf<Lazy<Promise<Database>>>()
+    expectTypeOf<Container.ResolveUnwrapped<typeof c>['legacyLazy']>()
+      .toEqualTypeOf<Promise<Database>>()
+  })
+
+  it('does not propagate async state through an AsyncLazy dependency', () => {
+    const c = new Container()
+      .registerAsyncFactory(
+        'database',
+        async () => new Database(),
+        [],
+        undefined,
+        'databaseLazy'
+      )
+      .registerClass('consumer', AsyncLazyConsumer, ['databaseLazy'])
+
+    expectTypeOf(c.get('consumer')).toEqualTypeOf<AsyncLazyConsumer>()
+    expectTypeOf<
+      Assignable<GraphOf<typeof c>['consumer'], AsyncSpec<AsyncLazyConsumer>>
+    >().toEqualTypeOf<false>()
+  })
+
+  it('applies singleton lifetime rules to the complete companion entry', () => {
+    const singleton = new Container()
+      .registerClass('syncDb', Database, [], 'singleton', 'syncDbLazy')
+      .registerAsyncFactory(
+        'asyncDb',
+        async () => new Database(),
+        [],
+        'singleton',
+        'asyncDbLazy'
+      )
+
+    singleton.registerClass('syncConsumer', SyncLazyConsumer, ['syncDbLazy'])
+    singleton.registerClass('asyncConsumer', AsyncLazyConsumer, ['asyncDbLazy'])
+
+    const short = new Container()
+      .registerClass('scopedDb', Database, [], 'scoped', 'scopedDbLazy')
+      .registerAsyncFactory(
+        'transientDb',
+        async () => new Database(),
+        [],
+        'transient',
+        'transientDbLazy'
+      )
+
+    // @ts-expect-error — singleton consumers cannot inject a scoped target companion
+    short.registerClass('badScoped', SyncLazyConsumer, ['scopedDbLazy'])
+    // @ts-expect-error — singleton consumers cannot inject a transient async target companion
+    short.registerClass('badTransient', AsyncLazyConsumer, ['transientDbLazy'])
+
+    const localOrRemote: 'localDb' | 'remoteDb' = Math.random() > 0.5
+      ? 'localDb'
+      : 'remoteDb'
+    const mixedSingleton = new Container()
+      .registerValue('localDb', new Database())
+      .registerAsyncFactory('remoteDb', async () => new Database(), [])
+      .registerClass(
+        'database',
+        Repository,
+        [localOrRemote],
+        'singleton',
+        'databaseLazy'
+      )
+    class MixedRepositoryConsumer {
+      constructor(
+        readonly lazy: Lazy<Repository> | AsyncLazy<Repository>
+      ) {}
+    }
+    mixedSingleton.registerClass(
+      'mixedConsumer',
+      MixedRepositoryConsumer,
+      ['databaseLazy']
+    )
+
+    const targetKind: 'singleton' | 'scoped' = Math.random() > 0.5
+      ? 'singleton'
+      : 'scoped'
+    const possibleScoped = new Container()
+      .registerClass('db', Database, [], targetKind, 'dbLazy')
+    // @ts-expect-error — a possibly scoped target is not singleton-safe
+    possibleScoped.registerClass('bad', SyncLazyConsumer, ['dbLazy'])
+
+    // @ts-expect-error — explicit target-kind unions are checked as a whole
+    unsafeCompanionContainer.registerClass('badKind', SyncLazyConsumer, ['targetKindUnion'])
+    // @ts-expect-error — a managed/unmanaged union is not singleton-safe
+    unsafeCompanionContainer.registerClass('badUnion', SyncLazyConsumer, ['managedUnmanagedUnion'])
+  })
+
+  it('preserves shared requirements and brands through createScope', () => {
+    interface RequestContext {
+      readonly requestId: string
+    }
+    const root = new Container()
+      .declareScopeInputs<{request: RequestContext}>()
+      .registerFactory(
+        'localDb',
+        ['request'],
+        (c) => {
+          c.get('request')
+          return new Database()
+        },
+        'scoped'
+      )
+      .registerAsyncFactory(
+        'remoteDb',
+        async (_request: RequestContext) => new Database(),
+        ['request'],
+        'scoped'
+      )
+    const databaseKey: 'localDb' | 'remoteDb' = Math.random() > 0.5
+      ? 'localDb'
+      : 'remoteDb'
+    const withCompanion = root.registerClass(
+      'repository',
+      Repository,
+      [databaseKey],
+      'scoped',
+      'repositoryLazy'
+    )
+    type ExpectedRoot = WithRequirements<
+      LazySpec<Repository, 'scoped'> | AsyncLazySpec<Repository, 'scoped'>,
+      'request'
+    >
+
+    expectTypeOf<GraphOf<typeof withCompanion>['repositoryLazy']>()
+      .toEqualTypeOf<ExpectedRoot>()
+    // @ts-expect-error — both companion branches require the scope input
+    withCompanion.get('repositoryLazy')
+
+    const scope = withCompanion.createScope({
+      request: {requestId: 'request'}
+    })
+    expectTypeOf<GraphOf<typeof scope>['repositoryLazy']>().toEqualTypeOf<
+      LazySpec<Repository, 'scoped'> | AsyncLazySpec<Repository, 'scoped'>
+    >()
+    expectTypeOf(scope.get('repositoryLazy')).toEqualTypeOf<
+      Lazy<Repository> | AsyncLazy<Repository>
+    >()
+  })
+
+  it('keeps Providers, modules, and named declarations compatible', () => {
+    const c = new Container().registerAsyncFactory(
+      'database',
+      async () => new Database(),
+      [],
+      undefined,
+      'databaseLazy'
+    )
+    type Providers = Container.Providers<typeof c>
+    expectTypeOf<Providers['database']>().toEqualTypeOf<() => Database>()
+    expectTypeOf<Providers['databaseLazy']>().toEqualTypeOf<
+      () => AsyncLazy<Database>
+    >()
+
+    type Added = {
+      database: AsyncSpec<Database, 'singleton'>
+      databaseLazy: AsyncLazySpec<Database, 'singleton'>
+    }
+    const module: Module<Record<never, never>, Added> = (container) =>
+      container.registerAsyncFactory(
+        'database',
+        async () => new Database(),
+        [],
+        undefined,
+        'databaseLazy'
+      )
+
+    function consumeNamed(container: Container<Added>): void {
+      expectTypeOf(container.get('databaseLazy')).toEqualTypeOf<
+        AsyncLazy<Database>
+      >()
+      expectTypeOf(container.getAsync('database')).toEqualTypeOf<
+        Promise<Database>
+      >()
+    }
+
+    void module
+    void consumeNamed
   })
 })
