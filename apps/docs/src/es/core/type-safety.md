@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/es/core/type-safety"
       "inLanguage": "es-ES"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-21"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, seguridad de tipos, TypeScript, inferencia de tipos, firmas de constructor, tiempo de compilación, inyección de dependencias"
@@ -103,3 +103,23 @@ new Container()
 ```
 
 El modo estricto en runtime sigue siendo defensa en profundidad frente a casts `as`, claves dinámicas, contenedores externos capturados y ciclos de dependencias.
+
+## Preparación y estado async
+
+El tipo del grafo también registra requisitos de entradas de scope y registros async declarativos. Una clave desaparece de `.get()` hasta que se proporcionan sus entradas, y una clave `AsyncSpec` pasa a `.getAsync()` junto con las clases que dependen de ella.
+
+```ts
+const root = new Container()
+  .declareScopeInputs<{request: Request}>()
+  .registerAsyncFactory('db', openDatabase, [])
+  .registerClass('handler', Handler, ['request', 'db'], 'scoped')
+
+const scope = root.createScope({request})
+
+// @ts-expect-error: handler es async
+scope.get('handler')
+
+await scope.getAsync('handler')
+```
+
+Usa [Entradas y perfiles de scope](./scope-inputs) para modelar la preparación y [Grafo de dependencias asíncrono](./async-dependency-graph) para elegir el contrato Promise.

@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ru/core/type-safety"
       "inLanguage": "ru-RU"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, типобезопасность, TypeScript, вывод типов, сигнатуры конструкторов, время компиляции, внедрение зависимостей"
@@ -101,3 +101,23 @@ new Container()
 ```
 
 Runtime-проверки в strict mode остаются вторым рубежом защиты для `as`-кастов, динамических ключей, захваченных внешних контейнеров и циклов зависимостей.
+
+## Готовность и async status
+
+Тип графа также хранит требования scope inputs и декларативные async-регистрации. Ключ недоступен через `.get()`, пока его inputs не предоставлены. Ключ `AsyncSpec` и зависимые от него классы разрешаются через `.getAsync()`.
+
+```ts
+const root = new Container()
+  .declareScopeInputs<{request: Request}>()
+  .registerAsyncFactory('db', openDatabase, [])
+  .registerClass('handler', Handler, ['request', 'db'], 'scoped')
+
+const scope = root.createScope({request})
+
+// @ts-expect-error: handler является async
+scope.get('handler')
+
+await scope.getAsync('handler')
+```
+
+Готовность моделируется через [Данные и профили скоупа](./scope-inputs), а выбор Promise-контракта описан в [Асинхронном графе зависимостей](./async-dependency-graph).

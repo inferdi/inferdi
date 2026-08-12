@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/core/type-safety"
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-21"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, type safety, TypeScript, type inference, constructor signatures, compile-time, dependency injection"
@@ -103,3 +103,23 @@ new Container()
 ```
 
 Runtime strict mode remains defense-in-depth for `as` casts, dynamic keys, captured outer containers, and dependency cycles.
+
+## Readiness and Async Status
+
+The graph type also records scope-input requirements and declarative async registrations. A key disappears from `.get()` until its inputs are provided, and an `AsyncSpec` key moves to `.getAsync()` together with classes that depend on it.
+
+```ts
+const root = new Container()
+  .declareScopeInputs<{request: Request}>()
+  .registerAsyncFactory('db', openDatabase, [])
+  .registerClass('handler', Handler, ['request', 'db'], 'scoped')
+
+const scope = root.createScope({request})
+
+// @ts-expect-error: handler is async
+scope.get('handler')
+
+await scope.getAsync('handler')
+```
+
+Use [Scope Inputs and Profiles](./scope-inputs) to model readiness and [Async Dependency Graph](./async-dependency-graph) to choose the correct Promise contract.

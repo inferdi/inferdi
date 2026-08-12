@@ -21,18 +21,18 @@ schema:
       "@id": "https://inferdi.com/ja/reference/api#article"
       "headline": "InferDI コア API サマリー"
       "name": "API サマリー"
-      "description": "registerAsyncFactory、getAsync、AsyncSpec、スコープ、オーバーライド、破棄を含む @inferdi/inferdi コア API のまとめです。"
+      "description": "スコープ入力、registerAsyncFactory、準備状態を考慮した解決、オーバーライド、破棄を含む @inferdi/inferdi v6 コア API のまとめです。"
       "url": "https://inferdi.com/ja/reference/api"
       "mainEntityOfPage": "https://inferdi.com/ja/reference/api"
       "inLanguage": "ja-JP"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-08-09"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "executableLibraryName": "@inferdi/inferdi"
       "programmingModel": "明示的な登録、フルエントビルダー"
       "targetPlatform": "Node.js, Bun, Deno, Browser"
-      "keywords": "InferDI, API, Container, registerFactory, registerAsyncFactory, getAsync, AsyncSpec, scope, dispose"
+      "keywords": "InferDI, API, Container, declareScopeInputs, ScopeInputMap, registerAsyncFactory, getAsync, AsyncSpec, ReadyKeys, dispose"
       "articleSection": "リファレンス"
       "isPartOf":
         "@type": "WebSite"
@@ -73,8 +73,10 @@ import {
   type AsyncSpec,
   type Module,
   type RegistrationKind,
+  type ScopeInputMap,
   type Spec,
   type SpecMap,
+  type WithRequirements
 } from '@inferdi/inferdi'
 ```
 
@@ -82,17 +84,19 @@ import {
 class Container<T extends DependenciesMap = Record<never, never>> {
   constructor(options?: ContainerOptions)
 
+  declareScopeInputs<Inputs>()
   registerClass(key, Ctor, deps, kind?, lazyKey?)
   registerFactory(key, factory, kind?, lazyKey?)
+  registerFactory(key, deps, factory, kind?, lazyKey?)
   registerAsyncFactory(key, factory, deps, kind?)
   registerValue(key, value)
   override(key, value)
   use(fn)
 
-  createScope()
-  get(key)
-  getAsync(key): Promise
-  has(key)
+  createScope(inputs?)
+  get(syncReadyKey)
+  getAsync(readyKey): Promise
+  has(key): key is keyof T
 
   get disposed(): boolean
   dispose(): Promise<void>
@@ -103,14 +107,13 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 
 ## 登録メソッド
 
-| メソッド | 用途 |
-| --- | --- |
-| `registerClass` | コンストラクターと依存関係のタプルを登録します。 |
-| `registerFactory` | カスタムの構築ロジックを登録します。 |
-| `registerAsyncFactory` | 宣言的な非同期グラフへ位置依存を登録します。 |
-| `registerValue` | 外部が所有するシングルトン値を登録します。 |
-| `override` | 既存の登録を置き換えます。キーがローカルキャッシュ済みなら拒否します。 |
-| `use` | モジュールビルダーを適用します。 |
+| メソッド | callback の入力 | グラフ内の型 | 解決方法 |
+| --- | --- | --- | --- |
+| `registerClass` | `deps` に対応するコンストラクター引数 | `Spec` または伝播した `AsyncSpec` | `get` または `getAsync` |
+| `registerFactory(key, factory, ...)` | ライフタイムで絞ったコンテナ | `Spec<ReturnType>` | `get` |
+| `registerFactory(key, deps, factory, ...)` | `deps` だけを持つ resolver | 入力要件付き `Spec` | `get` |
+| `registerAsyncFactory` | 解決済みの位置引数 | `AsyncSpec<Awaited<ReturnType>>` | `getAsync` |
+| `registerValue` | なし | 外部所有の singleton `Spec` | `get` |
 
 `registerClass` と `registerFactory` は `singleton`、`scoped`、`transient` のライフタイムと、省略可能な `lazyKey` コンパニオンを受け付けます。`registerValue` は常にシングルトンで、外部が所有します。
 
@@ -118,7 +121,26 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 
 `registerAsyncFactory` と、依存関係タプルが非同期キーを選ぶ可能性のある `registerClass` では readonly タプルが必要です。InferDI は登録時に非同期位置を一度だけ分類し、タプルへの参照を保持します。インラインリテラルは readonly として推論され、同期専用の `registerClass` は変更可能なタプルも受け付けます。
 
-`override` のタイミングガードが確認するのは現在のコンテナのキャッシュだけです。ローカルにキャッシュされた singleton/scoped 値、`registerValue`、2 回目のオーバーライドは検出しますが、transient の解決や、子コンテナ経由で解決された祖先所有の値は記録しません。依存関係グラフを解決する前にオーバーライドを適用してください。
+`registerAsyncFactory` と依存キー付き `registerFactory` は、引数順と callback 契約が異なります。
+
+```ts
+registerFactory(key, deps, resolverFactory, kind, lazyKey)
+registerAsyncFactory(key, valueFactory, deps, kind)
+```
+
+`override` は既存登録を置き換え、`use` は module builder を適用します。`override` のタイミングガードが確認するのは現在のコンテナのキャッシュだけです。ローカルにキャッシュされた singleton/scoped 値、`registerValue`、2 回目のオーバーライドは検出しますが、transient の解決や、子コンテナ経由で解決された祖先所有の値は記録しません。依存関係グラフを解決する前にオーバーライドを適用してください。
+
+## スコープ入力と解決
+
+`declareScopeInputs<Inputs>()` は型にだけ存在する scoped エントリーを追加します。`createScope(inputs)` は不足している値の一部を提供し、必須プロパティに応じた準備済みキー集合を持つコンテナを返します。入力値はアプリケーションが所有します。
+
+| API | 受け付けるキー |
+| --- | --- |
+| `get()` | `AsyncSpec` ではない準備済みキー |
+| `getAsync()` | 準備済みの同期キーと宣言的 async キー |
+| `has()` | 任意の string または symbol。登録の存在だけを証明 |
+
+`has()` はキーの準備状態や同期性を証明しません。型状態の絞り込みは[スコープ入力とプロファイル](../core/scope-inputs)、Promise の動作は[非同期依存グラフ](../core/async-dependency-graph)を参照してください。
 
 ## 名前空間の型
 
@@ -142,11 +164,17 @@ namespace Container {
 | `Container.UnwrappedValue<C, K>` | アンラップされた 1 つのサービス型を参照します。 |
 | `Container.Providers<C>` | テスト用にプロバイダーのサンクのマップを作成します。 |
 
+v6 のジェネリック resolver は受け付けるキー集合を保持する必要があります。`get()` には `Container.SyncReadyKeys<C>`、`getAsync()` には `Container.ReadyKeys<C>` を使い、制約なしの `keyof T` は使いません。
+
 ## 公開型
 
 ```ts
 type Lazy<T> = { readonly get: () => T }
 type RegistrationKind = 'singleton' | 'transient' | 'scoped'
+type DependenciesMap = Record<
+  string | symbol,
+  Spec<unknown, RegistrationKind>
+>
 
 interface ContainerOptions {
   readonly strict?: boolean
@@ -162,6 +190,11 @@ interface AsyncSpec<V, K extends RegistrationKind = 'singleton'>
   readonly async: true
 }
 
+interface LazySpec<V, TargetKind extends RegistrationKind>
+  extends Spec<Lazy<V>, 'transient'> {
+  readonly lazyOf: TargetKind
+}
+
 type SpecMap<M, K extends RegistrationKind = 'singleton'> = {
   [P in keyof M]: Spec<M[P], K>
 }
@@ -169,6 +202,8 @@ type SpecMap<M, K extends RegistrationKind = 'singleton'> = {
 type Module<TIn extends DependenciesMap, TOut extends DependenciesMap> =
   (c: Container<TIn>) => Container<TIn & TOut>
 ```
+
+`ScopeInputMap<M>` は必須かつ有限な string/symbol プロパティを scoped input エントリーへ変換します。optional キー、数値キー、`__proto__`、広い index signature、キー集合が異なる union は拒否します。`WithRequirements<S, K>` は名前付きモジュールの出力に必要な input keys を保持します。正確な conditional type 定義は公開 TypeScript declarations を参照してください。
 
 ## アダプター API の形
 

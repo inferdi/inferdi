@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/es/core/lifetime-guards"
       "inLanguage": "es-ES"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-31"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, tiempos de vida, singleton, scoped, transient, guard de tiempo de vida, dependencia cautiva, inyección de dependencias"
@@ -77,6 +77,8 @@ new Container()
 ```
 
 Ese registro lo rechaza TypeScript. En modo estricto, la misma forma se rechaza en runtime si un cast burla el sistema de tipos.
+
+Las entradas de scope declaradas cuentan como dependencias scoped. Registra un consumidor de petición, contexto de autenticación, tenant o payload de trabajo como `scoped` o `transient`; el compilador rechaza un consumidor singleton antes del runtime. Consulta [Entradas y perfiles de scope](./scope-inputs).
 
 ## Modo estricto
 

@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ja/core/lazy-injection"
       "inLanguage": "ja-JP"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-21"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, 遅延注入, Lazy, 遅延解決, 循環依存, シングルトン, 依存性注入"
@@ -102,4 +102,4 @@ new Container()
 
 ## 循環依存
 
-InferDI は、プリフライト中の宣言的な非同期依存を含む同期循環を検出しますが、自動では解消しません。`Lazy<singleton>` は同期の singleton エッジを断てますが、宣言的な非同期登録には lazy コンパニオンがありません。Promise 境界後に作られる動的な循環は、共有初期化を分割する、一方を引き上げる、循環を除く、といったアーキテクチャ上の修正が必要です。
+InferDI は、プリフライト中の宣言的な非同期依存を含む同期循環を検出しますが、自動では解消しません。`Lazy<singleton>` は同期の singleton エッジを断てますが、宣言的な非同期登録には lazy コンパニオンがありません。Promise 境界後に作られる動的な循環は、共有初期化を分割する、一方を引き上げる、循環を除く、といったアーキテクチャ上の修正が必要です。async 境界は[非同期依存グラフ](./async-dependency-graph)を参照してください。

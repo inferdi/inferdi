@@ -21,15 +21,15 @@ schema:
       "@id": "https://inferdi.com/ja/reference/migration#article"
       "headline": "InferDI マイグレーションガイド"
       "name": "マイグレーション"
-      "description": "メジャーバージョンごとの破壊的変更と、InferDI 5.0 への現在のマイグレーション手順をまとめています。信頼できる情報源として packages/inferdi/MIGRATION.md を反映しています。"
+      "description": "メジャーバージョンごとの破壊的変更と、InferDI 6.0 への現在のマイグレーション手順をまとめています。信頼できる情報源として packages/inferdi/MIGRATION.md を反映しています。"
       "url": "https://inferdi.com/ja/reference/migration"
       "mainEntityOfPage": "https://inferdi.com/ja/reference/migration"
       "inLanguage": "ja-JP"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-31"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, マイグレーション, 破壊的変更, アップグレード, 5.0, メジャーバージョン, 依存性注入"
+      "keywords": "InferDI, マイグレーション, 破壊的変更, アップグレード, 6.0, ReadyKeys, SyncReadyKeys, 依存性注入"
       "articleSection": "リファレンス"
       "isPartOf":
         "@type": "WebSite"
@@ -57,6 +57,34 @@ schema:
 # マイグレーション
 
 InferDI は破壊的変更をメジャーバージョンごとに記録しています。信頼できる情報源は引き続き [`packages/inferdi/MIGRATION.md`](https://github.com/inferdi/inferdi/blob/main/packages/inferdi/MIGRATION.md) ですが、現在のマイグレーションパスをここに要約します。
+
+## 6.0 へのマイグレーション
+
+### ジェネリック resolver では準備済みキーを使う
+
+`.get()` は、必要なスコープ入力が提供済みの同期キーを受け付けます。スコープ入力を持たない具体的なコンテナでは、同期キー集合は変わりません。`K extends keyof T` を使うジェネリック helper は準備状態と async 状態を保持する必要があります。
+
+```ts
+// 移行前
+function resolve<T extends DependenciesMap, K extends keyof T>(
+  container: Container<T>,
+  key: K
+) {
+  return container.get(key)
+}
+
+// 移行後
+function resolve<
+  T extends DependenciesMap,
+  K extends Container.SyncReadyKeys<Container<T>>
+>(container: Container<T>, key: K) {
+  return container.get(key)
+}
+```
+
+`getAsync()` を呼ぶジェネリック helper では `Container.ReadyKeys<Container<T>>` を使います。ジェネリックな `T extends DependenciesMap` は、宣言的 async エントリーや不足するスコープ入力によってブロックされたサービスを含む場合があります。
+
+新しいキー集合は [API サマリー](./api)、[スコープ入力とプロファイル](../core/scope-inputs)、[非同期依存グラフ](../core/async-dependency-graph)を参照してください。
 
 ## 5.0 へのマイグレーション
 

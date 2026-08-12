@@ -21,15 +21,15 @@ schema:
       "@id": "https://inferdi.com/ru/reference/migration#article"
       "headline": "Руководство по миграции InferDI"
       "name": "Миграция"
-      "description": "Breaking changes по major versions и текущий путь миграции на InferDI 5.0, повторяющий packages/inferdi/MIGRATION.md как источник истины."
+      "description": "Breaking changes по major versions и текущий путь миграции на InferDI 6.0, повторяющий packages/inferdi/MIGRATION.md как источник истины."
       "url": "https://inferdi.com/ru/reference/migration"
       "mainEntityOfPage": "https://inferdi.com/ru/reference/migration"
       "inLanguage": "ru-RU"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-31"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, миграция, breaking changes, обновление, 5.0, major version, внедрение зависимостей"
+      "keywords": "InferDI, миграция, breaking changes, обновление, 6.0, ReadyKeys, SyncReadyKeys, внедрение зависимостей"
       "articleSection": "Справочник"
       "isPartOf":
         "@type": "WebSite"
@@ -57,6 +57,34 @@ schema:
 # Миграция
 
 InferDI документирует breaking changes по major versions. Источник истины остаётся в [`packages/inferdi/MIGRATION.md`](https://github.com/inferdi/inferdi/blob/main/packages/inferdi/MIGRATION.md), а текущий путь миграции собран здесь.
+
+## Переход на 6.0
+
+### Generic resolver использует готовые ключи
+
+`.get()` теперь принимает готовые синхронные ключи, для которых предоставлены scope inputs. У конкретных контейнеров без scope inputs набор синхронных ключей не меняется. Generic helpers с `K extends keyof T` должны учитывать готовность и async status.
+
+```ts
+// До
+function resolve<T extends DependenciesMap, K extends keyof T>(
+  container: Container<T>,
+  key: K
+) {
+  return container.get(key)
+}
+
+// После
+function resolve<
+  T extends DependenciesMap,
+  K extends Container.SyncReadyKeys<Container<T>>
+>(container: Container<T>, key: K) {
+  return container.get(key)
+}
+```
+
+Для generic helper с `getAsync()` используйте `Container.ReadyKeys<Container<T>>`. Generic `T extends DependenciesMap` может содержать декларативные async-записи или сервисы, заблокированные недостающими scope inputs.
+
+Новые наборы ключей описаны в [Справочнике API](./api), [Данных и профилях скоупа](../core/scope-inputs) и [Асинхронном графе зависимостей](../core/async-dependency-graph).
 
 ## Переход на 5.0
 

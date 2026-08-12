@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ja/core/type-safety"
       "inLanguage": "ja-JP"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, 型安全性, TypeScript, 型推論, コンストラクターシグネチャ, コンパイル時, 依存性注入"
@@ -103,3 +103,23 @@ new Container()
 ```
 
 ランタイムの strict モードは、`as` キャスト、動的キー、キャプチャされた外側のコンテナ、依存関係の循環に対する多層防御として残ります。
+
+## 準備状態と async 状態
+
+グラフ型はスコープ入力の要件と宣言的 async 登録も記録します。入力が提供されるまでキーは `.get()` から除外され、`AsyncSpec` キーとそれに依存するクラスは `.getAsync()` で解決します。
+
+```ts
+const root = new Container()
+  .declareScopeInputs<{request: Request}>()
+  .registerAsyncFactory('db', openDatabase, [])
+  .registerClass('handler', Handler, ['request', 'db'], 'scoped')
+
+const scope = root.createScope({request})
+
+// @ts-expect-error: handler は async
+scope.get('handler')
+
+await scope.getAsync('handler')
+```
+
+準備状態は[スコープ入力とプロファイル](./scope-inputs)、Promise 契約の選択は[非同期依存グラフ](./async-dependency-graph)を参照してください。

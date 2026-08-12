@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ru/core/lifetime-guards"
       "inLanguage": "ru-RU"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-31"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, время жизни, singleton, scoped, transient, контроль времени жизни, захваченная зависимость, внедрение зависимостей"
@@ -77,6 +77,8 @@ new Container()
 ```
 
 Такую регистрацию отклонит TypeScript. В strict mode та же форма будет отклонена runtime-защитой, если каст обойдёт систему типов.
+
+Объявленные scope inputs считаются scoped-зависимостями. Регистрируйте потребителя request, auth context, tenant или job payload как `scoped` либо `transient`; singleton-потребителя компилятор отклонит до runtime. Подробнее: [Данные и профили скоупа](./scope-inputs).
 
 ## Строгий режим
 

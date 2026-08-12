@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/es/core/lazy-injection"
       "inLanguage": "es-ES"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-21"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, inyección perezosa, Lazy, resolución diferida, dependencia circular, singleton, inyección de dependencias"
@@ -102,4 +102,4 @@ Los consumidores con scope y transitorios pueden usar acompañantes perezosos pa
 
 ## Dependencias circulares
 
-InferDI detecta los ciclos síncronos, incluidas las dependencias asíncronas declarativas durante la fase previa, pero no los rompe automáticamente. `Lazy<singleton>` puede cortar una dependencia singleton síncrona; los registros asíncronos declarativos no tienen acompañante lazy. Los ciclos dinámicos creados tras un límite de Promise requieren una solución arquitectónica: divide la inicialización compartida, eleva uno de los lados o elimina el ciclo.
+InferDI detecta los ciclos síncronos, incluidas las dependencias asíncronas declarativas durante la fase previa, pero no los rompe automáticamente. `Lazy<singleton>` puede cortar una dependencia singleton síncrona; los registros asíncronos declarativos no tienen acompañante lazy. Los ciclos dinámicos creados tras un límite de Promise requieren una solución arquitectónica: divide la inicialización compartida, eleva uno de los lados o elimina el ciclo. Consulta [Grafo de dependencias asíncrono](./async-dependency-graph) para el límite async.

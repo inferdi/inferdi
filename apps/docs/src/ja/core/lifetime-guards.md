@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ja/core/lifetime-guards"
       "inLanguage": "ja-JP"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-31"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, ライフタイム, singleton, scoped, transient, ライフタイムガード, キャプティブ依存, 依存性注入"
@@ -77,6 +77,8 @@ new Container()
 ```
 
 この登録は TypeScript によって拒否されます。strict モードでは、キャストが型システムを回避した場合でも、同じ形がランタイムで拒否されます。
+
+宣言したスコープ入力は scoped 依存として扱われます。request、認証コンテキスト、tenant、job payload を読む利用者は `scoped` または `transient` で登録してください。singleton 利用者はコンパイル時に拒否されます。詳しくは[スコープ入力とプロファイル](./scope-inputs)を参照してください。
 
 ## strict モード
 

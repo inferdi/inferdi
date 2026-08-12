@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/core/lifetime-guards"
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-31"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, lifetimes, singleton, scoped, transient, lifetime guard, captive dependency, dependency injection"
@@ -77,6 +77,8 @@ new Container()
 ```
 
 That registration is rejected by TypeScript. In strict mode, the same shape is rejected at runtime if a cast bypasses the type system.
+
+Declared scope inputs count as scoped dependencies. Register a consumer that reads a request, auth context, tenant, or job payload as `scoped` or `transient`; the compiler rejects a singleton consumer before runtime. See [Scope Inputs and Profiles](./scope-inputs).
 
 ## Strict Mode
 

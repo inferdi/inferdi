@@ -1,6 +1,6 @@
 {
   "name": "@inferdi/express",
-  "version": "5.0.7",
+  "version": "6.0.0",
   "description": "Express request-scope middleware for InferDI.",
   "keywords": [
     "typescript",

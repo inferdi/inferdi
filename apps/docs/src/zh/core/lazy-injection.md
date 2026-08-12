@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/zh/core/lazy-injection"
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-21"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, 惰性注入, Lazy, 延迟解析, 循环依赖, 单例, 依赖注入"
@@ -102,4 +102,4 @@ new Container()
 
 ## 循环依赖
 
-InferDI 会检测同步循环，包括预检阶段的声明式异步依赖；它不会自动断环。`Lazy<singleton>` 可以断开同步的单例依赖，但声明式异步注册没有惰性伴随项。Promise 边界之后形成的动态循环需要从架构上解决：拆分共享初始化、提升其中一侧，或移除循环。
+InferDI 会检测同步循环，包括预检阶段的声明式异步依赖；它不会自动断环。`Lazy<singleton>` 可以断开同步的单例依赖，但声明式异步注册没有惰性伴随项。Promise 边界之后形成的动态循环需要从架构上解决：拆分共享初始化、提升其中一侧，或移除循环。异步边界详见[异步依赖图](./async-dependency-graph)。

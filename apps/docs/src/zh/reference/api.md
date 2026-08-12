@@ -21,18 +21,18 @@ schema:
       "@id": "https://inferdi.com/zh/reference/api#article"
       "headline": "InferDI 核心 API 概览"
       "name": "API 概览"
-      "description": "@inferdi/inferdi 核心 API 概览，包括 registerAsyncFactory、getAsync、AsyncSpec、作用域、覆盖和资源释放。"
+      "description": "@inferdi/inferdi v6 核心 API 概览，包括作用域输入、registerAsyncFactory、就绪状态解析、覆盖和资源释放。"
       "url": "https://inferdi.com/zh/reference/api"
       "mainEntityOfPage": "https://inferdi.com/zh/reference/api"
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-08-09"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "executableLibraryName": "@inferdi/inferdi"
       "programmingModel": "显式注册，流式构建器"
       "targetPlatform": "Node.js, Bun, Deno, Browser"
-      "keywords": "InferDI, API, Container, registerFactory, registerAsyncFactory, getAsync, AsyncSpec, 作用域, dispose"
+      "keywords": "InferDI, API, Container, declareScopeInputs, ScopeInputMap, registerAsyncFactory, getAsync, AsyncSpec, ReadyKeys, dispose"
       "articleSection": "参考"
       "isPartOf":
         "@type": "WebSite"
@@ -73,8 +73,10 @@ import {
   type AsyncSpec,
   type Module,
   type RegistrationKind,
+  type ScopeInputMap,
   type Spec,
   type SpecMap,
+  type WithRequirements
 } from '@inferdi/inferdi'
 ```
 
@@ -82,17 +84,19 @@ import {
 class Container<T extends DependenciesMap = Record<never, never>> {
   constructor(options?: ContainerOptions)
 
+  declareScopeInputs<Inputs>()
   registerClass(key, Ctor, deps, kind?, lazyKey?)
   registerFactory(key, factory, kind?, lazyKey?)
+  registerFactory(key, deps, factory, kind?, lazyKey?)
   registerAsyncFactory(key, factory, deps, kind?)
   registerValue(key, value)
   override(key, value)
   use(fn)
 
-  createScope()
-  get(key)
-  getAsync(key): Promise
-  has(key)
+  createScope(inputs?)
+  get(syncReadyKey)
+  getAsync(readyKey): Promise
+  has(key): key is keyof T
 
   get disposed(): boolean
   dispose(): Promise<void>
@@ -103,14 +107,13 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 
 ## 注册方法
 
-| 方法 | 用途 |
-| --- | --- |
-| `registerClass` | 注册一个构造函数及其依赖元组。 |
-| `registerFactory` | 注册自定义的构造逻辑。 |
-| `registerAsyncFactory` | 在声明式异步图中注册位置依赖。 |
-| `registerValue` | 注册一个由外部拥有的单例值。 |
-| `override` | 替换已有注册；若键已存在于本地缓存中则拒绝操作。 |
-| `use` | 应用一个模块构建器。 |
+| 方法 | 回调输入 | 图中类型 | 解析方法 |
+| --- | --- | --- | --- |
+| `registerClass` | `deps` 对应的构造函数参数 | `Spec` 或传播后的 `AsyncSpec` | `get` 或 `getAsync` |
+| `registerFactory(key, factory, ...)` | 按生命周期过滤的容器 | `Spec<ReturnType>` | `get` |
+| `registerFactory(key, deps, factory, ...)` | 仅含 `deps` 的 resolver | 带输入要求的 `Spec` | `get` |
+| `registerAsyncFactory` | 解析后的位置参数 | `AsyncSpec<Awaited<ReturnType>>` | `getAsync` |
+| `registerValue` | 无 | 外部所有的 singleton `Spec` | `get` |
 
 `registerClass` 和 `registerFactory` 接受 `singleton`、`scoped` 和 `transient` 三种生命周期，以及可选的 `lazyKey` 伴随项。`registerValue` 始终为单例，且由外部拥有。
 
@@ -118,7 +121,26 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 
 `registerAsyncFactory` 以及依赖元组可能选中异步键的 `registerClass` 调用都要求只读元组。InferDI 在注册时只分类一次异步位置，并保留该元组引用。内联字面量会推断为只读；仅同步的 `registerClass` 调用仍支持可变元组。
 
-`override` 的时机检查只查看当前容器的缓存。它能发现本地缓存的 singleton/scoped 值、`registerValue` 和重复覆盖，但不会记录 transient 解析，也不会记录通过子容器解析但由祖先容器拥有的值。请在解析依赖图之前应用覆盖。
+`registerAsyncFactory` 和带依赖的 `registerFactory` 使用不同的参数顺序和回调契约：
+
+```ts
+registerFactory(key, deps, resolverFactory, kind, lazyKey)
+registerAsyncFactory(key, valueFactory, deps, kind)
+```
+
+`override` 替换现有注册，`use` 应用模块构建器。`override` 的时机检查只查看当前容器的缓存。它能发现本地缓存的 singleton/scoped 值、`registerValue` 和重复覆盖，但不会记录 transient 解析，也不会记录通过子容器解析但由祖先容器拥有的值。请在解析依赖图之前应用覆盖。
+
+## 作用域输入与解析
+
+`declareScopeInputs<Inputs>()` 添加仅存在于类型中的 scoped 项。`createScope(inputs)` 提供缺少值的任意子集，并返回就绪键集合与必填属性对应的容器。输入值仍由应用所有。
+
+| API | 接受的键 |
+| --- | --- |
+| `get()` | 不含 `AsyncSpec` 的就绪键 |
+| `getAsync()` | 所有就绪的同步键和声明式异步键 |
+| `has()` | 任意 string 或 symbol；只证明注册存在 |
+
+`has()` 不能证明键已就绪或属于同步键。类型状态细化见[作用域输入与配置](../core/scope-inputs)，Promise 行为见[异步依赖图](../core/async-dependency-graph)。
 
 ## 命名空间类型
 
@@ -142,11 +164,17 @@ namespace Container {
 | `Container.UnwrappedValue<C, K>` | 查询单个已解包的服务类型。 |
 | `Container.Providers<C>` | 为测试创建一组 provider thunk 的映射。 |
 
+v6 的泛型 resolver 必须保留可接受的键集合。`get()` 使用 `Container.SyncReadyKeys<C>`，`getAsync()` 使用 `Container.ReadyKeys<C>`，不要使用不受约束的 `keyof T`。
+
 ## 公开类型
 
 ```ts
 type Lazy<T> = { readonly get: () => T }
 type RegistrationKind = 'singleton' | 'transient' | 'scoped'
+type DependenciesMap = Record<
+  string | symbol,
+  Spec<unknown, RegistrationKind>
+>
 
 interface ContainerOptions {
   readonly strict?: boolean
@@ -162,6 +190,11 @@ interface AsyncSpec<V, K extends RegistrationKind = 'singleton'>
   readonly async: true
 }
 
+interface LazySpec<V, TargetKind extends RegistrationKind>
+  extends Spec<Lazy<V>, 'transient'> {
+  readonly lazyOf: TargetKind
+}
+
 type SpecMap<M, K extends RegistrationKind = 'singleton'> = {
   [P in keyof M]: Spec<M[P], K>
 }
@@ -169,6 +202,8 @@ type SpecMap<M, K extends RegistrationKind = 'singleton'> = {
 type Module<TIn extends DependenciesMap, TOut extends DependenciesMap> =
   (c: Container<TIn>) => Container<TIn & TOut>
 ```
+
+`ScopeInputMap<M>` 把必填且有限的 string/symbol 属性映射为 scoped input 项。它会拒绝可选键、数字键、`__proto__`、宽泛索引签名以及键集合不同的联合类型。`WithRequirements<S, K>` 在具名模块输出上携带所需输入键。准确的条件类型定义以发布的 TypeScript 声明为准。
 
 ## 适配器 API 形态
 

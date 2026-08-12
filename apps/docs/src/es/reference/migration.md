@@ -21,15 +21,15 @@ schema:
       "@id": "https://inferdi.com/es/reference/migration#article"
       "headline": "Guía de migración de InferDI"
       "name": "Migración"
-      "description": "Cambios incompatibles por versión major y la ruta de migración actual a InferDI 5.0, reflejando packages/inferdi/MIGRATION.md como fuente de verdad."
+      "description": "Cambios incompatibles por versión major y la ruta de migración actual a InferDI 6.0, reflejando packages/inferdi/MIGRATION.md como fuente de verdad."
       "url": "https://inferdi.com/es/reference/migration"
       "mainEntityOfPage": "https://inferdi.com/es/reference/migration"
       "inLanguage": "es-ES"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-31"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, migración, cambios incompatibles, actualización, 5.0, versión major, inyección de dependencias"
+      "keywords": "InferDI, migración, cambios incompatibles, actualización, 6.0, ReadyKeys, SyncReadyKeys, inyección de dependencias"
       "articleSection": "Referencia"
       "isPartOf":
         "@type": "WebSite"
@@ -57,6 +57,34 @@ schema:
 # Migración
 
 InferDI registra los cambios incompatibles por versión major. La fuente de verdad sigue siendo [`packages/inferdi/MIGRATION.md`](https://github.com/inferdi/inferdi/blob/main/packages/inferdi/MIGRATION.md), pero aquí se resume la ruta de migración actual.
+
+## Migración a 6.0
+
+### Los resolvers genéricos usan claves listas
+
+`.get()` ahora acepta claves síncronas listas cuyos inputs de scope se hayan proporcionado. Los contenedores concretos sin inputs de scope mantienen el mismo conjunto de claves síncronas. Los helpers genéricos con `K extends keyof T` deben conservar la preparación y el estado async.
+
+```ts
+// Antes
+function resolve<T extends DependenciesMap, K extends keyof T>(
+  container: Container<T>,
+  key: K
+) {
+  return container.get(key)
+}
+
+// Después
+function resolve<
+  T extends DependenciesMap,
+  K extends Container.SyncReadyKeys<Container<T>>
+>(container: Container<T>, key: K) {
+  return container.get(key)
+}
+```
+
+Usa `Container.ReadyKeys<Container<T>>` en helpers genéricos que llamen a `getAsync()`. Un `T extends DependenciesMap` genérico puede contener entradas async declarativas o servicios bloqueados por inputs de scope ausentes.
+
+Los conjuntos de claves nuevos se describen en [Resumen de la API](./api), [Entradas y perfiles de scope](../core/scope-inputs) y [Grafo de dependencias asíncrono](../core/async-dependency-graph).
 
 ## Migración a 5.0
 

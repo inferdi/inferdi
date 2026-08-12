@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/zh/core/type-safety"
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, 类型安全, TypeScript, 类型推断, 构造函数签名, 编译期, 依赖注入"
@@ -103,3 +103,23 @@ new Container()
 ```
 
 运行时严格模式仍作为针对 `as` 类型转换、动态键、捕获的外层容器以及依赖循环的纵深防御手段。
+
+## 就绪状态与异步状态
+
+依赖图类型还会记录作用域输入要求和声明式异步注册。输入尚未提供时，对应键不会出现在 `.get()` 中。`AsyncSpec` 键及依赖它的类需要通过 `.getAsync()` 解析。
+
+```ts
+const root = new Container()
+  .declareScopeInputs<{request: Request}>()
+  .registerAsyncFactory('db', openDatabase, [])
+  .registerClass('handler', Handler, ['request', 'db'], 'scoped')
+
+const scope = root.createScope({request})
+
+// @ts-expect-error: handler 是异步项
+scope.get('handler')
+
+await scope.getAsync('handler')
+```
+
+使用[作用域输入与配置](./scope-inputs)建模就绪状态，使用[异步依赖图](./async-dependency-graph)选择 Promise 契约。

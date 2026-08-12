@@ -1,6 +1,6 @@
 {
   "name": "@inferdi/hono",
-  "version": "5.0.7",
+  "version": "6.0.0",
   "description": "Hono request-scope middleware for InferDI.",
   "keywords": [
     "typescript",

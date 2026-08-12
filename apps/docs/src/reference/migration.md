@@ -21,15 +21,15 @@ schema:
       "@id": "https://inferdi.com/reference/migration#article"
       "headline": "InferDI Migration guide"
       "name": "Migration"
-      "description": "Breaking changes by major version and the current migration path to InferDI 5.0, mirroring packages/inferdi/MIGRATION.md as the source of truth."
+      "description": "Breaking changes by major version and the current migration path to InferDI 6.0, mirroring packages/inferdi/MIGRATION.md as the source of truth."
       "url": "https://inferdi.com/reference/migration"
       "mainEntityOfPage": "https://inferdi.com/reference/migration"
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-31"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, migration, breaking changes, upgrade, 5.0, major version, dependency injection"
+      "keywords": "InferDI, migration, breaking changes, upgrade, 6.0, ReadyKeys, SyncReadyKeys, dependency injection"
       "articleSection": "Reference"
       "isPartOf":
         "@type": "WebSite"
@@ -57,6 +57,34 @@ schema:
 # Migration
 
 InferDI records breaking changes by major version. The source of truth remains [`packages/inferdi/MIGRATION.md`](https://github.com/inferdi/inferdi/blob/main/packages/inferdi/MIGRATION.md), but the current migration path is summarized here.
+
+## Migration to 6.0
+
+### Generic Resolver Helpers Use Ready Keys
+
+`.get()` now accepts ready synchronous keys whose scope-input requirements have been provided. Concrete containers without scope inputs keep the same synchronous key set. Generic helpers that use `K extends keyof T` must preserve readiness and async status.
+
+```ts
+// Before
+function resolve<T extends DependenciesMap, K extends keyof T>(
+  container: Container<T>,
+  key: K
+) {
+  return container.get(key)
+}
+
+// After
+function resolve<
+  T extends DependenciesMap,
+  K extends Container.SyncReadyKeys<Container<T>>
+>(container: Container<T>, key: K) {
+  return container.get(key)
+}
+```
+
+Use `Container.ReadyKeys<Container<T>>` in generic helpers that call `getAsync()`. A generic `T extends DependenciesMap` may contain declarative async entries or services blocked by missing scope inputs.
+
+The [API Summary](./api), [Scope Inputs and Profiles](../core/scope-inputs), and [Async Dependency Graph](../core/async-dependency-graph) describe the new key sets.
 
 ## Migration to 5.0
 

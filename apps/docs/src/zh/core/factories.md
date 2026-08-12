@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/zh/core/factories"
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-08-09"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, 工厂, registerFactory, registerAsyncFactory, getAsync, AsyncSpec, 依赖注入"
@@ -146,42 +146,18 @@ const promise = c.get('dbPromise') // Promise<Database>
 
 ## 声明式异步依赖图
 
-`registerAsyncFactory` 在 `AsyncSpec` 中保存最终服务类型，并接收按位置排列的依赖值。依赖异步键的 `registerClass` 注册会把异步状态继续传递到类图中。
+`registerAsyncFactory` 在 `AsyncSpec` 中保存最终服务类型，解析依赖元组，并把位置参数传给回调。类会继承声明依赖的异步状态。
 
 ```ts
-class Repository {
-  constructor(readonly db: Database) {}
-}
-
-const root = new Container()
-  .registerValue('config', {url: 'postgres://localhost/app'})
-  .declareScopeInputs<{request: RequestContext}>()
+const container = new Container()
+  .registerValue('config', {dsn: 'postgres://localhost/app'})
   .registerAsyncFactory(
     'db',
-    async (config) => connectDatabase(config.url),
+    (config: {dsn: string}) => connectDatabase(config.dsn),
     ['config']
   )
-  .registerAsyncFactory(
-    'session',
-    async (request) => loadSession(request),
-    ['request'],
-    'scoped'
-  )
-  .registerClass('repository', Repository, ['db'])
 
-const scope = root.createScope({request})
-const repository = await scope.getAsync('repository')
-
-// @ts-expect-error — 异步图键必须使用 getAsync()
-scope.get('repository')
+const db = await container.getAsync('db')
 ```
 
-`getAsync()` 接受已就绪的同步键和异步键，并返回 Promise。如果某个键或键联合可能包含 `AsyncSpec`，TypeScript 会拒绝 `get()`。`has()` 只证明注册存在；它不能证明键是同步键，也不会补充缺失的作用域输入。
-
-容器按元组顺序启动声明的依赖，只等待带有声明式异步标记的注册。单例和作用域注册各缓存一个原生 Promise。瞬态注册每次调用都会启动，并由调用方拥有。声明式循环和冷态生命周期违规会在同步预检阶段失败。
-
-异步回调不会收到容器。Promise 边界之后通过捕获容器发起的调用会形成动态图边，容器不分析这些边。InferDI 不提供异步 `Lazy<T>`、重试、取消或回滚。后续同级依赖在预检阶段失败时，已启动的初始化会保留原有缓存和所有权；异步瞬态可能继续执行，但没有可用的清理句柄。
-
-容器会在异步单例和作用域注册完成后继续缓存 Promise。请使用 `await using`、`await container.dispose()` 或 `Symbol.asyncDispose` 关闭容器。同步 `using` 会报告无法解包缓存的 Promise。
-
-向 `registerAsyncFactory` 传递只读依赖元组；当 `registerClass` 的元组可能选中异步键时也应如此。InferDI 会保留该元组，并只分类一次异步位置；内联字面量会自动推断为只读。
+两种 Promise 模型、类的异步状态传播、single-flight 缓存、失败语义和异步清理见[异步依赖图](./async-dependency-graph)。

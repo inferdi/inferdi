@@ -21,15 +21,15 @@ schema:
       "@id": "https://inferdi.com/zh/reference/migration#article"
       "headline": "InferDI 迁移指南"
       "name": "迁移"
-      "description": "按主版本划分的破坏性变更，以及迁移到 InferDI 5.0 的当前路径，以 packages/inferdi/MIGRATION.md 作为权威来源进行镜像。"
+      "description": "按主版本划分的破坏性变更，以及迁移到 InferDI 6.0 的当前路径，以 packages/inferdi/MIGRATION.md 作为权威来源进行镜像。"
       "url": "https://inferdi.com/zh/reference/migration"
       "mainEntityOfPage": "https://inferdi.com/zh/reference/migration"
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-31"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, 迁移, 破坏性变更, 升级, 5.0, 主版本, 依赖注入"
+      "keywords": "InferDI, 迁移, 破坏性变更, 升级, 6.0, ReadyKeys, SyncReadyKeys, 依赖注入"
       "articleSection": "参考"
       "isPartOf":
         "@type": "WebSite"
@@ -57,6 +57,34 @@ schema:
 # 迁移
 
 InferDI 按主版本记录破坏性变更。权威来源仍然是 [`packages/inferdi/MIGRATION.md`](https://github.com/inferdi/inferdi/blob/main/packages/inferdi/MIGRATION.md)，但当前的迁移路径在此处进行了汇总。
+
+## 迁移到 6.0
+
+### 泛型 resolver 使用就绪键
+
+`.get()` 现在只接受已提供作用域输入的就绪同步键。没有作用域输入的具体容器仍保留原来的同步键集合。使用 `K extends keyof T` 的泛型辅助函数需要保留就绪状态和异步状态。
+
+```ts
+// 迁移前
+function resolve<T extends DependenciesMap, K extends keyof T>(
+  container: Container<T>,
+  key: K
+) {
+  return container.get(key)
+}
+
+// 迁移后
+function resolve<
+  T extends DependenciesMap,
+  K extends Container.SyncReadyKeys<Container<T>>
+>(container: Container<T>, key: K) {
+  return container.get(key)
+}
+```
+
+调用 `getAsync()` 的泛型 helper 应使用 `Container.ReadyKeys<Container<T>>`。泛型 `T extends DependenciesMap` 可能包含声明式异步项，也可能包含因缺少作用域输入而不可用的服务。
+
+新的键集合见 [API 概览](./api)、[作用域输入与配置](../core/scope-inputs)和[异步依赖图](../core/async-dependency-graph)。
 
 ## 迁移到 5.0
 

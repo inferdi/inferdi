@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/ru/core/factories"
       "inLanguage": "ru-RU"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-08-09"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "keywords": "InferDI, фабрики, registerFactory, registerAsyncFactory, getAsync, AsyncSpec, внедрение зависимостей"
@@ -146,42 +146,18 @@ const promise = c.get('dbPromise') // Promise<Database>
 
 ## Декларативный асинхронный граф
 
-`registerAsyncFactory` хранит итоговый тип сервиса в `AsyncSpec` и получает позиционные значения зависимостей. `registerClass` распространяет async status по графу классов.
+`registerAsyncFactory` хранит итоговый тип сервиса в `AsyncSpec`, разрешает кортеж зависимостей и передаёт в callback позиционные значения. Классы наследуют async status от объявленных зависимостей.
 
 ```ts
-class Repository {
-  constructor(readonly db: Database) {}
-}
-
-const root = new Container()
-  .registerValue('config', {url: 'postgres://localhost/app'})
-  .declareScopeInputs<{request: RequestContext}>()
+const container = new Container()
+  .registerValue('config', {dsn: 'postgres://localhost/app'})
   .registerAsyncFactory(
     'db',
-    async (config) => connectDatabase(config.url),
+    (config: {dsn: string}) => connectDatabase(config.dsn),
     ['config']
   )
-  .registerAsyncFactory(
-    'session',
-    async (request) => loadSession(request),
-    ['request'],
-    'scoped'
-  )
-  .registerClass('repository', Repository, ['db'])
 
-const scope = root.createScope({request})
-const repository = await scope.getAsync('repository')
-
-// @ts-expect-error — ключи async-графа требуют getAsync()
-scope.get('repository')
+const db = await container.getAsync('db')
 ```
 
-`getAsync()` принимает готовые sync- и async-ключи и возвращает Promise. TypeScript отклоняет `get()`, если ключ или union ключей может содержать `AsyncSpec`. `has()` подтверждает только наличие регистрации: он не доказывает, что ключ синхронный, и не предоставляет недостающие scope inputs.
-
-Контейнер запускает объявленные зависимости по порядку кортежа и ожидает только помеченные async-регистрации. Singleton и scoped регистрации кешируют один native Promise. Transient запускается при каждом вызове и остаётся во владении вызывающего кода. Декларативные циклы и cold lifetime violations завершаются ошибкой во время синхронного preflight.
-
-Async callback не получает контейнер. Вызовы через захваченный контейнер после Promise boundary создают динамические рёбра, которые граф не анализирует. InferDI не добавляет async `Lazy<T>`, retry, cancellation или rollback. Если следующий sibling падает во время preflight, уже начатые инициализации сохраняют прежний cache и ownership; async transient может продолжить работу без teardown handle.
-
-Owned async singleton и scoped регистрации сохраняют Promise в кеше после выполнения. Закрывайте их контейнеры через `await using`, `await container.dispose()` или `Symbol.asyncDispose`. Синхронный `using` сообщает, что кешированный Promise нельзя развернуть.
-
-Передавайте readonly-кортежи зависимостей в `registerAsyncFactory` и в `registerClass`, если кортеж может выбрать async-ключ. InferDI сохраняет ссылку на кортеж и один раз классифицирует async-позиции; литералы автоматически выводятся как readonly.
+Две Promise-модели, распространение async status через классы, single-flight кеш, ошибки и async teardown описаны в разделе [Асинхронный граф зависимостей](./async-dependency-graph).

@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/zh/core/lifetime-guards"
       "inLanguage": "zh-CN"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-31"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, 生命周期, 单例, 作用域级, 瞬态, 生命周期守卫, 受困依赖, 依赖注入"
@@ -77,6 +77,8 @@ new Container()
 ```
 
 该注册会被 TypeScript 拒绝。在严格模式下，如果有类型转换绕过了类型系统，同样的形态在运行时也会被拒绝。
+
+声明的作用域输入属于 scoped 依赖。读取请求、认证上下文、租户或任务载荷的服务应注册为 `scoped` 或 `transient`；编译器会在运行前拒绝 singleton 消费方。参见[作用域输入与配置](./scope-inputs)。
 
 ## 严格模式
 

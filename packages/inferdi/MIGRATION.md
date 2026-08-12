@@ -5,37 +5,13 @@ For new features and fixes within a major line, see the release notes on the Git
 
 ## Table of Contents
 
+- [Migration to 6.0](#migration-to-60)
 - [Migration to 5.0](#migration-to-50)
 - [Migration to 4.0](#migration-to-40)
 - [Migration to 3.0](#migration-to-30)
 - [Migration to 2.0](#migration-to-20)
 
-## Migration to 5.0
-
-The initial v5 release was **adapter-only**. Its version bump kept the published
-packages in lockstep and harmonized the five framework adapters
-(`@inferdi/fastify`, `@inferdi/express`,
-`@inferdi/hono`, `@inferdi/koa`, `@inferdi/elysia`) onto one contract: the same
-option vocabulary (`createScope`, `setupScope`, `disposeScope`, `autoDispose`,
-`onDisposeError`), the same exported types (`MaybePromise`, `InferdiScope`,
-`InferdiRoot`, `InferdiScopeOf`), and one cleanup-ownership model — a disposal
-failure after the response is produced is observed/logged and never corrupts the
-response.
-
-### Core type corrections
-
-Later v5 builds tighten two type-level contracts that previously allowed the
-declared graph to differ from runtime behavior:
-
-- Explicit non-singleton type arguments now require the matching runtime
-  `kind`. Change
-  `registerFactory<'svc', Svc, 'scoped'>('svc', factory)` to
-  `registerFactory<'svc', Svc, 'scoped'>('svc', factory, 'scoped')`. The same
-  rule applies to `registerClass`. Omitting `kind` still infers `singleton`.
-- `Container.ResolveUnwrapped<C>` unwraps only managed `LazySpec` companion
-  entries created through `lazyKey`. An ordinary service that happens to expose
-  a zero-argument `.get()` method now remains that service type instead of being
-  structurally mistaken for `Lazy<T>`.
+## Migration to 6.0
 
 ### Generic resolver helpers use ready keys
 
@@ -63,6 +39,33 @@ function resolve<
   return container.get(key)
 }
 ```
+
+## Migration to 5.0
+
+The initial v5 release was **adapter-only**. Its version bump kept the published
+packages in lockstep and harmonized the five framework adapters
+(`@inferdi/fastify`, `@inferdi/express`,
+`@inferdi/hono`, `@inferdi/koa`, `@inferdi/elysia`) onto one contract: the same
+option vocabulary (`createScope`, `setupScope`, `disposeScope`, `autoDispose`,
+`onDisposeError`), the same exported types (`MaybePromise`, `InferdiScope`,
+`InferdiRoot`, `InferdiScopeOf`), and one cleanup-ownership model — a disposal
+failure after the response is produced is observed/logged and never corrupts the
+response.
+
+### Core type corrections
+
+Later v5 builds tighten two type-level contracts that previously allowed the
+declared graph to differ from runtime behavior:
+
+- Explicit non-singleton type arguments now require the matching runtime
+  `kind`. Change
+  `registerFactory<'svc', Svc, 'scoped'>('svc', factory)` to
+  `registerFactory<'svc', Svc, 'scoped'>('svc', factory, 'scoped')`. The same
+  rule applies to `registerClass`. Omitting `kind` still infers `singleton`.
+- `Container.ResolveUnwrapped<C>` unwraps only managed `LazySpec` companion
+  entries created through `lazyKey`. An ordinary service that happens to expose
+  a zero-argument `.get()` method now remains that service type instead of being
+  structurally mistaken for `Lazy<T>`.
 
 ### Scoped resolution requires a child scope
 

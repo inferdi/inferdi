@@ -21,18 +21,18 @@ schema:
       "@id": "https://inferdi.com/reference/api#article"
       "headline": "InferDI Core API Summary"
       "name": "API Summary"
-      "description": "A summary of the @inferdi/inferdi core API, including registerAsyncFactory, getAsync, AsyncSpec, scopes, overrides, and disposal."
+      "description": "A summary of the @inferdi/inferdi v6 core API, including scope inputs, registerAsyncFactory, readiness-aware resolution, overrides, and disposal."
       "url": "https://inferdi.com/reference/api"
       "mainEntityOfPage": "https://inferdi.com/reference/api"
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-08-09"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Intermediate"
       "executableLibraryName": "@inferdi/inferdi"
       "programmingModel": "Explicit registration, fluent builder"
       "targetPlatform": "Node.js, Bun, Deno, Browser"
-      "keywords": "InferDI, API, Container, registerFactory, registerAsyncFactory, getAsync, AsyncSpec, scope, dispose"
+      "keywords": "InferDI, API, Container, declareScopeInputs, ScopeInputMap, registerAsyncFactory, getAsync, AsyncSpec, ReadyKeys, dispose"
       "articleSection": "Reference"
       "isPartOf":
         "@type": "WebSite"
@@ -73,8 +73,10 @@ import {
   type AsyncSpec,
   type Module,
   type RegistrationKind,
+  type ScopeInputMap,
   type Spec,
   type SpecMap,
+  type WithRequirements
 } from '@inferdi/inferdi'
 ```
 
@@ -82,17 +84,19 @@ import {
 class Container<T extends DependenciesMap = Record<never, never>> {
   constructor(options?: ContainerOptions)
 
+  declareScopeInputs<Inputs>()
   registerClass(key, Ctor, deps, kind?, lazyKey?)
   registerFactory(key, factory, kind?, lazyKey?)
+  registerFactory(key, deps, factory, kind?, lazyKey?)
   registerAsyncFactory(key, factory, deps, kind?)
   registerValue(key, value)
   override(key, value)
   use(fn)
 
-  createScope()
-  get(key)
-  getAsync(key): Promise
-  has(key)
+  createScope(inputs?)
+  get(syncReadyKey)
+  getAsync(readyKey): Promise
+  has(key): key is keyof T
 
   get disposed(): boolean
   dispose(): Promise<void>
@@ -103,14 +107,13 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 
 ## Registration Methods
 
-| Method | Use |
-| --- | --- |
-| `registerClass` | Register a constructor and dependency tuple. |
-| `registerFactory` | Register custom construction logic. |
-| `registerAsyncFactory` | Register positional dependencies in the declarative async graph. |
-| `registerValue` | Register an externally owned singleton value. |
-| `override` | Replace an existing registration; rejects a key already cached locally. |
-| `use` | Apply a module builder. |
+| Method | Callback input | Stored graph type | Resolve with |
+| --- | --- | --- | --- |
+| `registerClass` | Constructor arguments from `deps` | `Spec` or propagated `AsyncSpec` | `get` or `getAsync` |
+| `registerFactory(key, factory, ...)` | Lifetime-filtered container | `Spec<ReturnType>` | `get` |
+| `registerFactory(key, deps, factory, ...)` | Resolver limited to `deps` | Requirement-aware `Spec` | `get` |
+| `registerAsyncFactory` | Resolved positional values | `AsyncSpec<Awaited<ReturnType>>` | `getAsync` |
+| `registerValue` | None | Externally owned singleton `Spec` | `get` |
 
 `registerClass` and `registerFactory` accept `singleton`, `scoped`, and `transient` lifetimes, plus an optional `lazyKey` companion. `registerValue` is always singleton and externally owned.
 
@@ -118,7 +121,26 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 
 `registerAsyncFactory` and any `registerClass` call whose tuple may select an async key require readonly dependencies. InferDI classifies async positions once and retains the tuple reference. Inline literals infer readonly tuples; sync-only `registerClass` calls keep mutable-tuple compatibility.
 
-The `override` timing guard checks only the current container's cache. It catches locally cached singleton/scoped values, `registerValue`, and repeated overrides, but it does not record transient resolutions or ancestor-owned values resolved through a child. Apply overrides before resolving the dependency graph.
+`registerAsyncFactory` and the deps-aware `registerFactory` use different argument orders and callback contracts:
+
+```ts
+registerFactory(key, deps, resolverFactory, kind, lazyKey)
+registerAsyncFactory(key, valueFactory, deps, kind)
+```
+
+`override` replaces an existing registration and `use` applies a module builder. The `override` timing guard checks only the current container's cache. It catches locally cached singleton/scoped values, `registerValue`, and repeated overrides, but it does not record transient resolutions or ancestor-owned values resolved through a child. Apply overrides before resolving the dependency graph.
+
+## Scope Inputs and Resolution
+
+`declareScopeInputs<Inputs>()` adds type-only scoped entries. `createScope(inputs)` supplies any subset of missing values and returns a container whose ready-key set reflects the provided required properties. Input values remain application-owned.
+
+| Surface | Accepted keys |
+| --- | --- |
+| `get()` | Ready keys without `AsyncSpec` |
+| `getAsync()` | All ready sync and declarative async keys |
+| `has()` | Any string or symbol; proves registration only |
+
+`has()` does not prove that a key is ready or synchronous. Read [Scope Inputs and Profiles](../core/scope-inputs) for type-state refinement and [Async Dependency Graph](../core/async-dependency-graph) for Promise behavior.
 
 ## Namespace Types
 
@@ -142,11 +164,17 @@ namespace Container {
 | `Container.UnwrappedValue<C, K>` | Look up one unwrapped service type. |
 | `Container.Providers<C>` | Create a map of provider thunks for tests. |
 
+Generic v6 resolvers must preserve the accepted key set. Use `Container.SyncReadyKeys<C>` with `get()` and `Container.ReadyKeys<C>` with `getAsync()` instead of unconstrained `keyof T`.
+
 ## Public Types
 
 ```ts
 type Lazy<T> = { readonly get: () => T }
 type RegistrationKind = 'singleton' | 'transient' | 'scoped'
+type DependenciesMap = Record<
+  string | symbol,
+  Spec<unknown, RegistrationKind>
+>
 
 interface ContainerOptions {
   readonly strict?: boolean
@@ -162,6 +190,11 @@ interface AsyncSpec<V, K extends RegistrationKind = 'singleton'>
   readonly async: true
 }
 
+interface LazySpec<V, TargetKind extends RegistrationKind>
+  extends Spec<Lazy<V>, 'transient'> {
+  readonly lazyOf: TargetKind
+}
+
 type SpecMap<M, K extends RegistrationKind = 'singleton'> = {
   [P in keyof M]: Spec<M[P], K>
 }
@@ -169,6 +202,8 @@ type SpecMap<M, K extends RegistrationKind = 'singleton'> = {
 type Module<TIn extends DependenciesMap, TOut extends DependenciesMap> =
   (c: Container<TIn>) => Container<TIn & TOut>
 ```
+
+`ScopeInputMap<M>` maps required finite string and symbol properties to scoped input entries. It rejects optional or numeric keys, `__proto__`, broad index signatures, and unions with different key sets. `WithRequirements<S, K>` carries required input keys on a named module output. Exact conditional definitions remain in the published TypeScript declarations.
 
 ## Adapter API Shapes
 

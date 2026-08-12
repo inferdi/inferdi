@@ -17,7 +17,7 @@ const enNav: DefaultTheme.NavItem[] = [
   { text: 'Guide', link: '/guide/quick-start' },
   { text: 'Performance', link: '/guide/performance' },
   { text: 'Adapters', link: '/adapters/' },
-  { text: '5.0.7', items: [
+  { text: '6.0.0', items: [
       { text: 'Migration', link: '/reference/migration' },
     ],
   },
@@ -27,7 +27,7 @@ const ruNav: DefaultTheme.NavItem[] = [
   { text: 'Руководство', link: '/ru/guide/quick-start' },
   { text: 'Производительность', link: '/ru/guide/performance' },
   { text: 'Адаптеры', link: '/ru/adapters/' },
-  { text: '5.0.7', items: [
+  { text: '6.0.0', items: [
       { text: 'Миграция', link: '/ru/reference/migration' },
     ],
   },
@@ -37,7 +37,7 @@ const zhNav: DefaultTheme.NavItem[] = [
   { text: '指南', link: '/zh/guide/quick-start' },
   { text: '性能', link: '/zh/guide/performance' },
   { text: '适配器', link: '/zh/adapters/' },
-  { text: '5.0.7', items: [
+  { text: '6.0.0', items: [
       { text: '迁移', link: '/zh/reference/migration' },
     ],
   },
@@ -47,7 +47,7 @@ const jaNav: DefaultTheme.NavItem[] = [
   { text: 'ガイド', link: '/ja/guide/quick-start' },
   { text: 'パフォーマンス', link: '/ja/guide/performance' },
   { text: 'アダプター', link: '/ja/adapters/' },
-  { text: '5.0.7', items: [
+  { text: '6.0.0', items: [
       { text: '移行', link: '/ja/reference/migration' },
     ],
   },
@@ -57,7 +57,7 @@ const esNav: DefaultTheme.NavItem[] = [
   { text: 'Guía', link: '/es/guide/quick-start' },
   { text: 'Rendimiento', link: '/es/guide/performance' },
   { text: 'Adaptadores', link: '/es/adapters/' },
-  { text: '5.0.7', items: [
+  { text: '6.0.0', items: [
       { text: 'Migración', link: '/es/reference/migration' },
     ],
   },
@@ -91,7 +91,9 @@ const enSidebar: DefaultTheme.Sidebar = [
       { text: 'Type Safety', link: '/core/type-safety' },
       { text: 'Lifetime Guards', link: '/core/lifetime-guards' },
       { text: 'Scopes and Teardown', link: '/core/scopes' },
+      { text: 'Scope Inputs and Profiles', link: '/core/scope-inputs' },
       { text: 'Factories', link: '/core/factories' },
+      { text: 'Async Dependency Graph', link: '/core/async-dependency-graph' },
       { text: 'Modules', link: '/core/modules' },
       { text: 'Lazy Injection', link: '/core/lazy-injection' },
       { text: 'Symbol Keys', link: '/core/symbol-keys' },
@@ -154,7 +156,9 @@ const ruSidebar: DefaultTheme.Sidebar = [
       { text: 'Типобезопасность', link: '/ru/core/type-safety' },
       { text: 'Контроль времени жизни', link: '/ru/core/lifetime-guards' },
       { text: 'Скоупы и очистка', link: '/ru/core/scopes' },
+      { text: 'Данные и профили скоупа', link: '/ru/core/scope-inputs' },
       { text: 'Фабрики', link: '/ru/core/factories' },
+      { text: 'Асинхронный граф зависимостей', link: '/ru/core/async-dependency-graph' },
       { text: 'Модули', link: '/ru/core/modules' },
       { text: 'Ленивое внедрение', link: '/ru/core/lazy-injection' },
       { text: 'Символьные ключи', link: '/ru/core/symbol-keys' },
@@ -217,7 +221,9 @@ const zhSidebar: DefaultTheme.Sidebar = [
       { text: '类型安全', link: '/zh/core/type-safety' },
       { text: '生命周期守卫', link: '/zh/core/lifetime-guards' },
       { text: '作用域与清理', link: '/zh/core/scopes' },
+      { text: '作用域输入与配置', link: '/zh/core/scope-inputs' },
       { text: '工厂', link: '/zh/core/factories' },
+      { text: '异步依赖图', link: '/zh/core/async-dependency-graph' },
       { text: '模块', link: '/zh/core/modules' },
       { text: '惰性注入', link: '/zh/core/lazy-injection' },
       { text: 'Symbol 键', link: '/zh/core/symbol-keys' },
@@ -280,7 +286,9 @@ const jaSidebar: DefaultTheme.Sidebar = [
       { text: '型安全性', link: '/ja/core/type-safety' },
       { text: 'ライフタイムガード', link: '/ja/core/lifetime-guards' },
       { text: 'スコープとクリーンアップ', link: '/ja/core/scopes' },
+      { text: 'スコープ入力とプロファイル', link: '/ja/core/scope-inputs' },
       { text: 'ファクトリー', link: '/ja/core/factories' },
+      { text: '非同期依存グラフ', link: '/ja/core/async-dependency-graph' },
       { text: 'モジュール', link: '/ja/core/modules' },
       { text: '遅延注入', link: '/ja/core/lazy-injection' },
       { text: 'Symbol キー', link: '/ja/core/symbol-keys' },
@@ -343,7 +351,9 @@ const esSidebar: DefaultTheme.Sidebar = [
       { text: 'Seguridad de tipos', link: '/es/core/type-safety' },
       { text: 'Guardas de tiempo de vida', link: '/es/core/lifetime-guards' },
       { text: 'Scopes y limpieza', link: '/es/core/scopes' },
+      { text: 'Entradas y perfiles de scope', link: '/es/core/scope-inputs' },
       { text: 'Factorías', link: '/es/core/factories' },
+      { text: 'Grafo de dependencias asíncrono', link: '/es/core/async-dependency-graph' },
       { text: 'Módulos', link: '/es/core/modules' },
       { text: 'Inyección perezosa', link: '/es/core/lazy-injection' },
       { text: 'Claves Symbol', link: '/es/core/symbol-keys' },

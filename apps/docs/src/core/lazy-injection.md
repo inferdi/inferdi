@@ -26,7 +26,7 @@ schema:
       "mainEntityOfPage": "https://inferdi.com/core/lazy-injection"
       "inLanguage": "en-US"
       "datePublished": "2026-06-12"
-      "dateModified": "2026-07-21"
+      "dateModified": "2026-08-11"
       "dependencies": "TypeScript >=5.2, Node.js >=16"
       "proficiencyLevel": "Expert"
       "keywords": "InferDI, lazy injection, Lazy, deferred resolution, circular dependency, singleton, dependency injection"
@@ -102,4 +102,4 @@ Scoped and transient consumers may use lazy companions for any lifetime because 
 
 ## Circular Dependencies
 
-InferDI detects synchronous cycles, including declarative async dependencies during preflight; it does not auto-break them. `Lazy<singleton>` can break a synchronous singleton edge, but declarative async registrations have no lazy companion. Dynamic cycles created after a Promise boundary require an architectural fix: split shared initialization, hoist one side, or remove the cycle.
+InferDI detects synchronous cycles, including declarative async dependencies during preflight; it does not auto-break them. `Lazy<singleton>` can break a synchronous singleton edge, but declarative async registrations have no lazy companion. Dynamic cycles created after a Promise boundary require an architectural fix: split shared initialization, hoist one side, or remove the cycle. See [Async Dependency Graph](./async-dependency-graph) for the async boundary.

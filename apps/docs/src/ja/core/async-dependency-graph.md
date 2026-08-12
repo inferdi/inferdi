@@ -1,0 +1,198 @@
+---
+schema:
+  "@context": "https://schema.org"
+  "@graph":
+    - "@type": "BreadcrumbList"
+      "@id": "https://inferdi.com/ja/core/async-dependency-graph#breadcrumb"
+      "itemListElement":
+        - "@type": "ListItem"
+          "position": 1
+          "name": "ホーム"
+          "item": "https://inferdi.com/ja/"
+        - "@type": "ListItem"
+          "position": 2
+          "name": "コアコンセプト"
+          "item": "https://inferdi.com/ja/core/type-safety"
+        - "@type": "ListItem"
+          "position": 3
+          "name": "非同期依存グラフ"
+          "item": "https://inferdi.com/ja/core/async-dependency-graph"
+    - "@type": "TechArticle"
+      "@id": "https://inferdi.com/ja/core/async-dependency-graph#article"
+      "headline": "InferDI の宣言的な非同期依存グラフ"
+      "name": "非同期依存グラフ"
+      "description": "registerAsyncFactory と getAsync を使い、single-flight キャッシュ、スコープ分離、明示的な破棄を備えた型安全な非同期依存グラフを構築します。"
+      "url": "https://inferdi.com/ja/core/async-dependency-graph"
+      "mainEntityOfPage": "https://inferdi.com/ja/core/async-dependency-graph"
+      "inLanguage": "ja-JP"
+      "datePublished": "2026-08-11"
+      "dateModified": "2026-08-11"
+      "dependencies": "TypeScript >=5.2, Node.js >=16"
+      "proficiencyLevel": "Intermediate"
+      "keywords": "InferDI, 非同期依存グラフ, registerAsyncFactory, getAsync, AsyncSpec, single-flight, TypeScript 依存性注入"
+      "articleSection": "コアコンセプト"
+      "isPartOf":
+        "@type": "WebSite"
+        "@id": "https://inferdi.com/#website"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "about":
+        "@type": "SoftwareApplication"
+        "name": "InferDI"
+        "applicationCategory": "DeveloperApplication"
+        "operatingSystem": "Node.js, Bun, Deno, Browser"
+      "author":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+      "publisher":
+        "@type": "Organization"
+        "name": "InferDI"
+        "url": "https://inferdi.com/"
+        "logo":
+          "@type": "ImageObject"
+          "url": "https://inferdi.com/logo.png"
+---
+
+# 非同期依存グラフ
+
+`registerAsyncFactory` は明示的な async エッジを記録します。グラフは最終的なサービス型を保持し、宣言された async 依存を待機して、依存するクラスへ async 状態を伝播します。
+
+## Promise モデルを選ぶ
+
+Promise はサービス自体を表す場合と、サービスの初期化境界を表す場合があります。InferDI はそれぞれに別の契約を用意しています。
+
+| API | グラフの値 | 注入される値 | 解決方法 |
+| --- | --- | --- | --- |
+| `registerFactory('dbPromise', () => connect())` | `Promise<Database>` | 同じ identity の Promise オブジェクト | `get()` |
+| `registerAsyncFactory('db', connect, [])` | `AsyncSpec` 内の `Database` | fulfilled `Database` | `getAsync()` |
+
+下流サービスが初期化済みの値を必要とする場合は `registerAsyncFactory` を使います。同期グラフに Promise 自体を置く場合だけ Promise-valued `registerFactory` を使ってください。
+
+## 非同期リクエストグラフを構築する
+
+次のグラフは root 用に database を 1 つ初期化し、認証済みスコープごとに session を 1 つ初期化します。宣言した依存に async 項目があれば、そのクラスも async になります。
+
+```ts
+interface AuthContext {
+  token: string
+}
+
+class Repository {
+  constructor(readonly db: Database) {}
+}
+
+class Dashboard {
+  constructor(
+    readonly repository: Repository,
+    readonly session: Session
+  ) {}
+}
+
+const root = new Container()
+  .registerValue('config', {dsn: 'postgres://localhost/app'})
+  .declareScopeInputs<{auth: AuthContext}>()
+  .registerAsyncFactory(
+    'db',
+    async (config: {dsn: string}) => connectDatabase(config.dsn),
+    ['config']
+  )
+  .registerAsyncFactory(
+    'session',
+    async (auth: AuthContext) => loadSession(auth.token),
+    ['auth'],
+    'scoped'
+  )
+  .registerClass('repository', Repository, ['db'])
+  .registerClass(
+    'dashboard',
+    Dashboard,
+    ['repository', 'session'],
+    'scoped'
+  )
+
+await using scope = root.createScope({auth})
+const dashboard = await scope.getAsync('dashboard')
+
+// @ts-expect-error: dashboard は非同期グラフに属する
+scope.get('dashboard')
+```
+
+root には `auth` 入力がないため、コンパイラは `root.getAsync('dashboard')` も拒否します。プロファイルの作成方法は[スコープ入力とプロファイル](./scope-inputs)を参照してください。
+
+## 解決とスケジューリング
+
+`getAsync()` は準備済みの sync キーと async キーを受け取り、Promise を返します。同期 lookup、cycle、lifetime、disposal のエラーは rejected Promise になります。
+
+InferDI は宣言した依存をタプル順に開始します。宣言的 async マーカーを持つ項目を待ってから、位置引数でファクトリーを呼び出します。互いに依存しない async 項目は同時に初期化できます。
+
+```ts
+const app = new Container()
+  .registerAsyncFactory('db', openDatabase, [])
+  .registerAsyncFactory('cache', openCache, [])
+  .registerAsyncFactory(
+    'service',
+    (db: Database, cache: Cache) => new Service(db, cache),
+    ['db', 'cache']
+  )
+```
+
+callback はコンテナではなく値を受け取ります。そのため、TypeScript とランタイム preflight の両方が async エッジを認識できます。
+
+`deps` が空でない場合は callback の各パラメーター型を注釈するか、既存のシグネチャを持つ関数を渡します。タプルはパラメーターの型と順序を検査しますが、contextual inference は提供しません。
+
+## ライフタイム別のキャッシュ
+
+| ライフタイム | 初期化 | 所有権 |
+| --- | --- | --- |
+| `singleton` | 所有コンテナ内の native Promise 1 つ | 所有コンテナ |
+| `scoped` | 解決するスコープごとに native Promise 1 つ | 解決するスコープ |
+| `transient` | 呼び出しごとに新しい初期化 | 呼び出し元 |
+
+並行する呼び出しは singleton と scoped の初期化を共有します。キャッシュされた rejected Promise は失敗状態のままで、InferDI は retry しません。再試行が必要なら、アプリケーションのライフサイクルに合わせて新しいスコープを開くか root を再構築します。
+
+`has()` は初期化を開始せずに登録だけを確認します。キーが同期であることは証明せず、不足しているスコープ入力も提供しません。
+
+## async リソースの破棄
+
+Singleton と scoped 登録は、fulfill 後も Promise をキャッシュに保持します。コンテナを非同期で破棄し、InferDI が初期化を待って解決済みリソースを検査できるようにします。
+
+```ts
+try {
+  const db = await root.getAsync('db')
+  await db.runMigrations()
+} finally {
+  await root.dispose()
+}
+```
+
+コンテナ所有の async リソースでは `await using`、`dispose()`、`Symbol.asyncDispose` を使えます。同期 `using` はキャッシュ済み Promise を展開できないため、誤用として報告します。
+
+## 従来の Promise 値
+
+`registerFactory` が返した Promise は同期サービス値のままです。その登録には `AsyncSpec` マーカーがないため、宣言的 async ファクトリーは同じ identity の Promise を受け取ります。
+
+```ts
+const legacy = new Container()
+  .registerFactory('dbPromise', () => connectDatabase())
+  .registerAsyncFactory(
+    'monitor',
+    (dbPromise: Promise<Database>) => new Monitor(dbPromise),
+    ['dbPromise']
+  )
+
+const promise = legacy.get('dbPromise')
+const monitor = await legacy.getAsync('monitor')
+```
+
+トップレベルの `getAsync('dbPromise')` は JavaScript の await セマンティクスに従い、`Database` へ解決されます。
+
+## 境界と失敗時の動作
+
+- `registerAsyncFactory` には readonly の依存タプルを渡します。async キーを選ぶ可能性がある `registerClass` でも readonly が必要です。InferDI は async 位置を一度だけ分類し、タプル参照を保持します。inline literal は readonly として推論されます。
+- 宣言的 cycle と cold lifetime 違反は同期 preflight 中に失敗します。Promise 境界の後で capture したコンテナを呼ぶと動的エッジになり、この分析の対象外です。
+- InferDI は async `Lazy<T>`、retry、cancellation、rollback を提供しません。cycle を分割するか、共有初期化を別サービスへ移してください。
+- 後の依存が preflight 中に失敗しても、先に始まった初期化はキャッシュと所有権の状態を維持します。開始済み async transient は teardown handle なしで動き続ける場合があります。
+- async 依存を持つクラスに同期 lazy companion は作れません。`registerAsyncFactory` に `lazyKey` パラメーターはありません。
+
+同期構築は[ファクトリー](./factories)、所有権モデルは[スコープとクリーンアップ](./scopes)を参照してください。
