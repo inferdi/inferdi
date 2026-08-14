@@ -1,59 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ja/reference/errors#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "ホーム"
-          "item": "https://inferdi.com/ja/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "リファレンス"
-          "item": "https://inferdi.com/ja/reference/api"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "エラー"
-          "item": "https://inferdi.com/ja/reference/errors"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ja/reference/errors#article"
-      "headline": "InferDI エラーリファレンス"
-      "name": "エラー"
-      "description": "グラフやライフサイクルの誤用に対して InferDI が明示的にスローするすべてのエラー（未知のキー、循環検出、ライフタイム違反、破棄済みコンテナ）と、そのメッセージ形式を解説します。登録ミスをテストで早期に検出できます。"
-      "url": "https://inferdi.com/ja/reference/errors"
-      "mainEntityOfPage": "https://inferdi.com/ja/reference/errors"
-      "inLanguage": "ja-JP"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-07-31"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, エラー, 例外, 未知のキー, 循環検出, ライフタイム違反, 破棄済みコンテナ, 依存性注入"
-      "articleSection": "リファレンス"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # エラー
 
 InferDI は、依存グラフやライフサイクルの誤用に対して明示的なエラーをスローします。登録ミスを早期に失敗させるため、これらのメッセージをテストで可視のまま保ちましょう。
@@ -69,8 +13,13 @@ InferDI は、依存グラフやライフサイクルの誤用に対して明示
 | シングルトンのライフタイム違反 | `Singleton "x" cannot depend on scoped "y"...` |
 | 同期的な循環 | `Circular dependency detected: a -> b -> a...` |
 | 非同期リソースに対する同期破棄 | `Sync [Symbol.dispose] called on a resource whose .dispose() returned a Promise...` |
+| キャッシュ済み async 初期化に対する同期破棄 | `Sync [Symbol.dispose] called on a container that cached a Promise from an async factory...` |
 | 遅延したオーバーライド | `Cannot override "k" because it has already been resolved...` |
 | 破棄されたコンテナでのオーバーライド | `Cannot override on a disposed container (key: "k")` |
+
+同期破棄は誤用を報告する前に、キャッシュ済みのネイティブ Promise の rejection を監視します。後から reject しても `unhandledRejection` にはなりませんが、同期処理ではリソースを待機したり閉じたりできません。カスタム Promise-like 値の `.then()` は呼び出しません。
+
+非同期破棄では、失敗した依存とその依存先が同じ `Error` オブジェクトで reject する場合があります。InferDI はそのオブジェクトを一度だけ報告します。異なるオブジェクトは、メッセージが同じでも別々の `AggregateError` cause として残ります。
 
 ## 非同期ファクトリーの循環
 

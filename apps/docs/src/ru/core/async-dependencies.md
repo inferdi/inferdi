@@ -1,60 +1,4 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ru/core/async-dependency-graph#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Главная"
-          "item": "https://inferdi.com/ru/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Базовые принципы"
-          "item": "https://inferdi.com/ru/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Асинхронный граф зависимостей"
-          "item": "https://inferdi.com/ru/core/async-dependency-graph"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ru/core/async-dependency-graph#article"
-      "headline": "Декларативные асинхронные графы зависимостей в InferDI"
-      "name": "Асинхронный граф зависимостей"
-      "description": "Создавайте типизированные асинхронные графы через registerAsyncFactory и getAsync с single-flight кешем, изоляцией скоупов и явной очисткой."
-      "url": "https://inferdi.com/ru/core/async-dependency-graph"
-      "mainEntityOfPage": "https://inferdi.com/ru/core/async-dependency-graph"
-      "inLanguage": "ru-RU"
-      "datePublished": "2026-08-11"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, асинхронный граф зависимостей, registerAsyncFactory, getAsync, AsyncSpec, single-flight, внедрение зависимостей TypeScript"
-      "articleSection": "Базовые принципы"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
-# Асинхронный граф зависимостей
+# Асинхронные зависимости
 
 `registerAsyncFactory` записывает явное async-ребро. В графе хранится итоговый тип сервиса, InferDI ожидает объявленные async-зависимости и распространяет async-статус на зависимые классы.
 
@@ -74,7 +18,7 @@ InferDI поддерживает два контракта: Promise может �
 `lazyKey` создаёт `AsyncLazy<T>`. Получение wrapper остаётся синхронным и не
 распространяет async status на его потребителя.
 
-## Async-граф запроса
+## Регистрация async-фабрик
 
 В этом графе один database создаётся для root, а отдельная session — для каждого авторизованного скоупа. Класс получает async-статус, если хотя бы одна объявленная зависимость асинхронна.
 
@@ -119,13 +63,13 @@ const root = new Container()
 await using scope = root.createScope({auth})
 const dashboard = await scope.getAsync('dashboard')
 
-// @ts-expect-error: dashboard входит в async-граф
+// @ts-expect-error: dashboard belongs to the async graph
 scope.get('dashboard')
 ```
 
-Компилятор также отклонит `root.getAsync('dashboard')`: в root нет входного значения `auth`. Создание профилей разобрано в разделе [Данные и профили скоупа](./scope-inputs).
+Компилятор также отклонит `root.getAsync('dashboard')`: в root нет входного значения `auth`. Создание профилей разобрано в разделе [Входные данные скоупа](./scope-inputs).
 
-## Разрешение и запуск
+## Resolve и распространение async-статуса
 
 `getAsync()` принимает готовые sync- и async-ключи и возвращает Promise. Синхронная ошибка lookup, cycle, lifetime или disposal превращается в rejected Promise.
 
@@ -146,7 +90,7 @@ Callback получает значения, а не контейнер. Благ
 
 При непустом `deps` укажите тип каждого параметра callback или передайте функцию с готовой сигнатурой. Кортеж проверяет типы и порядок параметров, но не даёт им contextual inference.
 
-## Кеширование по времени жизни
+## Запуск и кеширование
 
 | Время жизни | Инициализация | Владение |
 | --- | --- | --- |
@@ -158,7 +102,24 @@ Callback получает значения, а не контейнер. Благ
 
 `has()` проверяет регистрацию, не запуская инициализацию. Метод не доказывает, что ключ синхронный, и не предоставляет отсутствующие scope inputs.
 
-## Очистка async-ресурсов
+## AsyncLazy companions
+
+Передайте пятый аргумент `lazyKey`, чтобы отложить декларативную async-цель:
+
+```ts
+const root = new Container()
+  .registerAsyncFactory('db', openDatabase, [], undefined, 'dbLazy')
+
+const dbLazy = root.get('dbLazy') // AsyncLazy<Database>
+const first = dbLazy.get()
+const second = dbLazy.get()
+
+first === second // true for this singleton target
+```
+
+Создание wrapper остаётся синхронным, поэтому класс с `AsyncLazy<T>` не получает async-статус от этой зависимости. Wrapper захватывает разрешающий контейнер: scoped-цели остаются внутри его скоупа, а transient-цель запускается при каждом вызове и принадлежит вызывающему коду.
+
+## Освобождение ресурсов и ошибки
 
 Singleton- и scoped-регистрации сохраняют Promise в кеше после выполнения. Освобождайте их контейнер асинхронно: InferDI дождётся инициализации и проверит уже разрешённый ресурс.
 
@@ -172,6 +133,12 @@ try {
 ```
 
 Owned async-ресурсы поддерживают `await using`, `dispose()` и `Symbol.asyncDispose`. Синхронный `using` не может развернуть закешированный Promise и сообщает об ошибочном использовании.
+
+Перед выбросом этой ошибки sync dispose добавляет обработчик rejection к закешированному нативному Promise, поэтому поздний отказ не попадает в `unhandledRejection`. Promise не ожидается, а пользовательский thenable не ассимилируется.
+
+Rejected singleton- или scoped-инициализация остаётся в кеше. InferDI не повторяет её автоматически. Если поздняя зависимость падает во время preflight, уже начатые инициализации сохраняют своё состояние и владельца.
+
+Ошибка зависимости может пройти через несколько закешированных Promise инициализации. Async dispose сообщает один объект `Error` один раз; разные объекты остаются разными причинами `AggregateError`, в том числе при одинаковом тексте сообщений.
 
 ## Legacy Promise-значения
 
@@ -192,7 +159,7 @@ const monitor = await legacy.getAsync('monitor')
 
 На верхнем уровне `getAsync('dbPromise')` следует обычной JavaScript await-семантике и разрешается в `Database`.
 
-## Границы и ошибки
+## Динамические границы
 
 - Передавайте readonly-кортежи в `registerAsyncFactory` и в `registerClass`, если кортеж может выбрать async-ключ. InferDI один раз определяет async-позиции и сохраняет ссылку на кортеж. Для inline-литерала TypeScript выводит readonly-тип.
 - Декларативные циклы и холодные lifetime-нарушения завершаются на синхронном preflight. Вызовы через захваченный контейнер после Promise boundary создают динамические рёбра вне этого анализа.
@@ -201,4 +168,4 @@ const monitor = await legacy.getAsync('monitor')
 - Async-класс с `lazyKey` получает `AsyncLazy<Class>`, а mixed sync/async class — `Lazy<Class> | AsyncLazy<Class>`.
 - Динамический цикл через `AsyncLazy.get()` после Promise boundary может ждать собственный cached pending Promise без runtime-ошибки.
 
-Синхронное создание описано в разделе [Фабрики](./factories), а модель владения — в [Скоупах и очистке](./scopes).
+Синхронное создание описано в разделе [Фабрики](./factories), а модель владения — в [Скоупах и освобождении ресурсов](./scopes).

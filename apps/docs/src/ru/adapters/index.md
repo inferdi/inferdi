@@ -1,55 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ru/adapters/#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Главная"
-          "item": "https://inferdi.com/ru/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Адаптеры"
-          "item": "https://inferdi.com/ru/adapters/"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ru/adapters/#article"
-      "headline": "Адаптеры фреймворков InferDI — обзор"
-      "name": "Адаптеры фреймворков"
-      "description": "Каждый адаптер InferDI создаёт scope запроса, публикует его через нативный объект фреймворка и освобождает в безопасной точке жизненного цикла."
-      "url": "https://inferdi.com/ru/adapters/"
-      "mainEntityOfPage": "https://inferdi.com/ru/adapters/"
-      "inLanguage": "ru-RU"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript, @inferdi/inferdi, Fastify, Hono, Koa, Express, Elysia"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, адаптеры, scope запроса, Fastify, Hono, Koa, Express, Elysia, middleware, dependency injection"
-      "articleSection": "Адаптеры"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Адаптеры фреймворков
 
 Каждый адаптер создаёт ровно один scope на запрос, кладёт его в нативное для фреймворка место и освобождает в безопасной точке жизненного цикла. При этом сохраняется конкретный тип контейнера, которым владеет приложение: `request.di` остаётся полностью типизированным, а не `any` и не базовым контейнером.
@@ -72,7 +20,7 @@ schema:
 
 1. **Создать** - создаёт scope из корневого контейнера (`createScope`, по умолчанию `root.createScope()`) в начале запроса.
 2. **Выставить** - кладёт его в нативное место фреймворка (`request.di`, `ctx.state.di`, `c.var.di` или ключ контекста Elysia) *до* setup, чтобы и ошибка setup, и ваши cleanup-хуки видели один и тот же слот.
-3. **Настроить** - `setupScope` наполняет scope данными запроса: идентификатор запроса, авторизованный пользователь, IP клиента. Может быть асинхронным.
+3. **Настроить** — `setupScope` выполняет дополнительную инициализацию до запуска обработчиков. Может быть асинхронным.
 4. **Обработать** - обработчики маршрутов и ошибок фреймворка резолвят сервисы из выставленного scope.
 5. **Очистить** - освобождает scope в безопасной точке завершения жизненного цикла (`disposeScope`, по умолчанию `scope.dispose()`), если владение не было передано приложению.
 
@@ -81,8 +29,8 @@ schema:
 | Опция | По умолчанию | Назначение |
 | --- | --- | --- |
 | `container` | обязательна | Корневой контейнер, доступный приложению. Адаптеры его не очищают, кроме opt-in `disposeRootOnClose` у Fastify. |
-| `createScope` | `root.createScope()` | Создание scope на запрос. Может быть асинхронным. |
-| `setupScope` | нет | Наполнение scope до обработчиков. Может быть асинхронным. |
+| `createScope` | `root.createScope()` | Создаёт scope запроса. Объявленные данные запроса передавайте здесь. Может быть асинхронным. |
+| `setupScope` | нет | Выполняет дополнительную инициализацию до обработчиков. Может быть асинхронным. |
 | `disposeScope` | `scope.dispose()` | Пользовательская очистка. Синхронная или асинхронная. |
 | `autoDispose` | `true` | `false` или предикат, вернувший `false`, передаёт dispose вашему коду. |
 | `onDisposeError` | приёмник адаптера | Принимает ошибки очистки scope запроса: Fastify `request.log.error`, Koa `ctx.app.emit('error')`, остальные `console.error`. |

@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vitepress dev",
-    "build": "vitepress build",
+    "check": "node scripts/check-docs.mjs",
+    "check:seo": "node scripts/check-seo.mjs",
+    "build": "pnpm run check && vitepress build && pnpm run check:seo",
     "view": "vitepress preview --port 4173 --strictPort",
     "preview": "vitepress preview --port 4173 --strictPort",
     "stop": "node scripts/stop-preview.mjs"

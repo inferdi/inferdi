@@ -9,9 +9,9 @@ Every adapter in `examples/` imports its registrations from here, so the per-fra
 - **`registerValue('config', readConfig())`** — static config loaded once at boot.
 - **`registerFactory('db', async (c) => …)`** — an async factory whose `Promise` is cached, awaited on every consumer, and unwrapped on dispose so `Symbol.asyncDispose` runs on the resolved pool.
 - **LIFO `Symbol.asyncDispose`** — `Database` implements it, so `await scope.dispose()` waits for the pool to close in reverse-creation order.
-- **`Lazy<Clock>` companion key** — a `transient` Clock injected into a singleton `AuditService`. Passing the bare `'clock'` key would be a **compile error**; `'clockLazy'` is the sanctioned escape. See the commented `@ts-expect-error` block at the bottom of `container.ts`.
+- **`Lazy<Clock>` companion key** — a singleton target resolved only when `AuditService` first needs it. Lazy injection preserves the target lifetime; it cannot make a scoped or transient dependency safe for a singleton.
 - **`Module<TIn, TOut>` + `.use(coreModule)`** — a reusable registration unit with documented inputs and outputs.
-- **`createScope()` + hydrate `scope.get('request')`** — the recommended request-scoped pattern. `RequestContext` is registered as `scoped`, so the framework adapter writes request data into the scoped instance. The helper is async so it can dispose the scope if hydration fails after resources have been opened.
+- **`declareScopeInputs()` + `createScope({ request })`** — request data enters the graph at the lifecycle boundary. The returned scope type records that the input is ready.
 - **`Container.Providers<typeof builder>`** (in `mocks.ts` example below) — a typed shape for mock-factory fixtures in tests.
 
 ## Why one shared file

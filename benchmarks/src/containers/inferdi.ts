@@ -8,7 +8,7 @@ import {
 import type { Resolver } from './types.js'
 
 function configureRoot() {
-  return new Container({strict: false})
+  return new Container({fast: true})
     // Logger is registered as singleton + a lazy companion 'lazyLogger' (Lazy<Logger>)
     .registerClass('logger', Logger, [], 'singleton', 'lazyLogger')
     .registerClass('config', Config, [], 'singleton')

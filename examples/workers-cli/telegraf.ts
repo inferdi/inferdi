@@ -19,7 +19,7 @@ const withContainer: MiddlewareFn<BotContext> = async (ctx, next) => {
    * shared services (Logger, AuditService) get the same fields they would
    * see in HTTP request context
    */
-  await using scope = await createRequestScope(root, {
+  await using scope = createRequestScope(root, {
     requestId: String(ctx.update.update_id),
     userId: ctx.from?.id !== undefined ? String(ctx.from.id) : undefined
   })

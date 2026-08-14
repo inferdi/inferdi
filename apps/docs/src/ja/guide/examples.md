@@ -1,66 +1,6 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ja/guide/examples#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "ホーム"
-          "item": "https://inferdi.com/ja/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "ガイド"
-          "item": "https://inferdi.com/ja/guide/quick-start"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "例"
-          "item": "https://inferdi.com/ja/guide/examples"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ja/guide/examples#article"
-      "headline": "InferDI の例 — フレームワークとランタイムのパターン"
-      "name": "例"
-      "description": "バックエンド、API レイヤー、フルスタックフレームワーク、ランタイム、フロントエンド、ワーカーにわたる InferDI のリファレンス例の一覧。各グループは、ルートを構築する場所、リクエストスコープを作成する場所、それを破棄する場所を示します。"
-      "url": "https://inferdi.com/ja/guide/examples"
-      "mainEntityOfPage": "https://inferdi.com/ja/guide/examples"
-      "inLanguage": "ja-JP"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, 例, パターン, 依存性注入, リクエストスコープ, フレームワーク, ランタイム"
-      "articleSection": "ガイド"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # 例
 
-リポジトリは例を GitHub 限定の参照スニペットとして保持しています。ルートパッケージはそれらのフレームワーク依存をインストールせず、`examples/` ディレクトリの型チェックも行わず、npm にも公開しません。
-
-該当するパターンをアプリケーションにコピーし、そこでフレームワークの依存をインストールしてください。
-
-以下の各グループは [`examples/`](https://github.com/inferdi/inferdi/tree/main/examples) 内の 1 つのディレクトリに対応しています。グループのページを開くと、そのグループ内の例を 1 ページで比較できます。
+アプリケーションが所有するライフサイクル境界を選び、そのエコシステムでスコープを作成、公開、破棄する方法を比較してください。各グループは [`examples/`](https://github.com/inferdi/inferdi/tree/main/examples) のディレクトリに対応します。
 
 ## ここから始める
 
@@ -81,3 +21,7 @@ schema:
 サーバーサイドの例では、アプリケーションのグラフとして `examples/_shared/container.ts` を使用します。グループのページはライフサイクルの所有に焦点を当てています。すなわち、スコープがどこで作成され、どこで公開され、どこで破棄されるかです。
 
 サーバーサイドとワーカーの例では、フレームワーク／プラットフォームのライフサイクルフックを比較してください。フロントエンドの例では、マウントとアンマウントの境界を比較してください。
+
+::: info 参照スニペット
+ルート workspace はすべてのフレームワーク依存をインストールせず、`examples/` の型チェックも行いません。必要なパターンをアプリケーションへコピーし、依存パッケージを追加して、共有グラフを自身の型に合わせてください。
+:::

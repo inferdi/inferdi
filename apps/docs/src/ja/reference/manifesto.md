@@ -1,57 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ja/reference/manifesto#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "ホーム"
-          "item": "https://inferdi.com/ja/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "リファレンス"
-          "item": "https://inferdi.com/ja/reference/api"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "InferDI コアアーキテクチャ宣言"
-          "item": "https://inferdi.com/ja/reference/manifesto"
-    - "@type": "Article"
-      "@id": "https://inferdi.com/ja/reference/manifesto#article"
-      "headline": "InferDI コアアーキテクチャ宣言"
-      "name": "InferDI コアアーキテクチャ宣言"
-      "description": "InferDI を支えるアーキテクチャ宣言。コンパイラが静的に検証できるものはすべて静的に検証すべきであり、ランタイムオーバーヘッドゼロ、依存ゼロ、デコレーターゼロを掲げ、それに伴う意識的なトレードオフを示します。"
-      "url": "https://inferdi.com/ja/reference/manifesto"
-      "mainEntityOfPage": "https://inferdi.com/ja/reference/manifesto"
-      "inLanguage": "ja-JP"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "keywords": "InferDI, 宣言, アーキテクチャ, 設計原則, 型安全性, ゼロオーバーヘッド, 依存ゼロ, 依存性注入"
-      "articleSection": "リファレンス"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # InferDI コアアーキテクチャ宣言
 
 この文書は `packages/inferdi` 内の `@inferdi/inferdi` を規定します。公開 API、型システム、`get()` の解決パス、登録の形、スコープのセマンティクス、クリーンアップの動作に触れる PR をレビューする前に、本書を読んでください。
@@ -77,8 +23,8 @@ InferDI は、TypeScript の DI が静的な保証を手放すことなくラン
 すべての公開シグネチャは、TypeScript がそのルールを表現できる場所で、無効なグラフ状態を表現不可能にしなければなりません。
 
 - `register*` は `K & ([K] extends [keyof T] ? never : unknown)` を使い、重複キーがコンパイル時に失敗し、問題のキーがエラー内に可視のまま残るようにします。
-- `DepsOf<AllowedDeps<T, Kind>, A>` は、`deps` タプルをコンストラクターのパラメーターと位置および構造的代入可能性によって照合します。
-- `AllowedDeps<T, Kind>` は、ファクトリーへ渡されるコンテナを絞り込みます。シングルトンファクトリーの内部では、`c.get('scoped')` は型エラーです。
+- `DepsOf<AllowedDeps<T, L>, A>` は、`deps` タプルをコンストラクターのパラメーターと位置および構造的代入可能性によって照合します。
+- `AllowedDeps<T, L>` は、ファクトリーへ渡されるコンテナを絞り込みます。シングルトンファクトリーの内部では、`c.get('scoped')` は型エラーです。
 - `Spec`、`AsyncSpec`、`LazySpec`、`SpecMap`、`Module`、`Container.Resolve`、`Container.ResolveUnwrapped`、`Container.UnwrappedValue`、`Container.Providers` は契約の一部です。これらへの変更は公開 API の変更として扱ってください。
 - 新規または変更された公開型のインターフェースには、`packages/inferdi/__tests__/container.test-d.ts` における肯定的な型テストと、否定的な `// @ts-expect-error` テストが必要です。
 
@@ -96,9 +42,9 @@ InferDI は ES2022 をターゲットとする素の TypeScript です。デコ�
 
 ### 2.3 ライフタイムは型である
 
-コアには 3 つの登録の種類があります。`singleton`、`scoped`、`transient` です。各登録は、そのライフタイムを `Spec<V, Kind>` を通じて運びます。
+コアには 3 つの登録の種類があります。`singleton`、`scoped`、`transient` です。各登録は、そのライフタイムを `Spec<V, L>` を通じて運びます。
 
-- シングルトンは、スコープドまたはトランジェントのサービスに直接依存してはなりません。`AllowedDeps<T, Kind>` はこれをコンパイル時に強制し、`strict: true` はキャストと動的登録に対してこれをランタイムで強制します。
+- シングルトンは、スコープドまたはトランジェントのサービスに直接依存してはなりません。`AllowedDeps<T, L>` はこれをコンパイル時に強制し、デフォルトの `{fast: false}` はキャストと動的登録に対してこれをランタイムで強制します。
 - `Lazy<V>` はターゲットのライフタイムを保持します。シングルトンの消費者は `LazySpec<V, 'singleton'>` のみを注入できます。`Lazy<scoped>` と `Lazy<transient>` はスコープドおよびトランジェントの消費者には引き続き合法であり、シングルトンの消費者には引き続き不正です。
 - ランタイムの `Registration.lazy` フラグは、ターゲットの種類が `'singleton'` である遅延コンパニオンに対してのみ `true` でなければなりません。
 - ランタイムの `Registration.owned` フラグは、生成値をコンテナが所有するクラスまたはファクトリー登録だけで `true` になります。`registerValue`、`.override()`、遅延コンパニオンでは `false` です。
@@ -123,7 +69,7 @@ if (cached !== undefined) return ...
 - コンストラクターの呼び出しは、0〜7 個の引数に対してアリティ展開のままです。8 個以上のパスは、`push` で構築されたパック配列を伴う `Reflect.construct` を使います。
 - `get()` は同期のままです。共有の `resolving` 配列と `singletonStack` が安全なのは、1 回の解決と宣言的な非同期依存のプリフライトがコールスタック上でアトミックに実行されるためです。`getAsync()` は同じリゾルバーの外側に Promise 境界を追加するだけで、continuation からこれらのスタックを変更しません。
 - 宣言的な非同期登録は、同期登録と同じ `regs`、`cache`、スコープ参照、所有権、破棄処理を使います。`Registration.async` は登録時の依存分類にだけ使うコールドメタデータであり、`get()` は読み取りません。
-- `strict: false` は、ローカルキャッシュの高速パス後にランタイムの循環チェックとライフタイムチェックを取り除けます。fast scope は不変のルートレジストリを直接参照し、委譲された singleton をローカルキャッシュへ反映できます。fast ツリーは最初の解決または scope 作成後に不変となります。
+- `{fast: false}` はデフォルトの checked mutable 契約です。`{fast: true}` はローカルキャッシュの高速パス後に循環とライフタイムのチェックを取り除き、registry owner を直接参照し、委譲された singleton をキャッシュへ反映します。fast ツリーは最初の解決または scope 作成後に不変です。
 
 `packages/inferdi/__tests__/container.bench.ts` は CI で強制されません。`get()`、登録オブジェクトの形、キャッシュの表現、スコープの参照、遅延コンパニオン、コンストラクターの呼び出しへの変更については、レビュアーがベンチマーク出力を要求しなければなりません。関連するシナリオで 5% を超えるローカルのリグレッションは、PR が範囲を限定した書面による正当化を含まない限り、マージを阻止します。
 
@@ -206,7 +152,7 @@ if (cached !== undefined) return ...
 | Promise 境界後の動的な循環検出なし | 宣言的な非同期依存は同期プリフライトを通り、既存の循環ガードを使います。Promise を返す旧来のファクトリーやキャプチャ済みコンテナから `await` 後に行う呼び出しは、解決スタックが消えた後に実行されます。その循環を分割するか、共有初期化を引き上げてください。 |
 | 非同期境界後のランタイムライフタイム検出なし | `AllowedDeps` は無効な型付きファクトリーを防ぎますが、`await` 後の `as` キャストやキャプチャした外部コンテナは `singletonStack` のクリア後に実行されます。完全な防御には非同期コンテキスト追跡が必要です。依存関係は同期部分で読み取ってください。 |
 | 自動の循環断ち切りなし | 一方が明示的な遅延シングルトンコンパニオンでない限り、循環はアーキテクチャ上の欠陥です。InferDI はサポートされるランタイムの循環を検出して報告します。proxy や部分的なインスタンスを作り出すことはありません。 |
-| ジェネリックな `<T>(c: Container<T>) => ...` モジュールなし | ジェネリック本体の内部では、`keyof T` が `DependenciesMap` の上限に潰れます。インラインの `.use()` ラムダ、または既知の入力の形を持つ `Module<TIn, TOut>` を使ってください。 |
+| ジェネリックな `<T>(c: Container<T>) => ...` モジュールなし | ジェネリック本体の内部では、`keyof T` が `DependenciesMap` の上限に潰れます。インラインの `.use()` ラムダ、または requirements を宣言する `Module<TRequirements, TProvides>` を使ってください。 |
 | 動的 DI リゾルバー API なし | `.has(key)` が認可された動的プローブです。静的キーは `.get()` を直接使うべきです。 |
 | 本番のオーバーライド機構なし | `.override()` はテストとホットリロードのフィクスチャのために存在します。本番のグラフ選択は `.use()` または通常のビルダーコードに属します。 |
 | 親から子への連鎖的破棄なし | 各コンテナは自身のインスタンスを所有します。連鎖的破棄は `dispose()` を非ローカルな副作用にし、スコープの所有権を壊してしまいます。 |

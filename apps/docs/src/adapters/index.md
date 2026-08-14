@@ -1,55 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/adapters/#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Home"
-          "item": "https://inferdi.com/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Adapters"
-          "item": "https://inferdi.com/adapters/"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/adapters/#article"
-      "headline": "InferDI Framework Adapters: overview"
-      "name": "Framework Adapters"
-      "description": "Each InferDI adapter creates one request scope, exposes it through the framework's request object, and disposes it at the framework's safe completion point."
-      "url": "https://inferdi.com/adapters/"
-      "mainEntityOfPage": "https://inferdi.com/adapters/"
-      "inLanguage": "en-US"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-07-21"
-      "dependencies": "TypeScript, @inferdi/inferdi, Fastify, Hono, Koa, Express, Elysia"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, adapters, request scope, Fastify, Hono, Koa, Express, Elysia, middleware, dependency injection"
-      "articleSection": "Adapters"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Framework Adapters
 
 Each adapter creates one request scope, exposes it at the framework-native location, and disposes it at the framework's safe completion point. Your application keeps its concrete container type, so `request.di` remains fully typed.
@@ -72,7 +20,7 @@ In scoped mode every adapter runs the same steps for each request:
 
 1. **Create** the scope from the root container (`createScope`, default `root.createScope()`) when the request begins.
 2. **Expose** it at the framework-native location (`request.di`, `ctx.state.di`, `c.var.di`, or the Elysia context key) *before* setup runs, so a setup failure and your cleanup hooks all observe the same slot.
-3. **Set up** the scope with `setupScope` to hydrate request-derived state — request id, authenticated user, client IP. It may be async.
+3. **Set up** the scope with `setupScope` when additional initialization is needed before handlers run. It may be async.
 4. **Handle** the request: route handlers and the framework's error handlers resolve services from the exposed scope.
 5. **Dispose** the scope at the framework's safe completion point (`disposeScope`, default `scope.dispose()`), unless ownership was transferred.
 
@@ -81,8 +29,8 @@ In scoped mode every adapter runs the same steps for each request:
 | Option | Default | Purpose |
 | --- | --- | --- |
 | `container` | required | Root container exposed to the app. Adapters never dispose it (except Fastify's opt-in `disposeRootOnClose`). |
-| `createScope` | `root.createScope()` | Build the per-request scope. May be async. |
-| `setupScope` | none | Hydrate the scope before handlers run. May be async. |
+| `createScope` | `root.createScope()` | Build the per-request scope. Pass declared request inputs here. May be async. |
+| `setupScope` | none | Run additional initialization before handlers. May be async. |
 | `disposeScope` | `scope.dispose()` | Custom teardown. May be sync or async. |
 | `autoDispose` | `true` | `false`, or a predicate returning `false`, hands disposal to your code. |
 | `onDisposeError` | per-adapter sink | Receives request-scope disposal failures: Fastify `request.log.error`, Koa `ctx.app.emit('error')`, others `console.error`. |

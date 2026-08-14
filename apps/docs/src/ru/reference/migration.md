@@ -1,71 +1,22 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ru/reference/migration#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Главная"
-          "item": "https://inferdi.com/ru/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Справочник"
-          "item": "https://inferdi.com/ru/reference/api"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Миграция"
-          "item": "https://inferdi.com/ru/reference/migration"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ru/reference/migration#article"
-      "headline": "Руководство по миграции InferDI"
-      "name": "Миграция"
-      "description": "Breaking changes по major versions и текущий путь миграции на InferDI 6.0, повторяющий packages/inferdi/MIGRATION.md как источник истины."
-      "url": "https://inferdi.com/ru/reference/migration"
-      "mainEntityOfPage": "https://inferdi.com/ru/reference/migration"
-      "inLanguage": "ru-RU"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, миграция, breaking changes, обновление, 6.0, ReadyKeys, SyncReadyKeys, внедрение зависимостей"
-      "articleSection": "Справочник"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Миграция
 
 InferDI документирует breaking changes по major versions. Источник истины остаётся в [`packages/inferdi/MIGRATION.md`](https://github.com/inferdi/inferdi/blob/main/packages/inferdi/MIGRATION.md), а текущий путь миграции собран здесь.
 
 ## Переход на 6.0
 
+- Замените `RegistrationKind` на `Lifetime`, а `Spec.kind` на `Spec.lifetime`; deprecated alias не оставлен.
+- Перенесите deps у sync-фабрик: `registerFactory(key, deps, factory, ...)` → `registerFactory(key, factory, deps, ...)`. Companion требует явный lifetime, включая `'singleton'`.
+- Замените прежнюю опцию отключения runtime-проверок на `{fast: true}`. Prerelease-опция `mode` удалена. По умолчанию `fast: false`: runtime-проверки включены, а граф остаётся mutable; `fast: true` выбирает unchecked fixed contract.
+- Именованный `Module<TRequirements, TProvides>` принимает actual graph с дополнительными регистрациями, сохраняет их, точно проверяет requirements и запрещает collisions outputs. `new Container(parent)` больше не public; используйте `createScope()`.
+- Регистрация теперь отклоняет любой тип ключа, который может пересечься с существующим основным или lazy-ключом. Сузьте broad- или union-ключ до нового значения либо используйте `.override()` для намеренной замены.
+- Async teardown сообщает общий объект rejection один раз, если ошибка зависимости прошла через несколько закешированных Promise. Sync teardown наблюдает rejection нативного Promise до выброса ошибки об async-использовании.
+
 ### Generic resolver использует готовые ключи
 
 `.get()` теперь принимает готовые синхронные ключи, для которых предоставлены scope inputs. У конкретных контейнеров без scope inputs набор синхронных ключей не меняется. Generic helpers с `K extends keyof T` должны учитывать готовность и async status.
 
 ```ts
-// До
+// Before
 function resolve<T extends DependenciesMap, K extends keyof T>(
   container: Container<T>,
   key: K
@@ -73,7 +24,7 @@ function resolve<T extends DependenciesMap, K extends keyof T>(
   return container.get(key)
 }
 
-// После
+// After
 function resolve<
   T extends DependenciesMap,
   K extends Container.SyncReadyKeys<Container<T>>
@@ -88,7 +39,7 @@ function resolve<
 
 `LazySpec` теперь содержит private type-only mode brand; v6 также добавляет
 `AsyncLazySpec`. В явных `Container` и `Module` shapes используйте эти
-именованные exports вместо структурного `{type, kind, lazyOf}`. Runtime-поля у
+именованные exports вместо структурного `{type, lifetime, lazyOf}`. Runtime-поля у
 brand нет.
 
 Пятый `lazyKey` у `registerAsyncFactory` создаёт `AsyncLazy<T>`. Async-класс
@@ -97,11 +48,11 @@ brand нет.
 `Lazy<Promise<T>>`. `Container.ResolveUnwrapped` distributive-разворачивает все
 управляемые варианты.
 
-Новые наборы ключей описаны в [Справочнике API](./api), [Данных и профилях скоупа](../core/scope-inputs) и [Асинхронном графе зависимостей](../core/async-dependency-graph).
+Новые наборы ключей описаны в [Справочнике API](./api), [Входных данных скоупа](../core/scope-inputs) и [Асинхронных зависимостях](../core/async-dependencies).
 
 ## Переход на 5.0
 
-Первый релиз v5 затрагивал только адаптеры. Повышение версии нужно, чтобы все опубликованные пакеты остались в синхронных версиях, а адаптеры фреймворков использовали общий контракт очистки. Более поздние сборки v5 также закрепляют владение через дочерний scope и ужесточают описанный ниже контракт Fast Mode.
+Первый релиз v5 затрагивал только адаптеры. Повышение версии нужно, чтобы все опубликованные пакеты остались в синхронных версиях, а адаптеры фреймворков использовали общий контракт очистки. Более поздние сборки v5 также закрепляют владение через дочерний scope и ужесточают описанный ниже контракт `{fast: true}`.
 
 Общие контракты адаптеров:
 
@@ -114,11 +65,11 @@ brand нет.
 
 ### Scoped-разрешение требует дочерний scope
 
-При `strict: true` (по умолчанию) resolve scoped-ключа из root теперь выбрасывает `Scoped "key" cannot be resolved from the root container. Use createScope().` Создайте дочерний контейнер через `const scope = root.createScope()`, вызовите `scope.get(scopedKey)` и освободите scope на его границе жизненного цикла. Fast Mode отключает эту runtime-проверку, но scoped-сервисы всё равно следует получать из дочерних scope.
+При `{fast: false}` (по умолчанию) resolve scoped-ключа из root теперь выбрасывает `Scoped "key" cannot be resolved from the root container. Use createScope().` Создайте дочерний контейнер через `const scope = root.createScope()`, вызовите `scope.get(scopedKey)` и освободите scope на его границе жизненного цикла. `{fast: true}` отключает эту runtime-проверку, но scoped-сервисы всё равно следует получать из дочерних scope.
 
-### Контракт неизменяемого графа Fast Mode
+### Контракт фиксированного графа `fast: true`
 
-`new Container({ strict: false })` теперь читает неизменяемый root registry
+`new Container({fast: true})` читает неизменяемый root registry
 напрямую из scope, избегает прохода по родителям, а delegated singleton
 зеркалирует в cache scope. Strict scope при каждом локальном промахе проходит
 точную цепочку родителей вместо хранения снимков lookup, поэтому мутации видны
@@ -127,7 +78,7 @@ brand нет.
 один раз в одной линейной fluent-цепочке, завершите регистрацию до первого
 resolve или создания scope, не меняйте активированное дерево и закрывайте
 дочерние scope раньше предков. Для hot reload и любого дерева, которое меняется
-после активации, используйте `strict: true`.
+после активации, используйте `{fast: false}`.
 
 ### Заметки по адаптерам
 
@@ -157,7 +108,7 @@ v4 ужесточает семантику времени жизни `Lazy<T>`. 
 .registerClass('req', RequestContext, [], 'scoped', 'reqLazy')
 .registerClass('app', AppService, ['reqLazy'], 'singleton')
 
-// v4: делаем потребителя scoped
+// v4: make the consumer scoped
 .registerClass('req', RequestContext, [], 'scoped', 'reqLazy')
 .registerClass('app', AppService, ['reqLazy'], 'scoped')
 ```
@@ -176,7 +127,7 @@ type Deps = SpecMap<{ clock: Clock }> & {
 
 ## Переход на 3.0
 
-v3 переносит безопасность времени жизни в систему типов. Runtime behavior остаётся совместимым, а runtime-защита в strict mode остаётся вторым рубежом.
+v3 переносит безопасность времени жизни в систему типов. Runtime behavior остаётся совместимым, а default runtime-защита остаётся вторым рубежом.
 
 Главные изменения:
 
@@ -185,7 +136,7 @@ v3 переносит безопасность времени жизни в си
 - `registerFactory` сужает параметр `c` для singleton-фабрик.
 - `registerClass` фильтрует `deps` для singleton-регистраций.
 - `override(key, value)` сохраняет исходный вид времени жизни.
-- `new Container({ strict: false })` может отключить runtime-проверки циклов и времени жизни после аудита графа.
+- `new Container({fast: true})` может отключить runtime-проверки циклов и времени жизни после аудита графа.
 
 Типовые исправления:
 
@@ -257,7 +208,7 @@ v2 также добавил string- и symbol-ключи во все метод
 1. Прочитать заметки о миграции для всех major-версий, через которые проходите.
 2. Обновить [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) и все установленные адаптеры вместе.
 3. Запустить type tests или `tsc --noEmit`, чтобы поймать изменения формы графа.
-4. Запустить runtime tests в strict mode.
+4. Запустить runtime tests с default checked contract.
 5. Проверить владение scope запроса, если используются `skipInferdiDispose`, `autoDispose: false` или пользовательский `disposeScope`.
 
 ## Стабильные границы

@@ -1,59 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ru/adapters/elysia#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Главная"
-          "item": "https://inferdi.com/ru/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Адаптеры"
-          "item": "https://inferdi.com/ru/adapters/"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Адаптер Elysia"
-          "item": "https://inferdi.com/ru/adapters/elysia"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ru/adapters/elysia#article"
-      "headline": "Адаптер InferDI для Elysia — @inferdi/elysia"
-      "name": "Адаптер Elysia"
-      "description": "@inferdi/elysia — это плагин для Elysia v1: в режиме со scope он создаёт один scope запроса, выставляет его в контекст Elysia, оставляет доступным для обработчиков ошибок и очищает из onAfterResponse — с режимом без scope запроса для приложений на Bun."
-      "url": "https://inferdi.com/ru/adapters/elysia"
-      "mainEntityOfPage": "https://inferdi.com/ru/adapters/elysia"
-      "inLanguage": "ru-RU"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript, Elysia v1, @inferdi/inferdi"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, Elysia, Elysia v1, плагин, Bun, scoped derive, onAfterResponse, без scope запроса, внедрение зависимостей"
-      "articleSection": "Адаптеры"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "@inferdi/elysia"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js >=20, Bun"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Адаптер Elysia
 
 [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) - это плагин для Elysia v1. В режиме со scope он создаёт один scope запроса, выставляет его в контекст Elysia, оставляет доступным для пользовательских обработчиков ошибок и очищает из `onAfterResponse`.
@@ -77,11 +21,12 @@ const root = buildRootContainer()
 const app = new Elysia()
   .use(inferdiElysia({
     container: root,
-    setupScope: (scope, { request }) => {
-      const ctx = scope.get('request')
-      ctx.requestId = crypto.randomUUID()
-      ctx.userId = request.headers.get('x-user-id') ?? undefined
-    },
+    createScope: (_root, { request }) => root.createScope({
+      request: {
+        requestId: crypto.randomUUID(),
+        userId: request.headers.get('x-user-id') ?? undefined
+      }
+    })
   }))
   .get('/users/:id', ({ di, params }) =>
     di.get('users').profile(params.id),
@@ -92,7 +37,16 @@ const app = new Elysia()
 
 ```ts
 const app = new Elysia()
-  .use(inferdiElysia({ container: root, key: 'container' }))
+  .use(inferdiElysia({
+    container: root,
+    key: 'container',
+    createScope: (_root, { request }) => root.createScope({
+      request: {
+        requestId: crypto.randomUUID(),
+        userId: request.headers.get('x-user-id') ?? undefined
+      }
+    })
+  }))
   .get('/users/:id', ({ container, params }) =>
     container.get('users').profile(params.id),
   )
@@ -108,8 +62,8 @@ Routes должны регистрироваться после `.use(inferdiEly
 | `key` | `'di'` | Ключ контекста Elysia. |
 | `scopePerRequest` | `true` | `false` для режима без scope запроса. |
 | `createScope` | `root.createScope()` | Пользовательское создание scope запроса. |
-| `setupScope` | нет | Наполняет scope до validation и обработчиков маршрутов. |
-| `setupValidatedScope` | нет | Наполняет scope после validation Elysia. |
+| `setupScope` | нет | Выполняет дополнительную инициализацию после создания scope. |
+| `setupValidatedScope` | нет | Выполняет дополнительную инициализацию после validation Elysia. |
 | `disposeScope` | `scope.dispose()` | Пользовательская очистка. |
 | `autoDispose` | `true` | `false` или предикат `false` передаёт владение. |
 | `onDisposeError` | `console.error` | Приёмник ошибок очистки. |

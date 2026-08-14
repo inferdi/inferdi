@@ -1,120 +1,82 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/core/factories#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Home"
-          "item": "https://inferdi.com/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Core Concepts"
-          "item": "https://inferdi.com/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Factories"
-          "item": "https://inferdi.com/core/factories"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/core/factories#article"
-      "headline": "Factories in InferDI — registerFactory"
-      "name": "Factories"
-      "description": "Use registerFactory for custom synchronous construction and registerAsyncFactory for a declarative async dependency graph."
-      "url": "https://inferdi.com/core/factories"
-      "mainEntityOfPage": "https://inferdi.com/core/factories"
-      "inLanguage": "en-US"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, factories, registerFactory, registerAsyncFactory, getAsync, AsyncSpec, dependency injection"
-      "articleSection": "Core Concepts"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Factories
 
-Use `registerFactory` when construction needs more than `new Ctor(...deps)`: reading multiple values, adapting third-party clients, creating configuration objects, or returning a promise.
+Use `registerClass` when construction is exactly `new Ctor(...deps)`. Use `registerFactory` when construction needs configuration, a third-party API, an interface binding, or other explicit logic.
 
 ```ts
 const container = new Container()
-  .registerValue('config', { dsn: 'postgres://localhost/app', poolSize: 10 })
-  .registerFactory('pgPool', (c) => {
+  .registerValue('config', {
+    dsn: 'postgres://localhost/app',
+    poolSize: 10
+  })
+  .registerFactory('pool', (c) => {
     const { dsn, poolSize } = c.get('config')
     return new Pool({ connectionString: dsn, max: poolSize })
   })
-  .registerClass('users', UserRepo, ['pgPool'])
+  .registerClass('users', UserRepository, ['pool'])
 ```
 
-The factory return value becomes the key's resolved type.
+The return type becomes the registered service type.
 
-## Hot Transient Graphs
+## Container-aware Factories
 
-`registerClass` is the default for transient services. Keep it unless profiling identifies construction as a meaningful part of a hot path.
-
-V8 can slow a narrow pattern: one graph repeatedly resolves many different transient classes that have the same dependency count. Register only those measured services with factories when the application artifact confirms the hotspot:
+The basic callback receives a lifetime-filtered container. A singleton factory can resolve only singleton-safe dependencies; scoped and transient keys are rejected by TypeScript.
 
 ```ts
-const container = new Container()
-  .registerClass('context', RequestContext, [], 'scoped')
-  .registerClass('schema', Schema, [])
+const root = new Container()
+  .registerValue('prefix', 'app')
+  .registerFactory('logger', (c) => new Logger(c.get('prefix')))
+```
+
+Use this form when the factory needs conditional or multi-step resolution. Keep all `.get()` calls synchronous. For an initialization boundary that should propagate through the graph, use `registerAsyncFactory` instead.
+
+## Declared Factory Dependencies
+
+The deps-aware overload makes factory requirements visible in the graph and limits the callback resolver to those keys:
+
+```ts
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('logger', Logger, [])
   .registerFactory(
-    'parseRequest',
-    (c) => new ParseRequest(c.get('context'), c.get('schema')),
-    'transient',
+    'requestLog',
+    (deps) => new RequestLog(
+      deps.get('request'),
+      deps.get('logger')
+    ),
+    ['request', 'logger'],
+    'scoped'
   )
 ```
 
-Each factory should contain its own `new Service(...)` call. Do not route several services through one generic construction helper if this optimization matters. Factories repeat dependency wiring, so use them for measured hotspots rather than converting every transient registration.
+Declared dependencies carry scope-input readiness and lifetime requirements through modules and other registrations. Unlike `registerAsyncFactory`, this callback receives a resolver, not positional values.
 
 ## Factory Lifetimes
 
-Factories use the same lifetime model as classes:
+Factories use the same lifetimes as classes:
 
 ```ts
 const root = new Container()
   .registerFactory('cache', () => new Cache(), 'singleton')
-  .registerFactory('request', () => new RequestState(), 'scoped')
+  .registerFactory('requestState', () => new RequestState(), 'scoped')
+  .registerFactory('operation', () => new Operation(), 'transient')
 ```
 
-Inside a singleton factory, the `c` parameter is narrowed to singleton-safe dependencies. Scoped and transient keys do not autocomplete and are rejected by TypeScript.
+Singleton and scoped results are cached and owned by their container. Transient results are not cached or disposed by InferDI.
 
-Pass an optional fourth `lazyKey` to register a lifetime-preserving `Lazy<V>` companion, exactly as with `registerClass`:
+Pass a fourth `lazyKey` to create a lifetime-preserving companion:
 
 ```ts
 const root = new Container()
   .registerFactory('cache', () => new Cache(), 'singleton', 'cacheLazy')
 
-root.get('cacheLazy').get() // Cache
+root.get('cacheLazy').get()
 ```
 
-When using the default singleton lifetime, pass `undefined` before the companion key: `registerFactory('cache', factory, undefined, 'cacheLazy')`.
+A companion requires an explicit lifetime, including `'singleton'`. See [Lazy Injection](./lazy-injection) for lifetime and disposal rules.
 
-## Binding Interfaces
+## Bind Interfaces
 
-TypeScript interfaces are erased during compilation and have no runtime value to pass as a constructor. Bind an interface to its implementation through an explicit factory type instead:
+Interfaces have no runtime constructor. Give the factory an explicit service type when consumers should depend on an abstraction:
 
 ```ts
 interface Mailer {
@@ -126,58 +88,16 @@ class SendGridMailer implements Mailer {
 }
 
 const container = new Container()
-  .registerFactory<'mailer', Mailer>('mailer', () => new SendGridMailer())
-```
-
-Consumers of `'mailer'` see the `Mailer` abstraction, not the concrete class.
-
-## Promise-valued sync factories
-
-`registerFactory` treats a returned Promise as the service value. The key remains synchronous, `get()` returns that Promise, and another factory receives it by identity.
-
-```ts
-const c = new Container()
-  .registerFactory('dbPromise', () => connectDatabase())
-
-const promise = c.get('dbPromise') // Promise<Database>
-```
-
-This legacy form supports single-flight caching. A cycle created after `await` through captured container calls falls outside the synchronous cycle and lifetime guards.
-
-Adding a companion does not change this model:
-
-```ts
-const c = new Container()
-  .registerFactory('dbPromise', () => connectDatabase(), undefined, 'dbLazy')
-
-c.get('dbLazy') // Lazy<Promise<Database>>
-```
-
-## Declarative async graphs
-
-`registerAsyncFactory` stores the final service type in `AsyncSpec`, resolves its dependency tuple, and passes positional values to the callback. Classes inherit async status from declared dependencies.
-
-```ts
-const container = new Container()
-  .registerValue('config', {dsn: 'postgres://localhost/app'})
-  .registerAsyncFactory(
-    'db',
-    (config: {dsn: string}) => connectDatabase(config.dsn),
-    ['config']
+  .registerFactory<'mailer', Mailer>(
+    'mailer',
+    () => new SendGridMailer()
   )
-
-const db = await container.getAsync('db')
 ```
 
-Pass a fifth `lazyKey` to expose `AsyncLazy<Database>` without starting the
-factory:
+Consumers of `mailer` now see `Mailer`, not `SendGridMailer`.
 
-```ts
-const container = new Container()
-  .registerAsyncFactory('db', connectDatabase, [], undefined, 'dbLazy')
+## Choose the Promise Contract
 
-const dbLazy = container.get('dbLazy')
-const db = await dbLazy.get()
-```
+A Promise returned by `registerFactory` is the service value itself: `.get()` returns `Promise<T>` and dependent factories receive that same Promise. Use this only when the Promise belongs in the synchronous graph.
 
-Read [Async Dependency Graph](./async-dependency-graph) for the two Promise models, async propagation through classes, single-flight caching, failure semantics, and async teardown.
+Use `registerAsyncFactory` when `T` is the service and the Promise is its initialization boundary. That form propagates async status and resolves through `.getAsync()`. [Async Dependencies](./async-dependencies) documents both contracts, caching, lazy companions, failure behavior, and teardown.

@@ -12,7 +12,7 @@ export const worker = new Worker('email', async (job: Job<{ to: string }>) => {
    * Reuse the same per-request shape for jobs: jobId → requestId, payload
    * recipient → userId so AuditService records pick up the right user
    */
-  await using scope = await createRequestScope(root, {
+  await using scope = createRequestScope(root, {
     requestId: job.id ?? `job:${job.name}`,
     userId: job.data.to
   })

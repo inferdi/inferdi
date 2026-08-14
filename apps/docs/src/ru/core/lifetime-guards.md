@@ -1,60 +1,4 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ru/core/lifetime-guards#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Главная"
-          "item": "https://inferdi.com/ru/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Базовые принципы"
-          "item": "https://inferdi.com/ru/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Контроль времени жизни"
-          "item": "https://inferdi.com/ru/core/lifetime-guards"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ru/core/lifetime-guards#article"
-      "headline": "Контроль времени жизни в InferDI — singleton, scoped и transient"
-      "name": "Контроль времени жизни"
-      "description": "Три вида времени жизни в InferDI — singleton, scoped и transient — и защита на этапе компиляции и во время выполнения, которая не даёт долгоживущему сервису захватить короткоживущий и протечь состоянием между запросами."
-      "url": "https://inferdi.com/ru/core/lifetime-guards"
-      "mainEntityOfPage": "https://inferdi.com/ru/core/lifetime-guards"
-      "inLanguage": "ru-RU"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Expert"
-      "keywords": "InferDI, время жизни, singleton, scoped, transient, контроль времени жизни, захваченная зависимость, внедрение зависимостей"
-      "articleSection": "Базовые принципы"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
-# Контроль времени жизни
+# Время жизни
 
 В InferDI есть три вида времени жизни:
 
@@ -64,7 +8,7 @@ schema:
 | `scoped` | один раз на дочерний scope | дочерний scope | да |
 | `transient` | при каждом resolve | никогда | нет |
 
-При `strict: true` попытка получить `scoped`-ключ из root выбрасывает `Scoped "key" cannot be resolved from the root container. Use createScope().` Получайте scoped-сервисы из дочернего контейнера, который вернул `createScope()`.
+При default `{fast: false}` попытка получить `scoped`-ключ из root выбрасывает `Scoped "key" cannot be resolved from the root container. Use createScope().` Получайте scoped-сервисы из дочернего контейнера, который вернул `createScope()`.
 
 ## Правило жизненного цикла
 
@@ -76,13 +20,13 @@ new Container()
   .registerClass('users', UserService, ['request'], 'singleton')
 ```
 
-Такую регистрацию отклонит TypeScript. В strict mode та же форма будет отклонена runtime-защитой, если каст обойдёт систему типов.
+Такую регистрацию отклонит TypeScript. При `fast: false` runtime-защита отклонит ту же форму, если каст обойдёт систему типов.
 
-Объявленные scope inputs считаются scoped-зависимостями. Регистрируйте потребителя request, auth context, tenant или job payload как `scoped` либо `transient`; singleton-потребителя компилятор отклонит до runtime. Подробнее: [Данные и профили скоупа](./scope-inputs).
+Объявленные scope inputs считаются scoped-зависимостями. Регистрируйте потребителя request, auth context, tenant или job payload как `scoped` либо `transient`; singleton-потребителя компилятор отклонит до runtime. Подробнее: [Входные данные скоупа](./scope-inputs).
 
-## Строгий режим
+## Runtime-проверки по умолчанию
 
-`strict: true` включен по умолчанию. Он ловит:
+`fast` по умолчанию равен `false`. Граф остаётся mutable, а runtime проверяет:
 
 - прямой resolve scoped-ключа из root-контейнера
 - нарушения singleton-to-scoped и singleton-to-transient через касты
@@ -92,17 +36,18 @@ new Container()
 - неправильное использование динамических ключей, обходящее статическую проверку
 
 ```ts
-const root = new Container({ strict: true })
+const root = new Container()
+const explicitRoot = new Container({ fast: false })
 ```
 
-## Быстрый режим
+## `fast: true`
 
-Используйте `strict: false` только после того, как тесты доказывают форму графа:
+Используйте `fast: true` только после того, как тесты доказывают форму графа:
 
 ```ts
-const root = new Container({ strict: false })
+const root = new Container({ fast: true })
 ```
 
-Быстрый режим убирает runtime-учёт циклов и времени жизни из пути resolve. Scope читает неизменяемый root registry напрямую, не проходя цепочку родителей, а delegated singleton зеркалируется в cache scope. Strict scope при каждом локальном промахе проходит точную цепочку родителей, поэтому мутации остаются видимыми без сохранённых метаданных lookup. Дедупликация owned-инстансов выполняется во время disposal в обоих режимах. Контракт на уровне типов не меняется, но Fast Mode не защищает от нечестных кастов, захваченных внешних контейнеров и циклов. Он также отключает запрет на resolve scoped-ключей из root, поэтому код приложения не должен обращаться к ним через root-контейнер.
+Опция сохраняет type-level контракт, но убирает runtime-учёт циклов и времени жизни. После активации дерево контейнеров считается фиксированным; проверка scoped-ключа в root также отключается.
 
-Рекомендуемый процесс: разрабатывать и тестировать в strict mode, регистрировать каждый runtime-ключ один раз в одной линейной fluent-цепочке и завершить регистрацию до первого resolve или создания scope. Переключайте только проверенные неизменяемые production-графы и закрывайте дочерние scope раньше предков.
+Разрабатывайте и тестируйте с `fast: false`. Включайте `fast: true` только для проверенного неизменяемого production-графа. Точные runtime-компромиссы и правила активации описаны в разделе [Производительность](../guide/performance#fast-true).

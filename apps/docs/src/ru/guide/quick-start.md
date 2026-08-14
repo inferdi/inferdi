@@ -1,118 +1,120 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ru/guide/quick-start#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Главная"
-          "item": "https://inferdi.com/ru/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Руководство"
-          "item": "https://inferdi.com/ru/guide/quick-start"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Быстрый старт"
-          "item": "https://inferdi.com/ru/guide/quick-start"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ru/guide/quick-start#article"
-      "headline": "Быстрый старт InferDI: первый типизированный граф зависимостей"
-      "name": "Быстрый старт"
-      "description": "Стройте граф зависимостей через fluent API InferDI. TypeScript проверяет аргументы конструктора при регистрации сервисов, а кешированный resolve использует один Map.get()."
-      "url": "https://inferdi.com/ru/guide/quick-start"
-      "mainEntityOfPage": "https://inferdi.com/ru/guide/quick-start"
-      "inLanguage": "ru-RU"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Beginner"
-      "keywords": "InferDI, быстрый старт, внедрение зависимостей, DI в TypeScript, container, fluent API, типобезопасность"
-      "articleSection": "Руководство"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Быстрый старт
 
-Граф зависимостей строится через fluent API, а TypeScript проверяет его по ходу: каждый кортеж зависимостей сопоставляется с параметрами конструктора, поэтому перепутанный или пропущенный аргумент становится ошибкой компиляции, а не сюрпризом во время выполнения. Здесь нет декораторов `@Injectable()` и `reflect-metadata` - связывание описано обычным кодом, который понимает компилятор.
+В этом примере мы соберём полный граф, получим сервис из root-контейнера, а затем создадим скоуп запроса. Декораторы и настройка метаданных не нужны.
+
+## Установка
+
+::: code-group
+
+```bash [pnpm]
+pnpm add @inferdi/inferdi
+```
+
+```bash [npm]
+npm install @inferdi/inferdi
+```
+
+```bash [yarn]
+yarn add @inferdi/inferdi
+```
+
+:::
+
+## Сборка графа
 
 ```ts
 import { Container } from '@inferdi/inferdi'
 
+type RequestContext = {
+  requestId: string
+}
+
 class Logger {
-  log(message: string) {
-    console.log(`[LOG] ${message}`)
+  info(message: string) {
+    console.info(message)
   }
 }
 
-class UserRepo {
+class Database {
+  constructor(readonly dsn: string) {}
+}
+
+class UserService {
   constructor(
-    private readonly logger: Logger,
-    private readonly dsn: string,
+    private readonly request: RequestContext,
+    private readonly database: Database,
+    private readonly logger: Logger
   ) {}
 
   find(id: string) {
-    this.logger.log(`Finding ${id} in ${this.dsn}`)
+    this.logger.info(`request=${this.request.requestId} user=${id}`)
+    return { id, database: this.database.dsn }
   }
 }
 
-const container = new Container()
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
   .registerValue('dsn', 'postgres://localhost/app')
   .registerClass('logger', Logger, [])
-  .registerClass('userRepo', UserRepo, ['logger', 'dsn'])
-
-container.get('userRepo').find('42')
+  .registerClass('database', Database, ['dsn'])
+  .registerClass(
+    'users',
+    UserService,
+    ['request', 'database', 'logger'],
+    'scoped'
+  )
 ```
 
-`registerClass('userRepo', UserRepo, ['logger', 'dsn'])` проверяется позиционно. Если заменить кортеж на `['dsn', 'logger']`, TypeScript покажет ошибку до запуска приложения.
+Каждый кортеж зависимостей проверяется по конструктору. Если поменять местами `database` и `logger`, пропустить `request` или указать неизвестный ключ, TypeScript сообщит об ошибке.
 
-## Получение значения
+В этом графе один внешний вход и четыре регистрации:
 
-Для получения значения используйте `.get(key)`:
+```text
+dsn ───────────────▶ database (singleton) ─┐
+logger (singleton) ────────────────────────┼─▶ users (scoped)
+request (scope input) ─────────────────────┘
+```
+
+## Получение сервисов
+
+Singleton из root-контейнера можно получить синхронно через `.get()`:
 
 ```ts
-const repo = container.get('userRepo')
+const database = root.get('database')
 ```
 
-Ключ должен быть зарегистрирован в типе контейнера. Неизвестный статический ключ даёт ошибку компиляции. Динамические ключи сначала проверяйте через `.has(key)`.
-
-## Время жизни
-
-По умолчанию регистрации имеют время жизни `singleton`. Для классов оно передаётся четвёртым аргументом, для фабрик - третьим.
+Сервису `users` нужен вход `request`, поэтому сначала откройте скоуп:
 
 ```ts
-const root = new Container()
-  .registerClass('logger', Logger, [])
-  .registerClass('request', RequestContext, [], 'scoped')
-  .registerClass('token', Token, [], 'transient')
+const request = { requestId: crypto.randomUUID() }
+
+await using scope = root.createScope({ request })
+const users = scope.get('users')
+
+users.find('42')
 ```
 
-| Вид | Создание | Кеш | Очистка |
+Тип созданного скоупа хранит информацию о готовности `request`. Вызов `root.get('users')` не компилируется, потому что у root-контейнера нет данных запроса.
+
+## Выбор времени жизни
+
+По умолчанию регистрация имеет время жизни `singleton`. Явно укажите другое значение, если объект принадлежит скоупу или вызывающему коду.
+
+| Время жизни | Создание | Где кешируется | Кто освобождает |
 | --- | --- | --- | --- |
-| `singleton` | один раз на контейнер-владелец | да | да |
-| `scoped` | один раз на scope | да | да |
-| `transient` | при каждом вызове `.get()` | нет | нет |
+| `singleton` | один раз | создавший контейнер | этот контейнер |
+| `scoped` | один раз на дочерний скоуп | дочерний скоуп | этот скоуп |
+| `transient` | при каждом resolve | нигде | вызывающий код |
 
-Singleton не может напрямую зависеть от `scoped` или `transient` сервиса. Это правило проверяется типами и runtime-защитой в strict mode.
+Singleton не может напрямую зависеть от scoped- или transient-сервиса. InferDI проверяет это в типах и, по умолчанию, повторяет проверку во время выполнения.
+
+## Куда дальше
+
+| Задача | Раздел |
+| --- | --- |
+| разобраться в compile-time проверках графа | [Типобезопасность](../core/type-safety) |
+| описать запрос, tenant или данные задачи | [Входные данные скоупа](../core/scope-inputs) |
+| асинхронно инициализировать зависимость | [Асинхронные зависимости](../core/async-dependencies) |
+| безопасно закрывать базы данных и другие ресурсы | [Скоупы и освобождение ресурсов](../core/scopes) |
+| связать скоупы с веб-фреймворком | [Адаптеры](../adapters/) |
+| посмотреть полные примеры для фреймворков и runtime | [Примеры](./examples) |

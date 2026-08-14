@@ -109,6 +109,7 @@ describe('Phase 3 — error aggregation', () => {
 
     expect(caught).toBeInstanceOf(AggregateError)
     const agg = caught as AggregateError
+    expect(agg.message).toBe('Container.dispose: multiple teardown errors')
     expect(agg.errors).toHaveLength(2)
     expect(agg.errors.map((e: Error) => e.message).sort()).toEqual(['boom-1', 'boom-2'])
     // The ok resource must be closed even when others fail
@@ -487,6 +488,37 @@ describe('Phase 3 — sync [Symbol.dispose]', () => {
     expect(rejections).toHaveLength(0)
   })
 
+  it('later rejection from a cached async-factory Promise is suppressed', async () => {
+    let reject!: (reason: unknown) => void
+    const pending = new Promise<TrackableAsync>((_resolve, rejectPromise) => {
+      reject = rejectPromise
+    })
+    const c = new Container().registerAsyncFactory('r', () => pending, [])
+    void c.getAsync('r')
+
+    expect(() => c[Symbol.dispose]()).toThrow(/await using/i)
+    reject(new Error('rejected-after-sync-dispose'))
+
+    await new Promise((resolve) => setImmediate(resolve))
+    await new Promise((resolve) => setImmediate(resolve))
+
+    expect(rejections).toHaveLength(0)
+  })
+
+  it('cached legacy thenable is not assimilated during sync disposal', () => {
+    let thenCalls = 0
+    const thenable = {
+      then() {
+        thenCalls++
+      }
+    }
+    const c = new Container().registerFactory('r', () => thenable)
+    c.get('r')
+
+    expect(() => c[Symbol.dispose]()).toThrow(/await using/i)
+    expect(thenCalls).toBe(0)
+  })
+
   it('mixed scenario: one sync ok + one sync-misuse → AggregateError is not needed (1 error) or a plain throw', () => {
     const okSync = new TrackableSync()
     const asyncPlain = new TrackableAsyncPlain()
@@ -556,6 +588,9 @@ describe('Phase 3 — sync [Symbol.dispose]', () => {
 
     expect(caught).toBeInstanceOf(AggregateError)
     const agg = caught as AggregateError
+    expect(agg.message).toBe(
+      'Container[Symbol.dispose]: multiple teardown errors'
+    )
     expect(agg.errors.map((e: Error) => e.message).sort()).toEqual(['boom-1', 'boom-2'])
   })
 })

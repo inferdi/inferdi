@@ -1,62 +1,6 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ja/guide/performance#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "ホーム"
-          "item": "https://inferdi.com/ja/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "ガイド"
-          "item": "https://inferdi.com/ja/guide/quick-start"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "パフォーマンス"
-          "item": "https://inferdi.com/ja/guide/performance"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ja/guide/performance#article"
-      "headline": "InferDI パフォーマンス：ウォームな解決は 1 回の Map.get() を使う"
-      "name": "パフォーマンス"
-      "description": "InferDI が依存解決をほぼゼロオーバーヘッドに保つ仕組み — 明示的な登録、キャッシュされたシングルトンとスコープ付きサービス、0〜7 個の依存に対する直接のコンストラクター呼び出し、そして Promise キャッシュされた非同期ファクトリー。リフレクション、メタデータテーブル、プロキシは介在しません。"
-      "url": "https://inferdi.com/ja/guide/performance"
-      "mainEntityOfPage": "https://inferdi.com/ja/guide/performance"
-      "inLanguage": "ja-JP"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-07-21"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Expert"
-      "keywords": "InferDI, パフォーマンス, ベンチマーク, ゼロオーバーヘッド, ホットパス, 依存性注入, V8, Map.get"
-      "articleSection": "ガイド"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # パフォーマンス
 
-ウォームな解決は、1 回の `Map.get(key)` に続く直接的な `new Ctor(...)` です — リフレクションも、メタデータテーブルも、間に挟まるプロキシもありません。以下のベンチマーク数値は、オプトインで有効にする特別な高速モードからではなく、いくつかの具体的なランタイム上の選択から導かれたものです。
+ウォームな解決は `Map.get(key)` を読み取り、構築が必要な場合は `new Ctor(...)` を直接呼び出します。以下のベンチマーク数値は、具体的なランタイム上の選択から導かれたものです。
 
 | ランタイム上の選択 | 効果 |
 | --- | --- |
@@ -64,7 +8,7 @@ schema:
 | シングルトンおよびスコープドサービスのキャッシュ | ウォームな解決は、サイクルとライフタイムの管理処理が実行される前に `cache.get(key)` から読み取ります。`cache.has(key)` のフォールバックは明示的な `undefined` 値のためだけに存在します。 |
 | 直接的なコンストラクター呼び出し | 依存が 0〜7 個のクラスは直接的な `new Ctor(...)` の経路を使用します。より大きなコンストラクターは `Reflect.construct` にフォールバックします。 |
 | 非同期ファクトリー | ファクトリーの `Promise` はそのままキャッシュされるため、`.get()` が同期のままで、並行する呼び出し元は進行中の初期化を 1 つ共有します。 |
-| strict モードの境界 | `strict: true` はサイクルとライフタイムのリークを検出し、正確な親チェーンを走査するため、ツリーの変更が直ちに反映されます。`strict: false` は、監査済みで不変のプロダクショングラフを信頼します。 |
+| ランタイム契約 | デフォルト/`fast: false` はランタイムチェックと変更可能な正確な親チェーンを維持します。`fast: true` はチェックを外し、固定トポロジーの scope lookup を有効にします。 |
 
 ![ベンチマーク結果](/benchmarking_results.png)
 
@@ -93,15 +37,39 @@ schema:
 - スコープドのライフサイクルには、スコープの作成、解決、そしてクリーンアップが含まれます。シナリオ 6 は反復のたびに破棄処理を含むため、解決単独ではなくスコープの所有を測定します。
 - InferDI は全 8 シナリオで首位です。スコープドのフローと 10 個の依存を持つ広いグラフでは Typed Inject が最も近い非 InferDI のベースラインであり、キャッシュされたシングルトン、トランジェント、深いグラフ、4 個の依存を持つ広いグラフでは InversifyJS が最も近い位置にあります。
 
-## 高速モード
+## `fast: true`
 
-`new Container({ strict: false })` は、ランタイムのサイクル管理、シングルトンスタックの追跡、そしてガードされた解決経路を囲む `try`/`finally` を取り除きます。fast scope は不変のルートレジストリを直接参照して親チェーンの走査を避け、委譲された singleton を scope のキャッシュへ反映します。strict scope はローカルミスのたびに正確な親チェーンを走査するため、scope ごとのルックアップメタデータや無効化管理なしで変更が反映されます。fast モードでは登録時の防御的な無効化も省略されます。owned インスタンスの同一性による重複排除は、作成時にキューを走査せず、両モードとも disposal 時に一度だけ実行されます。
+`new Container({ fast: true })` は、ランタイムのサイクル管理、シングルトンスタックの追跡、そしてガードされた解決経路を囲む `try`/`finally` を取り除きます。固定 scope は registry owner を直接参照して親チェーンの走査を避け、委譲された singleton を scope のキャッシュへ反映します。デフォルトの scope はローカルミスのたびに正確な親チェーンを走査するため、変更が反映されます。fast コンテナは登録時の防御的な無効化を省略します。owned インスタンスの同一性による重複排除は disposal 時に実行されます。
 
-高速モードは、デフォルトの strict モードでテストがグラフを十分に実行した後にのみ使用してください。TypeScript はシングルトンのサイクル、トランジェントのサイクル、動的キー、`as` キャスト、あるいはより広い外側のコンテナをクロージャに取り込むファクトリーを見ることができません。単一の線形 fluent チェーンで各ランタイムキーを一度だけ登録し、最初の解決または scope 作成前に登録を完了し、起動後のツリーを不変に保ち、祖先より先に子 scope を破棄してください。
+デフォルトの `new Container()` と明示的な `{fast: false}` は、ランタイムの安全性チェックと可変グラフを維持します。
 
-プロファイリング済みのプロダクションパスでは、その検証後の `{ strict: false }` がサポート対象で最速の構成です。開発、テスト、ホットリロード、および起動後に変更されるツリーでは strict モードを維持してください。
+`fast: true` は、`fast: false` でテストがグラフを十分に実行した後にのみ使用してください。TypeScript はシングルトンのサイクル、トランジェントのサイクル、動的キー、`as` キャスト、あるいはより広い外側のコンテナをクロージャに取り込むファクトリーを見ることができません。単一の線形 fluent チェーンで各ランタイムキーを一度だけ登録し、最初の解決または scope 作成前に登録を完了し、起動後のツリーを不変に保ち、祖先より先に子 scope を破棄してください。
+
+プロファイリング済みのプロダクションパスでは、その検証後の `{fast: true}` がサポート対象で最速の構成です。開発、テスト、ホットリロード、および起動後に変更されるツリーでは `fast: false` を維持してください。
 
 ## ホットパスの細かな詳細
+
+### transient サービスの生成
+
+transient サービスには通常 `registerClass` を使います。同じ依存数の異なる transient クラスを 1 つのグラフから繰り返し解決する処理がボトルネックだと計測できた場合だけ変更します。
+
+この限定的な V8 のホットスポットでは、明示的なファクトリーによりサービスごとの生成呼び出し位置を保てます。
+
+```ts
+const container = new Container()
+  .declareScopeInputs<{ context: RequestContext }>()
+  .registerClass('schema', Schema, [])
+  .registerFactory(
+    'parseRequest',
+    (c) => new ParseRequest(c.get('context'), c.get('schema')),
+    ['context', 'schema'],
+    'transient'
+  )
+```
+
+ファクトリーでは依存関係を重複して記述するため、実際のアプリケーションで効果を計測してから使ってください。共通のジェネリック生成ヘルパーを挟むと呼び出し位置が統合され、この最適化は失われます。
+
+### キーの表現
 
 シンボルキーは、`Map` がそれらを同一性で比較するため、タイトな解決ループで役立つことがあります。文字列キーはハッシュ化が必要で、衝突時には文字単位の比較が必要です。ほとんどのアプリケーションでは差を計測できないため、シンボルキーはプロファイラー主導の変更として扱ってください。
 

@@ -1,120 +1,82 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ru/core/factories#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Главная"
-          "item": "https://inferdi.com/ru/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Базовые принципы"
-          "item": "https://inferdi.com/ru/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Фабрики"
-          "item": "https://inferdi.com/ru/core/factories"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ru/core/factories#article"
-      "headline": "Фабрики в InferDI — registerFactory"
-      "name": "Фабрики"
-      "description": "Используйте registerFactory для синхронного создания и registerAsyncFactory для декларативного асинхронного графа зависимостей."
-      "url": "https://inferdi.com/ru/core/factories"
-      "mainEntityOfPage": "https://inferdi.com/ru/core/factories"
-      "inLanguage": "ru-RU"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, фабрики, registerFactory, registerAsyncFactory, getAsync, AsyncSpec, внедрение зависимостей"
-      "articleSection": "Базовые принципы"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Фабрики
 
-Используйте `registerFactory`, когда создание сложнее, чем `new Ctor(...deps)`: нужно прочитать несколько значений, адаптировать сторонний клиент, собрать объект конфигурации или вернуть promise.
+Используйте `registerClass`, если создание сводится к `new Ctor(...deps)`. `registerFactory` нужен для конфигурации, стороннего API, привязки интерфейса или другой явной логики.
 
 ```ts
 const container = new Container()
-  .registerValue('config', { dsn: 'postgres://localhost/app', poolSize: 10 })
-  .registerFactory('pgPool', (c) => {
+  .registerValue('config', {
+    dsn: 'postgres://localhost/app',
+    poolSize: 10
+  })
+  .registerFactory('pool', (c) => {
     const { dsn, poolSize } = c.get('config')
     return new Pool({ connectionString: dsn, max: poolSize })
   })
-  .registerClass('users', UserRepo, ['pgPool'])
+  .registerClass('users', UserRepository, ['pool'])
 ```
 
-Возвращаемое значение фабрики становится типом, который выдаёт этот ключ.
+Возвращаемый тип становится типом зарегистрированного сервиса.
 
-## Горячие transient-графы
+## Фабрики с доступом к контейнеру
 
-`registerClass` остаётся стандартным способом регистрации transient-сервисов. Оставляйте его, пока профилировщик не покажет, что создание объектов заметно влияет на горячий путь.
-
-У V8 есть узкий неблагоприятный случай: один граф много раз создаёт разные transient-классы с одинаковым числом зависимостей. Если профилировщик и собранный артефакт приложения подтверждают этот hotspot, зарегистрируйте только такие сервисы через фабрики:
+Базовый callback получает контейнер, отфильтрованный по времени жизни. Singleton-фабрика может получать только безопасные для singleton зависимости; scoped- и transient-ключи отклоняются TypeScript.
 
 ```ts
-const container = new Container()
-  .registerClass('context', RequestContext, [], 'scoped')
-  .registerClass('schema', Schema, [])
+const root = new Container()
+  .registerValue('prefix', 'app')
+  .registerFactory('logger', (c) => new Logger(c.get('prefix')))
+```
+
+Эта форма подходит для условного или многошагового создания. Все вызовы `.get()` внутри неё должны оставаться синхронными. Для инициализации, async-статус которой распространяется по графу, используйте `registerAsyncFactory`.
+
+## Объявленные зависимости фабрики
+
+Overload с `deps` делает требования фабрики видимыми в графе и ограничивает resolver указанными ключами:
+
+```ts
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('logger', Logger, [])
   .registerFactory(
-    'parseRequest',
-    (c) => new ParseRequest(c.get('context'), c.get('schema')),
-    'transient',
+    'requestLog',
+    (deps) => new RequestLog(
+      deps.get('request'),
+      deps.get('logger')
+    ),
+    ['request', 'logger'],
+    'scoped'
   )
 ```
 
-Каждая фабрика должна содержать собственный вызов `new Service(...)`. Не направляйте несколько сервисов в общий конструктор-помощник, если эта оптимизация важна. Фабрики дублируют описание зависимостей, поэтому применяйте их к измеренным hotspot, а не ко всем transient-регистрациям.
+Объявленные зависимости передают требования scope inputs и времени жизни через модули и другие регистрации. В отличие от `registerAsyncFactory`, callback получает resolver, а не позиционные значения.
 
 ## Время жизни фабрик
 
-Фабрики используют ту же модель времени жизни, что и классы:
+Фабрики поддерживают те же варианты времени жизни, что и классы:
 
 ```ts
 const root = new Container()
   .registerFactory('cache', () => new Cache(), 'singleton')
-  .registerFactory('request', () => new RequestState(), 'scoped')
+  .registerFactory('requestState', () => new RequestState(), 'scoped')
+  .registerFactory('operation', () => new Operation(), 'transient')
 ```
 
-В singleton-фабрике параметр `c` сужен до зависимостей, безопасных для singleton. Scoped и transient ключи не появляются в автодополнении и отклоняются TypeScript.
+Singleton- и scoped-результаты кешируются и принадлежат контейнеру. Transient-результаты InferDI не кеширует и не освобождает.
 
-Опциональный четвёртый аргумент `lazyKey` регистрирует сохраняющий время жизни companion `Lazy<V>` — точно так же, как в `registerClass`:
+Четвёртым аргументом можно передать `lazyKey` и создать companion с тем же временем жизни цели:
 
 ```ts
 const root = new Container()
   .registerFactory('cache', () => new Cache(), 'singleton', 'cacheLazy')
 
-root.get('cacheLazy').get() // Cache
+root.get('cacheLazy').get()
 ```
 
-Чтобы оставить время жизни singleton по умолчанию, перед ключом companion передайте `undefined`: `registerFactory('cache', factory, undefined, 'cacheLazy')`.
+При добавлении companion время жизни нужно указать явно, включая `'singleton'`. Остальные правила описаны в разделе [Ленивое внедрение](./lazy-injection).
 
 ## Привязка интерфейсов
 
-TypeScript интерфейсы стираются при компиляции, и во время выполнения нет значения, которое можно передать как конструктор. Вместо этого свяжите интерфейс с реализацией через явный тип фабрики:
+У интерфейса нет runtime-конструктора. Укажите тип сервиса явно, если потребители должны зависеть от абстракции:
 
 ```ts
 interface Mailer {
@@ -126,49 +88,16 @@ class SendGridMailer implements Mailer {
 }
 
 const container = new Container()
-  .registerFactory<'mailer', Mailer>('mailer', () => new SendGridMailer())
-```
-
-Потребители ключа `'mailer'` видят `Mailer`, а не конкретный класс.
-
-## Синхронные фабрики со значением Promise
-
-`registerFactory` считает возвращённый Promise значением сервиса. Ключ остаётся синхронным, `get()` возвращает Promise, а другая фабрика получает тот же объект.
-
-```ts
-const c = new Container()
-  .registerFactory('dbPromise', () => connectDatabase())
-
-const promise = c.get('dbPromise') // Promise<Database>
-```
-
-С `lazyKey` модель не меняется: `registerFactory('dbPromise', factory, undefined, 'dbLazy')` создаёт `Lazy<Promise<Database>>`.
-
-Эта форма сохраняет single-flight кеширование. Цикл, созданный после `await` через захваченный контейнер, находится вне синхронных проверок циклов и времени жизни.
-
-## Декларативный асинхронный граф
-
-`registerAsyncFactory` хранит итоговый тип сервиса в `AsyncSpec`, разрешает кортеж зависимостей и передаёт в callback позиционные значения. Классы наследуют async status от объявленных зависимостей.
-
-```ts
-const container = new Container()
-  .registerValue('config', {dsn: 'postgres://localhost/app'})
-  .registerAsyncFactory(
-    'db',
-    (config: {dsn: string}) => connectDatabase(config.dsn),
-    ['config']
+  .registerFactory<'mailer', Mailer>(
+    'mailer',
+    () => new SendGridMailer()
   )
-
-const db = await container.getAsync('db')
 ```
 
-Пятый `lazyKey` создаёт `AsyncLazy<Database>` и не запускает фабрику до `.get()`:
+Теперь потребители `mailer` видят `Mailer`, а не `SendGridMailer`.
 
-```ts
-const container = new Container()
-  .registerAsyncFactory('db', connectDatabase, [], undefined, 'dbLazy')
+## Выбор Promise-контракта
 
-const db = await container.get('dbLazy').get()
-```
+Promise, возвращённый из `registerFactory`, сам становится значением сервиса: `.get()` возвращает `Promise<T>`, а зависимые фабрики получают тот же объект. Используйте такую форму, только если Promise должен входить в синхронный граф.
 
-Две Promise-модели, распространение async status через классы, single-flight кеш, ошибки и async teardown описаны в разделе [Асинхронный граф зависимостей](./async-dependency-graph).
+Если сервисом является `T`, а Promise обозначает границу его инициализации, используйте `registerAsyncFactory`. Async-статус распространится по графу, а сервис будет доступен через `.getAsync()`. Оба контракта, кеширование, lazy companions, ошибки и teardown разобраны в разделе [Асинхронные зависимости](./async-dependencies).

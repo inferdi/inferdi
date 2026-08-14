@@ -1,60 +1,4 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/es/core/lifetime-guards#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Inicio"
-          "item": "https://inferdi.com/es/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Conceptos básicos"
-          "item": "https://inferdi.com/es/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Guards de tiempo de vida"
-          "item": "https://inferdi.com/es/core/lifetime-guards"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/es/core/lifetime-guards#article"
-      "headline": "Guards de tiempo de vida en InferDI — singleton, scoped y transient"
-      "name": "Guards de tiempo de vida"
-      "description": "Los tres tiempos de vida de InferDI — singleton, scoped y transient — y los guards de compilación y de runtime que impiden que un servicio de vida más larga capture a uno de vida más corta y filtre estado entre peticiones."
-      "url": "https://inferdi.com/es/core/lifetime-guards"
-      "mainEntityOfPage": "https://inferdi.com/es/core/lifetime-guards"
-      "inLanguage": "es-ES"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Expert"
-      "keywords": "InferDI, tiempos de vida, singleton, scoped, transient, guard de tiempo de vida, dependencia cautiva, inyección de dependencias"
-      "articleSection": "Conceptos básicos"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
-# Guards de tiempo de vida
+# Tiempos de vida
 
 InferDI tiene tres tiempos de vida:
 
@@ -64,7 +8,7 @@ InferDI tiene tres tiempos de vida:
 | `scoped` | una vez por scope hijo | scope hijo | sí |
 | `transient` | en cada resolución | nunca | no |
 
-Con `strict: true`, resolver una clave `scoped` desde la raíz lanza `Scoped "key" cannot be resolved from the root container. Use createScope().` Resuelve los servicios scoped desde un contenedor hijo devuelto por `createScope()`.
+Con el valor predeterminado `{fast: false}`, resolver una clave `scoped` desde la raíz lanza `Scoped "key" cannot be resolved from the root container. Use createScope().` Resuelve los servicios scoped desde un contenedor hijo devuelto por `createScope()`.
 
 ## La regla del tiempo de vida
 
@@ -76,13 +20,13 @@ new Container()
   .registerClass('users', UserService, ['request'], 'singleton')
 ```
 
-Ese registro lo rechaza TypeScript. En modo estricto, la misma forma se rechaza en runtime si un cast burla el sistema de tipos.
+TypeScript rechaza ese registro. Con `fast: false`, los checks de runtime rechazan la misma forma si un cast burla el sistema de tipos.
 
-Las entradas de scope declaradas cuentan como dependencias scoped. Registra un consumidor de petición, contexto de autenticación, tenant o payload de trabajo como `scoped` o `transient`; el compilador rechaza un consumidor singleton antes del runtime. Consulta [Entradas y perfiles de scope](./scope-inputs).
+Las entradas de scope declaradas cuentan como dependencias scoped. Registra un consumidor de petición, contexto de autenticación, tenant o payload de trabajo como `scoped` o `transient`; el compilador rechaza un consumidor singleton antes del runtime. Consulta [Entradas de scope](./scope-inputs).
 
-## Modo estricto
+## Comprobaciones en runtime predeterminadas
 
-`strict: true` es el valor por defecto. Atrapa:
+`fast` vale `false` por defecto. El grafo permanece mutable y el runtime detecta:
 
 - resolución directa de una clave scoped desde el contenedor raíz
 - violaciones de singleton a scoped o de singleton a transient introducidas por casts
@@ -92,17 +36,18 @@ Las entradas de scope declaradas cuentan como dependencias scoped. Registra un c
 - mal uso de claves dinámicas que burla la comprobación estática
 
 ```ts
-const root = new Container({ strict: true })
+const root = new Container()
+const explicitRoot = new Container({ fast: false })
 ```
 
-## Modo rápido
+## `fast: true`
 
-Usa `strict: false` solo después de que las pruebas demuestren la forma del grafo:
+Usa `fast: true` solo después de que las pruebas demuestren la forma del grafo:
 
 ```ts
-const root = new Container({ strict: false })
+const root = new Container({ fast: true })
 ```
 
-El modo rápido elimina del camino de resolución la contabilidad de ciclos y tiempos de vida en runtime. Los scopes leen directamente el registro raíz inmutable, sin recorrer la cadena de padres, y reflejan los singletons delegados en la caché del scope. Los scopes strict recorren su cadena exacta de padres en cada fallo local, por lo que las mutaciones siguen visibles sin conservar metadatos de búsqueda. La deduplicación por identidad de instancias owned se ejecuta durante el disposal en ambos modos. El modo rápido no cambia el contrato a nivel de tipos, pero tampoco puede defenderse frente a casts deshonestos, contenedores externos capturados o ciclos. También omite el guard de scoped en la raíz, por lo que el código de la aplicación no debe resolver claves scoped desde el contenedor raíz.
+La opción conserva el contrato de tipos, pero elimina la contabilidad de ciclos y tiempos de vida en runtime. El árbol de contenedores se considera fijo después de activarse y también se omite la comprobación de scoped en el root.
 
-Flujo de trabajo recomendado: desarrolla y prueba en modo estricto, registra cada clave de runtime una sola vez mediante una cadena fluent lineal y completa el registro antes de la primera resolución o creación de scope. Cambia únicamente grafos de producción auditados e inmutables y elimina los scopes hijos antes que sus ancestros.
+Desarrolla y prueba con `fast: false`. Usa `fast: true` solo para un grafo de producción comprobado e inmutable. [Rendimiento](../guide/performance#fast-true) explica los compromisos y las reglas de activación.

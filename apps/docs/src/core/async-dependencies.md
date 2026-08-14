@@ -1,60 +1,4 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/core/async-dependency-graph#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Home"
-          "item": "https://inferdi.com/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Core Concepts"
-          "item": "https://inferdi.com/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Async Dependency Graph"
-          "item": "https://inferdi.com/core/async-dependency-graph"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/core/async-dependency-graph#article"
-      "headline": "Declarative Async Dependency Graphs in InferDI"
-      "name": "Async Dependency Graph"
-      "description": "Build typed asynchronous dependency graphs with registerAsyncFactory, getAsync, single-flight caching, scope isolation, and explicit teardown."
-      "url": "https://inferdi.com/core/async-dependency-graph"
-      "mainEntityOfPage": "https://inferdi.com/core/async-dependency-graph"
-      "inLanguage": "en-US"
-      "datePublished": "2026-08-11"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, async dependency graph, registerAsyncFactory, getAsync, AsyncSpec, single-flight, TypeScript dependency injection"
-      "articleSection": "Core Concepts"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
-# Async Dependency Graph
+# Async Dependencies
 
 `registerAsyncFactory` records an explicit async edge. The graph stores the final service type, awaits declared async dependencies, and propagates async status through dependent classes.
 
@@ -73,7 +17,7 @@ The distinction also controls lazy companions. A Promise-valued
 `registerFactory(..., lazyKey)` produces `Lazy<Promise<T>>`; a declarative
 `registerAsyncFactory(..., lazyKey)` produces `AsyncLazy<T>`.
 
-## Build an Async Request Graph
+## Register Async Factories
 
 The following graph initializes one database for the root and one session per authenticated scope. Classes become async when any declared dependency is async.
 
@@ -122,9 +66,9 @@ const dashboard = await scope.getAsync('dashboard')
 scope.get('dashboard')
 ```
 
-The compiler also rejects `root.getAsync('dashboard')` because the root has no `auth` input. Read [Scope Inputs and Profiles](./scope-inputs) for profile construction.
+The compiler also rejects `root.getAsync('dashboard')` because the root has no `auth` input. Read [Scope Inputs](./scope-inputs) for profile construction.
 
-## Resolution and Scheduling
+## Resolve and Propagate
 
 `getAsync()` accepts ready sync and async keys and returns a Promise. A synchronous lookup, cycle, lifetime, or disposal error becomes a rejected Promise.
 
@@ -145,7 +89,7 @@ The callback receives values rather than a container. This keeps the async edges
 
 Annotate each callback parameter, or pass a function with an existing signature, when `deps` is not empty. The tuple checks those parameter types and their order; it does not provide contextual parameter inference.
 
-## Caching by Lifetime
+## Scheduling and Caching
 
 | Lifetime | Initialization | Ownership |
 | --- | --- | --- |
@@ -181,7 +125,7 @@ may choose a sync or async registration produces a
 The wrapper captures the resolving container. Scoped targets stay isolated by
 that captured scope. Transients start per call and remain caller-owned.
 
-## Async Resource Teardown
+## Teardown and Failures
 
 Singleton and scoped registrations keep their Promise in the cache after fulfillment. Dispose their container asynchronously so InferDI can await initialization and probe the resolved resource.
 
@@ -195,6 +139,12 @@ try {
 ```
 
 `await using`, `dispose()`, and `Symbol.asyncDispose` support owned async resources. Sync `using` cannot unwrap a cached Promise and reports the misuse.
+
+Sync disposal attaches a rejection observer to a cached native Promise before throwing that misuse error, which prevents a later rejection from reaching `unhandledRejection`. It does not await the Promise or assimilate a custom thenable.
+
+A rejected singleton or scoped initialization remains cached. InferDI does not retry it. Rebuild the root or open a new scope when retry belongs to the application lifecycle. If a later dependency fails during preflight, earlier initializations retain their cache and ownership state.
+
+Dependency failure can propagate through several cached initialization Promises. Async disposal reports the same `Error` object once; distinct error objects remain distinct `AggregateError` causes, including objects with equal messages.
 
 ## Legacy Promise Values
 
@@ -215,12 +165,12 @@ const monitor = await legacy.getAsync('monitor')
 
 At the top-level, `getAsync('dbPromise')` follows JavaScript await semantics and resolves to `Database`.
 
-## Boundaries and Failure Semantics
+## Dynamic Boundaries
 
 - Pass readonly dependency tuples to `registerAsyncFactory` and to `registerClass` when the tuple may select an async key. InferDI classifies async positions once and retains the tuple reference. Inline literals infer readonly tuples.
 - Declarative cycles and cold lifetime violations fail during synchronous preflight. Calls through a captured container after a Promise boundary create dynamic edges outside that analysis.
 - `AsyncLazy<T>` defers resolution; it does not add retry, cancellation, or rollback.
-- If a later dependency fails during preflight, earlier initializations keep their cache and ownership state. An already-started async transient may continue without a teardown handle.
+- An already-started async transient may continue without a teardown handle if a later dependency fails during preflight.
 - A dynamic cycle through `AsyncLazy.get()` after a Promise boundary can wait on its own cached pending Promise. The synchronous cycle detector cannot report that deadlock.
 
-See [Factories](./factories) for synchronous construction and [Scopes and Teardown](./scopes) for the ownership model.
+See [Factories](./factories) for synchronous construction and [Scopes and Disposal](./scopes) for the ownership model.

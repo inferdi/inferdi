@@ -4,4 +4,4 @@ These adapters share the [`../_shared/container.ts`](../_shared/container.ts) bu
 
 Create one scope per bot update, queue job, or CLI command invocation. These are bounded async functions, so `await using` is the right tool: disposal lands exactly at function exit, both on success and throw.
 
-Do not use `override()` outside tests. The production pattern is `await createRequestScope(root, {...})`.
+Do not use `override()` outside tests. The production pattern is `createRequestScope(root, {...})`.

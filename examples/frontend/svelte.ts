@@ -1,8 +1,8 @@
 import { Container } from '@inferdi/inferdi'
 import { getContext, onDestroy, setContext } from 'svelte'
 
-class RouteContext {
-  routeName = ''
+type RouteContext = {
+  readonly routeName: string
 }
 
 class ApiClient {
@@ -26,7 +26,7 @@ class InboxViewModel {
 }
 
 const root = new Container()
-  .registerClass('route', RouteContext, [], 'scoped')
+  .declareScopeInputs<{ route: RouteContext }>()
   .registerClass('api', ApiClient, [])
   .registerClass('inboxVm', InboxViewModel, ['route', 'api'], 'scoped')
 
@@ -37,14 +37,7 @@ const RootDIKey = Symbol('InferDI.root')
 const RouteDIKey = Symbol('InferDI.route')
 
 function createInboxRouteScope(parent: AppContainer) {
-  const scope = parent.createScope()
-  try {
-    scope.get('route').routeName = 'inbox'
-    return scope
-  } catch (error) {
-    scope.dispose().catch(console.error)
-    throw error
-  }
+  return parent.createScope({ route: { routeName: 'inbox' } })
 }
 
 export function provideRootContainer() {

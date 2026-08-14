@@ -7,8 +7,8 @@
  * This module demonstrates the InferDI features that matter in production:
  *
  *   1. registerValue('config', ...)  — static config (env-validated).
- *   2. registerFactory('db', async ...) — async resource with LIFO disposal
- *      via Symbol.asyncDispose. `await scope.dispose()` awaits the pool.
+ *   2. registerFactory('db', ...) — resource construction with LIFO async
+ *      disposal via Symbol.asyncDispose.
  *   3. registerClass with a `Lazy<V>` companion — singletons can defer
  *      resolution of another singleton dependency via a Lazy wrapper, which
  *      is useful for breaking init-time cycles. The lifetime guard rejects
@@ -16,8 +16,8 @@
  *      preserves the target's lifetime, it does not lift short-lived
  *      services into singleton scope.
  *   4. Module<TIn, TOut> — reusable registration unit composed via `.use()`.
- *   5. createScope() + hydrate `scope.get('request')` — the recommended way
- *      to thread per-request data through scoped services.
+ *   5. declareScopeInputs() + createScope({ request }) — typed request data
+ *      supplied at the lifecycle boundary.
  *   6. Container.Providers<...> — typed shape for mock-factory test fixtures.
  *
  * All adapters in this directory consume this builder; in your own project
@@ -100,14 +100,12 @@ export class Clock {
 }
 
 /*
- * Per-request data. Hydrated immediately after `createScope()`. Registered
- * as `scoped` so every request gets its own instance, and so child services
- * can take it as a constructor dependency
+ * Per-request data supplied by the framework when it opens a scope
  */
-export class RequestContext {
-  requestId = ''
-  userId: string | undefined = undefined
-  ip: string | undefined = undefined
+export type RequestContext = {
+  readonly requestId: string
+  readonly userId?: string | undefined
+  readonly ip?: string | undefined
 }
 
 /*
@@ -197,39 +195,23 @@ export const coreModule: Module<CoreIn, CoreOut> = (c) =>
 export function buildRootContainer(env: Record<string, string | undefined> = process.env) {
   return new Container()
     .registerValue('config', readConfig(env))
+    .declareScopeInputs<{ request: RequestContext }>()
     .use(coreModule)
-    .registerClass('request', RequestContext, [], 'scoped')
     .registerClass('users', UserService, ['request', 'db', 'audit'], 'scoped')
 }
 
 export type RootContainer = ReturnType<typeof buildRootContainer>
 
 /*
- * Shape passed in by the framework adapter (Fastify request, Hono context, etc.).
- * Kept as a structural record so adapters don't need to construct a RequestContext
- * instance themselves — `createRequestScope` writes the fields into the scoped one
+ * Shape passed in by the framework adapter (Fastify request, Hono context, etc.)
  */
-export type RequestInit = {
-  readonly requestId: string
-  readonly userId?: string | undefined
-  readonly ip?: string | undefined
+export type RequestInit = RequestContext
+
+export function createRequestScope(root: RootContainer, request: RequestInit) {
+  return root.createScope({ request })
 }
 
-export async function createRequestScope(root: RootContainer, init: RequestInit): Promise<RequestContainer> {
-  const scope = root.createScope()
-  try {
-    const ctx = scope.get('request')
-    ctx.requestId = init.requestId
-    ctx.userId = init.userId
-    ctx.ip = init.ip
-    return scope
-  } catch (error) {
-    await scope.dispose()
-    throw error
-  }
-}
-
-export type RequestContainer = ReturnType<RootContainer['createScope']>
+export type RequestContainer = ReturnType<typeof createRequestScope>
 
 // ---------------------------------------------------------------------------
 // 5. Compile-time lifetime guard — the heart of the library
@@ -245,7 +227,7 @@ export type RequestContainer = ReturnType<RootContainer['createScope']>
 //
 // const requestLeak = new Container()
 //   .registerValue('config', readConfig())
+//   .declareScopeInputs<{ request: RequestContext }>()
 //   .use(coreModule)
-//   .registerClass('request', RequestContext, [], 'scoped')
-//   // @ts-expect-error: singleton "auditWithReq" cannot take scoped "request"
-//   .registerClass('auditWithReq', AuditService, ['logger', 'request'])
+//   // @ts-expect-error: singleton "users" cannot take scoped input "request"
+//   .registerClass('users', UserService, ['request', 'db', 'audit'])

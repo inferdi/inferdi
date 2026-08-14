@@ -4,7 +4,7 @@ export type {
   AsyncLazy,
   DependenciesMap,
   Module,
-  RegistrationKind,
+  Lifetime,
   ScopeInputMap,
   Spec,
   AsyncSpec,

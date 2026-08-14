@@ -1,60 +1,4 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/core/scope-inputs#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Home"
-          "item": "https://inferdi.com/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Core Concepts"
-          "item": "https://inferdi.com/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Scope Inputs and Profiles"
-          "item": "https://inferdi.com/core/scope-inputs"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/core/scope-inputs#article"
-      "headline": "Scope Inputs and Profiles in InferDI"
-      "name": "Scope Inputs and Profiles"
-      "description": "Declare request-local inputs, build typed scope profiles, and let InferDI prevent resolution until each service has the values it needs."
-      "url": "https://inferdi.com/core/scope-inputs"
-      "mainEntityOfPage": "https://inferdi.com/core/scope-inputs"
-      "inLanguage": "en-US"
-      "datePublished": "2026-08-11"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, scope inputs, scope profiles, declareScopeInputs, createScope, ReadyKeys, TypeScript dependency injection"
-      "articleSection": "Core Concepts"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
-# Scope Inputs and Profiles
+# Scope Inputs
 
 Scope inputs are values supplied by the code that opens a scope: an HTTP request, authenticated user, tenant, job payload, or trace context. InferDI carries those requirements through the graph and prevents you from resolving a service before its inputs exist.
 
@@ -96,7 +40,7 @@ const root = new Container()
   )
 ```
 
-Scope inputs have scoped lifetime. A singleton cannot depend on one, so the compiler rejects an omitted or explicit `singleton` kind for both services above.
+Scope inputs have scoped lifetime. A singleton cannot depend on one, so the compiler rejects an omitted or explicit `singleton` lifetime for both services above.
 
 ## Open Typed Profiles
 
@@ -138,8 +82,8 @@ InferDI propagates input requirements through classes, lazy companions, deps-awa
 const app = root
   .registerFactory(
     'requestId',
-    ['request'],
     (c) => c.get('request').requestId,
+    ['request'],
     'scoped'
   )
   .registerAsyncFactory(
@@ -155,8 +99,8 @@ The dependency tuple in the deps-aware `registerFactory` overload declares type-
 The distinction also changes argument order:
 
 ```ts
-registerFactory(key, deps, factory, kind)
-registerAsyncFactory(key, factory, deps, kind)
+registerFactory(key, factory, deps, lifetime)
+registerAsyncFactory(key, factory, deps, lifetime)
 ```
 
 ## Nested Scope Ownership
@@ -220,6 +164,6 @@ function resolveAny<
 - A required property with value `undefined` counts as provided. InferDI tracks property presence, not truthiness.
 - `createScope(inputs)` takes a shallow snapshot of enumerable own string and symbol properties. Getters and Proxy traps run during that copy, so pass a passive data record.
 - The input schema exists only in TypeScript. JavaScript, `any`, or a cast can add unknown keys or shadow a registration in the child cache.
-- Fast Mode supports input refinement but keeps its immutable-graph rule: finish registration before the first `.get()` or `.createScope()`.
+- `{fast: true}` supports input refinement but keeps its fixed-graph rule: finish registration before the first `.get()` or `.createScope()`.
 
-See [Scopes and Teardown](./scopes) for ownership rules and [Async Dependency Graph](./async-dependency-graph) for async services that depend on scope inputs.
+See [Scopes and Disposal](./scopes) for ownership rules and [Async Dependencies](./async-dependencies) for async services that depend on scope inputs.

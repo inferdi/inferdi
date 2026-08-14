@@ -1,59 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/zh/adapters/elysia#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "首页"
-          "item": "https://inferdi.com/zh/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "适配器"
-          "item": "https://inferdi.com/zh/adapters/"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Elysia 适配器"
-          "item": "https://inferdi.com/zh/adapters/elysia"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/zh/adapters/elysia#article"
-      "headline": "InferDI Elysia 适配器 — @inferdi/elysia"
-      "name": "Elysia 适配器"
-      "description": "@inferdi/elysia 是 Elysia v1 插件：在作用域模式下，它创建一个请求作用域，将其暴露在 Elysia 上下文中，使其对错误处理器保持可用，并在 onAfterResponse 中释放它——同时为 Bun 应用提供仅根模式。"
-      "url": "https://inferdi.com/zh/adapters/elysia"
-      "mainEntityOfPage": "https://inferdi.com/zh/adapters/elysia"
-      "inLanguage": "zh-CN"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript, Elysia v1, @inferdi/inferdi"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, Elysia, Elysia v1, 插件, Bun, scoped derive, onAfterResponse, 仅根模式, 依赖注入"
-      "articleSection": "适配器"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "@inferdi/elysia"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js >=20, Bun"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Elysia 适配器
 
 [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) 是一个 Elysia v1 插件。在作用域模式下，它创建一个请求作用域，将其暴露在 Elysia 上下文上，使其对用户的错误处理器保持可用，并从 `onAfterResponse` 中释放它。
@@ -77,11 +21,12 @@ const root = buildRootContainer()
 const app = new Elysia()
   .use(inferdiElysia({
     container: root,
-    setupScope: (scope, { request }) => {
-      const ctx = scope.get('request')
-      ctx.requestId = crypto.randomUUID()
-      ctx.userId = request.headers.get('x-user-id') ?? undefined
-    },
+    createScope: (_root, { request }) => root.createScope({
+      request: {
+        requestId: crypto.randomUUID(),
+        userId: request.headers.get('x-user-id') ?? undefined
+      }
+    })
   }))
   .get('/users/:id', ({ di, params }) =>
     di.get('users').profile(params.id),
@@ -92,7 +37,16 @@ const app = new Elysia()
 
 ```ts
 const app = new Elysia()
-  .use(inferdiElysia({ container: root, key: 'container' }))
+  .use(inferdiElysia({
+    container: root,
+    key: 'container',
+    createScope: (_root, { request }) => root.createScope({
+      request: {
+        requestId: crypto.randomUUID(),
+        userId: request.headers.get('x-user-id') ?? undefined
+      }
+    })
+  }))
   .get('/users/:id', ({ container, params }) =>
     container.get('users').profile(params.id),
   )
@@ -108,8 +62,8 @@ const app = new Elysia()
 | `key` | `'di'` | Elysia 上下文键。 |
 | `scopePerRequest` | `true` | 设为 `false` 启用仅根模式。 |
 | `createScope` | `root.createScope()` | 自定义请求作用域创建。 |
-| `setupScope` | 无 | 在验证和路由处理器之前填充。 |
-| `setupValidatedScope` | 无 | 在 Elysia 验证之后填充。 |
+| `setupScope` | 无 | 在作用域创建后执行额外初始化。 |
+| `setupValidatedScope` | 无 | 在 Elysia 验证后执行额外初始化。 |
 | `disposeScope` | `scope.dispose()` | 自定义释放。 |
 | `autoDispose` | `true` | `false` 或返回 `false` 的谓词会转移所有权。 |
 | `onDisposeError` | `console.error` | 清理失败的接收端。 |

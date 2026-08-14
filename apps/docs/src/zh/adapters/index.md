@@ -1,55 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/zh/adapters/#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "首页"
-          "item": "https://inferdi.com/zh/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "适配器"
-          "item": "https://inferdi.com/zh/adapters/"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/zh/adapters/#article"
-      "headline": "InferDI 框架适配器 —— 概览"
-      "name": "框架适配器"
-      "description": "每个 InferDI 适配器都会创建请求作用域，通过框架原生位置公开它，并在安全的生命周期节点释放它。"
-      "url": "https://inferdi.com/zh/adapters/"
-      "mainEntityOfPage": "https://inferdi.com/zh/adapters/"
-      "inLanguage": "zh-CN"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript, @inferdi/inferdi, Fastify, Hono, Koa, Express, Elysia"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, 适配器, 请求作用域, Fastify, Hono, Koa, Express, Elysia, 中间件, 依赖注入"
-      "articleSection": "适配器"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # 框架适配器
 
 每个适配器都会为每个请求创建恰好一个请求作用域，将其暴露在框架原生的位置，并在框架安全的完成时机释放它 —— 同时保留应用所拥有的具体容器类型，因此 `request.di` 是完全带类型的，而不是 `any` 或某个基类容器。
@@ -72,7 +20,7 @@ schema:
 
 1. 在请求开始时，从根容器**创建**作用域（`createScope`，默认为 `root.createScope()`）。
 2. 在 setup 运行**之前**，将其**暴露**在框架原生的位置（`request.di`、`ctx.state.di`、`c.var.di` 或 Elysia 上下文键），这样 setup 失败以及你的清理钩子都能观察到同一个槽位。
-3. 用 `setupScope` **配置**作用域，以填充由请求派生的状态 —— 请求 id、已认证用户、客户端 IP。它可以是异步的。
+3. 如需在处理器运行前进行额外初始化，可使用 `setupScope` **设置**作用域。该步骤可以是异步的。
 4. **处理**请求：路由处理器和框架的错误处理器从暴露的作用域解析服务。
 5. 在框架安全的完成时机**释放**作用域（`disposeScope`，默认为 `scope.dispose()`），除非所有权已被转移。
 
@@ -81,8 +29,8 @@ schema:
 | 选项 | 默认值 | 用途 |
 | --- | --- | --- |
 | `container` | 必填 | 暴露给应用的根容器。适配器从不释放它（Fastify 的可选 `disposeRootOnClose` 除外）。 |
-| `createScope` | `root.createScope()` | 构建每个请求的作用域。可以是异步的。 |
-| `setupScope` | 无 | 在处理器运行前填充作用域。可以是异步的。 |
+| `createScope` | `root.createScope()` | 构建请求作用域，并在此传入声明的请求输入。可以是异步的。 |
+| `setupScope` | 无 | 在处理器运行前执行额外初始化。可以是异步的。 |
 | `disposeScope` | `scope.dispose()` | 自定义清理。可以是同步或异步的。 |
 | `autoDispose` | `true` | 取 `false`，或返回 `false` 的谓词，将释放交给你的代码处理。 |
 | `onDisposeError` | 各适配器各自的接收端 | 接收请求作用域的释放失败：Fastify 用 `request.log.error`，Koa 用 `ctx.app.emit('error')`，其余用 `console.error`。 |

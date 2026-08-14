@@ -1,59 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ja/adapters/hono#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "ホーム"
-          "item": "https://inferdi.com/ja/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "アダプター"
-          "item": "https://inferdi.com/ja/adapters/"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Hono アダプター"
-          "item": "https://inferdi.com/ja/adapters/hono"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ja/adapters/hono#article"
-      "headline": "InferDI Hono アダプター — @inferdi/hono"
-      "name": "Hono アダプター"
-      "description": "@inferdi/hono は Hono v4 のミドルウェアです。呼び出しごとに 1 つのリクエストスコープを作成し、Hono のコンテキスト変数を通じて公開し、境界の定まったルートパイプラインの完了後に破棄します。エッジの Cloudflare Workers や Bun に最適です。"
-      "url": "https://inferdi.com/ja/adapters/hono"
-      "mainEntityOfPage": "https://inferdi.com/ja/adapters/hono"
-      "inLanguage": "ja-JP"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript, Hono v4, @inferdi/inferdi"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, Hono, Hono v4, ミドルウェア, コンテキスト変数, エッジ, Cloudflare Workers, Bun, 依存性注入"
-      "articleSection": "アダプター"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "@inferdi/hono"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js >=16, Bun, Cloudflare Workers"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Hono アダプター
 
 [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) は Hono v4 のミドルウェアです。ミドルウェアの呼び出しごとに 1 つのリクエストスコープを作成し、それを Hono のコンテキスト変数を通じて公開し、境界の定まったルートパイプラインが完了した後に破棄します。
@@ -66,24 +10,26 @@ pnpm add @inferdi/inferdi @inferdi/hono hono
 
 ```ts
 import { Hono } from 'hono'
-import { inferdiHono, type InferdiHonoEnv } from '@inferdi/hono'
+import { inferdiHono, type InferdiHonoScopeEnv } from '@inferdi/hono'
 ```
 
 ## リクエストスコープ
 
 ```ts
 const root = buildRootContainer()
-type AppEnv = InferdiHonoEnv<typeof root>
+const openRequestScope = (requestId: string, userId?: string) =>
+  root.createScope({ request: { requestId, userId } })
+type RequestScope = ReturnType<typeof openRequestScope>
+type AppEnv = InferdiHonoScopeEnv<RequestScope>
 
 const app = new Hono<AppEnv>()
 
 app.use('*', inferdiHono({
   container: root,
-  setupScope: (scope, c) => {
-    const ctx = scope.get('request')
-    ctx.requestId = crypto.randomUUID()
-    ctx.userId = c.req.header('x-user-id')
-  },
+  createScope: (_root, c) => openRequestScope(
+    crypto.randomUUID(),
+    c.req.header('x-user-id')
+  )
 }))
 
 app.get('/users/:id', async (c) => {
@@ -96,10 +42,17 @@ app.get('/users/:id', async (c) => {
 ## カスタムキー
 
 ```ts
-type AppEnv = InferdiHonoEnv<typeof root, 'container'>
+type AppEnv = InferdiHonoScopeEnv<RequestScope, 'container'>
 
 const app = new Hono<AppEnv>()
-app.use('*', inferdiHono({ container: root, key: 'container' }))
+app.use('*', inferdiHono({
+  container: root,
+  key: 'container',
+  createScope: (_root, c) => openRequestScope(
+    crypto.randomUUID(),
+    c.req.header('x-user-id')
+  )
+}))
 
 app.get('/users/:id', async (c) => {
   return c.json(await c.var.container.get('users').profile(c.req.param('id')))
@@ -115,7 +68,7 @@ app.get('/users/:id', async (c) => {
 | `container` | 必須 | ルートコンテナ。このミドルウェアによって破棄されることはありません。 |
 | `key` | `'di'` | コンテキスト変数のキー。 |
 | `createScope` | `root.createScope()` | カスタムのリクエストスコープ作成。 |
-| `setupScope` | なし | ルートハンドラーの前にスコープをハイドレートします。 |
+| `setupScope` | なし | スコープ作成後に追加の初期化を行います。 |
 | `disposeScope` | `scope.dispose()` | カスタムの破棄。 |
 | `autoDispose` | `true` | `false` または `false` を返す述語は所有権を移譲します。 |
 | `onDisposeError` | `console.error` | クリーンアップ失敗のシンク。 |

@@ -1,59 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/zh/adapters/hono#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "首页"
-          "item": "https://inferdi.com/zh/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "适配器"
-          "item": "https://inferdi.com/zh/adapters/"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Hono 适配器"
-          "item": "https://inferdi.com/zh/adapters/hono"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/zh/adapters/hono#article"
-      "headline": "InferDI Hono 适配器 —— @inferdi/hono"
-      "name": "Hono 适配器"
-      "description": "@inferdi/hono 是 Hono v4 中间件：它在每次调用时创建一个请求作用域，通过 Hono 上下文变量暴露它，并在受限的路由管线完成之后释放它 —— 适用于边缘环境中的 Cloudflare Workers 和 Bun。"
-      "url": "https://inferdi.com/zh/adapters/hono"
-      "mainEntityOfPage": "https://inferdi.com/zh/adapters/hono"
-      "inLanguage": "zh-CN"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript, Hono v4, @inferdi/inferdi"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, Hono, Hono v4, 中间件, 上下文变量, 边缘, Cloudflare Workers, Bun, 依赖注入"
-      "articleSection": "适配器"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "@inferdi/hono"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js >=16, Bun, Cloudflare Workers"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Hono 适配器
 
 [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) 是 Hono v4 中间件。它在每次中间件调用时创建一个请求作用域，通过 Hono 上下文变量暴露它，并在受限的路由管线完成之后释放它。
@@ -66,24 +10,26 @@ pnpm add @inferdi/inferdi @inferdi/hono hono
 
 ```ts
 import { Hono } from 'hono'
-import { inferdiHono, type InferdiHonoEnv } from '@inferdi/hono'
+import { inferdiHono, type InferdiHonoScopeEnv } from '@inferdi/hono'
 ```
 
 ## 请求作用域
 
 ```ts
 const root = buildRootContainer()
-type AppEnv = InferdiHonoEnv<typeof root>
+const openRequestScope = (requestId: string, userId?: string) =>
+  root.createScope({ request: { requestId, userId } })
+type RequestScope = ReturnType<typeof openRequestScope>
+type AppEnv = InferdiHonoScopeEnv<RequestScope>
 
 const app = new Hono<AppEnv>()
 
 app.use('*', inferdiHono({
   container: root,
-  setupScope: (scope, c) => {
-    const ctx = scope.get('request')
-    ctx.requestId = crypto.randomUUID()
-    ctx.userId = c.req.header('x-user-id')
-  },
+  createScope: (_root, c) => openRequestScope(
+    crypto.randomUUID(),
+    c.req.header('x-user-id')
+  )
 }))
 
 app.get('/users/:id', async (c) => {
@@ -96,10 +42,17 @@ app.get('/users/:id', async (c) => {
 ## 自定义键
 
 ```ts
-type AppEnv = InferdiHonoEnv<typeof root, 'container'>
+type AppEnv = InferdiHonoScopeEnv<RequestScope, 'container'>
 
 const app = new Hono<AppEnv>()
-app.use('*', inferdiHono({ container: root, key: 'container' }))
+app.use('*', inferdiHono({
+  container: root,
+  key: 'container',
+  createScope: (_root, c) => openRequestScope(
+    crypto.randomUUID(),
+    c.req.header('x-user-id')
+  )
+}))
 
 app.get('/users/:id', async (c) => {
   return c.json(await c.var.container.get('users').profile(c.req.param('id')))
@@ -115,7 +68,7 @@ app.get('/users/:id', async (c) => {
 | `container` | 必填 | 根容器。该中间件从不释放它。 |
 | `key` | `'di'` | 上下文变量键。 |
 | `createScope` | `root.createScope()` | 自定义请求作用域创建。 |
-| `setupScope` | 无 | 在路由处理器之前填充作用域。 |
+| `setupScope` | 无 | 在作用域创建后执行额外初始化。 |
 | `disposeScope` | `scope.dispose()` | 自定义释放。 |
 | `autoDispose` | `true` | `false` 或返回 `false` 的谓词会转移所有权。 |
 | `onDisposeError` | `console.error` | 清理失败的接收端。 |

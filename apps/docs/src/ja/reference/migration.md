@@ -1,71 +1,22 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ja/reference/migration#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "ホーム"
-          "item": "https://inferdi.com/ja/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "リファレンス"
-          "item": "https://inferdi.com/ja/reference/api"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "マイグレーション"
-          "item": "https://inferdi.com/ja/reference/migration"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ja/reference/migration#article"
-      "headline": "InferDI マイグレーションガイド"
-      "name": "マイグレーション"
-      "description": "メジャーバージョンごとの破壊的変更と、InferDI 6.0 への現在のマイグレーション手順をまとめています。信頼できる情報源として packages/inferdi/MIGRATION.md を反映しています。"
-      "url": "https://inferdi.com/ja/reference/migration"
-      "mainEntityOfPage": "https://inferdi.com/ja/reference/migration"
-      "inLanguage": "ja-JP"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, マイグレーション, 破壊的変更, アップグレード, 6.0, ReadyKeys, SyncReadyKeys, 依存性注入"
-      "articleSection": "リファレンス"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # マイグレーション
 
 InferDI は破壊的変更をメジャーバージョンごとに記録しています。信頼できる情報源は引き続き [`packages/inferdi/MIGRATION.md`](https://github.com/inferdi/inferdi/blob/main/packages/inferdi/MIGRATION.md) ですが、現在のマイグレーションパスをここに要約します。
 
 ## 6.0 へのマイグレーション
 
+- `RegistrationKind` を `Lifetime` に、`Spec.kind` を `Spec.lifetime` に置き換えます。deprecated alias はありません。
+- 同期ファクトリーの deps は `registerFactory(key, factory, deps, ...)` の順になります。コンパニオンでは `'singleton'` を含むライフタイムを明示します。
+- 以前のランタイムチェック無効化オプションを `{fast: true}` に置き換えます。プレリリースの `mode` オプションは削除されました。`fast` のデフォルトは `false` で、ランタイムチェックと可変グラフを維持します。`fast: true` は unchecked fixed 契約を選択します。
+- 名前付き `Module<TRequirements, TProvides>` は追加登録を含む実際のグラフを受け入れて保持し、要件を厳密に検査し、出力衝突を拒否します。`new Container(parent)` は非公開になり、子は `createScope()` で作成します。
+- 登録は、既存の主キーまたは lazy キーと重複する可能性があるキー型を拒否します。broad / union キーを新しい候補へ絞り込むか、意図した置き換えには `.override()` を使用してください。
+- 依存の失敗が複数のキャッシュ済み Promise へ伝播した場合、async teardown は共有された rejection オブジェクトを一度だけ報告します。sync teardown は async 誤用エラーをスローする前にネイティブ Promise の rejection を監視します。
+
 ### ジェネリック resolver では準備済みキーを使う
 
 `.get()` は、必要なスコープ入力が提供済みの同期キーを受け付けます。スコープ入力を持たない具体的なコンテナでは、同期キー集合は変わりません。`K extends keyof T` を使うジェネリック helper は準備状態と async 状態を保持する必要があります。
 
 ```ts
-// 移行前
+// Before
 function resolve<T extends DependenciesMap, K extends keyof T>(
   container: Container<T>,
   key: K
@@ -73,7 +24,7 @@ function resolve<T extends DependenciesMap, K extends keyof T>(
   return container.get(key)
 }
 
-// 移行後
+// After
 function resolve<
   T extends DependenciesMap,
   K extends Container.SyncReadyKeys<Container<T>>
@@ -88,7 +39,7 @@ function resolve<
 
 `LazySpec` は private な type-only mode brand を持つようになり、v6 では
 `AsyncLazySpec` も追加されました。明示的な `Container` / `Module` shape
-では `{type, kind, lazyOf}` を再現せず、これらの named export を使います。
+では `{type, lifetime, lazyOf}` を再現せず、これらの named export を使います。
 brand に runtime field はありません。
 
 `registerAsyncFactory` の第 5 引数 `lazyKey` は `AsyncLazy<T>` を生成します。
@@ -97,11 +48,11 @@ Async クラスも同じ wrapper を使い、sync/async mixed クラスは
 `Lazy<Promise<T>>` のままです。`Container.ResolveUnwrapped` は管理対象の各
 mode を distributive に展開します。
 
-新しいキー集合は [API サマリー](./api)、[スコープ入力とプロファイル](../core/scope-inputs)、[非同期依存グラフ](../core/async-dependency-graph)を参照してください。
+新しいキー集合は [API サマリー](./api)、[スコープ入力](../core/scope-inputs)、[非同期依存関係](../core/async-dependencies)を参照してください。
 
 ## 5.0 へのマイグレーション
 
-最初の v5 リリースはアダプターのみを対象としていました。バージョンの引き上げは、すべての公開パッケージをロックステップに保ち、フレームワークアダプターを 1 つのクリーンアップ契約の周りに揃えるためのものです。後続の v5 ビルドでは、子スコープの所有権を適用し、以下の fast モード契約も厳格化します。
+最初の v5 リリースはアダプターのみを対象としていました。バージョンの引き上げは、すべての公開パッケージをロックステップに保ち、フレームワークアダプターを 1 つのクリーンアップ契約の周りに揃えるためのものです。後続の v5 ビルドでは、子スコープの所有権を適用し、以下の `{fast: true}` 契約も厳格化します。
 
 アダプターの契約は、現在これらのルールを共有しています。
 
@@ -114,11 +65,11 @@ mode を distributive に展開します。
 
 ### Scoped の解決には子スコープが必要
 
-デフォルトの `strict: true` では、ルートコンテナから scoped キーを解決すると `Scoped "key" cannot be resolved from the root container. Use createScope().` がスローされます。`const scope = root.createScope()` で子コンテナを作成し、`scope.get(scopedKey)` を呼び出して、対応するライフサイクル境界で子コンテナを破棄してください。fast モードはこのランタイムガードを省略しますが、scoped サービスは子スコープから解決する必要があります。
+デフォルトの `{fast: false}` では、ルートコンテナから scoped キーを解決すると `Scoped "key" cannot be resolved from the root container. Use createScope().` がスローされます。`const scope = root.createScope()` で子コンテナを作成し、`scope.get(scopedKey)` を呼び出して、対応するライフサイクル境界で子コンテナを破棄してください。`{fast: true}` はこのランタイムガードを省略しますが、scoped サービスは子スコープから解決する必要があります。
 
-### fast モードの不変グラフ契約
+### `fast: true` の固定グラフ契約
 
-`new Container({ strict: false })` は、scope から不変のルートレジストリを
+`new Container({fast: true})` は、scope から不変のルートレジストリを
 直接参照して親チェーンの走査を避け、委譲された singleton を scope の
 キャッシュへ反映します。strict scope はルックアップのスナップショットを
 保持せず、ローカルミスのたびに正確な親チェーンを走査するため、scope
@@ -127,7 +78,7 @@ mode を distributive に展開します。
 されます。単一の線形 fluent チェーンで各ランタイムキーを一度だけ登録し、
 最初の解決または scope 作成前に登録を完了し、起動後のツリーを不変に
 保ち、祖先より先に子 scope を破棄してください。ホットリロードや起動後に
-変更されるツリーでは `strict: true` を使用します。
+変更されるツリーでは `{fast: false}` を使用します。
 
 ### アダプターに関する注意
 
@@ -185,7 +136,7 @@ v3 はライフタイムの安全性を型システムへと移します。ラ�
 - `registerFactory` は、シングルトンファクトリーに対して `c` パラメーターを絞り込みます。
 - `registerClass` は、シングルトン登録に対して `deps` をフィルターします。
 - `override(key, value)` は、元のライフタイムの種類を保持します。
-- `new Container({ strict: false })` は、依存グラフの監査後にランタイムの循環ガードとライフタイムガードを無効化できます。
+- `new Container({fast: true})` は、依存グラフの監査後にランタイムの循環ガードとライフタイムガードを無効化できます。
 
 よくある修正:
 
@@ -257,7 +208,7 @@ v2 では、すべての登録メソッドに文字列またはシンボルの�
 1. 通過するすべてのメジャーバージョンのマイグレーションノートを読みます。
 2. [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) とインストール済みのすべてのアダプターを一緒にアップグレードします。
 3. 依存グラフの形の変化を捕捉するため、型テストまたは `tsc --noEmit` を実行します。
-4. strict モードでランタイムテストを実行します。
+4. デフォルトの checked 契約でランタイムテストを実行します。
 5. `skipInferdiDispose`、`autoDispose: false`、またはカスタムの `disposeScope` を使っている場合は、リクエストスコープの所有権を見直します。
 
 ## 安定した境界

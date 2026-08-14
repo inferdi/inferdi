@@ -5,8 +5,10 @@ import {
   type AsyncSpec,
   type DependenciesMap,
   type Lazy,
+  type Lifetime,
   type Module,
   type LazySpec,
+  type ContainerOptions,
   type ScopeInputMap,
   type Spec,
   type WithRequirements
@@ -24,6 +26,19 @@ const scopedAnswer: number = scope.get('answer')
 
 void answer
 void scopedAnswer
+
+const lifetime: Lifetime = 'scoped'
+const options: ContainerOptions = {fast: true}
+const factoryContainer = new Container(options)
+  .registerValue('source', 1)
+  .registerFactory(
+    'derived',
+    (c) => c.get('source') + 1,
+    ['source'],
+    'singleton',
+    'derivedLazy'
+  )
+const derived: number = factoryContainer.get('derivedLazy').get()
 
 interface RequestContext {
   readonly requestId: string
@@ -141,3 +156,5 @@ void repository
 void lazyDatabase
 void mixedRepositoryLazy
 void acceptsSyncCompanion
+void lifetime
+void derived

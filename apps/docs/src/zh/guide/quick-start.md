@@ -1,118 +1,120 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/zh/guide/quick-start#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "首页"
-          "item": "https://inferdi.com/zh/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "指南"
-          "item": "https://inferdi.com/zh/guide/quick-start"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "快速开始"
-          "item": "https://inferdi.com/zh/guide/quick-start"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/zh/guide/quick-start#article"
-      "headline": "InferDI 快速开始：构建第一个类型化依赖图"
-      "name": "快速开始"
-      "description": "使用 InferDI 的流式 API 构建依赖图。TypeScript 会在注册服务时检查构造函数参数，缓存命中时只需一次 Map.get()。"
-      "url": "https://inferdi.com/zh/guide/quick-start"
-      "mainEntityOfPage": "https://inferdi.com/zh/guide/quick-start"
-      "inLanguage": "zh-CN"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Beginner"
-      "keywords": "InferDI, 快速开始, 依赖注入, TypeScript DI, container, 流式 API, 类型安全"
-      "articleSection": "指南"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # 快速开始
 
-你通过流式 API 构建依赖图，TypeScript 会随着你的编写实时校验：每个依赖元组都会与目标构造函数的参数位置进行匹配，因此交换或缺失的参数是编译错误，而不是运行时的意外。这里没有 `@Injectable()` 装饰器，也没有 `reflect-metadata` —— 接线就是编译器能读懂的普通代码。
+本节将构建一个完整的依赖图，解析根容器中的服务，再创建请求作用域。无需装饰器或元数据配置。
+
+## 安装
+
+::: code-group
+
+```bash [pnpm]
+pnpm add @inferdi/inferdi
+```
+
+```bash [npm]
+npm install @inferdi/inferdi
+```
+
+```bash [yarn]
+yarn add @inferdi/inferdi
+```
+
+:::
+
+## 构建依赖图
 
 ```ts
 import { Container } from '@inferdi/inferdi'
 
+type RequestContext = {
+  requestId: string
+}
+
 class Logger {
-  log(message: string) {
-    console.log(`[LOG] ${message}`)
+  info(message: string) {
+    console.info(message)
   }
 }
 
-class UserRepo {
+class Database {
+  constructor(readonly dsn: string) {}
+}
+
+class UserService {
   constructor(
-    private readonly logger: Logger,
-    private readonly dsn: string,
+    private readonly request: RequestContext,
+    private readonly database: Database,
+    private readonly logger: Logger
   ) {}
 
   find(id: string) {
-    this.logger.log(`Finding ${id} in ${this.dsn}`)
+    this.logger.info(`request=${this.request.requestId} user=${id}`)
+    return { id, database: this.database.dsn }
   }
 }
 
-const container = new Container()
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
   .registerValue('dsn', 'postgres://localhost/app')
   .registerClass('logger', Logger, [])
-  .registerClass('userRepo', UserRepo, ['logger', 'dsn'])
-
-container.get('userRepo').find('42')
+  .registerClass('database', Database, ['dsn'])
+  .registerClass(
+    'users',
+    UserService,
+    ['request', 'database', 'logger'],
+    'scoped'
+  )
 ```
 
-对 `registerClass('userRepo', UserRepo, ['logger', 'dsn'])` 的调用会按位置进行校验。如果你把元组换成 `['dsn', 'logger']`，TypeScript 会在应用运行之前报告这个不匹配。
+每个依赖元组都会与构造函数参数进行检查。交换 `database` 和 `logger`、漏掉 `request` 或使用未知键都会触发 TypeScript 错误。
 
-## 解析值
+上面的依赖图包含一个外部输入和四项注册：
 
-使用 `.get(key)` 进行解析：
+```text
+dsn ───────────────▶ database (singleton) ─┐
+logger (singleton) ────────────────────────┼─▶ users (scoped)
+request (scope input) ─────────────────────┘
+```
+
+## 解析服务
+
+根容器中的 singleton 可以用 `.get()` 同步解析：
 
 ```ts
-const repo = container.get('userRepo')
+const database = root.get('database')
 ```
 
-该键必须在容器类型中注册过。未知的静态键是编译错误。动态键应在 `.get(key)` 之前用 `.has(key)` 探测。
+`users` 需要 `request` 输入，因此要先创建作用域：
+
+```ts
+const request = { requestId: crypto.randomUUID() }
+
+await using scope = root.createScope({ request })
+const users = scope.get('users')
+
+users.find('42')
+```
+
+返回的作用域类型记录了 `request` 已就绪。根容器没有请求输入，因此 `root.get('users')` 无法通过类型检查。
 
 ## 选择生命周期
 
-注册默认为 `singleton`。对于类，将生命周期作为第四个参数传入；对于工厂，则作为第三个参数。
+注册默认使用 `singleton`。如果值属于某个作用域或调用方，请显式指定生命周期。
 
-```ts
-const root = new Container()
-  .registerClass('logger', Logger, [])
-  .registerClass('request', RequestContext, [], 'scoped')
-  .registerClass('token', Token, [], 'transient')
-```
-
-| 类型 | 创建时机 | 是否缓存 | 是否由容器释放 |
+| 生命周期 | 创建时机 | 缓存位置 | 释放方 |
 | --- | --- | --- | --- |
-| `singleton` | 每个拥有它的容器创建一次 | 是 | 是 |
-| `scoped` | 每个作用域创建一次 | 是 | 是 |
-| `transient` | 每次解析都创建 | 否 | 否 |
+| `singleton` | 一次 | 创建它的容器 | 该容器 |
+| `scoped` | 每个子作用域一次 | 子作用域 | 该作用域 |
+| `transient` | 每次解析 | 不缓存 | 调用方 |
 
-单例不能直接依赖 `scoped` 或 `transient` 服务。该规则由类型强制，并在严格模式下由运行时守卫强制。
+singleton 不能直接依赖 scoped 或 transient 服务。InferDI 会在类型层面执行此规则，默认也会在运行时再次检查。
+
+## 下一步
+
+| 需求 | 继续阅读 |
+| --- | --- |
+| 了解编译期依赖图检查 | [类型安全](../core/type-safety) |
+| 建模请求、租户或任务数据 | [作用域输入](../core/scope-inputs) |
+| 异步初始化依赖 | [异步依赖](../core/async-dependencies) |
+| 安全关闭数据库和其他资源 | [作用域与资源释放](../core/scopes) |
+| 将作用域接入 Web 框架 | [框架适配器](../adapters/) |
+| 查看完整的框架与运行时示例 | [示例](./examples) |

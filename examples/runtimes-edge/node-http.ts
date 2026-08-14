@@ -25,7 +25,7 @@ function attachCleanup(res: ServerResponse, cleanup: () => void) {
 
 export const server = createServer((req, res) => {
   void (async () => {
-    const scope = await createRequestScope(root, {
+    const scope = createRequestScope(root, {
       requestId: req.headers['x-request-id'] as string | undefined ?? crypto.randomUUID()
     })
 

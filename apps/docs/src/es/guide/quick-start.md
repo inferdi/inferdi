@@ -1,118 +1,120 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/es/guide/quick-start#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Inicio"
-          "item": "https://inferdi.com/es/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Guía"
-          "item": "https://inferdi.com/es/guide/quick-start"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Inicio rápido"
-          "item": "https://inferdi.com/es/guide/quick-start"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/es/guide/quick-start#article"
-      "headline": "Inicio rápido de InferDI: construye tu primer grafo de dependencias tipado"
-      "name": "Inicio rápido"
-      "description": "Construye un grafo de dependencias con la API fluida de InferDI. TypeScript verifica los argumentos del constructor al registrar servicios y un resolve cacheado usa un solo Map.get()."
-      "url": "https://inferdi.com/es/guide/quick-start"
-      "mainEntityOfPage": "https://inferdi.com/es/guide/quick-start"
-      "inLanguage": "es-ES"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-07-21"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Beginner"
-      "keywords": "InferDI, inicio rápido, inyección de dependencias, DI con TypeScript, contenedor, API fluida, type-safe"
-      "articleSection": "Guía"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Inicio rápido
 
-Construyes el grafo de dependencias mediante una API fluida, y TypeScript lo comprueba a medida que avanzas: cada tupla de dependencias se contrasta con las posiciones del constructor del objetivo, de modo que un argumento intercambiado o ausente es un error de compilación, no una sorpresa en runtime. No hay decoradores `@Injectable()` ni `reflect-metadata`: el cableado es código corriente que el compilador puede leer.
+En este recorrido construiremos un grafo completo, resolveremos un servicio del contenedor raíz y abriremos un scope de petición. No hacen falta decoradores ni configuración de metadatos.
+
+## Instalación
+
+::: code-group
+
+```bash [pnpm]
+pnpm add @inferdi/inferdi
+```
+
+```bash [npm]
+npm install @inferdi/inferdi
+```
+
+```bash [yarn]
+yarn add @inferdi/inferdi
+```
+
+:::
+
+## Construir el grafo
 
 ```ts
 import { Container } from '@inferdi/inferdi'
 
+type RequestContext = {
+  requestId: string
+}
+
 class Logger {
-  log(message: string) {
-    console.log(`[LOG] ${message}`)
+  info(message: string) {
+    console.info(message)
   }
 }
 
-class UserRepo {
+class Database {
+  constructor(readonly dsn: string) {}
+}
+
+class UserService {
   constructor(
-    private readonly logger: Logger,
-    private readonly dsn: string,
+    private readonly request: RequestContext,
+    private readonly database: Database,
+    private readonly logger: Logger
   ) {}
 
   find(id: string) {
-    this.logger.log(`Finding ${id} in ${this.dsn}`)
+    this.logger.info(`request=${this.request.requestId} user=${id}`)
+    return { id, database: this.database.dsn }
   }
 }
 
-const container = new Container()
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
   .registerValue('dsn', 'postgres://localhost/app')
   .registerClass('logger', Logger, [])
-  .registerClass('userRepo', UserRepo, ['logger', 'dsn'])
-
-container.get('userRepo').find('42')
+  .registerClass('database', Database, ['dsn'])
+  .registerClass(
+    'users',
+    UserService,
+    ['request', 'database', 'logger'],
+    'scoped'
+  )
 ```
 
-La llamada a `registerClass('userRepo', UserRepo, ['logger', 'dsn'])` se comprueba posicionalmente. Si cambias la tupla por `['dsn', 'logger']`, TypeScript informa del desajuste antes de que la aplicación se ejecute.
+Cada tupla de dependencias se comprueba contra el constructor. Intercambiar `database` y `logger`, omitir `request` o usar una clave desconocida produce un error de TypeScript.
 
-## Resolver valores
+El grafo anterior contiene una entrada externa y cuatro registros:
 
-Usa `.get(key)` para la resolución:
+```text
+dsn ───────────────▶ database (singleton) ─┐
+logger (singleton) ────────────────────────┼─▶ users (scoped)
+request (scope input) ─────────────────────┘
+```
+
+## Resolver servicios
+
+Los singleton del contenedor raíz se resuelven de forma síncrona con `.get()`:
 
 ```ts
-const repo = container.get('userRepo')
+const database = root.get('database')
 ```
 
-La clave debe estar registrada en el tipo del contenedor. Las claves estáticas desconocidas son errores de compilación. Las claves dinámicas deben comprobarse con `.has(key)` antes de `.get(key)`.
+`users` necesita la entrada `request`, así que primero hay que abrir un scope:
+
+```ts
+const request = { requestId: crypto.randomUUID() }
+
+await using scope = root.createScope({ request })
+const users = scope.get('users')
+
+users.find('42')
+```
+
+El tipo del scope devuelto registra que `request` está disponible. `root.get('users')` no compila porque el contenedor raíz no tiene una petición.
 
 ## Elegir tiempos de vida
 
-Los registros usan `singleton` por defecto. Pasa el tiempo de vida como cuarto argumento para las clases, o como tercer argumento para las factorías.
+Los registros usan `singleton` por defecto. Indica otro tiempo de vida cuando el valor pertenezca al scope o al código que lo solicita.
 
-```ts
-const root = new Container()
-  .registerClass('logger', Logger, [])
-  .registerClass('request', RequestContext, [], 'scoped')
-  .registerClass('token', Token, [], 'transient')
-```
-
-| Tipo | Creado | Cacheado | Liberado por el contenedor |
+| Tiempo de vida | Creación | Caché | Responsable de liberar |
 | --- | --- | --- | --- |
-| `singleton` | una vez por contenedor propietario | sí | sí |
-| `scoped` | una vez por scope | sí | sí |
-| `transient` | en cada resolución | no | no |
+| `singleton` | una vez | el contenedor que lo crea | ese contenedor |
+| `scoped` | una vez por scope hijo | el scope hijo | ese scope |
+| `transient` | en cada resolución | ninguna | el llamador |
 
-Los singletons no pueden depender directamente de servicios `scoped` o `transient`. Esa regla la imponen los tipos y, en modo estricto, las comprobaciones en runtime.
+Un singleton no puede depender directamente de un servicio scoped o transient. InferDI aplica esta regla en los tipos y, por defecto, vuelve a comprobarla en runtime.
+
+## Siguiente paso
+
+| Si necesitas… | Continúa con |
+| --- | --- |
+| entender las comprobaciones del grafo en compilación | [Seguridad de tipos](../core/type-safety) |
+| modelar una petición, un tenant o los datos de una tarea | [Entradas de scope](../core/scope-inputs) |
+| inicializar una dependencia de forma asíncrona | [Dependencias asíncronas](../core/async-dependencies) |
+| cerrar bases de datos y otros recursos con seguridad | [Scopes y liberación de recursos](../core/scopes) |
+| conectar scopes con un framework web | [Adaptadores](../adapters/) |
+| ver ejemplos completos de frameworks y runtimes | [Ejemplos](./examples) |

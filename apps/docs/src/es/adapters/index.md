@@ -1,55 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/es/adapters/#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Inicio"
-          "item": "https://inferdi.com/es/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Adaptadores"
-          "item": "https://inferdi.com/es/adapters/"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/es/adapters/#article"
-      "headline": "Adaptadores de frameworks de InferDI — visión general"
-      "name": "Adaptadores de frameworks"
-      "description": "Cada adaptador de InferDI crea un scope de petición, lo expone mediante el objeto nativo del framework y lo libera en un punto seguro del ciclo de vida."
-      "url": "https://inferdi.com/es/adapters/"
-      "mainEntityOfPage": "https://inferdi.com/es/adapters/"
-      "inLanguage": "es-ES"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-07-21"
-      "dependencies": "TypeScript, @inferdi/inferdi, Fastify, Hono, Koa, Express, Elysia"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, adaptadores, scope de petición, Fastify, Hono, Koa, Express, Elysia, middleware, inyección de dependencias"
-      "articleSection": "Adaptadores"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Adaptadores de frameworks
 
 Cada adaptador crea exactamente un scope de petición por petición, lo expone en la ubicación nativa del framework y lo libera en el punto de finalización seguro del framework, conservando al mismo tiempo el tipo concreto de contenedor que tu aplicación posee, de modo que `request.di` queda totalmente tipado, no `any` ni un contenedor base.
@@ -72,7 +20,7 @@ En modo con scope, cada adaptador ejecuta los mismos pasos para cada petición:
 
 1. **Crea** el scope a partir del contenedor raíz (`createScope`, por defecto `root.createScope()`) cuando comienza la petición.
 2. **Expone** el scope en la ubicación nativa del framework (`request.di`, `ctx.state.di`, `c.var.di`, o la clave de contexto de Elysia) *antes* de que se ejecute la configuración, de modo que un fallo de configuración y tus hooks de limpieza observen todos el mismo slot.
-3. **Configura** el scope con `setupScope` para hidratar el estado derivado de la petición: id de petición, usuario autenticado, IP del cliente. Puede ser asíncrono.
+3. **Configura** el scope con `setupScope` si hace falta inicialización adicional antes de los handlers. Puede ser asíncrono.
 4. **Atiende** la petición: los handlers de rutas y los manejadores de errores del framework resuelven servicios desde el scope expuesto.
 5. **Libera** el scope en el punto de finalización seguro del framework (`disposeScope`, por defecto `scope.dispose()`), salvo que se haya transferido la propiedad.
 
@@ -81,8 +29,8 @@ En modo con scope, cada adaptador ejecuta los mismos pasos para cada petición:
 | Opción | Por defecto | Propósito |
 | --- | --- | --- |
 | `container` | requerido | Contenedor raíz expuesto a la aplicación. Los adaptadores nunca lo liberan (excepto el `disposeRootOnClose` opcional de Fastify). |
-| `createScope` | `root.createScope()` | Construye el scope por petición. Puede ser asíncrono. |
-| `setupScope` | ninguno | Hidrata el scope antes de que se ejecuten los handlers. Puede ser asíncrono. |
+| `createScope` | `root.createScope()` | Construye el scope y recibe aquí las entradas declaradas de la petición. Puede ser asíncrono. |
+| `setupScope` | ninguno | Ejecuta inicialización adicional antes de los handlers. Puede ser asíncrono. |
 | `disposeScope` | `scope.dispose()` | Limpieza personalizada. Puede ser síncrona o asíncrona. |
 | `autoDispose` | `true` | `false`, o un predicado que devuelve `false`, cede la liberación a tu código. |
 | `onDisposeError` | sumidero por adaptador | Recibe los fallos de liberación del scope de petición: Fastify `request.log.error`, Koa `ctx.app.emit('error')`, los demás `console.error`. |

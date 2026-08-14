@@ -22,8 +22,8 @@ They are reference snippets for GitHub readers. The root package intentionally d
 
 - Build one root container for the long-lived application/runtime instance.
 - Create a scope for each request, job, command, route, page, or large feature boundary.
-- Register runtime context classes and request/job/page services on the root as `scoped`.
-- Hydrate the scoped context instance immediately after `createScope()`; if hydration or early resolution can throw, dispose the partially created scope before rethrowing.
+- Declare runtime request, job, or route data with `declareScopeInputs()` and provide it to `createScope(inputs)`.
+- Register services that consume those inputs as `scoped` or `transient`.
 - Dispose request/job scopes explicitly when that unit of work is done.
 - Do not inject scoped or transient services directly into singletons.
 - Use `await using` when the function boundary owns all async work, such as CLI commands, queue jobs, Next.js Server Actions, and non-streaming fetch handlers.

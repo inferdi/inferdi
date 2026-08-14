@@ -1,5 +1,5 @@
 import {bench, describe} from 'vitest'
-import {Container} from '../src/Container'
+import {Container, type SpecMap} from '../src/Container'
 
 /*
  * ────────────────────────────────────────────────────────────────────────────
@@ -35,13 +35,13 @@ describe('symbol vs string: singleton cache hit', () => {
 const DEPTH = 50
 type DeepDeps = Record<string, {level: number}>
 
-function buildDeepContainer(): {container: Container<DeepDeps>; topKey: string} {
+function buildDeepContainer(): {container: Container<SpecMap<DeepDeps>>; topKey: string} {
   /*
    * Use a "wide" starting T = DeepDeps via an explicit cast. Registering string
    * keys through `as never` bypasses Exclude<K, keyof T> (for the benchmark only
    * runtime matters, not type-safety of the registration loop)
    */
-  const container = new Container<DeepDeps>()
+  const container = new Container<SpecMap<DeepDeps>>()
 
   // level0 — foundation, no dependencies
   container.registerFactory('level0' as never, () => ({level: 0}))
@@ -221,7 +221,7 @@ interface RuntimeBenchContainer {
 }
 
 function buildParentTransient(strict: boolean, depth = 1): RuntimeBenchContainer {
-  let container = new Container({strict})
+  let container = new Container(strict ? {} : {fast: true})
     .registerFactory('service', () => ({value: 1}), 'transient')
 
   for (let i = 0; i < depth; i++) {
@@ -232,7 +232,7 @@ function buildParentTransient(strict: boolean, depth = 1): RuntimeBenchContainer
 }
 
 function buildOwnedScopeRoot(strict: boolean): RuntimeBenchContainer {
-  const root = new Container({strict}) as unknown as RuntimeBenchContainer
+  const root = new Container(strict ? {} : {fast: true}) as unknown as RuntimeBenchContainer
 
   for (let i = 0; i < 16; i++) {
     root.registerFactory(`service${i}`, () => ({dispose: () => {}}), 'scoped')
@@ -426,7 +426,7 @@ describe('fan-out (wide graph)', () => {
 
 describe('error paths', () => {
   // Standalone container — `get('missing')` will walk up (no parent), then throw
-  const emptyC = new Container<Record<string, unknown>>()
+  const emptyC = new Container<SpecMap<Record<string, unknown>>>()
 
   bench('get() missing key → throw "Key not found"', () => {
     try {
@@ -457,7 +457,7 @@ describe('error paths', () => {
    * Cyclic registration is impossible in pure fluent style (a references b, which is
    * registered later). We use a pre-declared T + `as never` cast for registration
    */
-  const cycleC = new Container() as Container<{a: A; b: B}>
+  const cycleC = new Container() as unknown as Container<SpecMap<{a: A; b: B}>>
   cycleC.registerClass('a' as never, A, ['b' as never])
   cycleC.registerClass('b' as never, B, ['a' as never])
 
@@ -488,11 +488,11 @@ describe('error paths', () => {
  */
 
 function buildDeepSymbolContainer(): {
-  container: Container<Record<symbol, {level: number}>>
+  container: Container<SpecMap<Record<symbol, {level: number}>>>
   topKey: symbol
 } {
   type Deps = Record<symbol, {level: number}>
-  const container = new Container<Deps>()
+  const container = new Container<SpecMap<Deps>>()
   const keys: symbol[] = [Symbol('level0')]
 
   container.registerFactory(keys[0]! as never, () => ({level: 0}))

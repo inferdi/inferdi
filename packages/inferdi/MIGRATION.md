@@ -13,6 +13,110 @@ For new features and fixes within a major line, see the release notes on the Git
 
 ## Migration to 6.0
 
+### Lifetime vocabulary
+
+The public type model now uses one vocabulary consistently:
+
+- `RegistrationKind` was removed; import `Lifetime` instead.
+- `Spec<V, L>['kind']` was renamed to `Spec<V, L>['lifetime']`.
+- Public generic and parameter names now use `L` and `lifetime`.
+
+There is no deprecated alias. Runtime registration objects may still use an
+internal `kind` field, but it is not part of the public API.
+
+### `registerFactory` is factory-first
+
+Dependency-aware factories now put the callback before the dependency tuple:
+
+```ts
+// Before
+container.registerFactory('userId', ['auth'], resolver, 'scoped')
+
+// After
+container.registerFactory('userId', resolver, ['auth'], 'scoped')
+```
+
+The supported families are `key, factory`, optional explicit lifetime, and
+optional deps after the factory. A `lazyKey` always requires an explicit
+lifetime, including `'singleton'`:
+
+```ts
+container.registerFactory('clock', factory, 'singleton', 'clockLazy')
+container.registerFactory(
+  'userId',
+  resolver,
+  ['auth'],
+  'scoped',
+  'userIdLazy'
+)
+```
+
+### Runtime contracts use `fast`
+
+InferDI 6 exposes two runtime contracts:
+
+```ts
+new Container()              // checked, mutable graph
+new Container({fast: false}) // same contract, explicit
+new Container({fast: true})  // unchecked, fixed graph
+```
+
+Replace the previous runtime-check opt-out with `{fast: true}`. The prerelease
+`mode` option and its checked fixed contract were removed. `fast` defaults to
+`false`, which keeps cycle and lifetime checks enabled and preserves the exact
+mutable parent chain. `{fast: true}` disables those checks and enables fixed
+topology optimizations. Fixed graphs must finish registration and overrides
+before the first resolve or `createScope()`, and child scopes must be disposed
+before ancestors. Only the literal value `true` enables the fast contract;
+unknown values passed through a cast use the checked mutable contract.
+
+### Named modules declare requirements
+
+`Module<TRequirements, TProvides>` no longer requires the actual graph to equal
+`TRequirements`. Extra registrations are preserved, the callback sees only its
+declared requirements, and outputs are checked for collisions against the whole
+actual graph. Requirements use exact lifetime, sync/async, managed-lazy, and
+scope-input compatibility. Missing requirements, incompatible requirements,
+and output collisions have named compiler diagnostics.
+
+### Parent construction is internal
+
+`new Container(parent)` is no longer public. Create children only with
+`parent.createScope()`. Published ESM/CJS declarations and raw source expose
+only `new Container(options?)`.
+
+### Registration keys reject possible overlaps
+
+Every `register*` overload now rejects a key type whose possible values overlap
+an existing registration. The previous whole-union check allowed a value typed
+as `'primary' | 'secondary'` to overwrite `'primary'` while the graph retained
+the old type.
+
+```ts
+const c = new Container().registerValue('primary', 1)
+declare const key: 'primary' | 'secondary'
+
+// v6: rejected because key may be 'primary'
+c.registerValue(key, 2)
+```
+
+Narrow the value to a fresh key before registration. Use `.override()` when
+replacement is intentional. Broad and union `string | symbol` keys remain
+supported when their possible values do not intersect the graph. A `lazyKey`
+uses the same check against both existing registrations and its primary key.
+
+### Teardown reports propagated failures once
+
+An async dependency failure can propagate through several cached initialization
+Promises. During disposal, InferDI now reports the same `Error` object once.
+Distinct objects remain distinct `AggregateError` causes even when their
+messages match.
+
+Sync `[Symbol.dispose]` still throws when the container owns a cached Promise.
+It now observes a native Promise rejection before throwing, preventing a later
+failure from reaching `unhandledRejection`. It does not await the resource or
+invoke `.then()` on a custom Promise-like value.
+
 ### Generic resolver helpers use ready keys
 
 `.get()` now accepts ready sync keys whose scope-input requirements have been
@@ -44,7 +148,7 @@ function resolve<
 
 `LazySpec` now carries a private type-only mode brand, and v6 adds the matching
 `AsyncLazySpec`. Explicit container and module shapes must use the exported
-named interfaces instead of reproducing `{type, kind, lazyOf}` structurally.
+named interfaces instead of reproducing `{type, lifetime, lazyOf}` structurally.
 The private discriminant has no runtime field and cannot be imported.
 
 ```ts
@@ -103,7 +207,7 @@ declared graph to differ from runtime behavior:
 
 ### Scoped resolution requires a child scope
 
-With the default `strict: true`, resolving a `scoped` key from the root now
+With the default `{fast: false}`, resolving a `scoped` key from the root now
 throws `Scoped "key" cannot be resolved from the root container. Use
 createScope().` Replace a direct root read with a child scope:
 
@@ -117,30 +221,30 @@ const request = scope.get('request')
 ```
 
 Dispose the child at the matching application or request lifecycle boundary.
-Fast Mode skips this runtime guard, but application code must still keep scoped
+`{fast: true}` skips this runtime guard, but application code must still keep scoped
 resolution on child scopes.
 
-### Fast Mode immutable graph contract
+### `fast: true` fixed graph contract
 
-`new Container({ strict: false })` now resolves scope misses directly against
+`new Container({fast: true})` resolves scope misses directly against
 the immutable root registry instead of walking the parent chain. Delegated
 singletons are mirrored into the scope cache after their first resolve, and
 registration-time defensive cache invalidation is removed together with the
-cycle and lifetime guards. Strict scopes now walk their exact parent chain on
+cycle and lifetime guards. Default scopes walk their exact parent chain on
 every local miss instead of retaining parent-lookup snapshots. This removes
 invalidation bookkeeping and per-scope lookup metadata while keeping
 post-resolve tree mutations immediately visible. Owned-instance identity
-de-duplication now runs during disposal in both modes, preserving exactly-once
+de-duplication now runs during disposal in both contracts, preserving exactly-once
 teardown without the linear scan on every owned instance creation.
 
-If you use Fast Mode:
+If you use `{fast: true}`:
 
 - Register each runtime key once through one linear fluent chain; do not reuse
   older pre-widening container aliases for duplicate registration.
 - Complete all `register*` calls before the first `.get()` or `.createScope()`.
 - Do not call `register*` or `.override()` after the tree is activated.
 - Dispose child scopes before their ancestors.
-- Use the default `strict: true` for hot reload, mutable test fixtures, or any
+- Use the default `{fast: false}` for hot reload, mutable test fixtures, or any
   container tree that changes after activation.
 
 Breaking this contract can leave a child using a stale locally cached
@@ -161,7 +265,7 @@ Three contracts are now identical across the adapters:
   `ctx.state[key]`, `c.var[key]`, Elysia context key) during cleanup.
 
 Core-only applications need changes only if they resolve scoped keys from the
-root or mutate an activated Fast Mode tree. Adapter changes:
+root or mutate an activated fast tree. Adapter changes:
 
 ### `@inferdi/fastify`
 
@@ -250,7 +354,7 @@ universal lifetime escape: a singleton consumer could inject `Lazy<scoped>` or
 `lazy: true` flag, and the compile-time `AllowedDeps` filter passed any
 `Lazy<unknown>` through structurally. v4 makes `Lazy<T>` preserve the target's
 lifetime — `Lazy<singleton>` is the only Lazy variant a singleton may take, and
-the rule is enforced at both the type level and the strict-mode runtime.
+the rule is enforced at both the type level and by the default runtime checks.
 Non-singleton consumers are unaffected: a scoped or transient service may still
 inject any `Lazy<*>`.
 
@@ -267,7 +371,7 @@ inject any `Lazy<*>`.
   system can distinguish managed companions from raw `Lazy<V>` values.
 - **Runtime guard.** The `lazy: true` flag in `Registration` is now set only
   when the target kind is `'singleton'`. For other targets the companion is
-  rejected by the same strict-mode lifetime guard that catches direct
+  rejected by the same default lifetime guard that catches direct
   short-lived injections — handy for `as`-cast bypass cases.
 - **Captured-scope footgun is no longer a documented limitation.** Injecting
   `Lazy<scoped>` into a singleton was previously a known-but-allowed pattern
@@ -315,7 +419,7 @@ inject any `Lazy<*>`.
   common pattern in v3 documentation) becomes a TS error. The canonical
   example in `examples/_shared/container.ts` was updated to use a singleton
   target.
-- **Strict-mode runtime diagnostic.** For an `as`-cast bypass that lands a
+- **Runtime diagnostic.** With `fast: false`, an `as`-cast bypass that lands a
   `Lazy<scoped|transient>` in a singleton, the message reads
   `Singleton "<X>" cannot depend on transient "<lazyKey>"` (the wrapper itself
   is transient). Future versions may refine this to mention the companion's
@@ -406,17 +510,17 @@ the fluent `register*` chain still infers the right type, and
   through a `registerFactory((c) => ...)` body — the compiler rejects it
   before code ever runs. The runtime guard still fires as defense-in-depth
   for `as`-cast bypasses. See the
-  [Strict Lifetime Guards](./README.md#strict-lifetime-guards) section.
+  [Runtime Lifetime Guards](./README.md#runtime-lifetime-guards) section.
 
-- **`ContainerOptions` interface, `new Container({ strict: false })`** —
+- **`ContainerOptions` interface and runtime-check opt-out.** v3 introduced an
   optional opt-out of the runtime cycle / lifetime guard for applications
   that have audited their graph and trust the compile-time guard. Skips
   the `try`/`finally`, `singletonStack` push/pop, and the cycle bookkeeping
   inside `get()`. Cache fast-paths (warm singleton, warm lazy) run upstream
   of the guard and are unaffected. The flag is inherited by every child
-  spawned via `createScope()`. Default is `strict: true` — **existing code
-  needs no change**. See the
-  [Fast Mode](./README.md#fast-mode-new-container-strict-false) section
+  spawned via `createScope()`. The current equivalent is `{fast: true}`; the
+  current default remains checked. See the
+  [`fast` option](./README.md#runtime-contracts) section
   in the README for the trade-offs (cycles become `RangeError`, lifetime
   violations through `as`-casts become silent leaks).
 

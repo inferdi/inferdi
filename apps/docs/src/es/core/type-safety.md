@@ -1,59 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/es/core/type-safety#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Inicio"
-          "item": "https://inferdi.com/es/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Conceptos básicos"
-          "item": "https://inferdi.com/es/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Seguridad de tipos"
-          "item": "https://inferdi.com/es/core/type-safety"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/es/core/type-safety#article"
-      "headline": "Seguridad de tipos en InferDI: el grafo es el tipo"
-      "name": "Seguridad de tipos"
-      "description": "InferDI mantiene el grafo de dependencias en el sistema de tipos: un orden de argumentos incorrecto, una clave sin registrar o un singleton que alcanza estado con scope es un error de compilación en tu editor, no un stack trace en runtime que descubres bajo carga."
-      "url": "https://inferdi.com/es/core/type-safety"
-      "mainEntityOfPage": "https://inferdi.com/es/core/type-safety"
-      "inLanguage": "es-ES"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, seguridad de tipos, TypeScript, inferencia de tipos, firmas de constructor, tiempo de compilación, inyección de dependencias"
-      "articleSection": "Conceptos básicos"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Seguridad de tipos
 
 La regla central de InferDI: el grafo de dependencias vive en el sistema de tipos. Un grafo inválido — un orden de argumentos incorrecto, una clave que nunca se registró, un singleton que alcanza estado con scope — es un error de tipos que ves en tu editor, no un stack trace que descubres bajo carga. Todo lo que el compilador puede demostrar estáticamente se comprueba estáticamente; los guards de runtime existen solo para atrapar lo que los casts `as` y las claves dinámicas dejan pasar.
@@ -91,6 +35,24 @@ new Container()
 
 Las pruebas usan `.override()` cuando el reemplazo es intencional.
 
+El guard de unicidad comprueba todo el conjunto de valores representado por el tipo de la clave. Si una clave tiene el tipo `'dsn' | 'replica'` después de registrar `'dsn'`, TypeScript rechaza la llamada porque el valor de runtime podría sobrescribir `'dsn'`. La misma regla se aplica a un `string` o `symbol` amplio y a `lazyKey`, que no puede solaparse con la clave principal ni con una clave existente.
+
+Las claves amplias y union siguen disponibles cuando sus valores posibles no se solapan con el grafo. Un `string` amplio es válido en un contenedor vacío o después de registros compuestos solo por symbols. Acota una clave de runtime a un miembro nuevo antes de registrarla; usa `.override()` cuando quieras reemplazar un registro.
+
+## Claves dinámicas
+
+`.get()` comprueba directamente las claves estáticas. Si una clave llega en runtime, acota primero su tipo con `.has()`:
+
+```ts
+declare const key: string | symbol
+
+if (container.has(key)) {
+  container.get(key)
+}
+```
+
+`.has()` comprueba el registro sin resolver el valor. Devuelve `false` si el contenedor está liberado, pero no demuestra que las entradas de scope estén listas ni que una clave asíncrona pueda pasarse a `.get()`.
+
 ## El tiempo de vida en el tipo
 
 Cada entrada lleva tanto el tipo del valor como su clase de tiempo de vida. El sistema de tipos filtra las dependencias para que un singleton no pueda depender directamente de servicios con scope o transitorios.
@@ -116,10 +78,10 @@ const root = new Container()
 
 const scope = root.createScope({request})
 
-// @ts-expect-error: handler es async
+// @ts-expect-error: handler is async
 scope.get('handler')
 
 await scope.getAsync('handler')
 ```
 
-Usa [Entradas y perfiles de scope](./scope-inputs) para modelar la preparación y [Grafo de dependencias asíncrono](./async-dependency-graph) para elegir el contrato Promise.
+Usa [Entradas de scope](./scope-inputs) para modelar la preparación y [Dependencias asíncronas](./async-dependencies) para elegir el contrato Promise.

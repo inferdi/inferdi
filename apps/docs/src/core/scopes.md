@@ -1,79 +1,24 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/core/scopes#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Home"
-          "item": "https://inferdi.com/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Core Concepts"
-          "item": "https://inferdi.com/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Scopes and Teardown"
-          "item": "https://inferdi.com/core/scopes"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/core/scopes#article"
-      "headline": "Scopes and Teardown in InferDI"
-      "name": "Scopes and Teardown"
-      "description": "A scope bounds request-local services to one unit of work: a child scope inherits every parent registration but caches its own instances and owns their teardown, with LIFO disposal and support for using and await using."
-      "url": "https://inferdi.com/core/scopes"
-      "mainEntityOfPage": "https://inferdi.com/core/scopes"
-      "inLanguage": "en-US"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, scopes, teardown, disposal, child scope, using, await using, LIFO, dependency injection"
-      "articleSection": "Core Concepts"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
-# Scopes and Teardown
+# Scopes and Disposal
 
 A scope bounds the lifetime of request-local services to a single unit of work. A child scope inherits every parent registration, but caches its own scoped instances and owns their teardown — so the scope created for one request never shares state with, or outlives, another.
 
 ```ts
 const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
   .registerClass('db', Db, [])
-  .registerClass('request', RequestContext, [], 'scoped')
+  .registerClass('handler', RequestHandler, ['request', 'db'], 'scoped')
 
 async function handle(request: Request) {
-  await using scope = root.createScope()
-  const ctx = scope.get('request')
+  await using scope = root.createScope({ request })
+  return scope.get('handler').run()
 }
 ```
 
-`db` is a root singleton. `request` is created once per scope and disposed when the scope is disposed.
+`db` is a root singleton. The request is an application-owned scope input, while `handler` is created and owned by the request scope.
 
-`scoped` registrations belong to child scopes. With `strict: true` (the default), `root.get('request')` throws `Scoped "request" cannot be resolved from the root container. Use createScope().` Call `createScope()`, then resolve the key from its result. `strict: false` skips this runtime guard.
+`scoped` registrations belong to child scopes. With `fast: false` (the default), resolving one from the root throws `Scoped "key" cannot be resolved from the root container. Use createScope().` Call `createScope()`, then resolve the key from its result. `fast: true` skips this runtime guard.
 
-## Scope Inputs and Profiles
+## Scope Inputs
 
 Scope inputs represent external values that exist only when you open a scope, such as a request, authentication context, tenant, or job payload. Declare them once and provide any required subset through `createScope(inputs)`:
 
@@ -86,7 +31,7 @@ await using scope = root.createScope({request})
 scope.get('service')
 ```
 
-The container type tracks which inputs have been provided and hides dependent services until they are ready. See [Scope Inputs and Profiles](./scope-inputs) for named profiles, nested refinement, deps-aware factories, reusable types, and input validation rules.
+The container type tracks which inputs have been provided and hides dependent services until they are ready. See [Scope Inputs](./scope-inputs) for named profiles, nested refinement, deps-aware factories, reusable types, and input validation rules.
 
 ## Ownership
 

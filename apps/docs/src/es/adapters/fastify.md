@@ -1,59 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/es/adapters/fastify#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Inicio"
-          "item": "https://inferdi.com/es/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Adaptadores"
-          "item": "https://inferdi.com/es/adapters/"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Adaptador de Fastify"
-          "item": "https://inferdi.com/es/adapters/fastify"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/es/adapters/fastify#article"
-      "headline": "Adaptador de Fastify de InferDI — @inferdi/fastify"
-      "name": "Adaptador de Fastify"
-      "description": "@inferdi/fastify es un plugin de Fastify v5: en modo con scope expone la raíz como app.di, crea un scope de petición en onRequest, lo expone como request.di y lo libera en onResponse, con hooks de limpieza tipados y gestión del aborto del cliente."
-      "url": "https://inferdi.com/es/adapters/fastify"
-      "mainEntityOfPage": "https://inferdi.com/es/adapters/fastify"
-      "inLanguage": "es-ES"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript, Fastify v5, @inferdi/inferdi"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, Fastify, Fastify v5, plugin, scope de petición, request.di, onRequest, onResponse, inyección de dependencias"
-      "articleSection": "Adaptadores"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "@inferdi/fastify"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js >=20"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Adaptador de Fastify
 
 [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) es un plugin de Fastify v5. En modo con scope, expone la raíz como `app.di`, crea un scope de petición en `onRequest`, lo expone como `request.di` y lo libera en `onResponse`.
@@ -78,7 +22,13 @@ const root = buildRootContainer()
 const app = Fastify()
 
 type RootContainer = typeof root
-type RequestContainer = ReturnType<RootContainer['createScope']>
+const openRequestScope = (request: FastifyRequest) => root.createScope({
+  request: {
+    requestId: request.id,
+    ip: request.ip
+  }
+})
+type RequestContainer = ReturnType<typeof openRequestScope>
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -92,11 +42,7 @@ declare module 'fastify' {
 
 await app.register(inferdiFastify, {
   container: root,
-  setupScope: (scope: RequestContainer, request) => {
-    const ctx = scope.get('request')
-    ctx.requestId = request.id
-    ctx.ip = request.ip
-  },
+  createScope: (_root, request) => openRequestScope(request)
 })
 
 app.get('/users/:id', async (request) => {
@@ -114,7 +60,7 @@ El `app.register` de Fastify no puede inferir los genéricos del plugin con sufi
 | `container` | requerido | Contenedor raíz expuesto como `app.di`. |
 | `scopePerRequest` | `true` | Establece `false` para el modo solo raíz. |
 | `createScope` | `root.createScope()` | Creación personalizada del scope de petición. Puede ser asíncrona. |
-| `setupScope` | ninguno | Hidrata el scope en `onRequest`. Puede ser asíncrono. |
+| `setupScope` | ninguno | Ejecuta inicialización adicional después de crear el scope. |
 | `disposeScope` | `scope.dispose()` | Liberación personalizada. Puede ser síncrona o asíncrona. |
 | `autoDispose` | `true` | `false` o un predicado `false` transfiere la propiedad al código de la aplicación. |
 | `disposeRootOnClose` | `false` | Libera la raíz durante `fastify.close()`. |

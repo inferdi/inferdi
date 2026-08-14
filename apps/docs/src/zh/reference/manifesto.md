@@ -1,57 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/zh/reference/manifesto#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "首页"
-          "item": "https://inferdi.com/zh/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "参考"
-          "item": "https://inferdi.com/zh/reference/api"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "InferDI 核心架构宣言"
-          "item": "https://inferdi.com/zh/reference/manifesto"
-    - "@type": "Article"
-      "@id": "https://inferdi.com/zh/reference/manifesto#article"
-      "headline": "InferDI 核心架构宣言"
-      "name": "InferDI 核心架构宣言"
-      "description": "InferDI 背后的架构宣言：凡是编译器能够静态验证的，都必须静态验证，做到零运行时开销、零依赖、零装饰器，以及由此带来的有意识的权衡取舍。"
-      "url": "https://inferdi.com/zh/reference/manifesto"
-      "mainEntityOfPage": "https://inferdi.com/zh/reference/manifesto"
-      "inLanguage": "zh-CN"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "keywords": "InferDI, 宣言, 架构, 设计原则, 类型安全, 零开销, 零依赖, 依赖注入"
-      "articleSection": "参考"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # InferDI 核心架构宣言
 
 本文档规约 `packages/inferdi` 中的 `@inferdi/inferdi`。在评审任何触及公开 API、类型系统、`get()` 解析路径、注册形态、作用域语义或清理行为的 PR 之前，请先阅读本文档。
@@ -77,8 +23,8 @@ InferDI 证明 TypeScript 的依赖注入可以在不放弃静态保证的前提
 在 TypeScript 能够表达规则的地方，每一个公开签名都必须让无效的依赖图状态无法被表达。
 
 - `register*` 使用 `K & ([K] extends [keyof T] ? never : unknown)`，使重复的键在编译期失败，且出错的键在错误信息中保持可见。
-- `DepsOf<AllowedDeps<T, Kind>, A>` 会按位置和结构可赋值性，将 `deps` 元组与构造函数参数进行核对。
-- `AllowedDeps<T, Kind>` 会收窄传入工厂的容器。在单例工厂内部，`c.get('scoped')` 是一个类型错误。
+- `DepsOf<AllowedDeps<T, L>, A>` 会按位置和结构可赋值性，将 `deps` 元组与构造函数参数进行核对。
+- `AllowedDeps<T, L>` 会收窄传入工厂的容器。在单例工厂内部，`c.get('scoped')` 是一个类型错误。
 - `Spec`、`AsyncSpec`、`LazySpec`、`SpecMap`、`Module`、`Container.Resolve`、`Container.ResolveUnwrapped`、`Container.UnwrappedValue` 和 `Container.Providers` 都属于契约的一部分。对它们的改动应视为公开 API 的变更。
 - 新增或改动的公开类型接口需要在 `packages/inferdi/__tests__/container.test-d.ts` 中提供正向类型测试和负向的 `// @ts-expect-error` 测试。
 
@@ -96,9 +42,9 @@ InferDI 是面向 ES2022 的普通 TypeScript。不要添加装饰器、`reflect
 
 ### 2.3 生命周期即类型
 
-核心有三种注册种类：`singleton`、`scoped` 和 `transient`。每个注册都通过 `Spec<V, Kind>` 携带其生命周期。
+核心有三种注册种类：`singleton`、`scoped` 和 `transient`。每个注册都通过 `Spec<V, L>` 携带其生命周期。
 
-- 单例不得直接依赖作用域级或瞬态服务。`AllowedDeps<T, Kind>` 在编译期强制执行这一点；`strict: true` 在运行时针对强制转换和动态注册强制执行这一点。
+- 单例不得直接依赖作用域级或瞬态服务。`AllowedDeps<T, L>` 在编译期强制执行这一点；默认的 `{fast: false}` 在运行时针对强制转换和动态注册强制执行这一点。
 - `Lazy<V>` 会保留目标生命周期。单例消费者只能注入 `LazySpec<V, 'singleton'>`。`Lazy<scoped>` 和 `Lazy<transient>` 对作用域级和瞬态消费者仍然合法，但对单例消费者仍然非法。
 - 运行时的 `Registration.lazy` 标志只能在目标种类为 `'singleton'` 的惰性伴生项上为 `true`。
 - 运行时的 `Registration.owned` 标志只会在创建值归容器所有的类或工厂注册上为 `true`；在 `registerValue`、`.override()` 和惰性伴生项上为 `false`。
@@ -123,7 +69,7 @@ if (cached !== undefined) return ...
 - 构造函数调用对 0-7 个参数保持按参数个数展开。8 个及以上的路径使用 `Reflect.construct`，并配合通过 `push` 构建的紧凑数组（packed array）。
 - `get()` 保持同步。共享的 `resolving` 数组和 `singletonStack` 之所以安全，是因为一次解析及其声明式异步依赖预检会在调用栈上原子地运行。`getAsync()` 只在同一个解析器外增加 Promise 边界，不会在 continuation 中修改这些栈。
 - 声明式异步注册与同步注册共用 `regs`、`cache`、作用域查找、所有权和释放逻辑。`Registration.async` 只是注册阶段用于依赖分类的冷元数据；`get()` 不读取它。
-- `strict: false` 可以在本地缓存快速路径之后移除运行时的循环与生命周期检查。快速 scope 可以直接读取不可变的根注册表，并把委托解析的 singleton 镜像到本地缓存。fast 依赖树在首次解析或创建 scope 后必须保持不可变。
+- `{fast: false}` 是默认的 checked mutable 契约。`{fast: true}` 会在本地缓存快速路径之后移除循环与生命周期检查，直接读取 registry owner，并镜像委托 singleton。快速树在首次解析或创建 scope 后必须保持不可变。
 
 `packages/inferdi/__tests__/container.bench.ts` 不受 CI 强制约束。对于触及 `get()`、注册对象形态、缓存表示、作用域查找、惰性伴生项或构造函数调用的改动，评审者必须要求提供基准测试输出。在相关场景中超过 5% 的本地性能回退会阻止合并，除非该 PR 包含一份范围明确、书面的理由说明。
 
@@ -206,7 +152,7 @@ if (cached !== undefined) return ...
 | 不检测 Promise 边界之后的动态循环 | 声明式异步依赖经过同步预检，并使用现有的循环守卫。返回 Promise 的旧式工厂或捕获容器在 `await` 后发起的调用发生在解析栈清空之后。请拆分此类循环或提升共享初始化逻辑。 |
 | 不在异步边界后进行运行时生命周期检测 | `AllowedDeps` 仍会阻止无效的类型化工厂，但 `await` 后通过 `as` 强制转换或捕获的外部容器会在 `singletonStack` 清理后运行。完整防护需要异步上下文跟踪。请在同步阶段读取依赖项。 |
 | 没有自动断环 | 循环属于架构缺陷，除非其中一端是显式的惰性单例伴生项。InferDI 会检测受支持的运行时循环并报告它们；它不会臆造 proxy 或部分构造的实例。 |
-| 不支持泛型 `<T>(c: Container<T>) => ...` 模块 | 在泛型函数体内部，`keyof T` 会坍缩为 `DependenciesMap` 的上界。请使用内联的 `.use()` lambda，或带有已知输入形态的 `Module<TIn, TOut>`。 |
+| 不支持泛型 `<T>(c: Container<T>) => ...` 模块 | 在泛型函数体内部，`keyof T` 会坍缩为 `DependenciesMap` 的上界。请使用内联的 `.use()` lambda，或声明 requirements 的 `Module<TRequirements, TProvides>`。 |
 | 没有动态 DI 解析器 API | `.has(key)` 是被认可的动态探测方式。静态键应直接使用 `.get()`。 |
 | 没有生产环境覆盖方案 | `.override()` 仅用于测试和热重载夹具。生产环境的依赖图选择应当存在于 `.use()` 或常规的构建器代码中。 |
 | 没有父到子的级联释放 | 每个容器拥有其自身的实例。级联释放会使 `dispose()` 成为非局部的副作用，并破坏作用域所有权。 |

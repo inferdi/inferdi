@@ -7,10 +7,10 @@ the published `@inferdi/fastify`, `@inferdi/hono`, `@inferdi/koa`, `@inferdi/exp
 adapters for lifecycle hooks:
 
 1. Build the root container once when the server starts (`buildRootContainer()`).
-2. For each HTTP request, create a scope with `await createRequestScope(root, {...})` through an adapter scope hook.
+2. For each HTTP request, create a scope with `createRequestScope(root, {...})` through an adapter scope hook.
 3. Attach the scope to the framework request/context object.
 4. Dispose the scope from the framework's response-completion lifecycle. `dispose()` is idempotent, so Koa and Express can safely listen to both Node `finish` and `close`. In Fastify, use `onResponse` only; `onError` runs before the error handler finishes. In Elysia, use the adapter's guarded `onError` + `onAfterResponse` cleanup so validation failures after `derive` do not leak scopes.
 
 Avoid `await using` inside normal HTTP route handlers. Many frameworks can stream or defer response work after the handler returns, so scope disposal must be tied to the actual response lifecycle. Hono streaming handlers should call `skipInferdiDispose(c)` and own cleanup in the stream or `executionCtx.waitUntil`; Koa and Express stream bodies normally stay covered by `finish` / `close`, so call `skipInferdiDispose(...)` only for background ownership transfer.
 
-Do not use `override()` for request context in production code. It is a test API. The production pattern is `await createRequestScope(root, init)`, which creates the scope, hydrates the scoped context instance, and disposes the scope if hydration fails.
+Do not use `override()` for request context in production code. It is a test API. The production pattern is `createRequestScope(root, input)`, which passes a declared scope input to `root.createScope({ request: input })`.

@@ -1,71 +1,22 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/es/reference/migration#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Inicio"
-          "item": "https://inferdi.com/es/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Referencia"
-          "item": "https://inferdi.com/es/reference/api"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Migración"
-          "item": "https://inferdi.com/es/reference/migration"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/es/reference/migration#article"
-      "headline": "Guía de migración de InferDI"
-      "name": "Migración"
-      "description": "Cambios incompatibles por versión major y la ruta de migración actual a InferDI 6.0, reflejando packages/inferdi/MIGRATION.md como fuente de verdad."
-      "url": "https://inferdi.com/es/reference/migration"
-      "mainEntityOfPage": "https://inferdi.com/es/reference/migration"
-      "inLanguage": "es-ES"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, migración, cambios incompatibles, actualización, 6.0, ReadyKeys, SyncReadyKeys, inyección de dependencias"
-      "articleSection": "Referencia"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Migración
 
 InferDI registra los cambios incompatibles por versión major. La fuente de verdad sigue siendo [`packages/inferdi/MIGRATION.md`](https://github.com/inferdi/inferdi/blob/main/packages/inferdi/MIGRATION.md), pero aquí se resume la ruta de migración actual.
 
 ## Migración a 6.0
 
+- Sustituye `RegistrationKind` por `Lifetime` y `Spec.kind` por `Spec.lifetime`; no queda alias obsoleto.
+- Mueve `deps` en factorías sync a `registerFactory(key, factory, deps, ...)`. Un acompañante exige lifetime explícito, incluido `'singleton'`.
+- Sustituye la opción anterior que desactivaba los checks de runtime por `{fast: true}`. La opción `mode` de la prerelease se eliminó. `fast` vale `false` por defecto: mantiene los checks y el grafo mutable; `fast: true` selecciona el contrato unchecked fixed.
+- Un `Module<TRequirements, TProvides>` con nombre acepta grafos reales con registros extra, los conserva, comprueba requisitos exactos y rechaza colisiones de outputs. `new Container(parent)` deja de ser público; usa `createScope()`.
+- El registro rechaza ahora cualquier tipo de clave que pueda solaparse con una clave principal o lazy existente. Acota las claves amplias o union a un miembro nuevo, o usa `.override()` para un reemplazo intencional.
+- El teardown async informa una vez de un objeto de rechazo compartido cuando un fallo de dependencia se propaga por varias Promises en caché. El teardown sync observa el rechazo de una Promise nativa antes de lanzar el error de uso async incorrecto.
+
 ### Los resolvers genéricos usan claves listas
 
 `.get()` ahora acepta claves síncronas listas cuyos inputs de scope se hayan proporcionado. Los contenedores concretos sin inputs de scope mantienen el mismo conjunto de claves síncronas. Los helpers genéricos con `K extends keyof T` deben conservar la preparación y el estado async.
 
 ```ts
-// Antes
+// Before
 function resolve<T extends DependenciesMap, K extends keyof T>(
   container: Container<T>,
   key: K
@@ -73,7 +24,7 @@ function resolve<T extends DependenciesMap, K extends keyof T>(
   return container.get(key)
 }
 
-// Después
+// After
 function resolve<
   T extends DependenciesMap,
   K extends Container.SyncReadyKeys<Container<T>>
@@ -88,7 +39,7 @@ Usa `Container.ReadyKeys<Container<T>>` en helpers genéricos que llamen a `getA
 
 `LazySpec` incorpora un brand privado solo de tipos y v6 añade
 `AsyncLazySpec`. Las formas explícitas de `Container` y `Module` deben usar
-estas exportaciones con nombre en vez de reproducir `{type, kind, lazyOf}`. El
+estas exportaciones con nombre en vez de reproducir `{type, lifetime, lazyOf}`. El
 brand no crea un campo de runtime.
 
 El quinto `lazyKey` de `registerAsyncFactory` produce `AsyncLazy<T>`. Las clases
@@ -97,11 +48,11 @@ async usan el mismo wrapper; una clase mixed sync/async expone
 siguen siendo `Lazy<Promise<T>>`. `Container.ResolveUnwrapped` desenvuelve de
 forma distributiva todos los modos administrados.
 
-Los conjuntos de claves nuevos se describen en [Resumen de la API](./api), [Entradas y perfiles de scope](../core/scope-inputs) y [Grafo de dependencias asíncrono](../core/async-dependency-graph).
+Los conjuntos de claves nuevos se describen en [Resumen de la API](./api), [Entradas de scope](../core/scope-inputs) y [Dependencias asíncronas](../core/async-dependencies).
 
 ## Migración a 5.0
 
-La release inicial de v5 solo afectó a los adaptadores. El incremento de versión mantiene todos los paquetes publicados en lockstep y alinea los adaptadores de frameworks alrededor de un único contrato de limpieza. Las builds posteriores de v5 también aplican la propiedad del scope hijo y endurecen el contrato de modo rápido descrito a continuación.
+La release inicial de v5 solo afectó a los adaptadores. El incremento de versión mantiene todos los paquetes publicados en lockstep y alinea los adaptadores de frameworks alrededor de un único contrato de limpieza. Las builds posteriores de v5 también aplican la propiedad del scope hijo y endurecen el contrato `{fast: true}` descrito a continuación.
 
 Los contratos de los adaptadores ahora comparten estas reglas:
 
@@ -114,11 +65,11 @@ Los contratos de los adaptadores ahora comparten estas reglas:
 
 ### La resolución scoped requiere un scope hijo
 
-Con el valor predeterminado `strict: true`, resolver una clave scoped desde la raíz ahora lanza `Scoped "key" cannot be resolved from the root container. Use createScope().` Crea un contenedor hijo con `const scope = root.createScope()`, llama a `scope.get(scopedKey)` y libera el hijo en su límite de ciclo de vida. El modo rápido omite este guard en runtime, pero los servicios scoped deben seguir resolviéndose desde scopes hijos.
+Con el valor predeterminado `{fast: false}`, resolver una clave scoped desde la raíz ahora lanza `Scoped "key" cannot be resolved from the root container. Use createScope().` Crea un contenedor hijo con `const scope = root.createScope()`, llama a `scope.get(scopedKey)` y libera el hijo en su límite de ciclo de vida. `{fast: true}` omite este guard en runtime, pero los servicios scoped deben seguir resolviéndose desde scopes hijos.
 
-### Contrato de grafo inmutable del modo rápido
+### Contrato de grafo fijo de `fast: true`
 
-`new Container({ strict: false })` ahora lee el registro raíz inmutable
+`new Container({fast: true})` lee el registro raíz inmutable
 directamente desde los scopes, evita recorrer los padres y refleja los
 singletons delegados en la caché del scope. Los scopes strict recorren su cadena
 exacta de padres en cada fallo local en lugar de conservar instantáneas de
@@ -128,7 +79,7 @@ instancias owned se ejecuta durante el disposal en ambos modos. Registra cada
 clave de runtime una sola vez mediante una cadena fluent lineal, completa el
 registro antes de la primera resolución o creación de scope, mantén inmutable
 el árbol activado y elimina los scopes hijos antes que sus ancestros. Usa
-`strict: true` para hot reload o cualquier árbol que cambie después de
+`{fast: false}` para hot reload o cualquier árbol que cambie después de
 activarse.
 
 ### Notas de los adaptadores
@@ -187,7 +138,7 @@ Cambios principales:
 - `registerFactory` estrecha su parámetro `c` para las factorías singleton.
 - `registerClass` filtra `deps` para los registros singleton.
 - `override(key, value)` preserva el tipo de tiempo de vida original.
-- `new Container({ strict: false })` puede deshabilitar los guards de ciclo y tiempo de vida en runtime tras una auditoría del grafo.
+- `new Container({fast: true})` puede deshabilitar los guards de ciclo y tiempo de vida en runtime tras una auditoría del grafo.
 
 Correcciones comunes:
 
@@ -259,7 +210,7 @@ Al actualizar los adaptadores, mantén el paquete del adaptador y [`@inferdi/inf
 1. Lee las notas de migración de cada versión major que atravieses.
 2. Actualiza [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) y todos los adaptadores instalados juntos.
 3. Ejecuta las pruebas de tipos o `tsc --noEmit` para detectar cambios en la forma del grafo.
-4. Ejecuta las pruebas de runtime en modo estricto.
+4. Ejecuta las pruebas de runtime con el contrato checked predeterminado.
 5. Revisa la propiedad del scope de petición si usas `skipInferdiDispose`, `autoDispose: false` o un `disposeScope` personalizado.
 
 ## Fronteras estables

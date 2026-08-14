@@ -1,59 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/es/core/modules#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Inicio"
-          "item": "https://inferdi.com/es/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Conceptos básicos"
-          "item": "https://inferdi.com/es/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Módulos"
-          "item": "https://inferdi.com/es/core/modules"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/es/core/modules#article"
-      "headline": "Módulos en InferDI — componiendo constructores con .use()"
-      "name": "Módulos"
-      "description": "Divide un constructor de contenedor grande en piezas más pequeñas con .use() manteniendo la inferencia de tipos completa a lo largo de la cadena fluida, y comprende por qué los módulos genéricos necesitan una forma de entrada conocida."
-      "url": "https://inferdi.com/es/core/modules"
-      "mainEntityOfPage": "https://inferdi.com/es/core/modules"
-      "inLanguage": "es-ES"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, módulos, use, composición de contenedor, inferencia de tipos, tipo Module, inyección de dependencias"
-      "articleSection": "Conceptos básicos"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Módulos
 
 Usa `.use()` para dividir un constructor de contenedor grande en piezas más pequeñas, manteniendo la inferencia de tipos a lo largo de la cadena fluida.
@@ -74,7 +18,7 @@ Las lambdas en línea son la forma más ergonómica. El tipo de contenedor de la
 
 ## Módulos con nombre
 
-Para módulos reutilizables de forma fija, usa el tipo exportado `Module<TIn, TOut>`.
+Los módulos con nombre declaran solo sus requisitos y resultados con `Module<TRequirements, TProvides>`. El grafo real puede contener registros adicionales, que se conservan en el resultado.
 
 ```ts
 import {
@@ -83,29 +27,22 @@ import {
   type SpecMap,
 } from '@inferdi/inferdi'
 
-type Base = SpecMap<{ config: { env: string } }>
-type Added = SpecMap<{ mailer: Mailer }>
+type Requirements = SpecMap<{ config: { env: string } }>
+type Provides = SpecMap<{ mailer: Mailer }>
 
-const addMailer: Module<Base, Added> = (c) => {
+const addMailer: Module<Requirements, Provides> = (c) => {
   const { env } = c.get('config')
   return env === 'test'
     ? c.registerClass('mailer', MockMailer, [])
     : c.registerClass('mailer', RealMailer, [])
 }
+
+const app = new Container()
+  .registerValue('config', {env: 'test'})
+  .registerValue('metrics', new Metrics())
+  .use(addMailer) // keeps config + metrics and adds mailer
 ```
 
-Las funciones de módulo genéricas como `<T>(c: Container<T>) => ...` no pueden expresar la unicidad de claves dentro del cuerpo. Usa lambdas en línea o declaraciones de forma fija `Module<TIn, TOut>`.
+El callback solo ve `Container<TRequirements>`. Los requisitos se comprueban por tipo de servicio, lifetime exacto, modo sync/async, modo managed-lazy y disponibilidad de scope inputs. Los outputs no pueden colisionar con ninguna clave del grafo real; requisitos ausentes, incompatibles y colisiones tienen diagnósticos con nombre.
 
-## Comprobaciones dinámicas
-
-`.has(key)` es un type guard para claves dinámicas:
-
-```ts
-declare const key: string | symbol
-
-if (container.has(key)) {
-  container.get(key)
-}
-```
-
-`.has()` nunca resuelve el valor y devuelve `false` en contenedores liberados.
+Si la clave se selecciona en runtime, usa el [type guard `.has()`](./type-safety#claves-dinámicas) antes de resolverla.

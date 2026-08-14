@@ -29,7 +29,7 @@ interface Fixture {
 
 const ARITIES = [0, 1, 2, 3, 4, 5, 6, 7] as const
 const POOL_SIZES = [1, 2, 4, 8, 16] as const
-const MAX_POOL_SIZE = POOL_SIZES[POOL_SIZES.length - 1]
+const MAX_POOL_SIZE = POOL_SIZES[POOL_SIZES.length - 1]!
 const BENCH_OPTIONS = {time: 300, warmupTime: 150} as const
 
 let sink = 0
@@ -70,7 +70,7 @@ function buildFixture(
   strict: boolean,
   distinctDependencyKeys = false
 ): Fixture {
-  const container = new Container({strict}) as unknown as RuntimeContainer
+  const container = new Container(strict ? {} : {fast: true}) as unknown as RuntimeContainer
   const sharedDeps = Array.from({length: arity}, (_, index) => `dep${index}`)
 
   for (let index = 0; index < arity; index++) container.registerValue(sharedDeps[index]!, index + 1)

@@ -1,5 +1,6 @@
 ---
 layout: home
+description: "A zero-dependency, decorator-free DI container with compiler-checked graphs, explicit lifetimes, and predictable disposal."
 
 hero:
   name: InferDI
@@ -64,44 +65,4 @@ features:
     details: "InferDI has zero runtime dependencies and runs in Node, Bun, Deno, browsers, and workers. Adapters add optional request-scope lifecycle glue."
     link: /adapters/
     linkText: How adapters work
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "WebSite"
-      "@id": "https://inferdi.com/#website"
-      "url": "https://inferdi.com/"
-      "name": "InferDI"
-      "description": "Decorator-free, strongly typed dependency injection for modern TypeScript."
-      "inLanguage": "en-US"
-      "publisher":
-        "@id": "https://inferdi.com/#organization"
-      "potentialAction":
-        "@type": "SearchAction"
-        "target":
-          "@type": "EntryPoint"
-          "urlTemplate": "https://inferdi.com/?q={search_term_string}"
-        "query-input": "required name=search_term_string"
-    - "@type": "Organization"
-      "@id": "https://inferdi.com/#organization"
-      "name": "InferDI"
-      "url": "https://inferdi.com/"
-      "logo":
-        "@type": "ImageObject"
-        "url": "https://inferdi.com/logo.png"
-      "sameAs":
-        - "https://github.com/inferdi/inferdi"
-        - "https://twitter.com/inferdi_ts"
-    - "@type": "SoftwareApplication"
-      "@id": "https://inferdi.com/#software"
-      "name": "InferDI"
-      "applicationCategory": "DeveloperApplication"
-      "operatingSystem": "Node.js, Bun, Deno, Browser, Edge runtimes"
-      "softwareVersion": "6.0.0"
-      "programmingLanguage": "TypeScript"
-      "url": "https://inferdi.com/"
-      "downloadUrl": "https://www.npmjs.com/package/@inferdi/inferdi"
-      "description": "Zero-dependency, decorator-free, strongly typed DI container for TypeScript. TypeScript rejects misordered arguments, missing keys, and invalid lifetime dependencies at registration."
-      "license": "https://github.com/inferdi/inferdi/blob/main/LICENSE"
-      "author":
-        "@id": "https://inferdi.com/#organization"
 ---

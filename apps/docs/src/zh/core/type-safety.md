@@ -1,59 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/zh/core/type-safety#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "首页"
-          "item": "https://inferdi.com/zh/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "核心概念"
-          "item": "https://inferdi.com/zh/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "类型安全"
-          "item": "https://inferdi.com/zh/core/type-safety"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/zh/core/type-safety#article"
-      "headline": "InferDI 中的类型安全：依赖图即类型"
-      "name": "类型安全"
-      "description": "InferDI 将依赖图保留在类型系统中：错误的参数顺序、未注册的键，或单例去引用作用域级状态，都是你在编辑器里看到的编译错误，而不是在高负载下才发现的运行时堆栈跟踪。"
-      "url": "https://inferdi.com/zh/core/type-safety"
-      "mainEntityOfPage": "https://inferdi.com/zh/core/type-safety"
-      "inLanguage": "zh-CN"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, 类型安全, TypeScript, 类型推断, 构造函数签名, 编译期, 依赖注入"
-      "articleSection": "核心概念"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # 类型安全
 
 InferDI 的核心原则：依赖图存在于类型系统之中。一个无效的依赖图——错误的参数顺序、从未注册的键、单例去引用作用域级状态——都是你在编辑器里就能看到的类型错误，而不是在高负载下才发现的堆栈跟踪。凡是编译器能够静态证明的，都会被静态校验；运行时守卫只是用来捕捉那些被 `as` 类型转换和动态键绕过的问题。
@@ -91,6 +35,24 @@ new Container()
 
 当替换是有意为之时，测试应使用 `.override()`。
 
+唯一性守卫会检查键类型所表示的全部候选值。注册 `'dsn'` 后，如果候选键的类型是 `'dsn' | 'replica'`，TypeScript 会拒绝这次调用，因为运行时值可能覆盖 `'dsn'`。宽泛的 `string` 或 `symbol` 也遵循这项规则；`lazyKey` 不能与主键或已有键重叠。
+
+只要候选值不与依赖图重叠，宽泛键和联合键仍可使用。宽泛的 `string` 可以注册到空容器，也可以跟在仅含 symbol 键的注册之后。注册前请把运行时键收窄到确定的新成员；需要替换时请使用 `.override()`。
+
+## 动态键
+
+静态键由 `.get()` 直接检查。键来自运行时输入时，应先用 `.has()` 缩小类型：
+
+```ts
+declare const key: string | symbol
+
+if (container.has(key)) {
+  container.get(key)
+}
+```
+
+`.has()` 只检查注册，不会解析值。容器已释放时返回 `false`，但它不能证明作用域输入已就绪，也不能证明异步键可传给 `.get()`。
+
 ## 类型中的生命周期
 
 每个条目都同时携带值类型及其生命周期种类。类型系统会对依赖进行过滤，使单例无法直接依赖作用域级或瞬态服务。
@@ -116,10 +78,10 @@ const root = new Container()
 
 const scope = root.createScope({request})
 
-// @ts-expect-error: handler 是异步项
+// @ts-expect-error: handler is async
 scope.get('handler')
 
 await scope.getAsync('handler')
 ```
 
-使用[作用域输入与配置](./scope-inputs)建模就绪状态，使用[异步依赖图](./async-dependency-graph)选择 Promise 契约。
+使用[作用域输入](./scope-inputs)建模就绪状态，使用[异步依赖](./async-dependencies)选择 Promise 契约。

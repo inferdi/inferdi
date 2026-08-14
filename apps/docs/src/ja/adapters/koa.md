@@ -1,59 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ja/adapters/koa#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "ホーム"
-          "item": "https://inferdi.com/ja/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "アダプター"
-          "item": "https://inferdi.com/ja/adapters/"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Koa アダプター"
-          "item": "https://inferdi.com/ja/adapters/koa"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ja/adapters/koa#article"
-      "headline": "InferDI Koa アダプター — @inferdi/koa"
-      "name": "Koa アダプター"
-      "description": "@inferdi/koa は Koa v3 のミドルウェアです。1 つのリクエストスコープを作成し、ctx.state.di として公開し、Node のレスポンスが finish または close した後に破棄します。型付きの state キーとクリーンアップフックを備えています。"
-      "url": "https://inferdi.com/ja/adapters/koa"
-      "mainEntityOfPage": "https://inferdi.com/ja/adapters/koa"
-      "inLanguage": "ja-JP"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript, Koa v3, @inferdi/inferdi"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, Koa, Koa v3, ミドルウェア, ctx.state.di, レスポンスライフサイクル, 依存性注入"
-      "articleSection": "アダプター"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "@inferdi/koa"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js >=18"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Koa アダプター
 
 [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) は Koa v3 のミドルウェアです。1 つのリクエストスコープを作成し、それを `ctx.state.di` として公開し、Node レスポンスが finish または close した後に破棄します。
@@ -67,17 +11,20 @@ pnpm add -D @types/koa
 
 ```ts
 import Koa from 'koa'
-import { inferdiKoa, type InferdiScopeOf } from '@inferdi/koa'
+import { inferdiKoa, type InferdiKoaState } from '@inferdi/koa'
 ```
 
 ## リクエストスコープ
 
 ```ts
 const root = buildRootContainer()
+const openRequestScope = (request: RequestContext) =>
+  root.createScope({ request })
+type RequestScope = ReturnType<typeof openRequestScope>
 
 declare module 'koa' {
   interface DefaultState {
-    di: InferdiScopeOf<typeof root>
+    di: RequestScope
   }
 }
 
@@ -85,12 +32,11 @@ const app = new Koa()
 
 app.use(inferdiKoa({
   container: root,
-  setupScope: (scope, ctx) => {
-    const request = scope.get('request')
-    request.requestId = crypto.randomUUID()
-    request.userId = ctx.get('x-user-id') || undefined
-    request.ip = ctx.ip
-  },
+  createScope: (_root, ctx) => openRequestScope({
+    requestId: crypto.randomUUID(),
+    userId: ctx.get('x-user-id') || undefined,
+    ip: ctx.ip
+  })
 }))
 
 app.use(async (ctx) => {
@@ -103,15 +49,23 @@ app.use(async (ctx) => {
 
 ```ts
 import type { DefaultState, ParameterizedContext } from 'koa'
-import { type InferdiKoaState, type InferdiScopeOf } from '@inferdi/koa'
+import { type InferdiKoaState } from '@inferdi/koa'
 
 type AppState =
   & DefaultState
-  & InferdiKoaState<InferdiScopeOf<typeof root>, 'container'>
+  & InferdiKoaState<RequestScope, 'container'>
 
 type AppContext = ParameterizedContext<AppState>
 
-app.use(inferdiKoa({ container: root, key: 'container' }))
+app.use(inferdiKoa({
+  container: root,
+  key: 'container',
+  createScope: (_root, ctx) => openRequestScope({
+    requestId: crypto.randomUUID(),
+    userId: ctx.get('x-user-id') || undefined,
+    ip: ctx.ip
+  })
+}))
 
 app.use(async (ctx: AppContext) => {
   ctx.body = await ctx.state.container.get('users').profile('42')
@@ -125,7 +79,7 @@ app.use(async (ctx: AppContext) => {
 | `container` | 必須 | ルートコンテナ。このミドルウェアによって破棄されることはありません。 |
 | `key` | `'di'` | Koa の state キー。 |
 | `createScope` | `root.createScope()` | カスタムのリクエストスコープ作成。 |
-| `setupScope` | なし | ダウンストリームのミドルウェアの前にスコープをハイドレートします。 |
+| `setupScope` | なし | スコープ作成後に追加の初期化を行います。 |
 | `disposeScope` | `scope.dispose()` | カスタムの破棄。 |
 | `autoDispose` | `true` | `false` または `false` を返す述語は所有権を移譲します。 |
 | `onDisposeError` | `ctx.app.emit('error')` | クリーンアップ失敗のシンク。 |

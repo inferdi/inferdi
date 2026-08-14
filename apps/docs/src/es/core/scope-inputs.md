@@ -1,60 +1,4 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/es/core/scope-inputs#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Inicio"
-          "item": "https://inferdi.com/es/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Conceptos básicos"
-          "item": "https://inferdi.com/es/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Entradas y perfiles de scope"
-          "item": "https://inferdi.com/es/core/scope-inputs"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/es/core/scope-inputs#article"
-      "headline": "Entradas y perfiles de scope en InferDI"
-      "name": "Entradas y perfiles de scope"
-      "description": "Declara entradas por petición, crea perfiles de scope tipados e impide resolver un servicio hasta que tenga todos los valores necesarios."
-      "url": "https://inferdi.com/es/core/scope-inputs"
-      "mainEntityOfPage": "https://inferdi.com/es/core/scope-inputs"
-      "inLanguage": "es-ES"
-      "datePublished": "2026-08-11"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, entradas de scope, perfiles de scope, declareScopeInputs, createScope, ReadyKeys, inyección de dependencias TypeScript"
-      "articleSection": "Conceptos básicos"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
-# Entradas y perfiles de scope
+# Entradas de scope
 
 Las entradas de scope son valores que entrega el código que abre un scope: una petición HTTP, un usuario autenticado, un tenant, el payload de un trabajo o el contexto de una traza. InferDI propaga esos requisitos por el grafo e impide resolver un servicio antes de que sus entradas estén disponibles.
 
@@ -96,7 +40,7 @@ const root = new Container()
   )
 ```
 
-Las entradas tienen lifetime `scoped`. Un singleton no puede depender de ellas, así que el compilador rechaza omitir el kind o declarar `singleton` en los servicios del ejemplo.
+Las entradas tienen lifetime `scoped`. Un singleton no puede depender de ellas, así que el compilador rechaza omitir el lifetime o declarar `singleton` en los servicios del ejemplo.
 
 ## Abrir perfiles tipados
 
@@ -106,7 +50,7 @@ Las entradas tienen lifetime `scoped`. Un singleton no puede depender de ellas, 
 const publicScope = root.createScope({request})
 publicScope.get('publicService')
 
-// @ts-expect-error: auth todavía no se ha proporcionado
+// @ts-expect-error: auth has not been provided
 publicScope.get('accountService')
 
 const authenticatedScope = publicScope.createScope({auth})
@@ -138,8 +82,8 @@ InferDI propaga los requisitos por clases, companions lazy, factorías síncrona
 const app = root
   .registerFactory(
     'requestId',
-    ['request'],
     (c) => c.get('request').requestId,
+    ['request'],
     'scoped'
   )
   .registerAsyncFactory(
@@ -155,8 +99,8 @@ La tupla del overload de `registerFactory` con dependencias declara aristas a ni
 El orden de argumentos también cambia:
 
 ```ts
-registerFactory(key, deps, factory, kind)
-registerAsyncFactory(key, factory, deps, kind)
+registerFactory(key, factory, deps, lifetime)
+registerAsyncFactory(key, factory, deps, lifetime)
 ```
 
 ## Propiedad de scopes anidados
@@ -220,6 +164,6 @@ function resolveAny<
 - Una propiedad obligatoria con valor `undefined` cuenta como proporcionada. InferDI comprueba la presencia de la propiedad, no su truthiness.
 - `createScope(inputs)` toma una copia superficial de las propiedades string y symbol propias y enumerables. Los getters y Proxy traps se ejecutan durante la copia; pasa un objeto de datos normal.
 - El schema de entradas solo existe en TypeScript. JavaScript, `any` o un cast pueden añadir claves desconocidas o tapar un registro en la caché del hijo.
-- Fast Mode admite el refinamiento de entradas, pero conserva su regla de grafo inmutable: termina los registros antes del primer `.get()` o `.createScope()`.
+- `{fast: true}` admite el refinamiento de entradas, pero conserva su regla de grafo fijo: termina los registros antes del primer `.get()` o `.createScope()`.
 
-Consulta [Scopes y limpieza](./scopes) para las reglas de propiedad y [Grafo de dependencias asíncrono](./async-dependency-graph) para servicios async que dependen de entradas de scope.
+Consulta [Scopes y liberación de recursos](./scopes) para las reglas de propiedad y [Dependencias asíncronas](./async-dependencies) para servicios async que dependen de entradas de scope.

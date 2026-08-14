@@ -1,59 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/zh/adapters/fastify#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "首页"
-          "item": "https://inferdi.com/zh/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "适配器"
-          "item": "https://inferdi.com/zh/adapters/"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Fastify 适配器"
-          "item": "https://inferdi.com/zh/adapters/fastify"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/zh/adapters/fastify#article"
-      "headline": "InferDI Fastify 适配器 —— @inferdi/fastify"
-      "name": "Fastify 适配器"
-      "description": "@inferdi/fastify 是一个 Fastify v5 插件：在作用域模式下，它将根容器暴露为 app.di，在 onRequest 中创建一个请求作用域，将其暴露为 request.di，并在 onResponse 中释放它 —— 配有带类型的清理钩子和客户端中止处理。"
-      "url": "https://inferdi.com/zh/adapters/fastify"
-      "mainEntityOfPage": "https://inferdi.com/zh/adapters/fastify"
-      "inLanguage": "zh-CN"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript, Fastify v5, @inferdi/inferdi"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, Fastify, Fastify v5, 插件, 请求作用域, request.di, onRequest, onResponse, 依赖注入"
-      "articleSection": "适配器"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "@inferdi/fastify"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js >=20"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Fastify 适配器
 
 [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) 是一个 Fastify v5 插件。在作用域模式下，它将根容器暴露为 `app.di`，在 `onRequest` 中创建一个请求作用域，将其暴露为 `request.di`，并在 `onResponse` 中释放它。
@@ -78,7 +22,13 @@ const root = buildRootContainer()
 const app = Fastify()
 
 type RootContainer = typeof root
-type RequestContainer = ReturnType<RootContainer['createScope']>
+const openRequestScope = (request: FastifyRequest) => root.createScope({
+  request: {
+    requestId: request.id,
+    ip: request.ip
+  }
+})
+type RequestContainer = ReturnType<typeof openRequestScope>
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -92,11 +42,7 @@ declare module 'fastify' {
 
 await app.register(inferdiFastify, {
   container: root,
-  setupScope: (scope: RequestContainer, request) => {
-    const ctx = scope.get('request')
-    ctx.requestId = request.id
-    ctx.ip = request.ip
-  },
+  createScope: (_root, request) => openRequestScope(request)
 })
 
 app.get('/users/:id', async (request) => {
@@ -114,7 +60,7 @@ Fastify 的 `app.register` 无法为内联钩子推导出足够深的插件泛�
 | `container` | 必填 | 暴露为 `app.di` 的根容器。 |
 | `scopePerRequest` | `true` | 设为 `false` 启用仅根模式。 |
 | `createScope` | `root.createScope()` | 自定义请求作用域创建。可以是异步的。 |
-| `setupScope` | 无 | 在 `onRequest` 中填充作用域。可以是异步的。 |
+| `setupScope` | 无 | 在作用域创建后执行额外初始化。 |
 | `disposeScope` | `scope.dispose()` | 自定义释放。可以是同步或异步的。 |
 | `autoDispose` | `true` | `false` 或返回 `false` 的谓词会将所有权转移给应用代码。 |
 | `disposeRootOnClose` | `false` | 在 `fastify.close()` 期间释放根容器。 |

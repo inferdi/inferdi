@@ -1,5 +1,6 @@
 ---
 layout: home
+description: "Contenedor de DI sin dependencias en runtime ni decoradores, con grafos, tiempos de vida y scopes comprobados por TypeScript."
 
 hero:
   name: InferDI
@@ -64,44 +65,4 @@ features:
     details: "InferDI no tiene dependencias en runtime y se ejecuta en Node, Bun, Deno, navegadores y workers. Los adaptadores añaden ciclo de vida opcional para el scope de petición."
     link: /es/adapters/
     linkText: Cómo funcionan los adaptadores
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "WebSite"
-      "@id": "https://inferdi.com/#website"
-      "url": "https://inferdi.com/es/"
-      "name": "InferDI"
-      "description": "Inyección de dependencias sin decoradores y fuertemente tipada para el TypeScript moderno."
-      "inLanguage": "es-ES"
-      "publisher":
-        "@id": "https://inferdi.com/#organization"
-      "potentialAction":
-        "@type": "SearchAction"
-        "target":
-          "@type": "EntryPoint"
-          "urlTemplate": "https://inferdi.com/?q={search_term_string}"
-        "query-input": "required name=search_term_string"
-    - "@type": "Organization"
-      "@id": "https://inferdi.com/#organization"
-      "name": "InferDI"
-      "url": "https://inferdi.com/"
-      "logo":
-        "@type": "ImageObject"
-        "url": "https://inferdi.com/logo.png"
-      "sameAs":
-        - "https://github.com/inferdi/inferdi"
-        - "https://twitter.com/inferdi_ts"
-    - "@type": "SoftwareApplication"
-      "@id": "https://inferdi.com/#software"
-      "name": "InferDI"
-      "applicationCategory": "DeveloperApplication"
-      "operatingSystem": "Node.js, Bun, Deno, Browser, Edge runtimes"
-      "softwareVersion": "6.0.0"
-      "programmingLanguage": "TypeScript"
-      "url": "https://inferdi.com/"
-      "downloadUrl": "https://www.npmjs.com/package/@inferdi/inferdi"
-      "description": "Contenedor de DI para TypeScript sin dependencias en runtime, sin decoradores y fuertemente tipado. TypeScript comprueba el orden de argumentos, las claves y las dependencias de tiempo de vida al registrar servicios."
-      "license": "https://github.com/inferdi/inferdi/blob/main/LICENSE"
-      "author":
-        "@id": "https://inferdi.com/#organization"
 ---

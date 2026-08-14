@@ -16,9 +16,9 @@ program
      * async `Database` factory in the shared root is closed before the
      * process exits
      */
-    await using scope = root.createScope()
-    const ctx = scope.get('request')
-    ctx.requestId = `cli:import-users:${Date.now()}`
+    await using scope = root.createScope({
+      request: { requestId: `cli:import-users:${Date.now()}` }
+    })
 
     scope.get('audit').record('cli.import-users.start', {
       file,

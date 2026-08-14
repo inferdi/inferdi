@@ -26,12 +26,15 @@ export const root: RootContainer =
  * including on thrown errors
  */
 export async function getProfileAction(formData: FormData) {
-  await using scope = root.createScope()
-  const ctx = scope.get('request')
-  ctx.requestId = crypto.randomUUID()
-  ctx.userId = String(formData.get('userId') ?? '') || undefined
+  const userId = String(formData.get('userId') ?? '') || undefined
+  await using scope = root.createScope({
+    request: {
+      requestId: crypto.randomUUID(),
+      userId
+    }
+  })
 
-  const profile = await scope.get('users').profile(ctx.userId ?? 'me')
+  const profile = await scope.get('users').profile(userId ?? 'me')
   revalidatePath('/profile')
   return profile
 }

@@ -1,118 +1,120 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ja/guide/quick-start#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "ホーム"
-          "item": "https://inferdi.com/ja/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "ガイド"
-          "item": "https://inferdi.com/ja/guide/quick-start"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "クイックスタート"
-          "item": "https://inferdi.com/ja/guide/quick-start"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ja/guide/quick-start#article"
-      "headline": "InferDI クイックスタート：最初の型付き依存グラフを構築する"
-      "name": "クイックスタート"
-      "description": "InferDI の流れるような API で依存グラフを構築し、配線しながら TypeScript がすべてのコンストラクター引数を検証します。@Injectable デコレーターも reflect-metadata も不要で、コンパイラが読み取る素のコードと、ホットパスでの 1 回の Map.get() 解決だけです。"
-      "url": "https://inferdi.com/ja/guide/quick-start"
-      "mainEntityOfPage": "https://inferdi.com/ja/guide/quick-start"
-      "inLanguage": "ja-JP"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Beginner"
-      "keywords": "InferDI, クイックスタート, 依存性注入, TypeScript DI, container, fluent API, 型安全"
-      "articleSection": "ガイド"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # クイックスタート
 
-依存グラフは流れるような API を通じて構築し、TypeScript はその過程で検証を行います。すべての依存タプルはターゲットのコンストラクター位置と照合されるため、引数の入れ替えや欠落はランタイムでの予期せぬ問題ではなく、コンパイルエラーになります。`@Injectable()` デコレーターも `reflect-metadata` もありません — 配線はコンパイラが読み取れる素のコードです。
+この手順では、依存グラフ全体を構築し、ルートサービスを解決したあと、リクエストスコープを開きます。デコレーターやメタデータの設定は不要です。
+
+## インストール
+
+::: code-group
+
+```bash [pnpm]
+pnpm add @inferdi/inferdi
+```
+
+```bash [npm]
+npm install @inferdi/inferdi
+```
+
+```bash [yarn]
+yarn add @inferdi/inferdi
+```
+
+:::
+
+## グラフを構築する
 
 ```ts
 import { Container } from '@inferdi/inferdi'
 
+type RequestContext = {
+  requestId: string
+}
+
 class Logger {
-  log(message: string) {
-    console.log(`[LOG] ${message}`)
+  info(message: string) {
+    console.info(message)
   }
 }
 
-class UserRepo {
+class Database {
+  constructor(readonly dsn: string) {}
+}
+
+class UserService {
   constructor(
-    private readonly logger: Logger,
-    private readonly dsn: string,
+    private readonly request: RequestContext,
+    private readonly database: Database,
+    private readonly logger: Logger
   ) {}
 
   find(id: string) {
-    this.logger.log(`Finding ${id} in ${this.dsn}`)
+    this.logger.info(`request=${this.request.requestId} user=${id}`)
+    return { id, database: this.database.dsn }
   }
 }
 
-const container = new Container()
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
   .registerValue('dsn', 'postgres://localhost/app')
   .registerClass('logger', Logger, [])
-  .registerClass('userRepo', UserRepo, ['logger', 'dsn'])
-
-container.get('userRepo').find('42')
+  .registerClass('database', Database, ['dsn'])
+  .registerClass(
+    'users',
+    UserService,
+    ['request', 'database', 'logger'],
+    'scoped'
+  )
 ```
 
-`registerClass('userRepo', UserRepo, ['logger', 'dsn'])` の呼び出しは位置ベースで検証されます。タプルを `['dsn', 'logger']` に入れ替えると、TypeScript はアプリが実行される前に不一致を報告します。
+各依存タプルはコンストラクターと照合されます。`database` と `logger` の順序を入れ替える、`request` を省く、未登録キーを指定すると、TypeScript エラーになります。
 
-## 値を解決する
+このグラフには 1 つの外部入力と 4 つの登録があります。
 
-解決には `.get(key)` を使用します。
+```text
+dsn ───────────────▶ database (singleton) ─┐
+logger (singleton) ────────────────────────┼─▶ users (scoped)
+request (scope input) ─────────────────────┘
+```
+
+## サービスを解決する
+
+ルートの singleton は `.get()` で同期的に解決できます。
 
 ```ts
-const repo = container.get('userRepo')
+const database = root.get('database')
 ```
 
-キーはコンテナの型に登録されている必要があります。未知の静的キーはコンパイルエラーになります。動的キーは `.get(key)` の前に `.has(key)` で調べるべきです。
+`users` には `request` 入力が必要なので、先にスコープを開きます。
+
+```ts
+const request = { requestId: crypto.randomUUID() }
+
+await using scope = root.createScope({ request })
+const users = scope.get('users')
+
+users.find('42')
+```
+
+返されたスコープの型には、`request` が準備済みであることが記録されます。ルートにはリクエスト入力がないため、`root.get('users')` は型エラーになります。
 
 ## ライフタイムを選ぶ
 
-登録はデフォルトで `singleton` になります。クラスでは 4 番目の引数として、ファクトリーでは 3 番目の引数としてライフタイムを渡します。
+登録の既定値は `singleton` です。値がスコープまたは呼び出し側に属する場合は、ライフタイムを明示します。
 
-```ts
-const root = new Container()
-  .registerClass('logger', Logger, [])
-  .registerClass('request', RequestContext, [], 'scoped')
-  .registerClass('token', Token, [], 'transient')
-```
-
-| 種類 | 作成タイミング | キャッシュ | コンテナによる破棄 |
+| ライフタイム | 作成 | キャッシュ | 破棄する側 |
 | --- | --- | --- | --- |
-| `singleton` | 所有コンテナごとに一度 | あり | あり |
-| `scoped` | スコープごとに一度 | あり | あり |
-| `transient` | 解決のたびに | なし | なし |
+| `singleton` | 1 回 | 作成したコンテナー | そのコンテナー |
+| `scoped` | 子スコープごとに 1 回 | 子スコープ | そのスコープ |
+| `transient` | 解決するたび | なし | 呼び出し側 |
 
-シングルトンは `scoped` または `transient` のサービスに直接依存することはできません。このルールは型によって、そして strict モードではランタイムガードによって強制されます。
+singleton は scoped または transient サービスへ直接依存できません。InferDI はこの規則を型で検証し、既定では実行時にも確認します。
+
+## 次に読むページ
+
+| 目的 | ページ |
+| --- | --- |
+| コンパイル時のグラフ検証を理解する | [型安全性](../core/type-safety) |
+| リクエスト、テナント、ジョブデータをモデル化する | [スコープ入力](../core/scope-inputs) |
+| 依存関係を非同期に初期化する | [非同期依存関係](../core/async-dependencies) |
+| データベースなどのリソースを安全に閉じる | [スコープとリソース破棄](../core/scopes) |
+| スコープを Web フレームワークへ接続する | [フレームワークアダプター](../adapters/) |
+| フレームワークとランタイムの完全な例を見る | [例](./examples) |

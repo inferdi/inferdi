@@ -10,7 +10,7 @@ export const runtime = 'edge'
 const root = buildRootContainer()
 
 export async function GET(request: Request) {
-  const scope = await createRequestScope(root, {
+  const scope = createRequestScope(root, {
     requestId: request.headers.get('x-vercel-id') ?? crypto.randomUUID()
   })
 

@@ -1,59 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/core/type-safety#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Home"
-          "item": "https://inferdi.com/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Core Concepts"
-          "item": "https://inferdi.com/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Type Safety"
-          "item": "https://inferdi.com/core/type-safety"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/core/type-safety#article"
-      "headline": "Type Safety in InferDI: the graph is the type"
-      "name": "Type Safety"
-      "description": "InferDI models the dependency graph in TypeScript. Invalid argument order, unknown keys, and invalid lifetime dependencies fail at the registration site."
-      "url": "https://inferdi.com/core/type-safety"
-      "mainEntityOfPage": "https://inferdi.com/core/type-safety"
-      "inLanguage": "en-US"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, type safety, TypeScript, type inference, constructor signatures, compile-time, dependency injection"
-      "articleSection": "Core Concepts"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Type Safety
 
 InferDI models the dependency graph in the type system. A wrong argument order, an unregistered key, and a singleton dependency on scoped state produce type errors in your editor. Runtime guards handle cast-based and dynamic-key bypasses that TypeScript cannot prove.
@@ -91,9 +35,27 @@ new Container()
 
 Tests use `.override()` when replacement is intentional.
 
+The uniqueness guard checks the complete set of values represented by the key type. If a candidate is typed as `'dsn' | 'replica'` after `'dsn'` has been registered, TypeScript rejects the call because the runtime value may overwrite `'dsn'`. The same rule applies to a broad `string` or `symbol` and to `lazyKey`, which must not overlap the primary key or any existing key.
+
+Broad and union keys remain valid when their possible values do not overlap the graph. A broad string is valid on an empty container or after symbol-only registrations. Narrow a runtime key to a known fresh member before registering it; use `.override()` when replacement is the goal.
+
+## Dynamic Keys
+
+Static keys are checked directly by `.get()`. When a key comes from runtime input, narrow it with `.has()` first:
+
+```ts
+declare const key: string | symbol
+
+if (container.has(key)) {
+  container.get(key)
+}
+```
+
+`.has()` checks registration without resolving the value. It returns `false` for disposed containers, but it does not prove that required scope inputs are ready or that an async key can be passed to `.get()`.
+
 ## Lifetime in the Type
 
-Each entry carries both the value type and its lifetime kind. The type system filters dependencies so a singleton cannot depend directly on scoped or transient services.
+Each entry carries both the value type and its lifetime. The type system filters dependencies so a singleton cannot depend directly on scoped or transient services.
 
 ```ts
 new Container()
@@ -102,7 +64,7 @@ new Container()
   .registerClass('users', UserService, ['request'], 'singleton')
 ```
 
-Runtime strict mode remains defense-in-depth for `as` casts, dynamic keys, captured outer containers, and dependency cycles.
+The default runtime checks remain defense-in-depth for `as` casts, dynamic keys, captured outer containers, and dependency cycles.
 
 ## Readiness and Async Status
 
@@ -122,4 +84,4 @@ scope.get('handler')
 await scope.getAsync('handler')
 ```
 
-Use [Scope Inputs and Profiles](./scope-inputs) to model readiness and [Async Dependency Graph](./async-dependency-graph) to choose the correct Promise contract.
+Use [Scope Inputs](./scope-inputs) to model readiness and [Async Dependencies](./async-dependencies) to choose the correct Promise contract.

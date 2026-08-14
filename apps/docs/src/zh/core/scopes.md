@@ -1,79 +1,24 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/zh/core/scopes#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "首页"
-          "item": "https://inferdi.com/zh/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "核心概念"
-          "item": "https://inferdi.com/zh/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "作用域与清理"
-          "item": "https://inferdi.com/zh/core/scopes"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/zh/core/scopes#article"
-      "headline": "InferDI 中的作用域与清理"
-      "name": "作用域与清理"
-      "description": "作用域将请求本地服务限定在单个工作单元内：子作用域继承父级的每一项注册，但缓存它自己的实例并拥有它们的清理职责，采用 LIFO 清理顺序并支持 using 与 await using。"
-      "url": "https://inferdi.com/zh/core/scopes"
-      "mainEntityOfPage": "https://inferdi.com/zh/core/scopes"
-      "inLanguage": "zh-CN"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, 作用域, 清理, 销毁, 子作用域, using, await using, LIFO, 依赖注入"
-      "articleSection": "核心概念"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
-# 作用域与清理
+# 作用域与资源释放
 
 作用域将请求本地服务的生命周期限定在单个工作单元内。子作用域继承父级的每一项注册，但会缓存它自己的作用域级实例并拥有它们的清理职责——因此为某个请求创建的作用域永远不会与另一个请求共享状态，也不会比它存活得更久。
 
 ```ts
 const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
   .registerClass('db', Db, [])
-  .registerClass('request', RequestContext, [], 'scoped')
+  .registerClass('handler', RequestHandler, ['request', 'db'], 'scoped')
 
 async function handle(request: Request) {
-  await using scope = root.createScope()
-  const ctx = scope.get('request')
+  await using scope = root.createScope({ request })
+  return scope.get('handler').run()
 }
 ```
 
-`db` 是一个根单例。`request` 在每个作用域创建一次，并在作用域被释放时释放。
+`db` 是根 singleton。request 作为外部作用域输入，仍由应用管理；`handler` 则由请求作用域创建并释放。
 
-`scoped` 注册属于子作用域。在默认的 `strict: true` 模式下，`root.get('request')` 会抛出 `Scoped "request" cannot be resolved from the root container. Use createScope().`。请从 `createScope()` 返回的容器解析该键。`strict: false` 会跳过这项运行时检查。
+`scoped` 注册属于子作用域。默认的 `fast: false` 会在根容器解析此类注册时抛出 `Scoped "key" cannot be resolved from the root container. Use createScope().`。请从 `createScope()` 返回的容器解析该键。`fast: true` 会跳过这项运行时检查。
 
-## Scope 输入与配置函数
+## 作用域输入
 
 Scope 输入表示创建作用域时才存在的外部值，例如请求、认证上下文、租户或任务数据。先声明输入，再通过 `createScope(inputs)` 提供所需子集：
 
@@ -86,7 +31,7 @@ await using scope = root.createScope({request})
 scope.get('service')
 ```
 
-容器类型记录已经提供的输入，并在依赖就绪前隐藏对应服务。具名配置、嵌套细化、声明依赖的 factory、可复用类型和输入校验规则见[作用域输入与配置](./scope-inputs)。
+容器类型记录已经提供的输入，并在依赖就绪前隐藏对应服务。具名配置、嵌套细化、声明依赖的 factory、可复用类型和输入校验规则见[作用域输入](./scope-inputs)。
 
 ## 所有权
 

@@ -72,7 +72,7 @@ describe('async graph resolution', () => {
 
   const oneDep = new Container()
     .registerValue('a', 1)
-    .registerAsyncFactory('value', async (a) => a, ['a'], 'transient')
+    .registerAsyncFactory('value', async (a: number) => a, ['a'], 'transient')
 
   bench('async transient with one warmed dependency', async () => {
     await oneDep.getAsync('value')
@@ -86,7 +86,7 @@ describe('async graph resolution', () => {
     .registerValue('e', 5)
     .registerAsyncFactory(
       'value',
-      async (a, b, c, d, e) => a + b + c + d + e,
+      async (a: number, b: number, c: number, d: number, e: number) => a + b + c + d + e,
       ['a', 'b', 'c', 'd', 'e'],
       'transient'
     )
@@ -159,6 +159,12 @@ describe('registration-time async classification', () => {
 
   bench('register async factory with zero dependencies', () => {
     new Container().registerAsyncFactory('value', () => 1, [])
+  })
+
+  bench('register async factory with one dependency', () => {
+    new Container()
+      .registerValue('dependency', 1)
+      .registerAsyncFactory('value', (dependency: number) => dependency, ['dependency'])
   })
 
   bench('register async class with one dependency', () => {

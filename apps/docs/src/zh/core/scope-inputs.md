@@ -1,60 +1,4 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/zh/core/scope-inputs#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "首页"
-          "item": "https://inferdi.com/zh/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "核心概念"
-          "item": "https://inferdi.com/zh/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "作用域输入与配置"
-          "item": "https://inferdi.com/zh/core/scope-inputs"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/zh/core/scope-inputs#article"
-      "headline": "InferDI 中的作用域输入与配置"
-      "name": "作用域输入与配置"
-      "description": "声明请求级输入，构建类型安全的作用域配置，并在服务所需值齐备前阻止解析。"
-      "url": "https://inferdi.com/zh/core/scope-inputs"
-      "mainEntityOfPage": "https://inferdi.com/zh/core/scope-inputs"
-      "inLanguage": "zh-CN"
-      "datePublished": "2026-08-11"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, 作用域输入, 作用域配置, declareScopeInputs, createScope, ReadyKeys, TypeScript 依赖注入"
-      "articleSection": "核心概念"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
-# 作用域输入与配置
+# 作用域输入
 
 作用域输入由打开作用域的代码提供，例如 HTTP 请求、已认证用户、租户、任务载荷或追踪上下文。InferDI 会在依赖图中传播这些要求，并在输入齐备前阻止服务解析。
 
@@ -96,7 +40,7 @@ const root = new Container()
   )
 ```
 
-作用域输入采用 `scoped` 生命周期。单例不能依赖它们，因此编译器会拒绝上例中省略 kind 或显式使用 `singleton` 的写法。
+作用域输入采用 `scoped` 生命周期。单例不能依赖它们，因此编译器会拒绝上例中省略 lifetime 或显式使用 `singleton` 的写法。
 
 ## 打开类型安全的配置
 
@@ -106,7 +50,7 @@ const root = new Container()
 const publicScope = root.createScope({request})
 publicScope.get('publicService')
 
-// @ts-expect-error: 尚未提供 auth
+// @ts-expect-error: auth has not been provided
 publicScope.get('accountService')
 
 const authenticatedScope = publicScope.createScope({auth})
@@ -138,8 +82,8 @@ InferDI 会通过类、惰性 companion、声明依赖的同步工厂和声明�
 const app = root
   .registerFactory(
     'requestId',
-    ['request'],
     (c) => c.get('request').requestId,
+    ['request'],
     'scoped'
   )
   .registerAsyncFactory(
@@ -155,8 +99,8 @@ const app = root
 两种 API 的参数顺序也不同：
 
 ```ts
-registerFactory(key, deps, factory, kind)
-registerAsyncFactory(key, factory, deps, kind)
+registerFactory(key, factory, deps, lifetime)
+registerAsyncFactory(key, factory, deps, lifetime)
 ```
 
 ## 嵌套作用域的所有权
@@ -220,6 +164,6 @@ function resolveAny<
 - 值为 `undefined` 的必填属性仍算已提供。InferDI 检查属性是否存在，不检查真假值。
 - `createScope(inputs)` 对可枚举的自有 string 和 symbol 属性做浅拷贝。复制过程会执行 getter 和 Proxy trap，请传入普通数据对象。
 - 输入 schema 只存在于 TypeScript。JavaScript、`any` 或类型断言可以加入未知键，也可以覆盖子容器缓存中的注册。
-- Fast Mode 支持逐步提供输入，但仍要求依赖图不可变：在第一次 `.get()` 或 `.createScope()` 前完成注册。
+- `{fast: true}` 支持逐步提供输入，但仍要求依赖图固定：在第一次 `.get()` 或 `.createScope()` 前完成注册。
 
-所有权规则见[作用域与清理](./scopes)，依赖作用域输入的异步服务见[异步依赖图](./async-dependency-graph)。
+所有权规则见[作用域与资源释放](./scopes)，依赖作用域输入的异步服务见[异步依赖](./async-dependencies)。

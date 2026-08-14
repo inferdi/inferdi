@@ -11,7 +11,7 @@ import {
 const root = buildRootContainer()
 
 Deno.serve(async (request) => {
-  await using scope = await createRequestScope(root, {
+  await using scope = createRequestScope(root, {
     requestId: request.headers.get('x-request-id') ?? crypto.randomUUID()
   })
 

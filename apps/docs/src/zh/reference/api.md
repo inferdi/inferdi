@@ -1,62 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/zh/reference/api#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "首页"
-          "item": "https://inferdi.com/zh/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "参考"
-          "item": "https://inferdi.com/zh/reference/api"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "API 概览"
-          "item": "https://inferdi.com/zh/reference/api"
-    - "@type": "APIReference"
-      "@id": "https://inferdi.com/zh/reference/api#article"
-      "headline": "InferDI 核心 API 概览"
-      "name": "API 概览"
-      "description": "@inferdi/inferdi v6 核心 API 概览，包括作用域输入、registerAsyncFactory、就绪状态解析、覆盖和资源释放。"
-      "url": "https://inferdi.com/zh/reference/api"
-      "mainEntityOfPage": "https://inferdi.com/zh/reference/api"
-      "inLanguage": "zh-CN"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "executableLibraryName": "@inferdi/inferdi"
-      "programmingModel": "显式注册，流式构建器"
-      "targetPlatform": "Node.js, Bun, Deno, Browser"
-      "keywords": "InferDI, API, Container, declareScopeInputs, ScopeInputMap, registerAsyncFactory, getAsync, AsyncSpec, ReadyKeys, dispose"
-      "articleSection": "参考"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # API 概览
 
 本页总结了公开的核心 API。准确的泛型定义请参阅软件包 README 和 TypeScript 声明文件。
@@ -74,7 +15,7 @@ import {
   type AsyncLazySpec,
   type AsyncSpec,
   type Module,
-  type RegistrationKind,
+  type Lifetime,
   type ScopeInputMap,
   type Spec,
   type SpecMap,
@@ -87,10 +28,12 @@ class Container<T extends DependenciesMap = Record<never, never>> {
   constructor(options?: ContainerOptions)
 
   declareScopeInputs<Inputs>()
-  registerClass(key, Ctor, deps, kind?, lazyKey?)
-  registerFactory(key, factory, kind?, lazyKey?)
-  registerFactory(key, deps, factory, kind?, lazyKey?)
-  registerAsyncFactory(key, factory, deps, kind?, lazyKey?)
+  registerClass(key, Ctor, deps, lifetime?, lazyKey?)
+  registerFactory(key, factory, lifetime?)
+  registerFactory(key, factory, lifetime, lazyKey)
+  registerFactory(key, factory, deps, lifetime?)
+  registerFactory(key, factory, deps, lifetime, lazyKey)
+  registerAsyncFactory(key, factory, deps, lifetime?, lazyKey?)
   registerValue(key, value)
   override(key, value)
   use(fn)
@@ -107,27 +50,31 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 }
 ```
 
+`fast` 默认为 `false`：运行时安全检查保持启用，作用域保留精确的可变父链。
+`{fast: true}` 会关闭这些检查，并把依赖图视为固定图，从而启用扁平化父级
+查找和继承 singleton 镜像。子作用域会继承根容器的配置。
+
 ## 注册方法
 
 | 方法 | 回调输入 | 图中类型 | 解析方法 |
 | --- | --- | --- | --- |
 | `registerClass` | `deps` 对应的构造函数参数 | `Spec` 或传播后的 `AsyncSpec` | `get` 或 `getAsync` |
 | `registerFactory(key, factory, ...)` | 按生命周期过滤的容器 | `Spec<ReturnType>` | `get` |
-| `registerFactory(key, deps, factory, ...)` | 仅含 `deps` 的 resolver | 带输入要求的 `Spec` | `get` |
+| `registerFactory(key, factory, deps, ...)` | 仅含 `deps` 的 resolver | 带输入要求的 `Spec` | `get` |
 | `registerAsyncFactory` | 解析后的位置参数 | `AsyncSpec<Awaited<ReturnType>>` | `getAsync` |
 | `registerValue` | 无 | 外部所有的 singleton `Spec` | `get` |
 
-`registerClass` 和 `registerFactory` 接受 `singleton`、`scoped` 和 `transient` 三种生命周期，以及可选的 `lazyKey` 伴随项。`registerValue` 始终为单例，且由外部拥有。
+`registerClass` 和 `registerFactory` 接受 `singleton`、`scoped` 和 `transient` 三种生命周期。`registerFactory` 创建伴随项时必须显式传入生命周期，包括 `'singleton'`。`registerValue` 始终为单例，且由外部拥有。
 
-`registerAsyncFactory` 接受相同的生命周期和可选的第五个 `lazyKey`。主注册用 `AsyncSpec` 保存最终服务类型，伴随项类型为 `AsyncLazySpec<Awaited<ReturnType>, Kind>`。目标使用 `getAsync()`，包装器使用 `get()`。
+`registerAsyncFactory` 接受相同的生命周期和可选的第五个 `lazyKey`。主注册用 `AsyncSpec` 保存最终服务类型，伴随项类型为 `AsyncLazySpec<Awaited<ReturnType>, L>`。目标使用 `getAsync()`，包装器使用 `get()`。
 
 `registerAsyncFactory` 以及依赖元组可能选中异步键的 `registerClass` 调用都要求只读元组。InferDI 在注册时只分类一次异步位置，并保留该元组引用。内联字面量会推断为只读；仅同步的 `registerClass` 调用仍支持可变元组。
 
 `registerAsyncFactory` 和带依赖的 `registerFactory` 使用不同的参数顺序和回调契约：
 
 ```ts
-registerFactory(key, deps, resolverFactory, kind, lazyKey)
-registerAsyncFactory(key, valueFactory, deps, kind, lazyKey)
+registerFactory(key, resolverFactory, deps, lifetime, lazyKey)
+registerAsyncFactory(key, valueFactory, deps, lifetime, lazyKey)
 ```
 
 `override` 替换现有注册，`use` 应用模块构建器。`override` 的时机检查只查看当前容器的缓存。它能发现本地缓存的 singleton/scoped 值、`registerValue` 和重复覆盖，但不会记录 transient 解析，也不会记录通过子容器解析但由祖先容器拥有的值。请在解析依赖图之前应用覆盖。
@@ -142,7 +89,7 @@ registerAsyncFactory(key, valueFactory, deps, kind, lazyKey)
 | `getAsync()` | 所有就绪的同步键和声明式异步键 |
 | `has()` | 任意 string 或 symbol；只证明注册存在 |
 
-`has()` 不能证明键已就绪或属于同步键。类型状态细化见[作用域输入与配置](../core/scope-inputs)，Promise 行为见[异步依赖图](../core/async-dependency-graph)。
+`has()` 不能证明键已就绪或属于同步键。类型状态细化见[作用域输入](../core/scope-inputs)，Promise 行为见[异步依赖](../core/async-dependencies)。
 
 ## 命名空间类型
 
@@ -173,42 +120,42 @@ v6 的泛型 resolver 必须保留可接受的键集合。`get()` 使用 `Contai
 ```ts
 type Lazy<T> = { readonly get: () => T }
 type AsyncLazy<T> = { readonly get: () => Promise<T> }
-type RegistrationKind = 'singleton' | 'transient' | 'scoped'
+type Lifetime = 'singleton' | 'scoped' | 'transient'
 type DependenciesMap = Record<
   string | symbol,
-  Spec<unknown, RegistrationKind>
+  Spec<unknown, Lifetime>
 >
 
 interface ContainerOptions {
-  readonly strict?: boolean
+  readonly fast?: boolean
 }
 
-interface Spec<V, K extends RegistrationKind = 'singleton'> {
+interface Spec<V, L extends Lifetime = 'singleton'> {
   readonly type: V
-  readonly kind: K
+  readonly lifetime: L
 }
 
-interface AsyncSpec<V, K extends RegistrationKind = 'singleton'>
-  extends Spec<V, K> {
+interface AsyncSpec<V, L extends Lifetime = 'singleton'>
+  extends Spec<V, L> {
   readonly async: true
 }
 
-interface LazySpec<V, TargetKind extends RegistrationKind>
+interface LazySpec<V, TargetLifetime extends Lifetime>
   extends Spec<Lazy<V>, 'transient'> {
-  readonly lazyOf: TargetKind
+  readonly lazyOf: TargetLifetime
 }
 
-interface AsyncLazySpec<V, TargetKind extends RegistrationKind>
+interface AsyncLazySpec<V, TargetLifetime extends Lifetime>
   extends Spec<AsyncLazy<V>, 'transient'> {
-  readonly lazyOf: TargetKind
+  readonly lazyOf: TargetLifetime
 }
 
-type SpecMap<M, K extends RegistrationKind = 'singleton'> = {
-  [P in keyof M]: Spec<M[P], K>
+type SpecMap<M, L extends Lifetime = 'singleton'> = {
+  [P in keyof M]: Spec<M[P], L>
 }
 
-type Module<TIn extends DependenciesMap, TOut extends DependenciesMap> =
-  (c: Container<TIn>) => Container<TIn & TOut>
+type Module<TRequirements extends DependenciesMap, TProvides extends DependenciesMap> =
+  (c: Container<TRequirements>) => Container<TRequirements & TProvides>
 ```
 
 `LazySpec` 和 `AsyncLazySpec` 带有私有的 type-only 判别字段。显式

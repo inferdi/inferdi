@@ -1,59 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/es/adapters/express#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Inicio"
-          "item": "https://inferdi.com/es/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Adaptadores"
-          "item": "https://inferdi.com/es/adapters/"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Adaptador de Express"
-          "item": "https://inferdi.com/es/adapters/express"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/es/adapters/express#article"
-      "headline": "Adaptador de Express de InferDI — @inferdi/express"
-      "name": "Adaptador de Express"
-      "description": "@inferdi/express es middleware de Express 5: crea un scope de petición, lo expone como req.di y lo libera después de que la respuesta de Node finaliza o se cierra, con fusión de declaraciones para un req.di totalmente tipado."
-      "url": "https://inferdi.com/es/adapters/express"
-      "mainEntityOfPage": "https://inferdi.com/es/adapters/express"
-      "inLanguage": "es-ES"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript, Express 5, @inferdi/inferdi"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, Express, Express 5, middleware, req.di, fusión de declaraciones, ciclo de vida de la respuesta, inyección de dependencias"
-      "articleSection": "Adaptadores"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "@inferdi/express"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js >=18"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Adaptador de Express
 
 [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) es middleware de Express 5. Crea un scope de petición, lo expone como `req.di` y lo libera después de que la respuesta de Node finaliza o se cierra.
@@ -67,18 +11,21 @@ pnpm add -D @types/express
 
 ```ts
 import express from 'express'
-import { inferdiExpress, type InferdiScopeOf } from '@inferdi/express'
+import { inferdiExpress } from '@inferdi/express'
 ```
 
 ## Scope de petición
 
 ```ts
 const root = buildRootContainer()
+const openRequestScope = (request: RequestContext) =>
+  root.createScope({ request })
+type RequestScope = ReturnType<typeof openRequestScope>
 
 declare global {
   namespace Express {
     interface Request {
-      di: InferdiScopeOf<typeof root>
+      di: RequestScope
     }
   }
 }
@@ -87,12 +34,11 @@ const app = express()
 
 app.use(inferdiExpress({
   container: root,
-  setupScope: (scope, req) => {
-    const request = scope.get('request')
-    request.requestId = crypto.randomUUID()
-    request.userId = req.get('x-user-id') || undefined
-    request.ip = req.ip
-  },
+  createScope: (_root, req) => openRequestScope({
+    requestId: crypto.randomUUID(),
+    userId: req.get('x-user-id') || undefined,
+    ip: req.ip
+  })
 }))
 
 app.get('/users/:id', async (req, res, next) => {
@@ -112,7 +58,7 @@ El adaptador no aumenta globalmente `Express.Request` con `any`, `unknown` ni un
 | --- | --- | --- |
 | `container` | requerido | Contenedor raíz. Este middleware nunca lo libera. |
 | `createScope` | `root.createScope()` | Creación personalizada del scope de petición. |
-| `setupScope` | ninguno | Hidrata el scope antes de los handlers de rutas. |
+| `setupScope` | ninguno | Ejecuta inicialización adicional después de crear el scope. |
 | `disposeScope` | `scope.dispose()` | Liberación personalizada. |
 | `autoDispose` | `true` | `false` o un predicado `false` transfiere la propiedad. |
 | `onDisposeError` | `console.error` | Sumidero de fallos de limpieza. |

@@ -18,7 +18,7 @@ export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     root ??= buildRootContainer(env)
 
-    const scope = await createRequestScope(root, {
+    const scope = createRequestScope(root, {
       requestId: request.headers.get('cf-ray') ?? crypto.randomUUID()
     })
 

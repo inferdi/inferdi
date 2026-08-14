@@ -1,57 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/es/reference/manifesto#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Inicio"
-          "item": "https://inferdi.com/es/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Referencia"
-          "item": "https://inferdi.com/es/reference/api"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Manifiesto arquitectónico del core de InferDI"
-          "item": "https://inferdi.com/es/reference/manifesto"
-    - "@type": "Article"
-      "@id": "https://inferdi.com/es/reference/manifesto#article"
-      "headline": "Manifiesto arquitectónico del core de InferDI"
-      "name": "Manifiesto arquitectónico del core de InferDI"
-      "description": "El manifiesto arquitectónico que sustenta a InferDI: todo lo que el compilador pueda verificar de forma estática debe verificarse de forma estática, con cero sobrecarga en tiempo de ejecución, cero dependencias, cero decoradores y las decisiones de compromiso conscientes que de ello se derivan."
-      "url": "https://inferdi.com/es/reference/manifesto"
-      "mainEntityOfPage": "https://inferdi.com/es/reference/manifesto"
-      "inLanguage": "es-ES"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "keywords": "InferDI, manifiesto, arquitectura, principios de diseño, seguridad de tipos, cero sobrecarga, cero dependencias, inyección de dependencias"
-      "articleSection": "Referencia"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Manifiesto arquitectónico del core de InferDI
 
 Este documento rige `@inferdi/inferdi` en `packages/inferdi`. Léelo antes de
@@ -96,9 +42,9 @@ irrepresentables allí donde TypeScript pueda expresar la regla.
 - `register*` usa `K & ([K] extends [keyof T] ? never : unknown)` para que las
   claves duplicadas fallen en tiempo de compilación y la clave infractora siga
   siendo visible en el error.
-- `DepsOf<AllowedDeps<T, Kind>, A>` comprueba una tupla `deps` contra los
+- `DepsOf<AllowedDeps<T, L>, A>` comprueba una tupla `deps` contra los
   parámetros del constructor por posición y por asignabilidad estructural.
-- `AllowedDeps<T, Kind>` estrecha el contenedor pasado a las factorías. Dentro de
+- `AllowedDeps<T, L>` estrecha el contenedor pasado a las factorías. Dentro de
   una factoría singleton, `c.get('scoped')` es un error de tipo.
 - `Spec`, `AsyncSpec`, `LazySpec`, `SpecMap`, `Module`, `Container.Resolve`,
   `Container.ResolveUnwrapped`, `Container.UnwrappedValue` y
@@ -133,11 +79,12 @@ el paquete core rechaza.
 ### 2.3 El tiempo de vida es un tipo
 
 El core tiene tres tipos de registro: `singleton`, `scoped` y `transient`. Cada
-registro lleva su tiempo de vida a través de `Spec<V, Kind>`.
+registro lleva su tiempo de vida a través de `Spec<V, L>`.
 
 - Un singleton no debe depender directamente de un servicio con scope o
-  transitorio. `AllowedDeps<T, Kind>` lo impone en tiempo de compilación;
-  `strict: true` lo impone en runtime para casts y registros dinámicos.
+  transitorio. `AllowedDeps<T, L>` lo impone en tiempo de compilación;
+  `{fast: false}`, el valor por defecto, lo impone en runtime para casts y
+  registros dinámicos.
 - `Lazy<V>` preserva el tiempo de vida del objetivo. Un consumidor singleton solo
   puede inyectar `LazySpec<V, 'singleton'>`. `Lazy<scoped>` y `Lazy<transient>`
   siguen siendo legales para consumidores con scope y transitorios, y siguen
@@ -187,10 +134,10 @@ No añadas trabajo antes de esa búsqueda.
 - Los registros asíncronos declarativos comparten `regs`, `cache`, búsqueda de
   scope, propiedad y liberación con los registros síncronos. `Registration.async`
   es metadato frío para clasificar dependencias al registrar; `get()` no lo lee.
-- `strict: false` puede eliminar las comprobaciones de ciclos y tiempo de vida en
-  runtime tras la ruta rápida de caché local. Los scopes rápidos pueden leer
-  directamente el registro raíz inmutable y reflejar singletons delegados en su
-  caché local. Un árbol fast es inmutable tras su primera resolución o scope.
+- `{fast: false}` es el contrato checked mutable por defecto. `{fast: true}`
+  elimina las comprobaciones de ciclos y tiempo de vida tras la ruta rápida de
+  caché local, lee directamente el registry owner y refleja singletons delegados.
+  Un árbol fast es inmutable tras su primera resolución o scope.
 
 `packages/inferdi/__tests__/container.bench.ts` no está impuesto por CI. Quienes
 revisan deben exigir salida de benchmark para los cambios en `get()`, en la forma
@@ -306,7 +253,7 @@ Documenta estas decisiones en lugar de "arreglarlas".
 | Sin detección de ciclos dinámicos tras un límite de Promise | Las dependencias asíncronas declarativas pasan por una fase previa síncrona y usan el detector de ciclos existente. Las llamadas posteriores a `await` desde factorías antiguas que devuelven Promise o contenedores capturados ocurren después de limpiar la pila de resolución. Separa ese ciclo o eleva la inicialización compartida. |
 | Sin detección de tiempo de vida en runtime tras un límite asíncrono | `AllowedDeps` bloquea las factorías tipadas inválidas, pero los casts con `as` y los contenedores externos capturados después de `await` se ejecutan tras limpiar `singletonStack`. La defensa completa requeriría seguimiento de contexto asíncrono. Lee las dependencias en el preámbulo síncrono. |
 | Sin ruptura automática de ciclos | Los ciclos son defectos arquitectónicos a menos que uno de los lados sea un companion singleton lazy explícito. InferDI detecta los ciclos de runtime soportados y los reporta; no inventa proxies ni instancias parciales. |
-| Sin módulos genéricos `<T>(c: Container<T>) => ...` | `keyof T` colapsa al límite superior `DependenciesMap` dentro del cuerpo genérico. Usa lambdas `.use()` en línea o `Module<TIn, TOut>` con una forma de entrada conocida. |
+| Sin módulos genéricos `<T>(c: Container<T>) => ...` | `keyof T` colapsa al límite superior `DependenciesMap` dentro del cuerpo genérico. Usa lambdas `.use()` en línea o `Module<TRequirements, TProvides>` con requisitos declarados. |
 | Sin API de resolutor de DI dinámico | `.has(key)` es la sonda dinámica autorizada. Las claves estáticas deberían usar `.get()` directamente. |
 | Sin historia de override en producción | `.override()` existe para pruebas y fixtures de hot-reload. La selección del grafo en producción pertenece a `.use()` o al código normal del builder. |
 | Sin liberación en cascada de padre a hijo | Cada contenedor posee sus propias instancias. La liberación en cascada convertiría a `dispose()` en un efecto secundario no local y rompería la propiedad del scope. |

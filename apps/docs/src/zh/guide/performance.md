@@ -1,62 +1,6 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/zh/guide/performance#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "首页"
-          "item": "https://inferdi.com/zh/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "指南"
-          "item": "https://inferdi.com/zh/guide/quick-start"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "性能"
-          "item": "https://inferdi.com/zh/guide/performance"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/zh/guide/performance#article"
-      "headline": "InferDI 性能：热路径解析使用一次 Map.get()"
-      "name": "性能"
-      "description": "InferDI 使用显式注册、缓存的单例与作用域级服务、0-7 个依赖的直接构造函数调用，以及 Promise 缓存的异步工厂。"
-      "url": "https://inferdi.com/zh/guide/performance"
-      "mainEntityOfPage": "https://inferdi.com/zh/guide/performance"
-      "inLanguage": "zh-CN"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-07-21"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Expert"
-      "keywords": "InferDI, 性能, 基准测试, 零开销, 热路径, 依赖注入, V8, Map.get"
-      "articleSection": "指南"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # 性能
 
-一次热路径解析就是一次 `Map.get(key)`，紧接着一次直接的 `new Ctor(...)` —— 中间没有反射、没有元数据表、也没有代理。下面的基准测试数字源自几个具体的运行时选择，而不是你必须主动开启的某种特殊快速模式：
+一次热路径解析会读取 `Map.get(key)`，并在需要构造时直接调用 `new Ctor(...)`。下面的基准测试数字源自具体的运行时选择：
 
 | 运行时选择 | 效果 |
 | --- | --- |
@@ -64,7 +8,7 @@ schema:
 | 缓存的单例和作用域级服务 | 一次热路径解析会先从 `cache.get(key)` 读取，然后才运行循环检测和生命周期记账。`cache.has(key)` 回退仅用于显式的 `undefined` 值。 |
 | 直接调用构造函数 | 具有 0-7 个依赖的类使用直接的 `new Ctor(...)` 路径。更大的构造函数则回退到 `Reflect.construct`。 |
 | 异步工厂 | 工厂返回的 `Promise` 会被原样缓存，因此并发调用者共享同一个进行中的初始化，而 `.get()` 仍保持同步。 |
-| 严格模式边界 | `strict: true` 捕获循环和生命周期泄漏，并遍历精确的父链，因此依赖树变更会立即可见。`strict: false` 信任经过审计且不可变的生产依赖图。 |
+| 运行时契约 | 默认值/`fast: false` 保留运行时检查和精确的可变父链。`fast: true` 关闭检查并启用固定拓扑的作用域查找。 |
 
 ![Benchmark results](/benchmarking_results.png)
 
@@ -93,15 +37,39 @@ schema:
 - 作用域生命周期包括作用域创建、解析和清理。场景 6 在每次迭代中都包含释放工作，因此它衡量的是作用域所有权，而不仅仅是解析。
 - InferDI 在全部 8 个场景中领先。Typed Inject 在作用域流程和 10 个依赖的宽图场景中仍是最接近的非 InferDI 基线；InversifyJS 则最接近缓存单例、瞬态、深层图和 4 个依赖的宽图场景。
 
-## 快速模式
+## `fast: true`
 
-`new Container({ strict: false })` 移除了运行时循环记账、单例栈跟踪，以及守卫解析路径周围的 `try`/`finally`。快速 scope 会直接读取不可变的根注册表，不再遍历父链，并把委托解析的 singleton 镜像到 scope 缓存中。strict scope 在每次本地未命中时遍历精确的父链，因此无需为每个 scope 保留查找元数据或失效记账，也能立即看到依赖树变更。快速模式还会跳过注册期间的防御性失效处理。owned 实例的身份去重在两种模式下都只于 disposal 阶段执行一次，不再在实例创建时扫描队列。
+`new Container({ fast: true })` 移除了运行时循环记账、单例栈跟踪，以及守卫解析路径周围的 `try`/`finally`。固定 scope 会直接读取 registry owner，不再遍历父链，并把委托解析的 singleton 镜像到 scope 缓存中。默认 scope 在每次本地未命中时遍历精确的父链，因此依赖树变更仍然可见。fast 容器会跳过注册期间的防御性失效处理。owned 实例的身份去重仍在 disposal 阶段执行。
 
-只有在测试已于默认严格模式下充分演练过依赖图之后，才使用快速模式。TypeScript 无法看到单例循环、瞬态循环、动态键、`as` 类型断言，或闭包捕获了更外层容器的工厂。请通过单一线性 fluent 链对每个运行时键只注册一次，在首次解析或创建 scope 前完成所有注册，激活后保持依赖树不可变，并先释放子 scope，再释放其祖先。
+默认的 `new Container()` 和显式的 `{fast: false}` 会保留运行时安全检查和可变依赖图。
 
-对于经过性能分析的生产路径，完成上述验证后 `{ strict: false }` 是受支持的最快配置。开发、测试、热重载以及任何激活后仍会变更的依赖树都应保留严格模式。
+只有在测试已使用 `fast: false` 充分演练过依赖图之后，才使用 `fast: true`。TypeScript 无法看到单例循环、瞬态循环、动态键、`as` 类型断言，或闭包捕获了更外层容器的工厂。请通过单一线性 fluent 链对每个运行时键只注册一次，在首次解析或创建 scope 前完成所有注册，激活后保持依赖树不可变，并先释放子 scope，再释放其祖先。
+
+对于经过性能分析的生产路径，完成上述验证后 `{fast: true}` 是受支持的最快配置。开发、测试、热重载以及任何激活后仍会变更的依赖树都应保留 `fast: false`。
 
 ## 热路径的小细节
+
+### transient 服务的构造
+
+`registerClass` 是 transient 服务的默认选择。只有性能分析确认同一依赖图频繁解析许多依赖数量相同的 transient 类时，才需要改用工厂。
+
+针对这一特定的 V8 热点，显式工厂可以为每项服务保留独立的构造调用点：
+
+```ts
+const container = new Container()
+  .declareScopeInputs<{ context: RequestContext }>()
+  .registerClass('schema', Schema, [])
+  .registerFactory(
+    'parseRequest',
+    (c) => new ParseRequest(c.get('context'), c.get('schema')),
+    ['context', 'schema'],
+    'transient'
+  )
+```
+
+工厂会重复依赖列表，因此只应在实际应用中测得收益后使用。共享的泛型构造辅助函数会合并调用点，使这项优化失效。
+
+### 键的表示方式
 
 Symbol 键在密集的解析循环中可能有所帮助，因为 `Map` 按身份比较它们。字符串键需要哈希计算，且在冲突时还需逐字符比较。大多数应用不会测量出差异，因此应将 symbol 键视为由性能剖析驱动的改动。
 

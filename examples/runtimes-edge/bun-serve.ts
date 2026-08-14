@@ -7,7 +7,7 @@ const root = buildRootContainer()
 
 export default Bun.serve({
   async fetch(request) {
-    await using scope = await createRequestScope(root, {
+    await using scope = createRequestScope(root, {
       requestId: request.headers.get('x-request-id') ?? crypto.randomUUID()
     })
 

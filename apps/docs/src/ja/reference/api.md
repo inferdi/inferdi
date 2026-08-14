@@ -1,62 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ja/reference/api#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "ホーム"
-          "item": "https://inferdi.com/ja/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "リファレンス"
-          "item": "https://inferdi.com/ja/reference/api"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "API サマリー"
-          "item": "https://inferdi.com/ja/reference/api"
-    - "@type": "APIReference"
-      "@id": "https://inferdi.com/ja/reference/api#article"
-      "headline": "InferDI コア API サマリー"
-      "name": "API サマリー"
-      "description": "スコープ入力、registerAsyncFactory、準備状態を考慮した解決、オーバーライド、破棄を含む @inferdi/inferdi v6 コア API のまとめです。"
-      "url": "https://inferdi.com/ja/reference/api"
-      "mainEntityOfPage": "https://inferdi.com/ja/reference/api"
-      "inLanguage": "ja-JP"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "executableLibraryName": "@inferdi/inferdi"
-      "programmingModel": "明示的な登録、フルエントビルダー"
-      "targetPlatform": "Node.js, Bun, Deno, Browser"
-      "keywords": "InferDI, API, Container, declareScopeInputs, ScopeInputMap, registerAsyncFactory, getAsync, AsyncSpec, ReadyKeys, dispose"
-      "articleSection": "リファレンス"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # API サマリー
 
 このページでは、公開されているコア API をまとめています。正確なジェネリック定義については、パッケージの README と TypeScript の型宣言を参照してください。
@@ -74,7 +15,7 @@ import {
   type AsyncLazySpec,
   type AsyncSpec,
   type Module,
-  type RegistrationKind,
+  type Lifetime,
   type ScopeInputMap,
   type Spec,
   type SpecMap,
@@ -87,10 +28,12 @@ class Container<T extends DependenciesMap = Record<never, never>> {
   constructor(options?: ContainerOptions)
 
   declareScopeInputs<Inputs>()
-  registerClass(key, Ctor, deps, kind?, lazyKey?)
-  registerFactory(key, factory, kind?, lazyKey?)
-  registerFactory(key, deps, factory, kind?, lazyKey?)
-  registerAsyncFactory(key, factory, deps, kind?, lazyKey?)
+  registerClass(key, Ctor, deps, lifetime?, lazyKey?)
+  registerFactory(key, factory, lifetime?)
+  registerFactory(key, factory, lifetime, lazyKey)
+  registerFactory(key, factory, deps, lifetime?)
+  registerFactory(key, factory, deps, lifetime, lazyKey)
+  registerAsyncFactory(key, factory, deps, lifetime?, lazyKey?)
   registerValue(key, value)
   override(key, value)
   use(fn)
@@ -107,27 +50,32 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 }
 ```
 
+`fast` のデフォルトは `false` です。ランタイムの安全性チェックを維持し、
+scope は正確で可変な親チェーンを保持します。`{fast: true}` はチェックを
+無効にしてグラフを固定として扱い、親 lookup のフラット化と継承 singleton
+のミラーリングを有効にします。子 scope は root の設定を継承します。
+
 ## 登録メソッド
 
 | メソッド | callback の入力 | グラフ内の型 | 解決方法 |
 | --- | --- | --- | --- |
 | `registerClass` | `deps` に対応するコンストラクター引数 | `Spec` または伝播した `AsyncSpec` | `get` または `getAsync` |
 | `registerFactory(key, factory, ...)` | ライフタイムで絞ったコンテナ | `Spec<ReturnType>` | `get` |
-| `registerFactory(key, deps, factory, ...)` | `deps` だけを持つ resolver | 入力要件付き `Spec` | `get` |
+| `registerFactory(key, factory, deps, ...)` | `deps` だけを持つ resolver | 入力要件付き `Spec` | `get` |
 | `registerAsyncFactory` | 解決済みの位置引数 | `AsyncSpec<Awaited<ReturnType>>` | `getAsync` |
 | `registerValue` | なし | 外部所有の singleton `Spec` | `get` |
 
-`registerClass` と `registerFactory` は `singleton`、`scoped`、`transient` のライフタイムと、省略可能な `lazyKey` コンパニオンを受け付けます。`registerValue` は常にシングルトンで、外部が所有します。
+`registerClass` と `registerFactory` は `singleton`、`scoped`、`transient` のライフタイムを受け付けます。`registerFactory` でコンパニオンを作る場合は、`'singleton'` を含めライフタイムを明示します。`registerValue` は常にシングルトンで、外部が所有します。
 
-`registerAsyncFactory` は同じライフタイムと省略可能な第 5 引数 `lazyKey` を受け付けます。主登録は最終型を `AsyncSpec` に保持し、コンパニオン型は `AsyncLazySpec<Awaited<ReturnType>, Kind>` です。ターゲットは `getAsync()`、ラッパーは `get()` で解決します。
+`registerAsyncFactory` は同じライフタイムと省略可能な第 5 引数 `lazyKey` を受け付けます。主登録は最終型を `AsyncSpec` に保持し、コンパニオン型は `AsyncLazySpec<Awaited<ReturnType>, L>` です。ターゲットは `getAsync()`、ラッパーは `get()` で解決します。
 
 `registerAsyncFactory` と、依存関係タプルが非同期キーを選ぶ可能性のある `registerClass` では readonly タプルが必要です。InferDI は登録時に非同期位置を一度だけ分類し、タプルへの参照を保持します。インラインリテラルは readonly として推論され、同期専用の `registerClass` は変更可能なタプルも受け付けます。
 
 `registerAsyncFactory` と依存キー付き `registerFactory` は、引数順と callback 契約が異なります。
 
 ```ts
-registerFactory(key, deps, resolverFactory, kind, lazyKey)
-registerAsyncFactory(key, valueFactory, deps, kind, lazyKey)
+registerFactory(key, resolverFactory, deps, lifetime, lazyKey)
+registerAsyncFactory(key, valueFactory, deps, lifetime, lazyKey)
 ```
 
 `override` は既存登録を置き換え、`use` は module builder を適用します。`override` のタイミングガードが確認するのは現在のコンテナのキャッシュだけです。ローカルにキャッシュされた singleton/scoped 値、`registerValue`、2 回目のオーバーライドは検出しますが、transient の解決や、子コンテナ経由で解決された祖先所有の値は記録しません。依存関係グラフを解決する前にオーバーライドを適用してください。
@@ -142,7 +90,7 @@ registerAsyncFactory(key, valueFactory, deps, kind, lazyKey)
 | `getAsync()` | 準備済みの同期キーと宣言的 async キー |
 | `has()` | 任意の string または symbol。登録の存在だけを証明 |
 
-`has()` はキーの準備状態や同期性を証明しません。型状態の絞り込みは[スコープ入力とプロファイル](../core/scope-inputs)、Promise の動作は[非同期依存グラフ](../core/async-dependency-graph)を参照してください。
+`has()` はキーの準備状態や同期性を証明しません。型状態の絞り込みは[スコープ入力](../core/scope-inputs)、Promise の動作は[非同期依存関係](../core/async-dependencies)を参照してください。
 
 ## 名前空間の型
 
@@ -173,42 +121,42 @@ v6 のジェネリック resolver は受け付けるキー集合を保持する�
 ```ts
 type Lazy<T> = { readonly get: () => T }
 type AsyncLazy<T> = { readonly get: () => Promise<T> }
-type RegistrationKind = 'singleton' | 'transient' | 'scoped'
+type Lifetime = 'singleton' | 'scoped' | 'transient'
 type DependenciesMap = Record<
   string | symbol,
-  Spec<unknown, RegistrationKind>
+  Spec<unknown, Lifetime>
 >
 
 interface ContainerOptions {
-  readonly strict?: boolean
+  readonly fast?: boolean
 }
 
-interface Spec<V, K extends RegistrationKind = 'singleton'> {
+interface Spec<V, L extends Lifetime = 'singleton'> {
   readonly type: V
-  readonly kind: K
+  readonly lifetime: L
 }
 
-interface AsyncSpec<V, K extends RegistrationKind = 'singleton'>
-  extends Spec<V, K> {
+interface AsyncSpec<V, L extends Lifetime = 'singleton'>
+  extends Spec<V, L> {
   readonly async: true
 }
 
-interface LazySpec<V, TargetKind extends RegistrationKind>
+interface LazySpec<V, TargetLifetime extends Lifetime>
   extends Spec<Lazy<V>, 'transient'> {
-  readonly lazyOf: TargetKind
+  readonly lazyOf: TargetLifetime
 }
 
-interface AsyncLazySpec<V, TargetKind extends RegistrationKind>
+interface AsyncLazySpec<V, TargetLifetime extends Lifetime>
   extends Spec<AsyncLazy<V>, 'transient'> {
-  readonly lazyOf: TargetKind
+  readonly lazyOf: TargetLifetime
 }
 
-type SpecMap<M, K extends RegistrationKind = 'singleton'> = {
-  [P in keyof M]: Spec<M[P], K>
+type SpecMap<M, L extends Lifetime = 'singleton'> = {
+  [P in keyof M]: Spec<M[P], L>
 }
 
-type Module<TIn extends DependenciesMap, TOut extends DependenciesMap> =
-  (c: Container<TIn>) => Container<TIn & TOut>
+type Module<TRequirements extends DependenciesMap, TProvides extends DependenciesMap> =
+  (c: Container<TRequirements>) => Container<TRequirements & TProvides>
 ```
 
 `LazySpec` と `AsyncLazySpec` は private な type-only discriminant を持ちます。

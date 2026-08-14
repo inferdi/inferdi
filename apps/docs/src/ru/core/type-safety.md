@@ -1,59 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ru/core/type-safety#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Главная"
-          "item": "https://inferdi.com/ru/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Базовые принципы"
-          "item": "https://inferdi.com/ru/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Типобезопасность"
-          "item": "https://inferdi.com/ru/core/type-safety"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ru/core/type-safety#article"
-      "headline": "Типобезопасность в InferDI: граф и есть тип"
-      "name": "Типобезопасность"
-      "description": "InferDI описывает граф зависимостей в TypeScript. Неверный порядок аргументов, неизвестные ключи и недопустимые зависимости по времени жизни выявляются при регистрации."
-      "url": "https://inferdi.com/ru/core/type-safety"
-      "mainEntityOfPage": "https://inferdi.com/ru/core/type-safety"
-      "inLanguage": "ru-RU"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, типобезопасность, TypeScript, вывод типов, сигнатуры конструкторов, время компиляции, внедрение зависимостей"
-      "articleSection": "Базовые принципы"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Типобезопасность
 
 Главное правило InferDI: граф зависимостей живёт в системе типов. Неверный граф - перепутанный порядок аргументов, незарегистрированный ключ, singleton, который тянется к scoped-состоянию - это ошибка типа прямо в редакторе, а не stack trace, который вы найдёте под нагрузкой. Всё, что компилятор может доказать статически, проверяется статически; runtime-защита нужна только для того, что проскользнуло через `as`-касты и динамические ключи.
@@ -85,10 +29,29 @@ new Container()
 ```ts
 new Container()
   .registerValue('dsn', 'postgres://localhost/app')
+  // TypeScript rejects this duplicate key.
   .registerValue('dsn', 'sqlite://memory')
 ```
 
 В тестах для намеренной замены используется `.override()`.
+
+Проверка уникальности учитывает весь набор значений, представленный типом ключа. Если после регистрации `'dsn'` новый ключ имеет тип `'dsn' | 'replica'`, TypeScript отклонит вызов: в runtime значение может перезаписать `'dsn'`. То же правило действует для широких `string` и `symbol`, а также для `lazyKey`, который не должен пересекаться с основным или существующим ключом.
+
+Broad- и union-ключи разрешены, пока их возможные значения не пересекаются с графом. Широкий `string` можно зарегистрировать в пустом контейнере или после ключей, состоящих только из symbol. Перед регистрацией сузьте runtime-ключ до заведомо нового значения; для намеренной замены используйте `.override()`.
+
+## Динамические ключи
+
+Статические ключи проверяются непосредственно в `.get()`. Если ключ приходит во время выполнения, сначала уточните его через `.has()`:
+
+```ts
+declare const key: string | symbol
+
+if (container.has(key)) {
+  container.get(key)
+}
+```
+
+`.has()` проверяет регистрацию, не получая значение. Для очищенного контейнера метод возвращает `false`, но не доказывает готовность scope inputs и не делает async-ключ доступным через `.get()`.
 
 ## Время жизни в типе
 
@@ -97,10 +60,11 @@ new Container()
 ```ts
 new Container()
   .registerClass('request', RequestContext, [], 'scoped')
+  // Rejected: singleton cannot capture scoped request state.
   .registerClass('users', UserService, ['request'], 'singleton')
 ```
 
-Runtime-проверки в strict mode остаются вторым рубежом защиты для `as`-кастов, динамических ключей, захваченных внешних контейнеров и циклов зависимостей.
+Default runtime-проверки остаются вторым рубежом защиты для `as`-кастов, динамических ключей, захваченных внешних контейнеров и циклов зависимостей.
 
 ## Готовность и async status
 
@@ -114,10 +78,10 @@ const root = new Container()
 
 const scope = root.createScope({request})
 
-// @ts-expect-error: handler является async
+// @ts-expect-error: handler is async
 scope.get('handler')
 
 await scope.getAsync('handler')
 ```
 
-Готовность моделируется через [Данные и профили скоупа](./scope-inputs), а выбор Promise-контракта описан в [Асинхронном графе зависимостей](./async-dependency-graph).
+Готовность моделируется через [входные данные скоупа](./scope-inputs), а выбор Promise-контракта описан в разделе [Асинхронные зависимости](./async-dependencies).

@@ -18,8 +18,8 @@ declare const EdgeRuntime: {
   waitUntil(promise: Promise<unknown>): void
 }
 
-class RequestContext {
-  requestId = ''
+type RequestContext = {
+  readonly requestId: string
 }
 
 function readSupabaseEnv() {
@@ -52,19 +52,21 @@ class ProfilesService {
 }
 
 const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
   .registerValue('supabaseEnv', readSupabaseEnv())
   .registerFactory('supabase', (c) => {
     const { url, key } = c.get('supabaseEnv')
     return createClient(url, key)
   })
-  .registerClass('request', RequestContext, [], 'scoped')
   .registerClass('profiles', ProfilesService, ['request', 'supabase'], 'scoped')
 
 Deno.serve(async (request) => {
-  const scope = root.createScope()
+  const scope = root.createScope({
+    request: {
+      requestId: request.headers.get('x-request-id') ?? crypto.randomUUID()
+    }
+  })
   try {
-    scope.get('request').requestId = request.headers.get('x-request-id') ?? crypto.randomUUID()
-
     const profiles = scope.get('profiles')
     const result = await profiles.list()
 

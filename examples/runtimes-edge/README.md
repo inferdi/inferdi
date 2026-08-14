@@ -2,9 +2,9 @@
 
 Most adapters here share the [`../_shared/container.ts`](../_shared/container.ts) builder; Supabase Edge Functions ships its own root to show how a custom factory swap works while keeping the same request-scope discipline.
 
-Use a module/process-level root container and create one scope per request. Register request context and request-owned handlers/services as `scoped` on the root. For each request, call `await createRequestScope(root, {...})`; the helper hydrates request data through the scoped instance and disposes the scope if hydration fails.
+Use a module/process-level root container and create one scope per request. Declare request context as a scope input and register request-owned handlers and services as `scoped`. For each request, call `createRequestScope(root, {...})` to provide that input.
 
-For bounded non-streaming handlers, prefer `await using scope = await createRequestScope(...)`. For servers whose response lifecycle outlives the handler callback, attach disposal to `finish`/`close` or the platform's response hook.
+For bounded non-streaming handlers, prefer `await using scope = createRequestScope(...)`. For servers whose response lifecycle outlives the handler callback, attach disposal to `finish`/`close` or the platform's response hook.
 
 For low-level servers, clean up on both normal completion and abort paths. For edge platforms with background work (Cloudflare `ctx.waitUntil`, Vercel `waitUntil`, Deno Deploy `info.waitUntil`, Supabase `EdgeRuntime.waitUntil`), **sequence dispose AFTER the background promise** with `.finally`. Running `Promise.all([background, scope.dispose()])` is a bug — it tears down the scoped services while the background work is still using them.
 

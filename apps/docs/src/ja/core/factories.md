@@ -1,120 +1,82 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ja/core/factories#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "ホーム"
-          "item": "https://inferdi.com/ja/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "コアコンセプト"
-          "item": "https://inferdi.com/ja/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "ファクトリー"
-          "item": "https://inferdi.com/ja/core/factories"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ja/core/factories#article"
-      "headline": "InferDI のファクトリー — registerFactory"
-      "name": "ファクトリー"
-      "description": "同期構築には registerFactory、宣言的な非同期依存グラフには registerAsyncFactory を使用します。"
-      "url": "https://inferdi.com/ja/core/factories"
-      "mainEntityOfPage": "https://inferdi.com/ja/core/factories"
-      "inLanguage": "ja-JP"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, ファクトリー, registerFactory, registerAsyncFactory, getAsync, AsyncSpec, 依存性注入"
-      "articleSection": "コアコンセプト"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # ファクトリー
 
-`new Ctor(...deps)` 以上のことが構築に必要な場合 — 複数の値を読み取る、サードパーティのクライアントを適応させる、設定オブジェクトを生成する、プロミスを返す — には `registerFactory` を使用します。
+生成処理が `new Ctor(...deps)` だけなら `registerClass` を使います。設定の参照、サードパーティ API、インターフェースのバインドなど、明示的な生成ロジックが必要な場合は `registerFactory` を使います。
 
 ```ts
 const container = new Container()
-  .registerValue('config', { dsn: 'postgres://localhost/app', poolSize: 10 })
-  .registerFactory('pgPool', (c) => {
+  .registerValue('config', {
+    dsn: 'postgres://localhost/app',
+    poolSize: 10
+  })
+  .registerFactory('pool', (c) => {
     const { dsn, poolSize } = c.get('config')
     return new Pool({ connectionString: dsn, max: poolSize })
   })
-  .registerClass('users', UserRepo, ['pgPool'])
+  .registerClass('users', UserRepository, ['pool'])
 ```
 
-ファクトリーの戻り値が、そのキーの解決後の型になります。
+戻り値の型が登録サービスの型になります。
 
-## ホットな transient グラフ
+## コンテナーを受け取るファクトリー
 
-transient サービスには `registerClass` を標準として使います。プロファイリングでコンストラクター呼び出しがホットパスの有意な割合を占めた場合だけ変更してください。
-
-V8 では、同じ依存数を持つ異なる transient クラスを一つのグラフが繰り返し解決する場合に遅くなることがあります。プロファイリングとアプリケーションのビルド成果物でこの hotspot を確認したら、そのサービスだけをファクトリーで登録します。
+基本のコールバックは、ライフタイムで絞り込まれたコンテナーを受け取ります。singleton ファクトリーから解決できるのは singleton に安全な依存だけで、scoped と transient のキーは TypeScript が拒否します。
 
 ```ts
-const container = new Container()
-  .registerClass('context', RequestContext, [], 'scoped')
-  .registerClass('schema', Schema, [])
+const root = new Container()
+  .registerValue('prefix', 'app')
+  .registerFactory('logger', (c) => new Logger(c.get('prefix')))
+```
+
+条件付きまたは複数段階の解決が必要な場合に使います。コールバック内の `.get()` は同期的でなければなりません。初期化の非同期状態をグラフへ伝播させる場合は `registerAsyncFactory` を使います。
+
+## ファクトリー依存関係の宣言
+
+`deps` を取るオーバーロードは要件をグラフへ記録し、コールバックのリゾルバーを指定キーに制限します。
+
+```ts
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('logger', Logger, [])
   .registerFactory(
-    'parseRequest',
-    (c) => new ParseRequest(c.get('context'), c.get('schema')),
-    'transient',
+    'requestLog',
+    (deps) => new RequestLog(
+      deps.get('request'),
+      deps.get('logger')
+    ),
+    ['request', 'logger'],
+    'scoped'
   )
 ```
 
-各ファクトリーには独自の `new Service(...)` 呼び出しを置いてください。この最適化が必要なら、複数のサービスを共通の構築ヘルパーへ渡してはいけません。ファクトリーは依存関係の記述を繰り返すため、計測済みの hotspot に限定します。
+宣言した依存関係は、スコープ入力とライフタイムの要件をモジュールや後続の登録へ伝えます。`registerAsyncFactory` と異なり、コールバックは位置引数ではなくリゾルバーを受け取ります。
 
 ## ファクトリーのライフタイム
 
-ファクトリーは、クラスと同じライフタイムモデルを使用します:
+ファクトリーはクラスと同じライフタイムを使います。
 
 ```ts
 const root = new Container()
   .registerFactory('cache', () => new Cache(), 'singleton')
-  .registerFactory('request', () => new RequestState(), 'scoped')
+  .registerFactory('requestState', () => new RequestState(), 'scoped')
+  .registerFactory('operation', () => new Operation(), 'transient')
 ```
 
-シングルトンのファクトリー内では、`c` パラメーターはシングルトンセーフな依存関係に絞り込まれます。スコープドおよびトランジェントなキーはオートコンプリートされず、TypeScript によって拒否されます。
+singleton と scoped の結果はキャッシュされ、コンテナーが所有します。transient の結果はキャッシュも破棄もされません。
 
-省略可能な第4引数 `lazyKey` を渡すと、`registerClass` と同じくライフタイムを保持する `Lazy<V>` コンパニオンが登録されます:
+第 4 引数に `lazyKey` を渡すと、対象のライフタイムを保持する companion を作成できます。
 
 ```ts
 const root = new Container()
   .registerFactory('cache', () => new Cache(), 'singleton', 'cacheLazy')
 
-root.get('cacheLazy').get() // Cache
+root.get('cacheLazy').get()
 ```
 
-デフォルトのシングルトンライフタイムを使う場合は、コンパニオンキーの前に `undefined` を渡します: `registerFactory('cache', factory, undefined, 'cacheLazy')`。
+companion を作成する場合は `'singleton'` も含めてライフタイムを明示します。詳しくは[遅延注入](./lazy-injection)を参照してください。
 
-## インターフェースのバインド
+## インターフェースをバインドする
 
-TypeScript のインターフェースはコンパイル時に消去され、コンストラクターとして渡すランタイム上の値を持ちません。代わりに、明示的なファクトリー型を通じて、インターフェースをその実装にバインドしてください:
+インターフェースには実行時のコンストラクターがありません。利用側を抽象型に依存させる場合は、サービス型を明示します。
 
 ```ts
 interface Mailer {
@@ -126,49 +88,16 @@ class SendGridMailer implements Mailer {
 }
 
 const container = new Container()
-  .registerFactory<'mailer', Mailer>('mailer', () => new SendGridMailer())
-```
-
-`'mailer'` の利用者は、具象クラスではなく `Mailer` という抽象を見ることになります。
-
-## Promise 値を返す同期ファクトリー
-
-`registerFactory` は、返された Promise をサービス値として扱います。キーは同期キーのままで、`get()` は Promise を返し、別のファクトリーには同じオブジェクトが渡されます。
-
-```ts
-const c = new Container()
-  .registerFactory('dbPromise', () => connectDatabase())
-
-const promise = c.get('dbPromise') // Promise<Database>
-```
-
-`lazyKey` を追加してもこのモデルは変わりません。`registerFactory('dbPromise', factory, undefined, 'dbLazy')` は `Lazy<Promise<Database>>` を生成します。
-
-この形式でも single-flight キャッシュを利用できます。キャプチャしたコンテナーを通じて `await` 後に作られた循環は、同期の循環およびライフタイム検査の対象外です。
-
-## 宣言的な非同期依存グラフ
-
-`registerAsyncFactory` は最終サービス型を `AsyncSpec` に保持し、依存タプルを解決して、位置引数を callback へ渡します。クラスは宣言した依存から async 状態を継承します。
-
-```ts
-const container = new Container()
-  .registerValue('config', {dsn: 'postgres://localhost/app'})
-  .registerAsyncFactory(
-    'db',
-    (config: {dsn: string}) => connectDatabase(config.dsn),
-    ['config']
+  .registerFactory<'mailer', Mailer>(
+    'mailer',
+    () => new SendGridMailer()
   )
-
-const db = await container.getAsync('db')
 ```
 
-第 5 引数の `lazyKey` は `AsyncLazy<Database>` を生成し、`.get()` までファクトリーを開始しません。
+`mailer` の利用側には `SendGridMailer` ではなく `Mailer` が見えます。
 
-```ts
-const container = new Container()
-  .registerAsyncFactory('db', connectDatabase, [], undefined, 'dbLazy')
+## Promise 契約を選ぶ
 
-const db = await container.get('dbLazy').get()
-```
+`registerFactory` が返した Promise はサービス値そのものです。`.get()` は `Promise<T>` を返し、依存するファクトリーも同じ Promise を受け取ります。同期グラフに Promise オブジェクト自体が必要な場合だけ使います。
 
-2 つの Promise モデル、クラスへの async 状態の伝播、single-flight キャッシュ、失敗時の動作、async teardown は[非同期依存グラフ](./async-dependency-graph)を参照してください。
+サービスが `T` で Promise が初期化境界なら、`registerAsyncFactory` を使います。非同期状態がグラフへ伝播し、サービスは `.getAsync()` で解決されます。[非同期依存関係](./async-dependencies)では両方の契約、キャッシュ、遅延 companion、失敗時の動作、リソース破棄を説明します。

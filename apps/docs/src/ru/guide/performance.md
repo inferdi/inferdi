@@ -1,62 +1,6 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ru/guide/performance#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Главная"
-          "item": "https://inferdi.com/ru/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Руководство"
-          "item": "https://inferdi.com/ru/guide/quick-start"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Производительность"
-          "item": "https://inferdi.com/ru/guide/performance"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ru/guide/performance#article"
-      "headline": "Производительность InferDI: тёплый resolve использует один Map.get()"
-      "name": "Производительность"
-      "description": "InferDI использует явные регистрации, кешированные singleton- и scoped-сервисы, прямые вызовы конструкторов для 0-7 зависимостей и Promise-кеширование async-фабрик."
-      "url": "https://inferdi.com/ru/guide/performance"
-      "mainEntityOfPage": "https://inferdi.com/ru/guide/performance"
-      "inLanguage": "ru-RU"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-07-21"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Expert"
-      "keywords": "InferDI, производительность, бенчмарк, нулевые накладные расходы, горячий путь, внедрение зависимостей, V8, Map.get"
-      "articleSection": "Руководство"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Производительность
 
-Тёплый вызов `.get()` - это один `Map.get(key)` и прямой `new Ctor(...)`: без reflection, таблиц метаданных и proxy на пути. Цифры в бенчмарке ниже появляются из конкретных решений в рантайме, а не из отдельного fast mode, который нужно включать вручную:
+Тёплый вызов `.get()` читает `Map.get(key)` и при необходимости напрямую вызывает `new Ctor(...)`. Цифры в бенчмарке ниже отражают конкретные решения в runtime:
 
 | Решение | Эффект |
 | --- | --- |
@@ -64,7 +8,7 @@ schema:
 | Закешированные singleton- и scoped-сервисы | Тёплый вызов `.get()` читает `cache.get(key)` до проверок циклов и времени жизни. Запасной `cache.has(key)` нужен только для явно зарегистрированного `undefined`. |
 | Прямые вызовы конструкторов | Классы с 0-7 зависимостями идут по прямому пути `new Ctor(...)`. Конструкторы с большим числом аргументов используют `Reflect.construct`. |
 | Асинхронные фабрики | Фабричный `Promise` кешируется как есть, поэтому параллельные вызовы делят одну начатую инициализацию, а `.get()` остаётся синхронным. |
-| Граница strict mode | `strict: true` ловит циклы и утечки времени жизни и проходит точную цепочку родителей, поэтому мутации дерева видны сразу. `strict: false` доверяет заранее проверенному неизменяемому production-графу. |
+| Runtime-контракт | Default/`fast: false` сохраняет runtime-проверки и точную mutable parent chain. `fast: true` отключает проверки и включает fixed-topology lookup scope. |
 
 ![Результаты бенчмарков](/benchmarking_results.png)
 
@@ -93,15 +37,39 @@ schema:
 - Жизненный цикл scope включает создание scope, resolve и очистку. Сценарий 6 выполняет dispose на каждой итерации, поэтому измеряет владение scope, а не только получение значения.
 - InferDI лидирует во всех 8 сценариях. Typed Inject остаётся ближайшей альтернативой в scoped-потоках и широком графе с десятью зависимостями, а InversifyJS — при закешированном singleton, transient, глубоком графе и широком графе с четырьмя зависимостями.
 
-## Быстрый режим
+## `fast: true`
 
-`new Container({ strict: false })` убирает runtime-учёт циклов, отслеживание singleton-стека и `try`/`finally` вокруг защищённого пути resolve. Fast scope читает неизменяемый root registry напрямую, не проходя цепочку родителей, а delegated singleton после первого resolve зеркалируется в cache scope. Strict scope при каждом локальном промахе проходит точную цепочку родителей: мутации остаются видимыми без метаданных lookup на каждом scope и без инвалидации снимков. В Fast Mode защитная инвалидация при регистрации пропускается. Дедупликация owned-инстансов выполняется один раз во время disposal в обоих режимах вместо сканирования очереди при создании.
+`new Container({ fast: true })` убирает runtime-учёт циклов, отслеживание singleton-стека и `try`/`finally` вокруг защищённого пути resolve. Фиксированные scope читают registry owner напрямую, не проходя цепочку родителей, а delegated singleton после первого resolve зеркалируется в cache scope. Default scope при каждом локальном промахе проходит точную цепочку родителей, поэтому мутации остаются видимыми. Fast-контейнеры пропускают защитную инвалидацию при регистрации. Дедупликация owned-инстансов по-прежнему выполняется во время disposal.
 
-Включайте быстрый режим только после тестов, которые прогнали граф в стандартном strict mode. TypeScript не видит singleton-циклы, transient-циклы, динамические ключи, `as`-касты и фабрики, захватившие внешний контейнер с более широким типом. Регистрируйте каждый runtime-ключ один раз в одной линейной fluent-цепочке, завершите регистрацию до первого resolve или создания scope, не меняйте активированное дерево и закрывайте дочерние scope раньше предков.
+Default `new Container()` и явный `{fast: false}` сохраняют runtime-проверки и mutable graph.
 
-Для профилированного production-пути `{ strict: false }` даёт максимальную поддерживаемую скорость после такой проверки. Оставляйте strict mode для разработки, тестов, hot reload и любого дерева, которое меняется после активации.
+Включайте `fast: true` только после тестов, которые прогнали граф с `fast: false`. TypeScript не видит singleton-циклы, transient-циклы, динамические ключи, `as`-касты и фабрики, захватившие внешний контейнер с более широким типом. Регистрируйте каждый runtime-ключ один раз в одной линейной fluent-цепочке, завершите регистрацию до первого resolve или создания scope, не меняйте активированное дерево и закрывайте дочерние scope раньше предков.
+
+Для профилированного production-пути `{fast: true}` даёт максимальную поддерживаемую скорость после такой проверки. Оставляйте `fast: false` для разработки, тестов, hot reload и любого дерева, которое меняется после активации.
 
 ## Детали горячего пути
+
+### Создание transient-сервисов
+
+`registerClass` остаётся основным вариантом для transient-сервисов. Меняйте его только после профилирования графа, который часто получает много разных transient-классов с одинаковым числом зависимостей.
+
+В таком узком V8-hotspot явная фабрика создаёт отдельное место вызова для каждого сервиса:
+
+```ts
+const container = new Container()
+  .declareScopeInputs<{ context: RequestContext }>()
+  .registerClass('schema', Schema, [])
+  .registerFactory(
+    'parseRequest',
+    (c) => new ParseRequest(c.get('context'), c.get('schema')),
+    ['context', 'schema'],
+    'transient'
+  )
+```
+
+Фабрика повторяет список зависимостей, поэтому используйте её только при измеримом выигрыше. Общий generic helper уберёт отдельное место вызова и сведёт оптимизацию на нет.
+
+### Представление ключей
 
 Symbol-ключи могут помочь в плотных циклах resolve, потому что `Map` сравнивает их по идентичности. Строковым ключам нужен хеш, а при коллизии - посимвольное сравнение. В большинстве приложений разница не измеряется, поэтому переходите на symbol-ключи только после сигнала профилировщика.
 

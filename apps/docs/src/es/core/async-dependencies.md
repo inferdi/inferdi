@@ -1,60 +1,4 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/es/core/async-dependency-graph#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Inicio"
-          "item": "https://inferdi.com/es/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Conceptos básicos"
-          "item": "https://inferdi.com/es/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Grafo de dependencias asíncrono"
-          "item": "https://inferdi.com/es/core/async-dependency-graph"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/es/core/async-dependency-graph#article"
-      "headline": "Grafos de dependencias asíncronos declarativos en InferDI"
-      "name": "Grafo de dependencias asíncrono"
-      "description": "Crea grafos de dependencias async tipados con registerAsyncFactory, getAsync, caché single-flight, aislamiento por scope y limpieza explícita."
-      "url": "https://inferdi.com/es/core/async-dependency-graph"
-      "mainEntityOfPage": "https://inferdi.com/es/core/async-dependency-graph"
-      "inLanguage": "es-ES"
-      "datePublished": "2026-08-11"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, grafo de dependencias asíncrono, registerAsyncFactory, getAsync, AsyncSpec, single-flight, inyección de dependencias TypeScript"
-      "articleSection": "Conceptos básicos"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
-# Grafo de dependencias asíncrono
+# Dependencias asíncronas
 
 `registerAsyncFactory` registra una arista async explícita. El grafo conserva el tipo final del servicio, espera las dependencias async declaradas y propaga el estado async a las clases que dependen de ellas.
 
@@ -73,7 +17,7 @@ La diferencia también decide el tipo acompañante. Un `registerFactory`
 Promise-valued produce `Lazy<Promise<T>>`; un `registerAsyncFactory` declarativo
 con un quinto `lazyKey` produce `AsyncLazy<T>`. Obtener el wrapper es síncrono y no propaga el estado async al consumidor.
 
-## Construir un grafo async por petición
+## Registrar factorías asíncronas
 
 Este grafo inicializa una base de datos para el root y una sesión por scope autenticado. Una clase pasa a ser async cuando alguna dependencia declarada es async.
 
@@ -118,13 +62,13 @@ const root = new Container()
 await using scope = root.createScope({auth})
 const dashboard = await scope.getAsync('dashboard')
 
-// @ts-expect-error: dashboard pertenece al grafo async
+// @ts-expect-error: dashboard belongs to the async graph
 scope.get('dashboard')
 ```
 
-El compilador también rechaza `root.getAsync('dashboard')` porque el root no tiene la entrada `auth`. Consulta [Entradas y perfiles de scope](./scope-inputs) para construir perfiles.
+El compilador también rechaza `root.getAsync('dashboard')` porque el root no tiene la entrada `auth`. Consulta [Entradas de scope](./scope-inputs) para construir perfiles.
 
-## Resolución y planificación
+## Resolución y propagación
 
 `getAsync()` acepta claves sync y async listas y devuelve una Promise. Un error síncrono de lookup, ciclo, lifetime o disposal se convierte en una Promise rechazada.
 
@@ -145,7 +89,7 @@ El callback recibe valores en vez de un contenedor. TypeScript y el preflight de
 
 Anota el tipo de cada parámetro del callback, o pasa una función con firma previa, cuando `deps` no esté vacío. La tupla comprueba los tipos y su orden; no proporciona inferencia contextual para los parámetros.
 
-## Caché por lifetime
+## Planificación y caché
 
 | Lifetime | Inicialización | Propiedad |
 | --- | --- | --- |
@@ -157,7 +101,24 @@ Las llamadas concurrentes comparten la inicialización singleton y scoped. Una P
 
 `has()` comprueba el registro sin iniciar la inicialización. No demuestra que una clave sea síncrona ni proporciona entradas de scope ausentes.
 
-## Limpieza de recursos async
+## Companions AsyncLazy
+
+Pasa un quinto argumento `lazyKey` para diferir un objetivo asíncrono declarativo:
+
+```ts
+const root = new Container()
+  .registerAsyncFactory('db', openDatabase, [], undefined, 'dbLazy')
+
+const dbLazy = root.get('dbLazy') // AsyncLazy<Database>
+const first = dbLazy.get()
+const second = dbLazy.get()
+
+first === second // true for this singleton target
+```
+
+La creación del wrapper sigue siendo síncrona, así que una clase que recibe `AsyncLazy<T>` no se vuelve asíncrona por esa dependencia. El wrapper captura el contenedor que lo resolvió: los objetivos scoped permanecen en ese scope y los transient se inician en cada llamada y pertenecen al llamador.
+
+## Liberación de recursos y errores
 
 Los registros singleton y scoped mantienen su Promise en caché tras el fulfillment. Libera su contenedor de forma asíncrona para que InferDI espere la inicialización e inspeccione el recurso resuelto.
 
@@ -171,6 +132,12 @@ try {
 ```
 
 Los recursos async propiedad del contenedor admiten `await using`, `dispose()` y `Symbol.asyncDispose`. Un `using` síncrono no puede desenvolver una Promise en caché e informa del uso incorrecto.
+
+Antes de lanzar ese error, la liberación síncrona añade un observador de rechazo a la Promise nativa en caché para que un fallo posterior no llegue a `unhandledRejection`. No espera la Promise ni asimila un thenable personalizado.
+
+Una inicialización singleton o scoped rechazada permanece en la caché; InferDI no la reintenta. Si una dependencia posterior falla durante el preflight, las inicializaciones ya iniciadas conservan su estado de caché y su propietario.
+
+El fallo de una dependencia puede propagarse por varias Promises de inicialización en caché. La liberación asíncrona informa una sola vez del mismo objeto `Error`; los objetos distintos siguen siendo causas distintas de `AggregateError`, incluso con mensajes iguales.
 
 ## Valores Promise heredados
 
@@ -191,7 +158,7 @@ const monitor = await legacy.getAsync('monitor')
 
 En el nivel superior, `getAsync('dbPromise')` sigue la semántica await de JavaScript y resuelve a `Database`.
 
-## Límites y semántica de errores
+## Límites dinámicos
 
 - Pasa tuplas readonly a `registerAsyncFactory` y a `registerClass` cuando la tupla pueda seleccionar una clave async. InferDI clasifica las posiciones async una vez y conserva la referencia a la tupla. Los literales inline se infieren como readonly.
 - Los ciclos declarativos y las infracciones de lifetime en frío fallan durante el preflight síncrono. Las llamadas mediante un contenedor capturado después de un límite Promise crean aristas dinámicas fuera de ese análisis.
@@ -200,4 +167,4 @@ En el nivel superior, `getAsync('dbPromise')` sigue la semántica await de JavaS
 - Una clase async con `lazyKey` produce `AsyncLazy<Class>`; una clase mixed sync/async produce `Lazy<Class> | AsyncLazy<Class>`.
 - Un ciclo dinámico mediante `AsyncLazy.get()` tras un límite Promise puede esperar su propia Promise pendiente en caché sin error de runtime.
 
-Consulta [Factorías](./factories) para la construcción síncrona y [Scopes y limpieza](./scopes) para el modelo de propiedad.
+Consulta [Factorías](./factories) para la construcción síncrona y [Scopes y liberación de recursos](./scopes) para el modelo de propiedad.

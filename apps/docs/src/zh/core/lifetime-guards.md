@@ -1,60 +1,4 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/zh/core/lifetime-guards#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "首页"
-          "item": "https://inferdi.com/zh/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "核心概念"
-          "item": "https://inferdi.com/zh/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "生命周期守卫"
-          "item": "https://inferdi.com/zh/core/lifetime-guards"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/zh/core/lifetime-guards#article"
-      "headline": "InferDI 中的生命周期守卫——单例、作用域级与瞬态"
-      "name": "生命周期守卫"
-      "description": "InferDI 的三种生命周期——单例、作用域级与瞬态——以及那些阻止生命周期更长的服务捕获生命周期更短的服务、并在请求之间泄漏状态的编译期与运行时守卫。"
-      "url": "https://inferdi.com/zh/core/lifetime-guards"
-      "mainEntityOfPage": "https://inferdi.com/zh/core/lifetime-guards"
-      "inLanguage": "zh-CN"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Expert"
-      "keywords": "InferDI, 生命周期, 单例, 作用域级, 瞬态, 生命周期守卫, 受困依赖, 依赖注入"
-      "articleSection": "核心概念"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
-# 生命周期守卫
+# 生命周期
 
 InferDI 提供三种生命周期：
 
@@ -64,7 +8,7 @@ InferDI 提供三种生命周期：
 | `scoped` | 每个子作用域创建一次 | 子作用域 | 是 |
 | `transient` | 每次解析都创建 | 从不缓存 | 否 |
 
-在 `strict: true` 模式下，从根容器解析 `scoped` 键会抛出 `Scoped "key" cannot be resolved from the root container. Use createScope().`。请从 `createScope()` 返回的子容器解析 scoped 服务。
+在默认的 `{fast: false}` 契约下，从根容器解析 `scoped` 键会抛出 `Scoped "key" cannot be resolved from the root container. Use createScope().`。请从 `createScope()` 返回的子容器解析 scoped 服务。
 
 ## 生命周期规则
 
@@ -76,13 +20,13 @@ new Container()
   .registerClass('users', UserService, ['request'], 'singleton')
 ```
 
-该注册会被 TypeScript 拒绝。在严格模式下，如果有类型转换绕过了类型系统，同样的形态在运行时也会被拒绝。
+该注册会被 TypeScript 拒绝。使用 `fast: false` 时，如果有类型转换绕过了类型系统，运行时检查也会拒绝同样的形态。
 
-声明的作用域输入属于 scoped 依赖。读取请求、认证上下文、租户或任务载荷的服务应注册为 `scoped` 或 `transient`；编译器会在运行前拒绝 singleton 消费方。参见[作用域输入与配置](./scope-inputs)。
+声明的作用域输入属于 scoped 依赖。读取请求、认证上下文、租户或任务载荷的服务应注册为 `scoped` 或 `transient`；编译器会在运行前拒绝 singleton 消费方。参见[作用域输入](./scope-inputs)。
 
-## 严格模式
+## 默认运行时检查
 
-`strict: true` 是默认值。它能捕捉：
+`fast` 默认为 `false`。依赖图保持可变，运行时会捕捉：
 
 - 直接从根容器解析 scoped 键
 - 由类型转换引入的单例到作用域级或单例到瞬态的违规
@@ -92,17 +36,18 @@ new Container()
 - 绕过静态检查的动态键误用
 
 ```ts
-const root = new Container({ strict: true })
+const root = new Container()
+const explicitRoot = new Container({ fast: false })
 ```
 
-## 快速模式
+## `fast: true`
 
-仅在测试已证明依赖图形态之后才使用 `strict: false`：
+仅在测试已证明依赖图形态之后才使用 `fast: true`：
 
 ```ts
-const root = new Container({ strict: false })
+const root = new Container({ fast: true })
 ```
 
-快速模式会从解析路径中移除运行时的循环与生命周期记账。scope 会直接读取不可变的根注册表，不再遍历父链，并把委托解析的 singleton 镜像到 scope 缓存中。strict scope 在每次本地未命中时遍历精确的父链，因此无需保留查找元数据也能立即看到依赖树变更。owned 实例的身份去重在两种模式下都于 disposal 阶段执行。它不会改变类型层面的契约，但也无法防御不诚实的类型转换、捕获的外层容器或循环。它也会跳过根容器的 scoped 保护，因此应用代码不得从根容器解析 scoped 键。
+该选项保留类型层面的契约，但移除运行时循环与生命周期记录。容器树激活后会被视为固定结构，根容器的 scoped 检查也会关闭。
 
-推荐的工作流程：在严格模式下开发和测试，通过单一线性 fluent 链对每个运行时键只注册一次，并在首次解析或创建 scope 前完成注册。然后只为经过审计且不可变的生产依赖图切换模式，并先释放子 scope，再释放其祖先。
+开发和测试时使用 `fast: false`。只有经过验证且不再变更的生产依赖图才应启用 `fast: true`。具体的运行时取舍和激活规则见[性能](../guide/performance#fast-true)。

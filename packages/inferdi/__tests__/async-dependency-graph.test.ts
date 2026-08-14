@@ -259,8 +259,8 @@ describe('compact async dependency graph — single-flight and lifetimes', () =>
     expect(calls).toBe(1)
   })
 
-  it('uses the same compact path in fast mode', async () => {
-    const c = new Container({strict: false})
+  it('uses the same compact path with fast enabled', async () => {
+    const c = new Container({fast: true})
       .registerAsyncFactory('db', async () => new Database(), [])
       .registerClass('repository', Repository, ['db'])
 
@@ -738,13 +738,13 @@ describe('AsyncLazy companions', () => {
     )
   })
 
-  it('keeps the same cast bypass branch-free in Fast Mode', async () => {
+  it('keeps the same cast bypass branch-free with fast enabled', async () => {
     class Holder {
       constructor(
         public readonly lazy: {get: () => Promise<Database>}
       ) {}
     }
-    const c = new Container({strict: false}).registerAsyncFactory(
+    const c = new Container({fast: true}).registerAsyncFactory(
       'db',
       async () => new Database(),
       [],
@@ -1100,6 +1100,44 @@ describe('compact async dependency graph — scopes, override, has, and disposal
 
     await expect(c.getAsync('resource')).rejects.toBe(error)
     await expect(c.dispose()).rejects.toBe(error)
+  })
+
+  it('reports a shared async dependency failure once during disposal', async () => {
+    const error = new Error('connect failed')
+    const c = new Container()
+      .registerAsyncFactory('dependency', async (): Promise<Database> => {
+        throw error
+      }, [])
+      .registerAsyncFactory('dependent', async (dependency: Database) => {
+        return dependency
+      }, ['dependency'])
+
+    await expect(c.getAsync('dependent')).rejects.toBe(error)
+    await expect(c.dispose()).rejects.toBe(error)
+  })
+
+  it('preserves distinct rejected initialization errors with equal messages', async () => {
+    const firstError = new Error('connect failed')
+    const secondError = new Error('connect failed')
+    const c = new Container()
+      .registerAsyncFactory('first', async (): Promise<Database> => {
+        throw firstError
+      }, [])
+      .registerAsyncFactory('second', async (): Promise<Database> => {
+        throw secondError
+      }, [])
+
+    await Promise.allSettled([
+      c.getAsync('first'),
+      c.getAsync('second')
+    ])
+    const error = await c.dispose().catch((reason: unknown) => reason)
+
+    expect(error).toBeInstanceOf(AggregateError)
+    expect((error as AggregateError).errors).toEqual([
+      secondError,
+      firstError
+    ])
   })
 
   it('requires async disposal even after an owned async resource is fulfilled', async () => {

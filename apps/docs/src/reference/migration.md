@@ -1,64 +1,15 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/reference/migration#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Home"
-          "item": "https://inferdi.com/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Reference"
-          "item": "https://inferdi.com/reference/api"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Migration"
-          "item": "https://inferdi.com/reference/migration"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/reference/migration#article"
-      "headline": "InferDI Migration guide"
-      "name": "Migration"
-      "description": "Breaking changes by major version and the current migration path to InferDI 6.0, mirroring packages/inferdi/MIGRATION.md as the source of truth."
-      "url": "https://inferdi.com/reference/migration"
-      "mainEntityOfPage": "https://inferdi.com/reference/migration"
-      "inLanguage": "en-US"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, migration, breaking changes, upgrade, 6.0, ReadyKeys, SyncReadyKeys, dependency injection"
-      "articleSection": "Reference"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Migration
 
 InferDI records breaking changes by major version. The source of truth remains [`packages/inferdi/MIGRATION.md`](https://github.com/inferdi/inferdi/blob/main/packages/inferdi/MIGRATION.md), but the current migration path is summarized here.
 
 ## Migration to 6.0
+
+- Replace `RegistrationKind` with `Lifetime` and `Spec.kind` with `Spec.lifetime`; no deprecated alias remains.
+- Move deps-aware sync factories from `registerFactory(key, deps, factory, ...)` to `registerFactory(key, factory, deps, ...)`. A sync factory companion requires an explicit lifetime, including `'singleton'`.
+- Replace the previous runtime-check opt-out with `{fast: true}`. The prerelease `mode` option was removed. `fast` defaults to `false`, which keeps runtime checks enabled and the graph mutable; `fast: true` selects the unchecked fixed contract.
+- Named `Module<TRequirements, TProvides>` accepts actual graphs with extra registrations, preserves them, checks exact requirements, and rejects output collisions. `new Container(parent)` is no longer public; use `createScope()`.
+- Registration now rejects any key type that may overlap an existing primary or lazy key. Narrow broad or union keys to a fresh member, or use `.override()` for intentional replacement.
+- Async teardown reports a shared rejection object once when dependency failure propagates through several cached Promises. Sync teardown observes native-Promise rejection before throwing an async-misuse error.
 
 ### Generic Resolver Helpers Use Ready Keys
 
@@ -88,7 +39,7 @@ Use `Container.ReadyKeys<Container<T>>` in generic helpers that call `getAsync()
 
 `LazySpec` now carries a private type-only mode brand, and v6 adds
 `AsyncLazySpec`. Explicit `Container` and `Module` shapes must use these named
-exports instead of reproducing `{type, kind, lazyOf}`. The brand has no runtime
+exports instead of reproducing `{type, lifetime, lazyOf}`. The brand has no runtime
 field.
 
 `registerAsyncFactory` accepts a fifth `lazyKey` and produces `AsyncLazy<T>`.
@@ -97,11 +48,11 @@ Async-propagated classes use the same wrapper; mixed sync/async classes expose
 `Lazy<Promise<T>>`. `Container.ResolveUnwrapped` unwraps managed sync, async,
 and mixed companions distributively.
 
-The [API Summary](./api), [Scope Inputs and Profiles](../core/scope-inputs), and [Async Dependency Graph](../core/async-dependency-graph) describe the new key sets.
+The [API Summary](./api), [Scope Inputs](../core/scope-inputs), and [Async Dependencies](../core/async-dependencies) describe the new key sets.
 
 ## Migration to 5.0
 
-The initial v5 release was adapter-only. The version bump keeps all published packages in lockstep and aligns framework adapters around one cleanup contract. Later v5 builds also enforce child-scope ownership and tighten the Fast Mode contract described below.
+The initial v5 release was adapter-only. The version bump keeps all published packages in lockstep and aligns framework adapters around one cleanup contract. Later v5 builds also enforce child-scope ownership and tighten the `{fast: true}` contract described below.
 
 Adapter contracts now share these rules:
 
@@ -114,19 +65,19 @@ Adapter contracts now share these rules:
 
 ### Scoped Resolution Requires a Child Scope
 
-With the default `strict: true`, resolving a scoped key from the root now throws `Scoped "key" cannot be resolved from the root container. Use createScope().` Create a child with `const scope = root.createScope()`, call `scope.get(scopedKey)`, and dispose the child at its lifecycle boundary. Fast Mode skips this runtime guard. Application code must resolve scoped keys from child scopes.
+With the default `{fast: false}`, resolving a scoped key from the root now throws `Scoped "key" cannot be resolved from the root container. Use createScope().` Create a child with `const scope = root.createScope()`, call `scope.get(scopedKey)`, and dispose the child at its lifecycle boundary. `{fast: true}` skips this runtime guard. Application code must resolve scoped keys from child scopes.
 
-### Fast Mode Immutable Graph Contract
+### `fast: true` Fixed Graph Contract
 
-`new Container({ strict: false })` now reads the immutable root registry
+`new Container({fast: true})` reads the immutable root registry
 directly from scopes, avoids parent walks, and mirrors delegated singletons
-into the scope cache. Strict scopes walk their exact parent chain on every
+into the scope cache. Default scopes walk their exact parent chain on every
 local miss instead of retaining parent-lookup snapshots, so mutations stay
 visible without invalidation bookkeeping or per-scope lookup metadata.
 Owned-instance identity de-duplication runs during disposal in both modes.
 Register each runtime key once through one linear fluent chain, complete
 registration before the first resolve or scope, keep the activated tree
-immutable, and dispose child scopes before their ancestors. Use `strict: true`
+immutable, and dispose child scopes before their ancestors. Use `{fast: false}`
 for hot reload or any tree that changes after activation.
 
 ### Adapter Notes
@@ -185,7 +136,7 @@ Main changes:
 - `registerFactory` narrows its `c` parameter for singleton factories.
 - `registerClass` filters `deps` for singleton registrations.
 - `override(key, value)` preserves the original lifetime kind.
-- `new Container({ strict: false })` can disable runtime cycle and lifetime guards after a graph audit.
+- `new Container({fast: true})` can disable runtime cycle and lifetime guards after a graph audit.
 
 Common fixes:
 
@@ -257,7 +208,7 @@ When upgrading adapters, keep the adapter package and [`@inferdi/inferdi`](https
 1. Read the migration notes for every major version crossed.
 2. Upgrade [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) and all installed adapters together.
 3. Run type tests or `tsc --noEmit` to catch graph-shape changes.
-4. Run runtime tests in strict mode.
+4. Run runtime tests with the default checked contract.
 5. Review request-scope ownership if you use `skipInferdiDispose`, `autoDispose: false`, or custom `disposeScope`.
 
 ## Stable Boundaries

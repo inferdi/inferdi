@@ -1,59 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/zh/adapters/koa#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "首页"
-          "item": "https://inferdi.com/zh/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "适配器"
-          "item": "https://inferdi.com/zh/adapters/"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Koa 适配器"
-          "item": "https://inferdi.com/zh/adapters/koa"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/zh/adapters/koa#article"
-      "headline": "InferDI Koa 适配器 — @inferdi/koa"
-      "name": "Koa 适配器"
-      "description": "@inferdi/koa 是 Koa v3 中间件：它创建一个请求作用域，将其暴露为 ctx.state.di，并在 Node 响应 finish 或 close 之后释放它——带有类型化的状态键和清理钩子。"
-      "url": "https://inferdi.com/zh/adapters/koa"
-      "mainEntityOfPage": "https://inferdi.com/zh/adapters/koa"
-      "inLanguage": "zh-CN"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript, Koa v3, @inferdi/inferdi"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, Koa, Koa v3, 中间件, ctx.state.di, 响应生命周期, 依赖注入"
-      "articleSection": "适配器"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "@inferdi/koa"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js >=18"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Koa 适配器
 
 [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) 是 Koa v3 中间件。它创建一个请求作用域，将其暴露为 `ctx.state.di`，并在 Node 响应 finish 或 close 之后释放它。
@@ -67,17 +11,20 @@ pnpm add -D @types/koa
 
 ```ts
 import Koa from 'koa'
-import { inferdiKoa, type InferdiScopeOf } from '@inferdi/koa'
+import { inferdiKoa, type InferdiKoaState } from '@inferdi/koa'
 ```
 
 ## 请求作用域
 
 ```ts
 const root = buildRootContainer()
+const openRequestScope = (request: RequestContext) =>
+  root.createScope({ request })
+type RequestScope = ReturnType<typeof openRequestScope>
 
 declare module 'koa' {
   interface DefaultState {
-    di: InferdiScopeOf<typeof root>
+    di: RequestScope
   }
 }
 
@@ -85,12 +32,11 @@ const app = new Koa()
 
 app.use(inferdiKoa({
   container: root,
-  setupScope: (scope, ctx) => {
-    const request = scope.get('request')
-    request.requestId = crypto.randomUUID()
-    request.userId = ctx.get('x-user-id') || undefined
-    request.ip = ctx.ip
-  },
+  createScope: (_root, ctx) => openRequestScope({
+    requestId: crypto.randomUUID(),
+    userId: ctx.get('x-user-id') || undefined,
+    ip: ctx.ip
+  })
 }))
 
 app.use(async (ctx) => {
@@ -103,15 +49,23 @@ app.use(async (ctx) => {
 
 ```ts
 import type { DefaultState, ParameterizedContext } from 'koa'
-import { type InferdiKoaState, type InferdiScopeOf } from '@inferdi/koa'
+import { type InferdiKoaState } from '@inferdi/koa'
 
 type AppState =
   & DefaultState
-  & InferdiKoaState<InferdiScopeOf<typeof root>, 'container'>
+  & InferdiKoaState<RequestScope, 'container'>
 
 type AppContext = ParameterizedContext<AppState>
 
-app.use(inferdiKoa({ container: root, key: 'container' }))
+app.use(inferdiKoa({
+  container: root,
+  key: 'container',
+  createScope: (_root, ctx) => openRequestScope({
+    requestId: crypto.randomUUID(),
+    userId: ctx.get('x-user-id') || undefined,
+    ip: ctx.ip
+  })
+}))
 
 app.use(async (ctx: AppContext) => {
   ctx.body = await ctx.state.container.get('users').profile('42')
@@ -125,7 +79,7 @@ app.use(async (ctx: AppContext) => {
 | `container` | 必填 | 根容器。该中间件从不释放它。 |
 | `key` | `'di'` | Koa 状态键。 |
 | `createScope` | `root.createScope()` | 自定义请求作用域创建。 |
-| `setupScope` | 无 | 在下游中间件之前填充作用域。 |
+| `setupScope` | 无 | 在作用域创建后执行额外初始化。 |
 | `disposeScope` | `scope.dispose()` | 自定义释放。 |
 | `autoDispose` | `true` | `false` 或返回 `false` 的谓词会转移所有权。 |
 | `onDisposeError` | `ctx.app.emit('error')` | 清理失败的接收端。 |

@@ -37,9 +37,9 @@ TypeScript can express the rule.
 
 - `register*` uses `K & ([K] extends [keyof T] ? never : unknown)` so duplicate
   keys fail at compile time and the offending key remains visible in the error.
-- `DepsOf<AllowedDeps<T, Kind>, A>` checks a `deps` tuple against constructor
+- `DepsOf<AllowedDeps<T, L>, A>` checks a `deps` tuple against constructor
   parameters by position and structural assignability.
-- `AllowedDeps<T, Kind>` narrows the container passed into factories. Inside a
+- `AllowedDeps<T, L>` narrows the container passed into factories. Inside a
   singleton factory, `c.get('scoped')` is a type error.
 - `Spec`, `AsyncSpec`, `LazySpec`, `SpecMap`, `Module`, `Container.Resolve`,
   `Container.ResolveUnwrapped`, `Container.UnwrappedValue`, and
@@ -69,18 +69,19 @@ state, toolchain requirements, and cold-start cost that the core package rejects
 
 ### 2.3 Lifetime Is A Type
 
-The core has three registration kinds: `singleton`, `scoped`, and `transient`.
-Each registration carries its lifetime through `Spec<V, Kind>`.
+The core has three registration lifetimes: `singleton`, `scoped`, and `transient`.
+Each registration carries its lifetime through `Spec<V, L>` and its public
+`lifetime` property.
 
 - A singleton must not depend directly on a scoped or transient service.
-  `AllowedDeps<T, Kind>` enforces this at compile time; `strict: true` enforces
+  `AllowedDeps<T, L>` enforces this at compile time; the default checked contract enforces
   it at runtime for casts and dynamic registrations.
 - `Lazy<V>` preserves the target lifetime. A singleton consumer may inject only
   `LazySpec<V, 'singleton'>`. `Lazy<scoped>` and `Lazy<transient>` remain legal
   for scoped and transient consumers, and remain illegal for singleton
   consumers.
 - The runtime `Registration.lazy` flag must be `true` only for lazy companions
-  whose target kind is `'singleton'`.
+  whose target lifetime is `'singleton'`.
 - The runtime `Registration.owned` flag is `true` only for class/factory
   registrations whose created value belongs to the container. It is `false`
   for `registerValue`, `.override()`, and lazy companions.
@@ -107,7 +108,7 @@ Do not add work before that lookup.
   reintroduce a second `cache.has(key)` lookup on the cache-hit path.
 - `_disposed`, registration lookup, parent lookup, cycle checks, lifetime
   checks, and singleton-stack mutation all live after the cache fast path.
-- Strict trees check local registrations before walking the exact parent chain.
+- Default trees check local registrations before walking the exact parent chain.
   They do not retain parent-lookup snapshots, so mutations remain observable
   without invalidation bookkeeping or per-scope lookup metadata.
 - Constructor invocation stays arity-unrolled for 0-7 args. The 8+ path uses
@@ -119,10 +120,10 @@ Do not add work before that lookup.
 - Declarative async registrations share `regs`, `cache`, scope lookup, ownership,
   and disposal with sync registrations. `Registration.async` is cold metadata
   used during registration-time dependency classification. `get()` never reads it.
-- `strict: false` may remove runtime cycle and lifetime checks after the local
-  cache fast path. Fast scopes may read the immutable root registry directly
-  and mirror delegated singletons into their local cache. A fast tree is
-  immutable after its first resolve or scope.
+- `{fast: false}` is the default checked mutable contract. `{fast: true}` removes
+  cycle and lifetime checks after the local cache fast path, reads the registry
+  owner directly, and mirrors delegated singletons into the local cache. A fast
+  tree is immutable after its first resolve or scope.
 
 `packages/inferdi/__tests__/container.bench.ts` is not CI-enforced. Reviewers
 must demand benchmark output for changes to `get()`, registration object shape,
@@ -222,7 +223,7 @@ Document these choices instead of "fixing" them.
 | No detection of dynamic cycles after a Promise boundary | Declarative async edges run through synchronous preflight and use the existing cycle guard. Calls from legacy Promise-valued factories or captured containers after `await` run after the resolve stack is cleared. Split that cycle or hoist shared initialization. |
 | No runtime lifetime detection after an async boundary | `AllowedDeps` still blocks invalid typed factories, but `as`-casts and captured outer containers used after `await` run after `singletonStack` has been cleared. Full defense-in-depth would require async-context tracking. Keep dependency reads in the synchronous factory prelude. |
 | No auto-cycle-breaking | Cycles are architectural defects unless one side is an explicit lazy singleton companion. InferDI detects supported runtime cycles and reports them; it does not invent proxies or partial instances. |
-| No generic `<T>(c: Container<T>) => ...` modules | `keyof T` collapses to the `DependenciesMap` upper bound inside the generic body. Use inline `.use()` lambdas or `Module<TIn, TOut>` with a known input shape. |
+| No generic `<T>(c: Container<T>) => ...` modules | `keyof T` collapses to the `DependenciesMap` upper bound inside the generic body. Use inline `.use()` lambdas or `Module<TRequirements, TProvides>` with declared requirements. |
 | No dynamic DI resolver API | `.has(key)` is the sanctioned dynamic probe. Static keys should use `.get()` directly. |
 | No production override story | `.override()` exists for tests and hot-reload fixtures. Production graph selection belongs in `.use()` or normal builder code. |
 | No cascading parent-to-child disposal | Each container owns its own instances. Cascading disposal would make `dispose()` a non-local side effect and break scope ownership. |

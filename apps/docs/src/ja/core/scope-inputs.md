@@ -1,60 +1,4 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ja/core/scope-inputs#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "ホーム"
-          "item": "https://inferdi.com/ja/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "コアコンセプト"
-          "item": "https://inferdi.com/ja/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "スコープ入力とプロファイル"
-          "item": "https://inferdi.com/ja/core/scope-inputs"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ja/core/scope-inputs#article"
-      "headline": "InferDI のスコープ入力とプロファイル"
-      "name": "スコープ入力とプロファイル"
-      "description": "リクエスト単位の入力を宣言し、型安全なスコーププロファイルを構築して、必要な値が揃う前のサービス解決を防ぎます。"
-      "url": "https://inferdi.com/ja/core/scope-inputs"
-      "mainEntityOfPage": "https://inferdi.com/ja/core/scope-inputs"
-      "inLanguage": "ja-JP"
-      "datePublished": "2026-08-11"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, スコープ入力, スコーププロファイル, declareScopeInputs, createScope, ReadyKeys, TypeScript 依存性注入"
-      "articleSection": "コアコンセプト"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
-# スコープ入力とプロファイル
+# スコープ入力
 
 スコープ入力は、スコープを開くコードが渡す値です。HTTP リクエスト、認証済みユーザー、テナント、ジョブの payload、トレースコンテキストなどが該当します。InferDI はその要件をグラフ全体へ伝播し、入力が揃う前のサービス解決を型で防ぎます。
 
@@ -96,7 +40,7 @@ const root = new Container()
   )
 ```
 
-スコープ入力のライフタイムは `scoped` です。singleton はスコープ入力へ依存できないため、上のサービスで kind を省略したり `singleton` を指定したりするとコンパイラが拒否します。
+スコープ入力のライフタイムは `scoped` です。singleton はスコープ入力へ依存できないため、上のサービスで lifetime を省略したり `singleton` を指定したりするとコンパイラが拒否します。
 
 ## 型付きプロファイルを開く
 
@@ -106,7 +50,7 @@ const root = new Container()
 const publicScope = root.createScope({request})
 publicScope.get('publicService')
 
-// @ts-expect-error: auth はまだ渡されていない
+// @ts-expect-error: auth has not been provided
 publicScope.get('accountService')
 
 const authenticatedScope = publicScope.createScope({auth})
@@ -138,8 +82,8 @@ InferDI は、クラス、lazy companion、依存キー付き同期ファクト�
 const app = root
   .registerFactory(
     'requestId',
-    ['request'],
     (c) => c.get('request').requestId,
+    ['request'],
     'scoped'
   )
   .registerAsyncFactory(
@@ -155,8 +99,8 @@ const app = root
 引数の順序も異なります。
 
 ```ts
-registerFactory(key, deps, factory, kind)
-registerAsyncFactory(key, factory, deps, kind)
+registerFactory(key, factory, deps, lifetime)
+registerAsyncFactory(key, factory, deps, lifetime)
 ```
 
 ## ネストしたスコープの所有権
@@ -220,6 +164,6 @@ function resolveAny<
 - 値が `undefined` の必須プロパティも提供済みとして扱われます。InferDI は truthiness ではなくプロパティの存在を確認します。
 - `createScope(inputs)` は enumerable な own string/symbol プロパティを shallow copy します。コピー時に getter と Proxy trap が実行されるため、通常のデータオブジェクトを渡してください。
 - 入力 schema は TypeScript にだけ存在します。JavaScript、`any`、型 assertion を使うと、未知のキーの追加や子コンテナのキャッシュ内の登録を上書きできます。
-- Fast Mode でも入力を段階的に追加できますが、グラフは不変に保ちます。最初の `.get()` または `.createScope()` より前に登録を終えてください。
+- `{fast: true}` でも入力を段階的に追加できますが、グラフは固定に保ちます。最初の `.get()` または `.createScope()` より前に登録を終えてください。
 
-所有権の規則は[スコープとクリーンアップ](./scopes)、スコープ入力へ依存する async サービスは[非同期依存グラフ](./async-dependency-graph)を参照してください。
+所有権の規則は[スコープとリソース破棄](./scopes)、スコープ入力へ依存する async サービスは[非同期依存関係](./async-dependencies)を参照してください。

@@ -36,8 +36,25 @@ class Command implements Checksum { constructor(readonly query: Checksum, readon
 class Response implements Checksum { constructor(readonly command: Checksum, readonly context: Checksum) {} get checksum() { return this.command.checksum + this.context.checksum + 43 } }
 class Controller implements Checksum { constructor(readonly response: Checksum, readonly metrics: Checksum, readonly logger: Checksum) {} get checksum() { return this.response.checksum + this.metrics.checksum + this.logger.checksum + 47 } }
 
-function build(strict: boolean, kind: 'singleton' | 'transient' = 'transient') {
-  return new Container({strict})
+type DynamicLifetime = 'singleton' | 'transient'
+
+interface DynamicLifetimeContainer {
+  registerClass(
+    key: string,
+    Ctor: new (...deps: any[]) => unknown,
+    deps: readonly string[],
+    lifetime: DynamicLifetime
+  ): DynamicLifetimeContainer
+  registerFactory(
+    key: string,
+    factory: (container: DynamicLifetimeContainer) => unknown,
+    lifetime: DynamicLifetime
+  ): DynamicLifetimeContainer
+  get(key: string): any
+}
+
+function build(strict: boolean, kind: DynamicLifetime = 'transient') {
+  return (new Container(strict ? {} : {fast: true}) as unknown as DynamicLifetimeContainer)
     .registerClass('l0', L0, [], kind)
     .registerClass('l1', L1, ['l0'], kind)
     .registerClass('l2', L2, ['l1'], kind)
@@ -50,8 +67,8 @@ function build(strict: boolean, kind: 'singleton' | 'transient' = 'transient') {
     .registerClass('l9', L9, ['l8'], kind)
 }
 
-function buildFactory(strict: boolean, kind: 'singleton' | 'transient' = 'transient') {
-  return new Container({strict})
+function buildFactory(strict: boolean, kind: DynamicLifetime = 'transient') {
+  return (new Container(strict ? {} : {fast: true}) as unknown as DynamicLifetimeContainer)
     .registerFactory('l0', () => new L0(), kind)
     .registerFactory('l1', (c) => new L1(c.get('l0')), kind)
     .registerFactory('l2', (c) => new L2(c.get('l1')), kind)
@@ -65,7 +82,7 @@ function buildFactory(strict: boolean, kind: 'singleton' | 'transient' = 'transi
 }
 
 function buildRequestGraph(strict: boolean) {
-  return new Container({strict})
+  return new Container(strict ? {} : {fast: true})
     .registerClass('config', Config, [])
     .registerClass('database', Database, [])
     .registerClass('logger', Logger, [])
@@ -84,7 +101,7 @@ function buildRequestGraph(strict: boolean) {
 }
 
 function buildRequestGraphFactory(strict: boolean) {
-  return new Container({strict})
+  return new Container(strict ? {} : {fast: true})
     .registerClass('config', Config, [])
     .registerClass('database', Database, [])
     .registerClass('logger', Logger, [])

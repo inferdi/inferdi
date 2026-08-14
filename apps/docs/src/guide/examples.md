@@ -1,66 +1,6 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/guide/examples#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Home"
-          "item": "https://inferdi.com/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Guide"
-          "item": "https://inferdi.com/guide/quick-start"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Examples"
-          "item": "https://inferdi.com/guide/examples"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/guide/examples#article"
-      "headline": "InferDI Examples — framework and runtime patterns"
-      "name": "Examples"
-      "description": "A map of InferDI reference examples across backends, API layers, full-stack frameworks, runtimes, frontends, and workers. Each group shows where to build the root, create a request scope, and dispose it."
-      "url": "https://inferdi.com/guide/examples"
-      "mainEntityOfPage": "https://inferdi.com/guide/examples"
-      "inLanguage": "en-US"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, examples, patterns, dependency injection, request scope, frameworks, runtimes"
-      "articleSection": "Guide"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Examples
 
-The repository keeps examples as GitHub-only reference snippets. The root package does not install their framework dependencies, does not typecheck the `examples/` directory, and does not publish it to npm.
-
-Copy the relevant pattern into your application and install the framework dependencies there.
-
-Each group below mirrors one directory in [`examples/`](https://github.com/inferdi/inferdi/tree/main/examples). Open a group page to compare the examples in that group on one page.
+Choose the boundary your application owns, then compare how that ecosystem creates, exposes, and disposes a scope. Each group mirrors one directory in [`examples/`](https://github.com/inferdi/inferdi/tree/main/examples).
 
 ## Start Here
 
@@ -81,3 +21,7 @@ Read [`examples/_shared/container.ts`](https://github.com/inferdi/inferdi/blob/m
 Use `examples/_shared/container.ts` as the application graph for server-side examples. The group pages focus on lifecycle ownership: where a scope is created, where it is exposed, and where it is disposed.
 
 For server-side and worker examples, compare the framework/platform lifecycle hooks. For frontend examples, compare the mount and unmount boundaries.
+
+::: info Reference snippets
+The root workspace does not install every framework dependency or typecheck `examples/`. Copy the relevant pattern into your application, install its dependencies, and adapt the shared graph to your types.
+:::

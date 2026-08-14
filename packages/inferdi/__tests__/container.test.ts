@@ -1,5 +1,10 @@
 import {describe, it, expect, vi} from 'vitest'
-import {Container, type DependenciesMap, type Lazy} from '../src/Container'
+import {
+  Container,
+  type ContainerOptions,
+  type DependenciesMap,
+  type Lazy
+} from '../src/Container'
 import {
   AppConfig,
   ConsoleLogger,
@@ -201,6 +206,37 @@ describe('Phase 1 — Functional', () => {
         .registerFactory('doubled', (ctx) => ctx.get('base') * 2)
 
       expect(c.get('doubled')).toBe(42)
+    })
+
+    it('dispatches all factory-first overload families', () => {
+      let transientCalls = 0
+      const c = new Container()
+        .registerValue('dep', 2)
+        .registerFactory('default', () => 1)
+        .registerFactory('transient', () => ++transientCalls, 'transient')
+        .registerFactory('lazy', () => 3, 'singleton', 'lazyCompanion')
+        .registerFactory('depsDefault', (r) => r.get('dep') * 2, ['dep'])
+        .registerFactory(
+          'depsTransient',
+          (r) => r.get('dep') * 3,
+          ['dep'],
+          'transient'
+        )
+        .registerFactory(
+          'depsLazy',
+          (r) => r.get('dep') * 4,
+          ['dep'],
+          'singleton',
+          'depsLazyCompanion'
+        )
+
+      expect(c.get('default')).toBe(1)
+      expect(c.get('transient')).toBe(1)
+      expect(c.get('transient')).toBe(2)
+      expect(c.get('lazyCompanion').get()).toBe(3)
+      expect(c.get('depsDefault')).toBe(4)
+      expect(c.get('depsTransient')).toBe(6)
+      expect(c.get('depsLazyCompanion').get()).toBe(8)
     })
   })
 
@@ -1350,7 +1386,7 @@ describe('Phase 7 — Test Overrides', () => {
      * exercises the regs entry: a singleton consumer registered on a child
      * scope resolves the companion through root.regs (cache miss on scope,
      * walk-up to root.regs hit). If override stripped `lazy: true`, the
-     * strict-mode lifetime guard would reject the transient lookup inside
+     * default lifetime guard would reject the transient lookup inside
      * an active singleton stack — see `tikets/override-strips-lazy-flag.md`
      */
     class Logger { info(_msg: string) {} }
@@ -1395,16 +1431,132 @@ describe('Phase 7 — Test Overrides', () => {
   })
 })
 
+describe.each([
+  ['default', undefined],
+  ['explicit fast false', {fast: false}]
+] as const)('checked runtime contract — %s', (_contract, options) => {
+  it('preserves exact mutable parent-chain behavior', () => {
+    const root = new Container(options).registerValue('root', 1)
+    const middle = root.createScope()
+    const leaf = middle.createScope()
+
+    middle.registerValue('late' as never, 2)
+
+    expect((leaf as unknown as {get(key: string): unknown}).get('late')).toBe(2)
+    expect((leaf as unknown as {parent: unknown}).parent).toBe(middle)
+  })
+
+  it('detects cycles', () => {
+    const c = new Container(options)
+      .registerFactory('a', (r) => r.get('b' as never))
+      .registerFactory('b', (r) => r.get('a' as never))
+
+    expect(() => c.get('a')).toThrow(/Circular dependency detected: a -> b -> a/)
+  })
+
+  it('detects inherited transient cycles from a child scope', () => {
+    const root = new Container(options)
+      .registerFactory('transient', (r) => r.get('transient' as never), 'transient')
+    const scope = root.createScope()
+
+    expect(() => scope.get('transient')).toThrow(
+      /Circular dependency detected: transient -> transient/
+    )
+  })
+
+  it('rejects lifetime violations and root-scoped resolution', () => {
+    class ShortLived {}
+    class Singleton {
+      constructor(readonly dependency: ShortLived) {}
+    }
+    const root = new Container(options)
+      .registerClass('shortLived', ShortLived, [], 'transient')
+      .registerClass('singleton', Singleton, ['shortLived' as never])
+      .registerClass('scoped', ShortLived, [], 'scoped')
+
+    expect(() => root.get('singleton')).toThrow(
+      /Singleton "singleton" cannot depend on transient "shortLived"/
+    )
+    expect(() => root.get('scoped')).toThrow(
+      /Scoped "scoped" cannot be resolved from the root container/
+    )
+  })
+
+  it('rejects a captured child-scope transient during singleton construction', () => {
+    class ShortLived {}
+    class Singleton {
+      constructor(readonly dependency: ShortLived) {}
+    }
+    let resolveFromScope!: () => ShortLived
+    const root = new Container(options)
+      .registerClass('shortLived', ShortLived, [], 'transient')
+      .registerFactory(
+        'singleton',
+        () => new Singleton(resolveFromScope()),
+        'singleton'
+      )
+    const scope = root.createScope()
+    resolveFromScope = () => scope.get('shortLived')
+
+    expect(() => root.get('singleton')).toThrow(
+      /Singleton "singleton" cannot depend on transient "shortLived"/
+    )
+  })
+})
+
+describe('unknown configuration fail-safe', () => {
+  const options = {
+    fast: 'true',
+    mode: 'fast'
+  } as unknown as ContainerOptions
+
+  it('uses checked mutable behavior without immutable topology', () => {
+    const root = new Container(options).registerValue('root', 1)
+    const middle = root.createScope()
+    const leaf = middle.createScope()
+    const leafState = leaf as unknown as {
+      fast: boolean
+      cache: Map<string, unknown>
+      parent: unknown
+    }
+
+    expect(leafState.fast).toBe(false)
+    expect(leafState.parent).toBe(middle)
+    expect(leaf.get('root')).toBe(1)
+    expect(leafState.cache.has('root')).toBe(false)
+
+    middle.registerValue('late' as never, 2)
+    expect((leaf as unknown as {get(key: string): unknown}).get('late')).toBe(2)
+  })
+
+  it('keeps cycle and lifetime guards enabled', () => {
+    const cycle = new Container(options)
+      .registerFactory('a', (r) => r.get('a' as never), 'transient')
+    expect(() => cycle.get('a')).toThrow(/Circular dependency detected/)
+
+    class ShortLived {}
+    class Singleton {
+      constructor(readonly dependency: ShortLived) {}
+    }
+    const lifetime = new Container(options)
+      .registerClass('shortLived', ShortLived, [], 'transient')
+      .registerClass('singleton', Singleton, ['shortLived' as never])
+    expect(() => lifetime.get('singleton')).toThrow(
+      /Singleton "singleton" cannot depend on transient "shortLived"/
+    )
+  })
+})
+
 /*
  * ────────────────────────────────────────────────────────────────────────────
- * Phase 9 — strict: false (opt-out runtime guards)
+ * Phase 9 — fast fixed contract
  * ────────────────────────────────────────────────────────────────────────────
  */
 
-describe('Phase 9 — strict: false', () => {
+describe('Phase 9 — fast fixed contract', () => {
   it('transient resolution skips the cycle bookkeeping (no try/finally)', () => {
     let calls = 0
-    const c = new Container({strict: false})
+    const c = new Container({fast: true})
       .registerFactory('counter', () => ({n: ++calls}), 'transient')
     expect(c.get('counter').n).toBe(1)
     expect(c.get('counter').n).toBe(2)
@@ -1412,7 +1564,7 @@ describe('Phase 9 — strict: false', () => {
   })
 
   it('singleton resolution caches and returns the same instance', () => {
-    const c = new Container({strict: false})
+    const c = new Container({fast: true})
       .registerClass('logger', ConsoleLogger, [])
     const a = c.get('logger')
     const b = c.get('logger')
@@ -1420,8 +1572,8 @@ describe('Phase 9 — strict: false', () => {
     expect(a).toBeInstanceOf(ConsoleLogger)
   })
 
-  it('scoped resolution honours scope isolation under strict:false', () => {
-    const root = new Container({strict: false})
+  it('scoped resolution honours scope isolation', () => {
+    const root = new Container({fast: true})
       .registerClass('logger', ConsoleLogger, [], 'scoped')
     const a = root.createScope()
     const b = root.createScope()
@@ -1430,7 +1582,7 @@ describe('Phase 9 — strict: false', () => {
   })
 
   it('singleton delegated from a child scope is mirrored into the scope cache', () => {
-    const root = new Container({strict: false}).registerClass('logger', ConsoleLogger, [])
+    const root = new Container({fast: true}).registerClass('logger', ConsoleLogger, [])
     const child = root.createScope()
     const state = child as unknown as {cache: Map<string, unknown>}
 
@@ -1443,7 +1595,7 @@ describe('Phase 9 — strict: false', () => {
   })
 
   it('delegated undefined singleton is mirrored with the cache marker', () => {
-    const root = new Container({strict: false}).registerValue('maybe', undefined)
+    const root = new Container({fast: true}).registerValue('maybe', undefined)
     const child = root.createScope()
     const cache = (child as unknown as {cache: Map<string, unknown>}).cache
 
@@ -1455,7 +1607,7 @@ describe('Phase 9 — strict: false', () => {
   it('delegated singleton remains owned by the root', async () => {
     let disposeCalls = 0
     const instance = {dispose: () => { disposeCalls++ }}
-    const root = new Container({strict: false}).registerFactory('service', () => instance)
+    const root = new Container({fast: true}).registerFactory('service', () => instance)
     const child = root.createScope()
 
     expect(child.get('service')).toBe(instance)
@@ -1467,10 +1619,10 @@ describe('Phase 9 — strict: false', () => {
     expect(disposeCalls).toBe(1)
   })
 
-  it('pre-activation scoped override stays externally owned in a fast scope', async () => {
+  it('pre-activation scoped override stays externally owned', async () => {
     let disposeCalls = 0
     const mock = {dispose: () => { disposeCalls++ }}
-    const root = new Container({strict: false})
+    const root = new Container({fast: true})
       .registerFactory('service', () => ({dispose: () => {}}), 'scoped')
 
     root.override('service', mock)
@@ -1482,26 +1634,36 @@ describe('Phase 9 — strict: false', () => {
     expect(disposeCalls).toBe(0)
   })
 
-  it('createScope inherits the strict flag', () => {
-    const root = new Container({strict: false})
+  it('createScope inherits both configuration characteristics', () => {
+    const root = new Container({fast: true})
     const child = root.createScope()
-    expect((child as unknown as {strict: boolean}).strict).toBe(false)
+    const grandchild = child.createScope()
+    expect((grandchild as unknown as {fast: boolean}).fast).toBe(true)
+    expect((grandchild as unknown as {parent: unknown}).parent).toBe(root)
 
-    const strictRoot = new Container()
-    const strictChild = strictRoot.createScope()
-    expect((strictChild as unknown as {strict: boolean}).strict).toBe(true)
+    const checkedRoot = new Container()
+    const checkedChild = checkedRoot.createScope()
+    const checkedGrandchild = checkedChild.createScope()
+    expect((checkedGrandchild as unknown as {fast: boolean}).fast).toBe(false)
+    expect((checkedGrandchild as unknown as {parent: unknown}).parent).toBe(checkedChild)
+
+    const explicitRoot = new Container({fast: false})
+    const explicitChild = explicitRoot.createScope()
+    const explicitGrandchild = explicitChild.createScope()
+    expect((explicitGrandchild as unknown as {fast: boolean}).fast).toBe(false)
+    expect((explicitGrandchild as unknown as {parent: unknown}).parent).toBe(explicitChild)
   })
 
   it('skips the lifetime guard — singleton may depend on a scoped service', () => {
     /*
      * Compile-time guard would normally reject this. We bypass via `as never`
-     * to model an `as`-cast escape; in strict mode this would throw at runtime,
-     * in strict:false it silently constructs the singleton with the scoped dep
+     * to model an `as`-cast escape; the default contract throws at runtime,
+     * while the fast contract constructs the singleton with the scoped dependency
      */
     class Holder {
       constructor(public readonly cfg: AppConfig) {}
     }
-    const c = new Container({strict: false})
+    const c = new Container({fast: true})
       .registerClass('cfg', AppConfig, [], 'scoped')
       .registerClass('holder', Holder, ['cfg' as never], 'singleton')
 
@@ -1513,7 +1675,7 @@ describe('Phase 9 — strict: false', () => {
   it('skips local-transient lifetime guard inside a singleton', () => {
     class Trans { public stamp = Math.random() }
     class Svc { constructor(public readonly dep: Trans) {} }
-    const c = new Container({strict: false})
+    const c = new Container({fast: true})
       .registerClass('trans', Trans, [], 'transient')
       .registerClass('svc', Svc, ['trans' as never], 'singleton')
 
@@ -1522,14 +1684,16 @@ describe('Phase 9 — strict: false', () => {
 
   it('transient self-cycle: stack overflows instead of throwing Circular dependency', () => {
     class A { constructor(_a: A) {} }
-    const c = new Container({strict: false}) as Container<{a: {type: A; kind: 'transient'}}>
+    const c = new Container({fast: true}) as Container<{
+      a: {type: A; lifetime: 'transient'}
+    }>
     c.registerClass('a' as never, A, ['a' as never], 'transient')
     expect(() => c.get('a')).toThrowError(RangeError)
   })
 
-  it('factory returning undefined: non-transient caches via UNDEFINED_MARKER under strict:false', () => {
+  it('factory returning undefined caches via UNDEFINED_MARKER', () => {
     let calls = 0
-    const c = new Container({strict: false})
+    const c = new Container({fast: true})
       .registerFactory('nil', () => { calls++; return undefined }, 'singleton')
 
     expect(c.get('nil')).toBeUndefined()
@@ -1537,9 +1701,9 @@ describe('Phase 9 — strict: false', () => {
     expect(calls).toBe(1)
   })
 
-  it('transient registered on parent remains uncached under strict:false', () => {
+  it('transient registered on parent remains uncached', () => {
     let calls = 0
-    const root = new Container({strict: false})
+    const root = new Container({fast: true})
       .registerFactory('counter', () => ({n: ++calls}), 'transient')
     const child = root.createScope()
 
@@ -1548,10 +1712,10 @@ describe('Phase 9 — strict: false', () => {
     expect(calls).toBe(2)
   })
 
-  it('defers owned de-duplication to teardown under strict:false', () => {
+  it('defers owned de-duplication to teardown', () => {
     let disposeCalls = 0
     const shared = {dispose: () => { disposeCalls++ }}
-    const c = new Container({strict: false})
+    const c = new Container({fast: true})
       .registerFactory('a', () => shared)
       .registerFactory('b', () => shared)
     c.get('a')
@@ -1564,7 +1728,7 @@ describe('Phase 9 — strict: false', () => {
   })
 
   it('reads nested scopes directly from the immutable registry owner', () => {
-    const root = new Container({strict: false}).registerValue('value', 'root')
+    const root = new Container({fast: true}).registerValue('value', 'root')
     const middle = root.createScope()
     const leaf = middle.createScope()
     const leafState = leaf as unknown as {parent: unknown}
@@ -1578,8 +1742,8 @@ describe('Phase 9 — strict: false', () => {
     expect(leaf.get('value')).toBe('root')
   })
 
-  it('reports an unknown key directly from a fast scope', () => {
-    const child = new Container({strict: false})
+  it('reports an unknown key directly from an immutable scope', () => {
+    const child = new Container({fast: true})
       .registerValue('value', 1)
       .createScope()
 
@@ -1587,8 +1751,8 @@ describe('Phase 9 — strict: false', () => {
       .toThrowError('Key "missing" not found')
   })
 
-  it('reports a disposed fast registry owner before the key has been cached', async () => {
-    const root = new Container({strict: false}).registerValue('value', 1)
+  it('reports a disposed registry owner before the key has been cached', async () => {
+    const root = new Container({fast: true}).registerValue('value', 1)
     const child = root.createScope()
 
     await root.dispose()
@@ -1597,8 +1761,8 @@ describe('Phase 9 — strict: false', () => {
       .toThrowError('Ancestor container is disposed (key: "value")')
   })
 
-  it('preserves the disposed diagnostic under strict:false', async () => {
-    const c = new Container({strict: false}).registerValue('value', 1)
+  it('preserves the disposed diagnostic', async () => {
+    const c = new Container({fast: true}).registerValue('value', 1)
 
     await c.dispose()
 
@@ -1683,7 +1847,11 @@ describe('Phase 10 — has', () => {
   })
 })
 
-describe.each([true, false])('scope inputs — strict: %s', (strict) => {
+describe.each([
+  ['default checked mutable', undefined],
+  ['explicit checked mutable', {fast: false}],
+  ['fast fixed', {fast: true}]
+] as const)('scope inputs — %s', (_contract, options) => {
   interface RequestContext {
     readonly requestId: string
   }
@@ -1708,7 +1876,7 @@ describe.each([true, false])('scope inputs — strict: %s', (strict) => {
   it('seeds string, symbol, and explicit undefined inputs', () => {
     const request = {requestId: 'request'}
     const auth = {userId: 'user'}
-    const root = new Container({strict})
+    const root = new Container(options)
       .declareScopeInputs<{
         request: RequestContext
         [AUTH]: AuthContext
@@ -1728,7 +1896,7 @@ describe.each([true, false])('scope inputs — strict: %s', (strict) => {
   it('refines a partial child while isolating scoped instances', () => {
     const request = {requestId: 'request'}
     const auth = {userId: 'user'}
-    const root = new Container({strict})
+    const root = new Container(options)
       .declareScopeInputs<{
         request: RequestContext
         auth: AuthContext
@@ -1754,7 +1922,7 @@ describe.each([true, false])('scope inputs — strict: %s', (strict) => {
     const request = {requestId: 'request'}
     const another = {requestId: 'another'}
     const values = {request}
-    const root = new Container({strict})
+    const root = new Container(options)
       .declareScopeInputs<{request: RequestContext}>()
     const scope = root.createScope(values)
 
@@ -1765,7 +1933,7 @@ describe.each([true, false])('scope inputs — strict: %s', (strict) => {
 
   it('inherits inputs through zero-argument nested scopes', () => {
     const request = {requestId: 'request'}
-    const root = new Container({strict})
+    const root = new Container(options)
       .declareScopeInputs<{request: RequestContext}>()
     const nested = root.createScope({request}).createScope()
 
@@ -1773,7 +1941,7 @@ describe.each([true, false])('scope inputs — strict: %s', (strict) => {
   })
 
   it('does not expose inputs through has()', () => {
-    const root = new Container({strict})
+    const root = new Container(options)
       .declareScopeInputs<{request: RequestContext}>()
     const scope = root.createScope({request: {requestId: 'request'}})
 
@@ -1790,7 +1958,7 @@ describe.each([true, false])('scope inputs — strict: %s', (strict) => {
     }
 
     const input = new Input()
-    const root = new Container({strict})
+    const root = new Container(options)
       .declareScopeInputs<{input: Input}>()
       .registerClass('service', OwnedService, ['input'], 'scoped')
     const scope = root.createScope({input})
@@ -1804,7 +1972,7 @@ describe.each([true, false])('scope inputs — strict: %s', (strict) => {
 
   it('disposal of one child does not mutate a shared inherited snapshot', async () => {
     const request = {requestId: 'request'}
-    const root = new Container({strict})
+    const root = new Container(options)
       .declareScopeInputs<{request: RequestContext}>()
     const parent = root.createScope({request})
     const first = parent.createScope()
@@ -1816,12 +1984,12 @@ describe.each([true, false])('scope inputs — strict: %s', (strict) => {
   })
 
   it('dispatches deps-aware factories without resolving the deps tuple', () => {
-    const root = new Container({strict})
+    const root = new Container(options)
       .declareScopeInputs<{request: RequestContext}>()
       .registerFactory(
         'requestId',
-        ['request'],
         (c) => c.get('request').requestId,
+        ['request'],
         'scoped',
         'requestIdLazy'
       )

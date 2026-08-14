@@ -7,8 +7,8 @@ import {
   type InjectionKey
 } from 'vue'
 
-class RouteContext {
-  routeName = ''
+type RouteContext = {
+  readonly routeName: string
 }
 
 class ApiClient {
@@ -32,7 +32,7 @@ class DashboardViewModel {
 }
 
 const root = new Container()
-  .registerClass('route', RouteContext, [], 'scoped')
+  .declareScopeInputs<{ route: RouteContext }>()
   .registerClass('api', ApiClient, [])
   .registerClass('dashboardVm', DashboardViewModel, ['route', 'api'], 'scoped')
 
@@ -40,14 +40,7 @@ type AppContainer = typeof root
 type RouteContainer = ReturnType<typeof createDashboardRouteScope>
 
 function createDashboardRouteScope(parent: AppContainer) {
-  const scope = parent.createScope()
-  try {
-    scope.get('route').routeName = 'dashboard'
-    return scope
-  } catch (error) {
-    scope.dispose().catch(console.error)
-    throw error
-  }
+  return parent.createScope({ route: { routeName: 'dashboard' } })
 }
 
 const RootDIKey: InjectionKey<AppContainer> = Symbol('InferDI.root')

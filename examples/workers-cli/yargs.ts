@@ -19,8 +19,9 @@ export const cli = yargs(hideBin(process.argv))
        * shared `Database` factory deterministically before the action
        * resolves (and therefore before the Node process exits)
        */
-      await using scope = root.createScope()
-      scope.get('request').requestId = `cli:sync:${Date.now()}`
+      await using scope = root.createScope({
+        request: { requestId: `cli:sync:${Date.now()}` }
+      })
 
       scope.get('audit').record('cli.sync', {
         target: argv.target,

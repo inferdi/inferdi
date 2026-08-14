@@ -55,7 +55,7 @@ export const server = new ApolloServer<GraphQLContext>({
 export async function start() {
   return startStandaloneServer(server, {
     context: async ({ req }) => ({
-      container: await createRequestScope(root, {
+      container: createRequestScope(root, {
         requestId: crypto.randomUUID(),
         userId: normalizeHeader(req.headers.authorization)
       })

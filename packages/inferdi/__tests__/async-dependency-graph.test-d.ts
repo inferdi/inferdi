@@ -303,11 +303,11 @@ describe('async dependency graph types', () => {
     })
 
     // @ts-expect-error — deps-aware sync factories reject async dependency tuples
-    c.registerFactory('badDeps', ['db'], (resolver) => resolver.has('db'))
+    c.registerFactory('badDeps', (resolver) => resolver.has('db'), ['db'])
 
     const mixed = 'config' as 'config' | 'db'
     // @ts-expect-error — mixed dependency unions are rejected as a whole
-    c.registerFactory('badMixedDeps', [mixed], (resolver) => resolver.has(mixed))
+    c.registerFactory('badMixedDeps', (resolver) => resolver.has(mixed), [mixed])
   })
 
   it('accepts a ready override and rejects a Promise override', () => {
@@ -524,12 +524,12 @@ describe('AsyncLazy type model', () => {
   it('brands managed companions and keeps sync/async modes incompatible', () => {
     type StructuralSync = {
       readonly type: Lazy<Database>
-      readonly kind: 'transient'
+      readonly lifetime: 'transient'
       readonly lazyOf: 'singleton'
     }
     type StructuralAsync = {
       readonly type: AsyncLazy<Database>
-      readonly kind: 'transient'
+      readonly lifetime: 'transient'
       readonly lazyOf: 'singleton'
     }
 
@@ -570,7 +570,7 @@ describe('AsyncLazy type model', () => {
     const c = new Container().registerFactory(
       'legacy',
       async () => new Database(),
-      undefined,
+      'singleton',
       'legacyLazy'
     )
 
@@ -657,7 +657,7 @@ describe('AsyncLazy type model', () => {
     // @ts-expect-error — a possibly scoped target is not singleton-safe
     possibleScoped.registerClass('bad', SyncLazyConsumer, ['dbLazy'])
 
-    // @ts-expect-error — explicit target-kind unions are checked as a whole
+    // @ts-expect-error — explicit target-lifetime unions are checked as a whole
     unsafeCompanionContainer.registerClass('badKind', SyncLazyConsumer, ['targetKindUnion'])
     // @ts-expect-error — a managed/unmanaged union is not singleton-safe
     unsafeCompanionContainer.registerClass('badUnion', SyncLazyConsumer, ['managedUnmanagedUnion'])
@@ -671,11 +671,11 @@ describe('AsyncLazy type model', () => {
       .declareScopeInputs<{request: RequestContext}>()
       .registerFactory(
         'localDb',
-        ['request'],
         (c) => {
           c.get('request')
           return new Database()
         },
+        ['request'],
         'scoped'
       )
       .registerAsyncFactory(

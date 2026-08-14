@@ -1,66 +1,6 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/es/guide/examples#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Inicio"
-          "item": "https://inferdi.com/es/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Guía"
-          "item": "https://inferdi.com/es/guide/quick-start"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Ejemplos"
-          "item": "https://inferdi.com/es/guide/examples"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/es/guide/examples#article"
-      "headline": "Ejemplos de InferDI — patrones de frameworks y runtimes"
-      "name": "Ejemplos"
-      "description": "Un mapa de los ejemplos de referencia de InferDI en backends, capas de API, frameworks full-stack, runtimes, frontends y workers. Cada grupo muestra dónde construir la raíz, crear un ámbito de petición y desecharlo."
-      "url": "https://inferdi.com/es/guide/examples"
-      "mainEntityOfPage": "https://inferdi.com/es/guide/examples"
-      "inLanguage": "es-ES"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, ejemplos, patrones, inyección de dependencias, ámbito de petición, frameworks, runtimes"
-      "articleSection": "Guía"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Ejemplos
 
-El repositorio mantiene los ejemplos como fragmentos de referencia exclusivos de GitHub. El paquete raíz no instala sus dependencias de framework, no comprueba los tipos del directorio `examples/` y no lo publica en npm.
-
-Copia el patrón relevante en tu aplicación e instala allí las dependencias del framework.
-
-Cada grupo a continuación refleja un directorio de [`examples/`](https://github.com/inferdi/inferdi/tree/main/examples). Abre la página de un grupo para comparar los ejemplos de ese grupo en una sola página.
+Elige el límite de ciclo de vida que controla tu aplicación y compara cómo crea, expone y libera un scope cada ecosistema. Cada grupo corresponde a un directorio de [`examples/`](https://github.com/inferdi/inferdi/tree/main/examples).
 
 ## Empieza aquí
 
@@ -81,3 +21,7 @@ Lee primero [`examples/_shared/container.ts`](https://github.com/inferdi/inferdi
 Usa `examples/_shared/container.ts` como el grafo de la aplicación para los ejemplos del lado del servidor. Las páginas de grupo se centran en la propiedad del ciclo de vida: dónde se crea un scope, dónde se expone y dónde se libera.
 
 Para los ejemplos del lado del servidor y de workers, compara los hooks del ciclo de vida del framework/plataforma. Para los ejemplos de frontend, compara los límites de montaje y desmontaje.
+
+::: info Fragmentos de referencia
+El workspace raíz no instala todas las dependencias de frameworks ni comprueba los tipos de `examples/`. Copia el patrón que necesites, instala sus dependencias y adapta el grafo compartido a tus tipos.
+:::

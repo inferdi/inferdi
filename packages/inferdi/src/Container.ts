@@ -66,23 +66,24 @@ export type AsyncLazy<T> = { readonly get: () => Promise<T> }
  * - `scoped` — one instance per `createScope()` child.
  * - `transient` — a new instance for every `.get()`; caller-owned, never disposed.
  *
- * Exported so users can write `Spec<V, Kind>` and `SpecMap<M, Kind>` for
- * explicit `Container<...>` annotations and `Module<TIn, TOut>` signatures.
+ * Exported so users can write `Spec<V, L>` and `SpecMap<M, L>` for
+ * explicit `Container<...>` annotations and
+ * `Module<TRequirements, TProvides>` signatures.
  */
-export type RegistrationKind = 'singleton' | 'transient' | 'scoped'
+export type Lifetime = 'singleton' | 'scoped' | 'transient'
 
 /**
  * A single entry of the type-level registry: the service type plus its
- * lifetime kind. Used internally as the value of {@link DependenciesMap}
+ * lifetime. Used internally as the value of {@link DependenciesMap}
  * and surfaced to users for explicit `Container<...>` typing.
  *
  * IMPORTANT: declared as `interface`, not type alias. TypeScript caches
- * instantiations of named interfaces; inline `{ type: V; kind: K }` literals
+ * instantiations of named interfaces; inline `{ type: V; lifetime: L }` literals
  * are re-evaluated and merged via `&` on every step of a fluent chain, which
  * grows compiler work quadratically on long chains.
  *
  * @template V - The service type produced by the registration.
- * @template K - The {@link RegistrationKind} that governs the service's lifetime.
+ * @template L - The {@link Lifetime} that governs the service.
  *
  * @example
  * ```ts
@@ -97,16 +98,16 @@ export type RegistrationKind = 'singleton' | 'transient' | 'scoped'
  * declare const c: Container<Deps>
  * ```
  */
-export interface Spec<V, K extends RegistrationKind = 'singleton'> {
+export interface Spec<V, L extends Lifetime = 'singleton'> {
   /*
-   * Readonly fields are covariant in V/K. Plain (mutable) fields are invariant,
+   * Readonly fields are covariant in V/L. Plain (mutable) fields are invariant,
    * which would block assignability of e.g. Spec<{port:8080}, 'singleton'> to the
-   * wider Spec<unknown, RegistrationKind> used as the index value in DependenciesMap.
+   * wider Spec<unknown, Lifetime> used as the index value in DependenciesMap.
    * Invariance would collapse `Container<T & Record<K, Spec<V, ...>>>` back to
    * `Container<DependenciesMap>` (or worse, `never`) on every fluent step
    */
   readonly type: V
-  readonly kind: K
+  readonly lifetime: L
 }
 
 /**
@@ -125,8 +126,8 @@ export interface Spec<V, K extends RegistrationKind = 'singleton'> {
  */
 export interface AsyncSpec<
   V,
-  K extends RegistrationKind = 'singleton'
-> extends Spec<V, K> {
+  L extends Lifetime = 'singleton'
+> extends Spec<V, L> {
   readonly async: true
 }
 
@@ -146,21 +147,21 @@ export interface AsyncSpec<
  * companions in explicit container and module shapes.
  *
  * @template V          - The wrapped service type (the `T` in `Lazy<T>`).
- * @template TargetKind - The lifetime kind of the underlying target service.
+ * @template TargetLifetime - The lifetime of the underlying target service.
  *
  * @example
  * ```ts
  * import { Container, type LazySpec, type Lazy } from '@inferdi/inferdi'
  *
  * declare const c: Container<{
- *   cfg:     { type: { port: number }; kind: 'singleton' }
+ *   cfg:     { type: { port: number }; lifetime: 'singleton' }
  *   cfgLazy: LazySpec<{ port: number }, 'singleton'>
  * }>
  * ```
  */
-export interface LazySpec<V, TargetKind extends RegistrationKind>
+export interface LazySpec<V, TargetLifetime extends Lifetime>
   extends Spec<Lazy<V>, 'transient'> {
-  readonly lazyOf: TargetKind
+  readonly lazyOf: TargetLifetime
   readonly [lazyMode]: 'sync'
 }
 
@@ -174,7 +175,7 @@ export interface LazySpec<V, TargetKind extends RegistrationKind>
  * explicit `Container` and `Module` shapes.
  *
  * @template V          - The final service type returned by `AsyncLazy.get()`.
- * @template TargetKind - The lifetime kind of the underlying target service.
+ * @template TargetLifetime - The lifetime of the underlying target service.
  *
  * @example
  * ```ts
@@ -186,9 +187,9 @@ export interface LazySpec<V, TargetKind extends RegistrationKind>
  * }>
  * ```
  */
-export interface AsyncLazySpec<V, TargetKind extends RegistrationKind>
+export interface AsyncLazySpec<V, TargetLifetime extends Lifetime>
   extends Spec<AsyncLazy<V>, 'transient'> {
-  readonly lazyOf: TargetKind
+  readonly lazyOf: TargetLifetime
   readonly [lazyMode]: 'async'
 }
 
@@ -269,23 +270,24 @@ export type WithRequirements<S, K extends string | symbol> = [K] extends [never]
 /**
  * Upper bound for the type-level "registry" carried by a {@link Container} —
  * a string-or-symbol-keyed map of {@link Spec} entries. Used as the constraint
- * on `Container<T>` and on the `TIn` / `TOut` parameters of {@link Module}.
+ * on `Container<T>` and on the requirements/provides parameters of
+ * {@link Module}.
  *
  * The fluent `register*` methods accumulate the map for you, so you rarely
  * need to write this type by hand — `Container.Resolve<typeof builder>`
  * extracts a flat `{ key: ServiceType }` view after the chain.
  */
-export type DependenciesMap = Record<string | symbol, Spec<unknown, RegistrationKind>>
+export type DependenciesMap = Record<string | symbol, Spec<unknown, Lifetime>>
 
 /**
  * Convenience helper: maps a flat `{ key: ServiceType }` shape onto the
  * {@link Spec}-based {@link DependenciesMap} form, defaulting every entry to
- * the given `Kind` (singleton by default). Lets users write
+ * the given lifetime (singleton by default). Lets users write
  * `Container<SpecMap<{ logger: Logger, db: Db }>>` instead of spelling out
  * each `Spec<...>` by hand.
  *
  * @template M - Flat record `{ key: ServiceType }`.
- * @template K - Lifetime kind applied to every entry (default `'singleton'`).
+ * @template L - Lifetime applied to every entry (default `'singleton'`).
  *
  * @example
  * ```ts
@@ -294,34 +296,35 @@ export type DependenciesMap = Record<string | symbol, Spec<unknown, Registration
  * // All singletons:
  * declare const c1: Container<SpecMap<{ logger: Logger, db: Db }>>
  *
- * // Mixed kinds — combine SpecMap with explicit Spec<...> entries:
+ * // Mixed lifetimes — combine SpecMap with explicit Spec<...> entries:
  * type Deps = SpecMap<{ cfg: Config }> & { req: Spec<ReqCtx, 'scoped'> }
  * declare const c2: Container<Deps>
  * ```
  */
 export type SpecMap<
   M extends Record<string | symbol, unknown>,
-  K extends RegistrationKind = 'singleton'
-> = { [P in keyof M]: Spec<M[P], K> }
+  L extends Lifetime = 'singleton'
+> = { [P in keyof M]: Spec<M[P], L> }
 
 /*
  * Filters T down to the keys that are legal to inject into a target with
- * the given TargetKind, per the runtime lifetime guard:
- *   - singleton target: only singleton entries and managed sync/async
- *     companions whose complete target-kind union is `'singleton'` are legal.
+ * the given TargetLifetime, per the runtime lifetime guard:
+ *   - any target lifetime that may be singleton: only singleton entries and managed sync/async
+ *     companions whose complete target-lifetime union is `'singleton'` are legal.
  *     Short-lived or possibly short-lived companions remain available to
  *     scoped/transient consumers but are blocked here — deferral preserves the
  *     target's lifetime, it does not lift short-lived services into singleton scope.
- *   - scoped / transient target: any entry is legal (matches runtime in get()).
+ *   - a target lifetime that excludes singleton: any entry is legal (matches
+ *     runtime in get()).
  * Managed companions are identified by their branded {@link LazySpec} or
  * {@link AsyncLazySpec} shape. The whole entry is checked non-distributively so
  * mixed target lifetimes and managed/unmanaged unions are not singleton-safe
  */
-type AllowedDeps<T extends DependenciesMap, TargetKind extends RegistrationKind> =
-  TargetKind extends 'singleton'
+type AllowedDeps<T extends DependenciesMap, TargetLifetime extends Lifetime> =
+  'singleton' extends TargetLifetime
     ? {
         [K in keyof T as
-            T[K]['kind'] extends 'singleton' ? K
+            T[K]['lifetime'] extends 'singleton' ? K
           : [T[K]] extends [
               LazySpec<unknown, 'singleton'> |
               AsyncLazySpec<unknown, 'singleton'>
@@ -354,7 +357,7 @@ type ReadyKeysOf<T extends DependenciesMap> =
 type RejectAsyncKey<
   T extends DependenciesMap,
   K extends keyof T
-> = Extract<T[K], AsyncSpec<unknown, RegistrationKind>> extends never
+> = Extract<T[K], AsyncSpec<unknown, Lifetime>> extends never
   ? unknown
   : never
 
@@ -373,23 +376,23 @@ type RequireReadonlyAsyncDeps<
 type RejectAsyncDeps<
   T extends DependenciesMap,
   D extends readonly (keyof T)[]
-> = Extract<T[D[number]], AsyncSpec<unknown, RegistrationKind>> extends never
+> = Extract<T[D[number]], AsyncSpec<unknown, Lifetime>> extends never
   ? unknown
   : never
 
 type ContainsAsyncDep<
   T extends DependenciesMap,
   D extends readonly (keyof T)[]
-> = Extract<T[D[number]], AsyncSpec<unknown, RegistrationKind>> extends never
+> = Extract<T[D[number]], AsyncSpec<unknown, Lifetime>> extends never
   ? false
   : true
 
 type DepAsyncState<
   T extends DependenciesMap,
   K extends keyof T
-> = [T[K]] extends [AsyncSpec<unknown, RegistrationKind>]
+> = [T[K]] extends [AsyncSpec<unknown, Lifetime>]
   ? 'async'
-  : Extract<T[K], AsyncSpec<unknown, RegistrationKind>> extends never
+  : Extract<T[K], AsyncSpec<unknown, Lifetime>> extends never
     ? 'sync'
     : 'mixed'
 
@@ -404,26 +407,26 @@ type ClassSpec<
   T extends DependenciesMap,
   D extends readonly (keyof T)[],
   V,
-  Kind extends RegistrationKind
+  L extends Lifetime
 > = 'async' extends DepAsyncStates<T, D>[number]
-  ? AsyncSpec<V, Kind>
+  ? AsyncSpec<V, L>
   : 'mixed' extends DepAsyncStates<T, D>[number]
-    ? Spec<V, Kind> | AsyncSpec<V, Kind>
-    : Spec<V, Kind>
+    ? Spec<V, L> | AsyncSpec<V, L>
+    : Spec<V, L>
 
 type LazyCompanion<S> =
-  S extends AsyncSpec<infer V, infer Kind>
-    ? AsyncLazySpec<V, Kind>
-    : S extends Spec<infer V, infer Kind>
-      ? LazySpec<V, Kind>
+  S extends AsyncSpec<infer V, infer L>
+    ? AsyncLazySpec<V, L>
+    : S extends Spec<infer V, infer L>
+      ? LazySpec<V, L>
       : never
 
 type UnwrapSpec<S> =
-  S extends AsyncLazySpec<infer V, infer _Kind>
+  S extends AsyncLazySpec<infer V, infer _Lifetime>
     ? V
-    : S extends LazySpec<infer V, infer _Kind>
+    : S extends LazySpec<infer V, infer _Lifetime>
       ? V
-      : S extends Spec<infer V, infer _Kind>
+      : S extends Spec<infer V, infer _Lifetime>
         ? V
         : never
 
@@ -464,6 +467,11 @@ type RegistrationKeys<T extends DependenciesMap> = {
   [K in keyof T]: T[K] extends {readonly [scopeInputMarker]: true} ? never : K
 }[keyof T]
 
+type NoKeyOverlap<
+  Candidate extends PropertyKey,
+  Existing extends PropertyKey
+> = [Candidate & Existing] extends [never] ? unknown : never
+
 type ScopeInputDeclarationCheck<T, Inputs extends object> =
   ScopeInputMap<Inputs> extends never
     ? {
@@ -482,8 +490,8 @@ interface FactoryResolver<T extends DependenciesMap> {
 
 type FactoryDependencyKeys<
   T extends DependenciesMap,
-  Kind extends RegistrationKind
-> = keyof T & keyof AllowedDeps<T, Kind>
+  L extends Lifetime
+> = keyof T & keyof AllowedDeps<T, L>
 
 type FactorySelection<
   T extends DependenciesMap,
@@ -492,84 +500,147 @@ type FactorySelection<
   [K in Extract<D[number], keyof T>]: WithRequirements<T[K], never>
 }
 
-type NoKeyOverlap<A, B> = keyof A & keyof B extends never
-  ? B
-  : `Error: module tries to override existing keys: ${string & keyof A & keyof B}`
+type EqualTypes<A, B> = [A] extends [B]
+  ? [B] extends [A] ? true : false
+  : false
+
+type AsyncStateOf<S> = [S] extends [AsyncSpec<unknown, Lifetime>]
+  ? 'async'
+  : Extract<S, AsyncSpec<unknown, Lifetime>> extends never
+    ? 'sync'
+    : 'mixed'
+
+type ScopeInputStateOf<S> = [S] extends [
+  {readonly [scopeInputMarker]: true}
+] ? true : false
+
+type LazyStateOf<S> = [S] extends [
+  AsyncLazySpec<unknown, infer L>
+] ? readonly ['async', L]
+  : [S] extends [LazySpec<unknown, infer L>]
+    ? readonly ['sync', L]
+    : 'plain'
+
+type ModuleEntryCompatible<Actual, Requirement> =
+  Actual extends Spec<unknown, Lifetime>
+    ? Requirement extends Spec<unknown, Lifetime>
+      ? [Actual['type']] extends [Requirement['type']]
+        ? EqualTypes<Actual['lifetime'], Requirement['lifetime']> extends true
+          ? EqualTypes<AsyncStateOf<Actual>, AsyncStateOf<Requirement>> extends true
+            ? EqualTypes<
+                ScopeInputStateOf<Actual>,
+                ScopeInputStateOf<Requirement>
+              > extends true
+              ? EqualTypes<LazyStateOf<Actual>, LazyStateOf<Requirement>> extends true
+                ? Exclude<
+                    RequirementsOf<Actual>,
+                    RequirementsOf<Requirement>
+                  > extends never
+                  ? true
+                  : false
+                : false
+              : false
+            : false
+          : false
+        : false
+      : false
+    : false
+
+type MissingModuleRequirements<
+  Actual extends DependenciesMap,
+  Requirements extends DependenciesMap
+> = Exclude<keyof Requirements, keyof Actual>
+
+type IncompatibleModuleRequirements<
+  Actual extends DependenciesMap,
+  Requirements extends DependenciesMap
+> = {
+  [K in keyof Requirements & keyof Actual]:
+    ModuleEntryCompatible<Actual[K], Requirements[K]> extends true ? never : K
+}[keyof Requirements & keyof Actual]
+
+type ModuleUseCheck<
+  Actual extends DependenciesMap,
+  Requirements extends DependenciesMap,
+  Provides extends DependenciesMap
+> = [MissingModuleRequirements<Actual, Requirements>] extends [never]
+  ? [IncompatibleModuleRequirements<Actual, Requirements>] extends [never]
+    ? [keyof Actual & keyof Provides] extends [never]
+      ? unknown
+      : {
+          readonly 'Module output keys collide with the container graph':
+            keyof Actual & keyof Provides
+        }
+    : {
+        readonly 'Incompatible module requirements':
+          IncompatibleModuleRequirements<Actual, Requirements>
+      }
+  : {
+      readonly 'Missing module requirements':
+        MissingModuleRequirements<Actual, Requirements>
+    }
+
+type ProvidedScopeInputKeys<T extends DependenciesMap> = {
+  [K in InputKeys<T>]: [RequirementsOf<T[K]>] extends [never] ? K : never
+}[InputKeys<T>]
+
+type RefineModuleProvides<
+  Actual extends DependenciesMap,
+  Provides extends DependenciesMap
+> = {
+  [K in keyof Provides]: WithRequirements<
+    Provides[K],
+    Exclude<RequirementsOf<Provides[K]>, ProvidedScopeInputKeys<Actual>>
+  >
+}
 
 /**
  * Construction options for {@link Container}.
  *
  * @example
  * ```ts
- * // Default — full runtime guards
+ * // Default: checked runtime with a mutable, exact parent chain
  * const root = new Container()
  *
- * // Opt out of the runtime guards. Applications that fully trust the v3
- * // compile-time guard (`AllowedDeps<T, Kind>`) and freeze the graph before
- * // its first resolve can use this for a faster hot path. The flag is inherited
- * // by every scope spawned via createScope()
- * const fast = new Container({ strict: false })
+ * // The default contract can also be selected explicitly
+ * const explicit = new Container({fast: false})
+ *
+ * // Unchecked fixed graph with optimized scope lookup
+ * const fast = new Container({fast: true})
  * ```
+ *
+ * `fast` defaults to `false`, preserving runtime guards and the exact mutable
+ * parent chain. `{fast: true}` treats the graph as fixed, flattens children to
+ * the registry owner, mirrors delegated singletons, and disables cycle and
+ * lifetime bookkeeping.
+ *
+ * Fixed graphs must finish every `register*`, `.use()`, and `.override()` call
+ * before the first resolve or `createScope()`. Dispose children before their
+ * ancestors. Only the literal value `true` enables the fast contract, so
+ * unknown values passed through a cast fail safe to the checked mutable contract.
  */
 export interface ContainerOptions {
-  /**
-   * Toggle runtime cycle and lifetime guards.
-   *
-   * - `true` (default) — cycle detection and the singleton lifetime guard
-   *   fire on every resolve. Errors are precise (`Circular dependency detected:
-   *   ...`, `Singleton "..." cannot depend on scoped "..."`).
-   * - `false` — both checks are skipped. `get()` for `transient` becomes a bare
-   *   `fn(this)` call; the non-transient path skips the cycle bookkeeping and
-   *   the singleton-stack push/pop, dropping a `try`/`finally` block and an
-   *   `Array#includes` scan from the hot path. Scopes read the immutable root
-   *   registry directly without a parent walk, delegated singletons are mirrored
-   *   into the scope cache, and registration skips defensive cache invalidation.
-   *   Owned-instance identity de-duplication runs on the cold disposal path in
-   *   both modes.
-   *
-   * Trade-off when `strict: false`: a cycle introduced via an `as`-cast or a
-   * dynamically built factory closure becomes a `RangeError: Maximum call
-   * stack size exceeded` instead of the precise diagnostic. A lifetime
-   * violation introduced the same way silently freezes a short-lived value
-   * inside a singleton.
-   *
-   * Fast mode treats the graph as immutable once scopes or resolutions exist.
-   * Register each runtime key once through one linear fluent chain, finish every
-   * `register*` call before the first `.get()` / `.createScope()`, do not call
-   * `.override()` on an activated tree, and dispose children before their
-   * ancestors. Breaking this contract may leave a child using a stale locally
-   * cached singleton or make a post-activation registration invisible to
-   * descendants.
-   *
-   * The compile-time guard catches both classes of bug for any code that
-   * passes through `tsc`, so the runtime guard is only material against
-   * `as`-cast bypasses or dynamic registration. Decide accordingly.
-   *
-   * Inherited by child scopes spawned via {@link Container.createScope}.
-   *
-   * @default true
-   */
-  readonly strict?: boolean
+  readonly fast?: boolean
 }
 
 /**
  * A reusable registration unit for {@link Container.use}. Takes a container
- * carrying the keys `TIn` and returns it widened by the keys in `TOut`.
+ * exposing only `TRequirements` and returns it widened by `TProvides`.
  *
- * `Module<TIn, TOut>` requires the container's `T` at the `.use()` call site
- * to match `TIn` **exactly**. For one-shot grouping inside a fluent chain,
- * prefer inline lambdas in `.use((c) => c.registerXyz(...))` — TypeScript
- * infers the container's full `T` at the call site, so registrations work
- * without re-listing prior keys. The named `Module<TIn, TOut>` type is most
- * useful for fixture builders that always start from a known base shape.
+ * The actual graph may contain additional registrations. Requirements must
+ * match their actual entries by service type, exact lifetime, sync/async mode,
+ * managed-lazy mode, scope-input identity, and readiness. The callback remains
+ * restricted to `Container<TRequirements>`, while the result of `.use()` keeps
+ * the complete actual graph and adds `TProvides`.
  *
- * Both `TIn` and `TOut` use the {@link Spec}-based {@link DependenciesMap} shape.
+ * Both `TRequirements` and `TProvides` use the {@link Spec}-based
+ * {@link DependenciesMap} shape.
  * Wrap a flat `{ key: ServiceType }` map in {@link SpecMap} to default every
  * entry to singleton, or write `Spec<V, 'scoped' | 'transient'>` explicitly for
- * mixed-kind modules.
+ * mixed-lifetime modules.
  *
- * @template TIn  - Required input keys (the container's T at the use-site).
- * @template TOut - Keys this module adds.
+ * @template TRequirements - Registrations required by the module.
+ * @template TProvides - Registrations added by the module.
  *
  * @example
  * ```ts
@@ -588,14 +659,18 @@ export interface ContainerOptions {
  *   .use(fixtureMailer)
  * ```
  */
-export type Module<TIn extends DependenciesMap, TOut extends DependenciesMap> =
-  (c: Container<TIn>) => Container<TIn & NoKeyOverlap<TIn, TOut>>
+export type Module<
+  TRequirements extends DependenciesMap,
+  TProvides extends DependenciesMap
+> = (
+  c: Container<TRequirements>
+) => Container<TRequirements & TProvides>
 
 interface Registration<T extends DependenciesMap, K extends keyof T> {
-  readonly kind: RegistrationKind
+  readonly kind: Lifetime
   /*
    * Marker that excludes the entry from the singleton lifetime guard. Set to
-   * `true` ONLY for Lazy/AsyncLazy companions whose target kind is `'singleton'`:
+   * `true` ONLY for Lazy/AsyncLazy companions whose target lifetime is `'singleton'`:
    *   - singleton-target companion: kind='transient', lazy=true → guard skipped,
    *     singleton consumer may legally inject the wrapper.
    *   - scoped/transient-target companion: kind='transient', lazy=false → guard
@@ -624,7 +699,7 @@ interface Registration<T extends DependenciesMap, K extends keyof T> {
 /*
  * Projects the constructor parameter types onto the allowed DI-map keys.
  * Prevents passing a deps key whose value is not assignable to the corresponding argument.
- * Reads `T[K]['type']` because each entry of the map is a Spec<V, Kind>
+ * Reads `T[K]['type']` because each entry of the map is a Spec<V, L>
  */
 type DepsOf<T extends DependenciesMap, A extends readonly unknown[]> = {
   readonly [I in keyof A]: Extract<
@@ -659,12 +734,12 @@ interface DisposableLike {
  * - `scoped` — one instance per `createScope()` child.
  * - `transient` — a new instance for every `.get()`. Caller-owned, never disposed.
  *
- * **Compile-time lifetime guard.** Each entry in `T` carries its kind via
+ * **Compile-time lifetime guard.** Each entry in `T` carries its lifetime via
  * {@link Spec}. The container passed to a `registerFactory((c) => ...)` body
- * is structurally narrowed via `AllowedDeps<T, Kind>` so that the only `.get(...)`
+ * is structurally narrowed via `AllowedDeps<T, L>` so that the only `.get(...)`
  * keys visible inside a singleton factory are singletons and singleton-target
  * `Lazy`/`AsyncLazy` companions.
- * `registerClass(_, _, deps, kind)` enforces the same constraint on its `deps`
+ * `registerClass(_, _, deps, lifetime)` enforces the same constraint on its `deps`
  * tuple. The runtime guard in `get()` remains as defense-in-depth against
  * `as`-cast bypasses; its error message names the offending keys.
  *
@@ -714,9 +789,8 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   private owned: unknown[] = []
   /*
    * resolving and singletonStack are shared across the whole tree — children inherit
-   * references from the parent. In strict mode resolving catches cycles and
-   * singletonStack catches an attempt by a singleton to take a scoped dependency.
-   * Fast mode leaves both arrays untouched.
+   * references from the parent. The default contract uses them for cycles and
+   * singleton lifetime violations. The fast contract leaves both arrays untouched.
    * A separate `root` field is unnecessary: these two collections already span the chain.
    *
    * INVARIANT: get() MUST stay synchronous. resolving works as a precise projection of
@@ -733,56 +807,47 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   /** @internal */
   private disposePromise: Promise<void> | undefined = undefined
   /*
-   * Strict children retain the exact parent chain. Fast children point directly to
-   * the immutable registry owner. dispose nulls the reference so a disposed child
+   * Mutable children retain the exact parent chain. Fixed children point directly
+   * to the registry owner. dispose nulls the reference so a disposed child
    * does not hold the live root with all of its caches and factories.
    * Declared as `T | undefined` (not `parent?: T`) to satisfy exactOptionalPropertyTypes
    * when assigning undefined in dispose()
    */
   /** @internal */
   private parent: Container<T> | undefined
-  /*
-   * Opt-out toggle for runtime guards.
-   * Stored per-container; inherited from `parent` when this is a scope child,
-   * otherwise read from the ContainerOptions argument. A single readonly
-   * boolean read on the hot path — predictable for V8's branch predictor
-   * because the same flag value flows through every resolve on a given tree
-   */
   /** @internal */
-  private readonly strict: boolean
+  private readonly fast: boolean
 
   /**
    * Creates a new container.
    *
-   * @param options - Optional construction options. `strict?: boolean` toggles
-   *                  runtime guards (default `true`).
+   * @param options - Optional runtime-check and graph-topology contract.
    *
    * @example
    * ```ts
    * const root = new Container()
-   * const fast = new Container({ strict: false })
+   * const explicit = new Container({fast: false})
+   * const production = new Container({fast: true})
    * ```
    */
-  public constructor(options?: ContainerOptions)
-  // Internal overload — used by createScope() to wire the parent chain
-  /** @internal */
-  public constructor(parent: Container<T>)
-  public constructor(arg?: ContainerOptions | Container<T>) {
-    if (arg instanceof Container) {
-      this.strict = arg.strict
+  public constructor(options?: ContainerOptions) {
+    if (options instanceof Container) {
+      this.fast = (options as unknown as Container<T>).fast
       /*
-       * A fast tree is immutable after activation, so every reachable registration
-       * lives on the original registry owner. Flatten nested scopes to that owner:
-       * parent misses become one direct registry lookup. Strict trees retain the
-       * exact chain because local registration and override mutations must remain
-       * observable
+       * A fixed tree keeps every reachable registration on its registry owner.
+       * Flatten nested scopes to that owner:
+       * parent misses become one direct registry lookup. Mutable trees retain the
+       * exact chain so supported graph mutations remain observable
        */
-      this.parent = !this.strict && arg.parent !== undefined ? arg.parent : arg
-      this.resolving = arg.resolving
-      this.singletonStack = arg.singletonStack
+      this.parent = this.fast &&
+        (options as unknown as Container<T>).parent !== undefined
+        ? (options as unknown as Container<T>).parent
+        : options as unknown as Container<T>
+      this.resolving = (options as unknown as Container<T>).resolving
+      this.singletonStack = (options as unknown as Container<T>).singletonStack
     } else {
       this.parent = undefined
-      this.strict = arg?.strict ?? true
+      this.fast = options?.fast === true
       this.resolving = []
       this.singletonStack = []
     }
@@ -883,7 +948,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * The container automatically infers the created type and adds it to the
    * container's registry. The compiler strictly checks that the `deps` array
    * precisely matches the constructor's arguments by both type and position,
-   * **and** that every dep is a legal lifetime for the target `kind` — a
+   * **and** that every dep is a legal lifetime for the target `lifetime` — a
    * singleton target only accepts singleton deps or singleton-target lazy companions.
    * Passing a `lazyKey` additionally registers a companion under that key. A
    * sync class gets `Lazy<V>`, an async-propagated class gets `AsyncLazy<V>`,
@@ -893,13 +958,13 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * @template K - The string-or-symbol key to register the class under. Must not be already registered.
    * @template V - The instance type created by the constructor.
    * @template A - The tuple of constructor argument types.
-   * @template Kind - The literal {@link RegistrationKind} of this registration.
+   * @template L - The literal {@link Lifetime} of this registration.
    * @template LK - The string-or-symbol key for the optional lazy companion.
    *
    * @param key - The unique string-or-symbol identifier for this dependency.
    * @param Ctor - The class constructor to instantiate.
    * @param deps - A tuple of dependency keys that map positionally to the constructor's parameters.
-   * @param kind - The lifetime of the instance: `'singleton'` (default), `'scoped'`, or `'transient'`.
+   * @param lifetime - The lifetime of the instance: `'singleton'` (default), `'scoped'`, or `'transient'`.
    * @param lazyKey - Optional companion key (string or symbol). When provided, registers a
    *                  mode-matched wrapper under that key. Must differ from `key` and
    *                  from any already-registered key.
@@ -927,10 +992,10 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     A extends readonly unknown[],
     const D extends DepsOf<AllowedDeps<T, 'singleton'>, A> = DepsOf<AllowedDeps<T, 'singleton'>, A>
   >(
-    key: K & ([K] extends [keyof T] ? never : unknown),
+    key: K & NoKeyOverlap<K, keyof T>,
     Ctor: new (...args: A) => V,
     deps: D & RequireReadonlyAsyncDeps<T, D>,
-    kind?: undefined
+    lifetime?: undefined
   ): Container<
     T & Record<
       K,
@@ -942,15 +1007,15 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     const K extends string | symbol,
     V,
     A extends readonly unknown[],
-    const Kind extends RegistrationKind,
-    const D extends DepsOf<AllowedDeps<T, Kind>, A> = DepsOf<AllowedDeps<T, Kind>, A>
+    const L extends Lifetime,
+    const D extends DepsOf<AllowedDeps<T, L>, A> = DepsOf<AllowedDeps<T, L>, A>
   >(
-    key: K & ([K] extends [keyof T] ? never : unknown),
+    key: K & NoKeyOverlap<K, keyof T>,
     Ctor: new (...args: A) => V,
     deps: D & RequireReadonlyAsyncDeps<T, D>,
-    kind: Kind
+    lifetime: L
   ): Container<
-    T & Record<K, WithRequirementsOfDeps<ClassSpec<T, D, V, Kind>, T, D>>
+    T & Record<K, WithRequirementsOfDeps<ClassSpec<T, D, V, L>, T, D>>
   >
 
   public registerClass<
@@ -960,11 +1025,11 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     const LK extends string | symbol,
     const D extends DepsOf<AllowedDeps<T, 'singleton'>, A> = DepsOf<AllowedDeps<T, 'singleton'>, A>
   >(
-    key: K & ([K] extends [keyof T] ? never : unknown),
+    key: K & NoKeyOverlap<K, keyof T>,
     Ctor: new (...args: A) => V,
     deps: D & RequireReadonlyAsyncDeps<T, D>,
-    kind: undefined,
-    lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
+    lifetime: undefined,
+    lazyKey: LK & NoKeyOverlap<LK, keyof T | K>
   ): Container<
     T & Record<
       K,
@@ -983,22 +1048,22 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     const K extends string | symbol,
     V,
     A extends readonly unknown[],
-    const Kind extends RegistrationKind,
+    const L extends Lifetime,
     const LK extends string | symbol,
-    const D extends DepsOf<AllowedDeps<T, Kind>, A> = DepsOf<AllowedDeps<T, Kind>, A>
+    const D extends DepsOf<AllowedDeps<T, L>, A> = DepsOf<AllowedDeps<T, L>, A>
   >(
-    key: K & ([K] extends [keyof T] ? never : unknown),
+    key: K & NoKeyOverlap<K, keyof T>,
     Ctor: new (...args: A) => V,
     deps: D & RequireReadonlyAsyncDeps<T, D>,
-    kind: Kind,
-    lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
+    lifetime: L,
+    lazyKey: LK & NoKeyOverlap<LK, keyof T | K>
   ): Container<
     T & Record<
       K,
-      WithRequirementsOfDeps<ClassSpec<T, D, V, Kind>, T, D>
+      WithRequirementsOfDeps<ClassSpec<T, D, V, L>, T, D>
     > & Record<
       LK,
-      WithRequirementsOfDeps<LazyCompanion<ClassSpec<T, D, V, Kind>>, T, D>
+      WithRequirementsOfDeps<LazyCompanion<ClassSpec<T, D, V, L>>, T, D>
     >
   >
 
@@ -1006,7 +1071,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     key: string | symbol,
     Ctor: new (...args: any[]) => any,
     deps: any[],
-    kind: RegistrationKind = 'singleton',
+    lifetime: Lifetime = 'singleton',
     lazyKey?: string | symbol
   ): any {
     if (this._disposed) {
@@ -1023,7 +1088,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
 
     if (asyncIndices !== undefined) {
       this.regs.set(key as keyof T, {
-        kind,
+        kind: lifetime,
         lazy: false,
         fn: ((c: Container<T>) => c.resolveAsyncDependencies(
           keys,
@@ -1034,7 +1099,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
         async: true
       })
 
-      if (this.strict) {
+      if (!this.fast) {
         this.cache.delete(key as keyof T)
       }
 
@@ -1042,7 +1107,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
         const targetKey = key as unknown as keyof T
         this.regs.set(lazyKey as unknown as keyof T, {
           kind: 'transient',
-          lazy: kind === 'singleton',
+          lazy: lifetime === 'singleton',
           fn: (c) => ({get: () => c.getAsync(targetKey as never)} as unknown as T[keyof T]['type']),
           owned: false
         })
@@ -1139,9 +1204,9 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
      * explicitly even for non-lazy entries — paying a single boolean field
      * per registration is far cheaper than a PIC bucket miss on the hot path
      */
-    this.regs.set(key as keyof T, {kind, lazy: false, fn, owned: true} as Registration<T, keyof T>)
+    this.regs.set(key as keyof T, {kind: lifetime, lazy: false, fn, owned: true} as Registration<T, keyof T>)
 
-    if (this.strict) {
+    if (!this.fast) {
       this.cache.delete(key as unknown as keyof T)
     }
 
@@ -1159,7 +1224,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
      *
      * LIFETIME GUARD: `lazy: true` excludes the companion from the singleton lifetime
      * check (see Registration.lazy and the runtime guards in get() / resolveWithOwnerAndReg).
-     * It is set ONLY when the target kind is `'singleton'`. For non-singleton targets,
+     * It is set ONLY when the target lifetime is `'singleton'`. For non-singleton targets,
      * the companion stays `lazy: false` and is rejected as a regular transient if a
      * singleton consumer tries to inject it via an `as`-cast bypass. The compile-time
      * `AllowedDeps<T, 'singleton'>` filter (via `LazySpec<V, 'singleton'>`) is the
@@ -1178,7 +1243,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
        */
       this.regs.set(lazyKey as unknown as keyof T, {
         kind: 'transient',
-        lazy: kind === 'singleton',
+        lazy: lifetime === 'singleton',
         fn: (c) => ({get: () => c.get(targetKey as never)} as unknown as T[keyof T]['type']),
         owned: false
       })
@@ -1192,7 +1257,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    *
    * The type `V` is inferred from the factory's return value and is automatically
    * added to the container's map. The factory receives the container as its only
-   * argument, **structurally narrowed via `AllowedDeps<T, Kind>`** — inside a
+   * argument, structurally narrowed for the chosen lifetime. Inside a
    * singleton factory only singleton keys and `Lazy<singleton>` companions are visible
    * to `.get(...)`, so a leak of scoped/transient state into a singleton is a
    * TypeScript error rather than a runtime exception.
@@ -1201,18 +1266,19 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * {@link Container.registerClass}.
    *
    * A factory that reads scope inputs must use the deps-aware overload:
-   * `registerFactory(key, deps, factory, kind)`. The tuple declares type-level
+   * `registerFactory(key, factory, deps, lifetime)`. The tuple declares type-level
    * edges and limits the callback to a resolver-only view of those keys. InferDI
    * does not resolve the tuple into callback arguments at runtime.
    *
    * @template K - The string-or-symbol key to register the factory under. Must not be already registered.
    * @template V - The return type of the factory.
-   * @template Kind - The literal {@link RegistrationKind} of this registration.
+   * @template L - The literal {@link Lifetime} of this registration.
    * @template LK - The string-or-symbol companion key for the optional `Lazy<V>` wrapper.
    *
    * @param key - The unique string-or-symbol identifier for this dependency.
    * @param factory - A function that takes the (narrowed) current container and returns the instance.
-   * @param kind - The lifetime of the instance: `'singleton'` (default), `'scoped'`, or `'transient'`.
+   * @param deps - Optional dependency keys that declare type-level edges and narrow the resolver.
+   * @param lifetime - The lifetime of the instance: `'singleton'` (default), `'scoped'`, or `'transient'`.
    * @param lazyKey - Optional companion key (string or symbol). When provided, registers a
    *                  `Lazy<V>` wrapper under that key. Must differ from `key` and from any
    *                  already-registered key.
@@ -1252,8 +1318,8 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    *   .declareScopeInputs<{auth: AuthContext}>()
    *   .registerFactory(
    *     'userId',
-   *     ['auth'],
    *     (c) => c.get('auth').userId,
+   *     ['auth'],
    *     'scoped'
    *   )
    * ```
@@ -1262,57 +1328,45 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     const K extends string | symbol,
     V
   >(
-    key: K & ([K] extends [keyof T] ? never : unknown),
+    key: K & NoKeyOverlap<K, keyof T>,
     factory: (c: Container<AllowedDeps<T, 'singleton'>>) => V,
-    kind?: undefined
+    lifetime?: undefined
   ): Container<T & Record<K, Spec<V, 'singleton'>>>
 
   public registerFactory<
     const K extends string | symbol,
     V,
-    const Kind extends RegistrationKind
+    const L extends Lifetime
   >(
-    key: K & ([K] extends [keyof T] ? never : unknown),
-    factory: (c: Container<AllowedDeps<T, Kind>>) => V,
-    kind: Kind
-  ): Container<T & Record<K, Spec<V, Kind>>>
+    key: K & NoKeyOverlap<K, keyof T>,
+    factory: (c: Container<AllowedDeps<T, L>>) => V,
+    lifetime: L
+  ): Container<T & Record<K, Spec<V, L>>>
 
   public registerFactory<
     const K extends string | symbol,
     V,
+    const L extends Lifetime,
     const LK extends string | symbol
   >(
-    key: K & ([K] extends [keyof T] ? never : unknown),
-    factory: (c: Container<AllowedDeps<T, 'singleton'>>) => V,
-    kind: undefined,
-    lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
-  ): Container<T & Record<K, Spec<V, 'singleton'>> & Record<LK, LazySpec<V, 'singleton'>>>
-
-  public registerFactory<
-    const K extends string | symbol,
-    V,
-    const Kind extends RegistrationKind,
-    const LK extends string | symbol
-  >(
-    key: K & ([K] extends [keyof T] ? never : unknown),
-    factory: (c: Container<AllowedDeps<T, Kind>>) => V,
-    kind: Kind,
-    lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
-  ): Container<T & Record<K, Spec<V, Kind>> & Record<LK, LazySpec<V, Kind>>>
+    key: K & NoKeyOverlap<K, keyof T>,
+    factory: (c: Container<AllowedDeps<T, L>>) => V,
+    lifetime: L,
+    lazyKey: LK & NoKeyOverlap<LK, keyof T | K>
+  ): Container<T & Record<K, Spec<V, L>> & Record<LK, LazySpec<V, L>>>
 
   public registerFactory<
     const K extends string | symbol,
     V,
     const D extends readonly FactoryDependencyKeys<T, 'singleton'>[]
   >(
-    key: K & ([K] extends [keyof T] ? never : unknown),
-    deps: D & RejectAsyncDeps<T, D>,
+    key: K & NoKeyOverlap<K, keyof T>,
     factory: (
       c: FactoryResolver<
         FactorySelection<AllowedDeps<T, 'singleton'>, D>
       >
     ) => V,
-    kind?: undefined
+    deps: D & RejectAsyncDeps<T, D>
   ): Container<
     T & Record<
       K,
@@ -1323,90 +1377,66 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   public registerFactory<
     const K extends string | symbol,
     V,
-    const Kind extends RegistrationKind,
-    const D extends readonly FactoryDependencyKeys<T, Kind>[]
+    const L extends Lifetime,
+    const D extends readonly FactoryDependencyKeys<T, L>[]
   >(
-    key: K & ([K] extends [keyof T] ? never : unknown),
-    deps: D & RejectAsyncDeps<T, D>,
+    key: K & NoKeyOverlap<K, keyof T>,
     factory: (
-      c: FactoryResolver<FactorySelection<AllowedDeps<T, Kind>, D>>
+      c: FactoryResolver<FactorySelection<AllowedDeps<T, L>, D>>
     ) => V,
-    kind: Kind
+    deps: D & RejectAsyncDeps<T, D>,
+    lifetime: L
   ): Container<
-    T & Record<K, WithRequirementsOfDeps<Spec<V, Kind>, T, D>>
+    T & Record<K, WithRequirementsOfDeps<Spec<V, L>, T, D>>
   >
 
   public registerFactory<
     const K extends string | symbol,
     V,
+    const L extends Lifetime,
     const LK extends string | symbol,
-    const D extends readonly FactoryDependencyKeys<T, 'singleton'>[]
+    const D extends readonly FactoryDependencyKeys<T, L>[]
   >(
-    key: K & ([K] extends [keyof T] ? never : unknown),
-    deps: D & RejectAsyncDeps<T, D>,
+    key: K & NoKeyOverlap<K, keyof T>,
     factory: (
       c: FactoryResolver<
-        FactorySelection<AllowedDeps<T, 'singleton'>, D>
+        FactorySelection<AllowedDeps<T, L>, D>
       >
     ) => V,
-    kind: undefined,
-    lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
-  ): Container<
-    T & Record<
-      K,
-      WithRequirementsOfDeps<Spec<V, 'singleton'>, T, D>
-    > & Record<
-      LK,
-      WithRequirementsOfDeps<LazySpec<V, 'singleton'>, T, D>
-    >
-  >
-
-  public registerFactory<
-    const K extends string | symbol,
-    V,
-    const Kind extends RegistrationKind,
-    const LK extends string | symbol,
-    const D extends readonly FactoryDependencyKeys<T, Kind>[]
-  >(
-    key: K & ([K] extends [keyof T] ? never : unknown),
     deps: D & RejectAsyncDeps<T, D>,
-    factory: (
-      c: FactoryResolver<FactorySelection<AllowedDeps<T, Kind>, D>>
-    ) => V,
-    kind: Kind,
-    lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
+    lifetime: L,
+    lazyKey: LK & NoKeyOverlap<LK, keyof T | K>
   ): Container<
-    T & Record<K, WithRequirementsOfDeps<Spec<V, Kind>, T, D>> &
-    Record<LK, WithRequirementsOfDeps<LazySpec<V, Kind>, T, D>>
+    T & Record<K, WithRequirementsOfDeps<Spec<V, L>, T, D>> &
+    Record<LK, WithRequirementsOfDeps<LazySpec<V, L>, T, D>>
   >
 
   public registerFactory(
     key: string | symbol,
-    depsOrFactory: readonly (string | symbol)[] | ((c: any) => any),
-    factoryOrKind?: ((c: any) => any) | RegistrationKind,
-    kindOrLazyKey?: RegistrationKind | string | symbol,
+    factory: (c: any) => any,
+    depsOrLifetime?: readonly (string | symbol)[] | Lifetime,
+    lifetimeOrLazyKey?: Lifetime | string | symbol,
     depsLazyKey?: string | symbol
   ): any {
     if (this._disposed) {
       throw new Error(`Cannot register on a disposed container (key: "${String(key)}")`)
     }
 
-    const depsAware = Array.isArray(depsOrFactory)
-    const factory = (depsAware ? factoryOrKind : depsOrFactory) as (c: any) => any
-    const kind = ((depsAware ? kindOrLazyKey : factoryOrKind) ?? 'singleton') as RegistrationKind
-    const lazyKey = depsAware ? depsLazyKey : kindOrLazyKey as string | symbol | undefined
+    const depsAware = Array.isArray(depsOrLifetime)
+    const lifetime = ((depsAware ? lifetimeOrLazyKey : depsOrLifetime) ?? 'singleton') as Lifetime
+    const lazyKey = depsAware ? depsLazyKey : lifetimeOrLazyKey as string | symbol | undefined
 
     this.regs.set(
       key as unknown as keyof T,
       {
-        kind,
+        kind: lifetime,
         lazy: false,
         fn: factory as unknown as (c: Container<T>) => T[keyof T]['type'],
         owned: true
       }
     )
 
-    if (this.strict) {
+    if (!this.fast) {
       this.cache.delete(key as unknown as keyof T)
     }
 
@@ -1419,7 +1449,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
        */
       this.regs.set(lazyKey as unknown as keyof T, {
         kind: 'transient',
-        lazy: kind === 'singleton',
+        lazy: lifetime === 'singleton',
         fn: (c) => ({get: () => c.get(targetKey as never)} as unknown as T[keyof T]['type']),
         owned: false
       })
@@ -1460,10 +1490,10 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     R,
     const D extends DepsOf<AllowedDeps<T, 'singleton'>, A> = DepsOf<AllowedDeps<T, 'singleton'>, A>
   >(
-    key: K & ([K] extends [keyof T] ? never : unknown),
+    key: K & NoKeyOverlap<K, keyof T>,
     factory: (...args: A) => R,
     deps: D & RequireReadonlyDeps<D>,
-    kind?: undefined
+    lifetime?: undefined
   ): Container<
     T & Record<
       K,
@@ -1475,17 +1505,17 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     const K extends string | symbol,
     A extends readonly unknown[],
     R,
-    const Kind extends RegistrationKind,
-    const D extends DepsOf<AllowedDeps<T, Kind>, A> = DepsOf<AllowedDeps<T, Kind>, A>
+    const L extends Lifetime,
+    const D extends DepsOf<AllowedDeps<T, L>, A> = DepsOf<AllowedDeps<T, L>, A>
   >(
-    key: K & ([K] extends [keyof T] ? never : unknown),
+    key: K & NoKeyOverlap<K, keyof T>,
     factory: (...args: A) => R,
     deps: D & RequireReadonlyDeps<D>,
-    kind: Kind
+    lifetime: L
   ): Container<
     T & Record<
       K,
-      WithRequirementsOfDeps<AsyncSpec<Awaited<R>, Kind>, T, D>
+      WithRequirementsOfDeps<AsyncSpec<Awaited<R>, L>, T, D>
     >
   >
 
@@ -1496,11 +1526,11 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     const LK extends string | symbol,
     const D extends DepsOf<AllowedDeps<T, 'singleton'>, A> = DepsOf<AllowedDeps<T, 'singleton'>, A>
   >(
-    key: K & ([K] extends [keyof T] ? never : unknown),
+    key: K & NoKeyOverlap<K, keyof T>,
     factory: (...args: A) => R,
     deps: D & RequireReadonlyDeps<D>,
-    kind: undefined,
-    lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
+    lifetime: undefined,
+    lazyKey: LK & NoKeyOverlap<LK, keyof T | K>
   ): Container<
     T & Record<
       K,
@@ -1515,22 +1545,22 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     const K extends string | symbol,
     A extends readonly unknown[],
     R,
-    const Kind extends RegistrationKind,
+    const L extends Lifetime,
     const LK extends string | symbol,
-    const D extends DepsOf<AllowedDeps<T, Kind>, A> = DepsOf<AllowedDeps<T, Kind>, A>
+    const D extends DepsOf<AllowedDeps<T, L>, A> = DepsOf<AllowedDeps<T, L>, A>
   >(
-    key: K & ([K] extends [keyof T] ? never : unknown),
+    key: K & NoKeyOverlap<K, keyof T>,
     factory: (...args: A) => R,
     deps: D & RequireReadonlyDeps<D>,
-    kind: Kind,
-    lazyKey: LK & ([LK] extends [keyof T | K] ? never : unknown)
+    lifetime: L,
+    lazyKey: LK & NoKeyOverlap<LK, keyof T | K>
   ): Container<
     T & Record<
       K,
-      WithRequirementsOfDeps<AsyncSpec<Awaited<R>, Kind>, T, D>
+      WithRequirementsOfDeps<AsyncSpec<Awaited<R>, L>, T, D>
     > & Record<
       LK,
-      WithRequirementsOfDeps<AsyncLazySpec<Awaited<R>, Kind>, T, D>
+      WithRequirementsOfDeps<AsyncLazySpec<Awaited<R>, L>, T, D>
     >
   >
 
@@ -1538,7 +1568,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     key: string | symbol,
     factory: (...args: any[]) => unknown,
     deps: readonly (string | symbol)[],
-    kind: RegistrationKind = 'singleton',
+    lifetime: Lifetime = 'singleton',
     lazyKey?: string | symbol
   ): any {
     if (this._disposed) {
@@ -1546,21 +1576,30 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     }
 
     const keys = deps as readonly (keyof T)[]
-    const asyncIndices = this.asyncDependencyIndices(keys) ?? []
+    let fn: (c: Container<T>) => Promise<unknown>
 
-    this.regs.set(key as keyof T, {
-      kind,
-      lazy: false,
-      fn: ((c: Container<T>) => c.resolveAsyncDependencies(
+    if (keys.length === 0) {
+      /* Preserve deferred invocation and sync-throw rejection without Promise.all([]) */
+      const invoke = () => factory()
+      fn = () => Promise.resolve().then(invoke)
+    } else {
+      const asyncIndices = this.asyncDependencyIndices(keys) ?? []
+      fn = (c) => c.resolveAsyncDependencies(
         keys,
         asyncIndices,
         (args) => factory(...args)
-      )) as unknown as (c: Container<T>) => T[keyof T]['type'],
+      )
+    }
+
+    this.regs.set(key as keyof T, {
+      kind: lifetime,
+      lazy: false,
+      fn: fn as unknown as (c: Container<T>) => T[keyof T]['type'],
       owned: true,
       async: true
     })
 
-    if (this.strict) {
+    if (!this.fast) {
       this.cache.delete(key as keyof T)
     }
 
@@ -1568,7 +1607,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       const targetKey = key as unknown as keyof T
       this.regs.set(lazyKey as unknown as keyof T, {
         kind: 'transient',
-        lazy: kind === 'singleton',
+        lazy: lifetime === 'singleton',
         fn: (c) => ({get: () => c.getAsync(targetKey as never)} as unknown as T[keyof T]['type']),
         owned: false
       })
@@ -1585,7 +1624,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * Use this for primitives, configs, and pre-constructed objects whose lifecycle
    * you manage outside the container.
    *
-   * Values are recorded with `kind: 'singleton'` in the type-level registry,
+   * Values are recorded with `lifetime: 'singleton'` in the type-level registry,
    * which means they are legal dependencies of singletons, scopeds, and
    * transients alike.
    *
@@ -1605,7 +1644,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * ```
    */
   public registerValue<const K extends string | symbol, const V>(
-    key: K & ([K] extends [keyof T] ? never : unknown),
+    key: K & NoKeyOverlap<K, keyof T>,
     value: V
   ): Container<T & Record<K, Spec<V, 'singleton'>>> {
     if (this._disposed) {
@@ -1638,13 +1677,13 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * type (`T[K]['type']`), so a mock has to structurally implement the
    * production interface — no `as any` escape hatch is needed.
    *
-   * **Kind preservation.** The original lifetime kind is preserved across the
+   * **Lifetime preservation.** The original lifetime is preserved across the
    * override. If the original registration lives on an ancestor (e.g. a
    * `root.registerFactory('db', _, 'scoped')` being overridden on a child
-   * scope), the walk-up reads the ancestor's kind and writes the local
-   * override with the same kind. This keeps the lifetime graph consistent.
+   * scope), the walk-up reads the ancestor's lifetime and writes the local
+   * override with the same lifetime. This keeps the lifetime graph consistent.
    *
-   * **Strict guarantees (Fail Fast):**
+   * **Fail-fast guarantees:**
    * - Throws if called on a disposed container.
    * - Throws if the key has already been resolved on this container. A late
    *   override would let already-built consumers retain a reference to the
@@ -1694,7 +1733,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       throw new Error(`Cannot override on a disposed container (key: "${String(key)}")`)
     }
     /*
-     * Strict Runtime Guard: refuse late overrides. If `cache.has(key)` is true,
+     * Runtime guard: refuse late overrides. If `cache.has(key)` is true,
      * the original was already resolved (or eagerly seeded by registerValue) on
      * this container — replacing it now would split the dependency graph
      * (existing consumers keep the old ref; future resolves see the mock)
@@ -1713,14 +1752,14 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
      * marker on `Lazy<singleton>` companions (registered with `lazy: true`).
      * Without copying `lazy`, an override on a `Lazy<singleton>` companion
      * would write `lazy: false`, and the next singleton consumer that injects
-     * the companion would trip the strict-mode lifetime guard
+     * the companion would trip the runtime lifetime guard
      * (kind='transient', lazy=false → guarded) — i.e. the mock would never
      * reach the consumer. A key not found anywhere is a misconfiguration;
      * surface it eagerly rather than silently materializing a singleton from
      * nothing
      */
     let cur: Container<T> | undefined = this
-    let existingKind: RegistrationKind | undefined
+    let existingKind: Lifetime | undefined
     let existingLazy = false
     let existingAsync: true | undefined
     while (cur !== undefined) {
@@ -1792,8 +1831,20 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    *   })
    * ```
    */
-  public use<R extends DependenciesMap>(fn: Module<T, R>): Container<T & R> {
-    return fn(this) as unknown as Container<T & R>
+  public use<R extends DependenciesMap>(
+    fn: (c: Container<T>) => Container<T & R>
+  ): Container<T & R>
+  public use<
+    Requirements extends DependenciesMap,
+    Provides extends DependenciesMap
+  >(
+    fn: Module<Requirements, Provides> &
+      ModuleUseCheck<T, Requirements, Provides>
+  ): Container<T & RefineModuleProvides<T, Provides>>
+  public use(
+    fn: (c: Container<any>) => Container<any>
+  ): Container<any> {
+    return fn(this)
   }
 
   /**
@@ -1832,7 +1883,9 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       throw new Error('Cannot create scope from a disposed container')
     }
 
-    const child = new Container<T>(this)
+    const child = new (Container as unknown as {
+      new (parent: Container<T>): Container<T>
+    })(this)
     const values = inputs === undefined
       ? this.scopeInputs
       : this.scopeInputs === undefined
@@ -1859,10 +1912,10 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   }
 
   /**
-   * Resolves a registered service by key with full type safety. Strict scopes
-   * walk the parent chain to find the registration; Fast Mode scopes read their
-   * immutable registry owner directly. The registered lifetime
-   * (singleton / scoped / transient) is honoured in both modes.
+   * Resolves a registered service by key with full type safety. Mutable scopes
+   * walk the parent chain to find the registration; fixed scopes read their
+   * registry owner directly. The registered lifetime
+   * (singleton / scoped / transient) is honoured in both contracts.
    *
    * @template K - One of the keys registered on this container or any ancestor.
    *               Restricted to `keyof T`, so unknown keys fail at compile time.
@@ -1899,12 +1952,12 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     }
 
     /*
-     * Fast scopes point directly at the immutable registry owner. Bypass the
+     * Fixed scopes point directly at the registry owner. Bypass the
      * guaranteed-empty local registry and parent walk. Delegated singletons are
      * mirrored into the scope cache after the first resolve, but remain owned and
      * disposed exclusively by the registry owner
      */
-    if (!this.strict && this.parent !== undefined) {
+    if (this.fast && this.parent !== undefined) {
       const owner = this.parent
       const reg = owner.regs.get(key) as Registration<T, K> | undefined
 
@@ -1939,7 +1992,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
 
     if (localReg !== undefined) {
       if (localReg.kind === 'transient') {
-        if (this.strict) {
+        if (!this.fast) {
           if (!localReg.lazy && this.singletonStack.length > 0) {
             const parent = this.singletonStack[this.singletonStack.length - 1]!
             throw new Error(
@@ -1967,13 +2020,13 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
         }
 
         /*
-         * strict=false hot path: no cycle bookkeeping, no try/finally, no lifetime
+         * Unchecked hot path: no cycle bookkeeping, no try/finally, no lifetime
          * check. Just call the factory. Caller-owned by transient contract
          */
         return localReg.fn(this)
       }
 
-      if (localReg.kind === 'scoped' && this.strict && this.parent === undefined) {
+      if (localReg.kind === 'scoped' && !this.fast && this.parent === undefined) {
         throw new Error(
           `Scoped "${String(key)}" cannot be resolved from the root container. ` +
           `Use createScope().`
@@ -1984,7 +2037,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       return this.resolveWithOwnerAndReg(this, localReg, key)
     }
 
-    // 3. Strict-mode walk-up across the exact parent chain
+    // 3. Mutable-mode walk-up across the exact parent chain
     let owner: Container<T> | undefined
     let reg: Registration<T, K> | undefined
 
@@ -2065,10 +2118,9 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
 
   /**
    * Type-guard predicate: returns `true` if `key` is registered on this
-   * container or any ancestor scope, `false` otherwise. Strict scopes walk the
-   * parent chain; Fast Mode scopes already point directly at their immutable
-   * registry owner. Like a strict `.get()` miss, strict `.has()` walks the exact
-   * parent chain.
+   * container or any ancestor scope, `false` otherwise. Mutable scopes walk the
+   * exact parent chain; fixed scopes already point directly at their registry
+   * owner.
    *
    * **Behaviour on a disposed container.** A disposed container clears `regs`
    * and nulls `parent`, so `.has()` returns `false` for every key after
@@ -2136,7 +2188,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
      * singleton is delegated from a child scope (this !== target). `target !== this`
      * already implies `reg.kind === 'singleton'` by the dispatch in get().
      * Unconditional because it serves correctness (avoid re-running a singleton
-     * factory) — not a "guard" that strict-mode would gate
+     * factory) — not a runtime-check guard
      */
     if (target !== this) {
       const cached = target.cache.get(key)
@@ -2146,14 +2198,15 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       }
     }
 
-    if (this.strict) {
+    if (!this.fast) {
       /*
        * Lifetime guard — short-lived dep inside a long-lived (singleton) factory.
        * `singletonStack.length > 0` is a cheap integer field-access; the rest of the
        * condition only runs inside an active singleton resolution. Defense-in-depth:
        * the v3 compile-time guard via AllowedDeps is the primary protection, but
        * `as`-cast bypasses and dynamically-built registrations need a runtime floor
-       * with a key-naming error message. Opt out via `new Container({ strict: false })`
+       * with a key-naming error message. The fast fixed contract opts out via
+       * `new Container({fast: true})`
        */
       if (!reg.lazy && (reg.kind === 'scoped' || reg.kind === 'transient') && this.singletonStack.length > 0) {
         const parent = this.singletonStack[this.singletonStack.length - 1]!
@@ -2201,7 +2254,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     }
 
     /*
-     * strict=false bare path: drop cycle bookkeeping, the singleton-stack
+     * Unchecked bare path: drop cycle bookkeeping, the singleton-stack
      * push/pop, and the surrounding try/finally. Transients return directly
      * from get(), so this path always caches a singleton or scoped instance.
      * A real cycle here loops the call stack until V8 throws RangeError
@@ -2326,6 +2379,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   ): Promise<void> {
     let errors: unknown[] | undefined
     const disposedInstances = instances.length > 1 ? new Set<unknown>() : undefined
+    const failedPromiseErrors = instances.length > 1 ? new Set<unknown>() : undefined
 
     for (let i = instances.length - 1; i >= 0; i--) {
       let inst = instances[i] as DisposableLike | PromiseLike<DisposableLike | null | undefined> | null | undefined
@@ -2345,7 +2399,19 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
          * Promise so polyfills and custom thenables also unwrap
          */
         if (typeof (inst as { then?: unknown }).then === 'function') {
-          inst = await (inst as PromiseLike<DisposableLike | null | undefined>)
+          try {
+            inst = await (inst as PromiseLike<DisposableLike | null | undefined>)
+          } catch (err) {
+            if (
+              failedPromiseErrors === undefined ||
+              !failedPromiseErrors.has(err)
+            ) {
+              (errors ??= []).push(err)
+              failedPromiseErrors?.add(err)
+            }
+            continue
+          }
+
           if (inst == null) continue
         }
 
@@ -2451,6 +2517,10 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
          * "silently fix the misuse", which hides the bug
          */
         if (typeof (inst as { then?: unknown }).then === 'function') {
+          if (inst instanceof Promise) {
+            void inst.catch(() => {})
+          }
+
           (errors ??= []).push(new Error(
             `Sync [Symbol.dispose] called on a container that cached a Promise from an ` +
             `async factory. Use \`await using\` / container.dispose() for async teardown.`
@@ -2493,7 +2563,10 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       throw errors[0]
     }
 
-    throw new AggregateError(errors, 'Container[Symbol.dispose]: multiple teardown errors')
+    throw new AggregateError(
+      errors,
+      'Container[Symbol.dispose]: multiple teardown errors'
+    )
   }
 
 }
@@ -2543,7 +2616,7 @@ export namespace Container {
 
   /**
    * Extracts the registered key map from a fully-built container type as a
-   * **flat** `{ key: ServiceType }` view — the lifetime kind from each {@link Spec}
+   * **flat** `{ key: ServiceType }` view — the lifetime from each {@link Spec}
    * is unwrapped so downstream consumers (handlers, mocks, test fixtures) see
    * the same shape they always did.
    *

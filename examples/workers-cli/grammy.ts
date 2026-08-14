@@ -13,7 +13,7 @@ type BotContext = Context & {
 }
 
 const withContainer: MiddlewareFn<BotContext> = async (ctx, next) => {
-  await using scope = await createRequestScope(root, {
+  await using scope = createRequestScope(root, {
     requestId: String(ctx.update.update_id),
     userId: ctx.from?.id !== undefined ? String(ctx.from.id) : undefined
   })

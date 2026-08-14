@@ -1,5 +1,6 @@
 ---
 layout: home
+description: "零运行时依赖、无需装饰器的 DI 容器，在编译期检查依赖图、生命周期和作用域边界。"
 
 hero:
   name: InferDI
@@ -64,44 +65,4 @@ features:
     details: "InferDI 没有运行时依赖，可运行于 Node、Bun、Deno、浏览器和 workers。适配器为请求作用域提供可选的生命周期胶水代码。"
     link: /zh/adapters/
     linkText: 适配器如何工作
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "WebSite"
-      "@id": "https://inferdi.com/#website"
-      "url": "https://inferdi.com/zh/"
-      "name": "InferDI"
-      "description": "面向现代 TypeScript 的无装饰器、强类型依赖注入。"
-      "inLanguage": "zh-CN"
-      "publisher":
-        "@id": "https://inferdi.com/#organization"
-      "potentialAction":
-        "@type": "SearchAction"
-        "target":
-          "@type": "EntryPoint"
-          "urlTemplate": "https://inferdi.com/?q={search_term_string}"
-        "query-input": "required name=search_term_string"
-    - "@type": "Organization"
-      "@id": "https://inferdi.com/#organization"
-      "name": "InferDI"
-      "url": "https://inferdi.com/"
-      "logo":
-        "@type": "ImageObject"
-        "url": "https://inferdi.com/logo.png"
-      "sameAs":
-        - "https://github.com/inferdi/inferdi"
-        - "https://twitter.com/inferdi_ts"
-    - "@type": "SoftwareApplication"
-      "@id": "https://inferdi.com/#software"
-      "name": "InferDI"
-      "applicationCategory": "DeveloperApplication"
-      "operatingSystem": "Node.js, Bun, Deno, Browser, Edge runtimes"
-      "softwareVersion": "6.0.0"
-      "programmingLanguage": "TypeScript"
-      "url": "https://inferdi.com/"
-      "downloadUrl": "https://www.npmjs.com/package/@inferdi/inferdi"
-      "description": "面向 TypeScript 的零运行时依赖、无装饰器、强类型 DI 容器。TypeScript 会在注册时检查参数顺序、缺失键和生命周期依赖。"
-      "license": "https://github.com/inferdi/inferdi/blob/main/LICENSE"
-      "author":
-        "@id": "https://inferdi.com/#organization"
 ---

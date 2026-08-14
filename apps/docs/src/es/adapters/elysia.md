@@ -1,59 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/es/adapters/elysia#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Inicio"
-          "item": "https://inferdi.com/es/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Adaptadores"
-          "item": "https://inferdi.com/es/adapters/"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Adaptador de Elysia"
-          "item": "https://inferdi.com/es/adapters/elysia"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/es/adapters/elysia#article"
-      "headline": "Adaptador de Elysia de InferDI — @inferdi/elysia"
-      "name": "Adaptador de Elysia"
-      "description": "@inferdi/elysia es un plugin de Elysia v1: en modo con scope crea un scope de petición, lo expone en el contexto de Elysia, lo mantiene disponible para los manejadores de errores y lo libera desde onAfterResponse, con un modo solo raíz para aplicaciones Bun."
-      "url": "https://inferdi.com/es/adapters/elysia"
-      "mainEntityOfPage": "https://inferdi.com/es/adapters/elysia"
-      "inLanguage": "es-ES"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript, Elysia v1, @inferdi/inferdi"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, Elysia, Elysia v1, plugin, Bun, derive con scope, onAfterResponse, solo raíz, inyección de dependencias"
-      "articleSection": "Adaptadores"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "@inferdi/elysia"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js >=20, Bun"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Adaptador de Elysia
 
 [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) es un plugin de Elysia v1. En modo con scope, crea un scope de petición, lo expone en el contexto de Elysia, lo mantiene disponible para los manejadores de errores del usuario y lo libera desde `onAfterResponse`.
@@ -77,11 +21,12 @@ const root = buildRootContainer()
 const app = new Elysia()
   .use(inferdiElysia({
     container: root,
-    setupScope: (scope, { request }) => {
-      const ctx = scope.get('request')
-      ctx.requestId = crypto.randomUUID()
-      ctx.userId = request.headers.get('x-user-id') ?? undefined
-    },
+    createScope: (_root, { request }) => root.createScope({
+      request: {
+        requestId: crypto.randomUUID(),
+        userId: request.headers.get('x-user-id') ?? undefined
+      }
+    })
   }))
   .get('/users/:id', ({ di, params }) =>
     di.get('users').profile(params.id),
@@ -92,7 +37,16 @@ Para una clave de contexto personalizada:
 
 ```ts
 const app = new Elysia()
-  .use(inferdiElysia({ container: root, key: 'container' }))
+  .use(inferdiElysia({
+    container: root,
+    key: 'container',
+    createScope: (_root, { request }) => root.createScope({
+      request: {
+        requestId: crypto.randomUUID(),
+        userId: request.headers.get('x-user-id') ?? undefined
+      }
+    })
+  }))
   .get('/users/:id', ({ container, params }) =>
     container.get('users').profile(params.id),
   )
@@ -108,8 +62,8 @@ Las rutas deben registrarse después de `.use(inferdiElysia(...))` en la cadena 
 | `key` | `'di'` | Clave de contexto de Elysia. |
 | `scopePerRequest` | `true` | Establece `false` para el modo solo raíz. |
 | `createScope` | `root.createScope()` | Creación personalizada del scope de petición. |
-| `setupScope` | ninguno | Hidrata antes de la validación y de los handlers de rutas. |
-| `setupValidatedScope` | ninguno | Hidrata después de la validación de Elysia. |
+| `setupScope` | ninguno | Ejecuta inicialización adicional después de crear el scope. |
+| `setupValidatedScope` | ninguno | Ejecuta inicialización adicional después de la validación de Elysia. |
 | `disposeScope` | `scope.dispose()` | Liberación personalizada. |
 | `autoDispose` | `true` | `false` o un predicado `false` transfiere la propiedad. |
 | `onDisposeError` | `console.error` | Sumidero de fallos de limpieza. |

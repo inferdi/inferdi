@@ -1,60 +1,4 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ru/core/scope-inputs#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Главная"
-          "item": "https://inferdi.com/ru/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Базовые принципы"
-          "item": "https://inferdi.com/ru/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Данные и профили скоупа"
-          "item": "https://inferdi.com/ru/core/scope-inputs"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ru/core/scope-inputs#article"
-      "headline": "Данные и профили скоупа в InferDI"
-      "name": "Данные и профили скоупа"
-      "description": "Объявляйте данные скоупа, создавайте типизированные профили и не разрешайте сервисы, пока для них не предоставлены все значения."
-      "url": "https://inferdi.com/ru/core/scope-inputs"
-      "mainEntityOfPage": "https://inferdi.com/ru/core/scope-inputs"
-      "inLanguage": "ru-RU"
-      "datePublished": "2026-08-11"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, данные скоупа, профили скоупа, declareScopeInputs, createScope, ReadyKeys, внедрение зависимостей TypeScript"
-      "articleSection": "Базовые принципы"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
-# Данные и профили скоупа
+# Входные данные скоупа
 
 Данные скоупа передаёт код, который открывает скоуп: HTTP-запрос, авторизованный пользователь, tenant, payload задания или trace context. InferDI проводит эти требования через граф и не даёт разрешить сервис, пока нужные данные не предоставлены.
 
@@ -96,7 +40,7 @@ const root = new Container()
   )
 ```
 
-Данные скоупа имеют время жизни `scoped`. Singleton не может зависеть от них, поэтому компилятор отклонит пропущенный или явно указанный `singleton` kind у этих сервисов.
+Данные скоупа имеют время жизни `scoped`. Singleton не может зависеть от них, поэтому компилятор отклонит пропущенный или явно указанный `singleton` lifetime у этих сервисов.
 
 ## Типизированные профили
 
@@ -106,7 +50,7 @@ const root = new Container()
 const publicScope = root.createScope({request})
 publicScope.get('publicService')
 
-// @ts-expect-error: auth ещё не предоставлен
+// @ts-expect-error: auth has not been provided
 publicScope.get('accountService')
 
 const authenticatedScope = publicScope.createScope({auth})
@@ -138,8 +82,8 @@ InferDI проводит требования через классы, lazy comp
 const app = root
   .registerFactory(
     'requestId',
-    ['request'],
     (c) => c.get('request').requestId,
+    ['request'],
     'scoped'
   )
   .registerAsyncFactory(
@@ -155,8 +99,8 @@ const app = root
 Из-за этого отличается и порядок аргументов:
 
 ```ts
-registerFactory(key, deps, factory, kind)
-registerAsyncFactory(key, factory, deps, kind)
+registerFactory(key, factory, deps, lifetime)
+registerAsyncFactory(key, factory, deps, lifetime)
 ```
 
 ## Владение вложенными скоупами
@@ -220,6 +164,6 @@ function resolveAny<
 - Обязательное свойство со значением `undefined` считается предоставленным. InferDI проверяет наличие свойства, а не truthiness.
 - `createScope(inputs)` делает неглубокий снимок собственных enumerable string- и symbol-свойств. При копировании выполняются getters и Proxy traps, поэтому передавайте обычный объект с данными.
 - Схема существует только в TypeScript. JavaScript, `any` или cast могут добавить неизвестный ключ либо перекрыть регистрацию в кеше дочернего контейнера.
-- Fast Mode поддерживает уточнение inputs, но сохраняет правило неизменяемого графа: завершите регистрацию до первого `.get()` или `.createScope()`.
+- `{fast: true}` поддерживает уточнение inputs, но сохраняет правило фиксированного графа: завершите регистрацию до первого `.get()` или `.createScope()`.
 
-Правила владения описаны в разделе [Скоупы и очистка](./scopes), а async-сервисы с входными данными скоупа — в [Асинхронном графе зависимостей](./async-dependency-graph).
+Правила владения описаны в разделе [Скоупы и освобождение ресурсов](./scopes), а async-сервисы с входными данными скоупа — в [Асинхронных зависимостях](./async-dependencies).

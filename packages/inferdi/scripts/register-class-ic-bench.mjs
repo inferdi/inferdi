@@ -31,7 +31,7 @@ function createCtorPools(size = POOL_SIZES[POOL_SIZES.length - 1]) {
 }
 
 function buildFixture(Container, ctorPools, arity, poolSize, kind, strict) {
-  const container = new Container({strict})
+  const container = new Container(strict ? {} : {fast: true})
   const deps = Array.from({length: arity}, (_, index) => `dep${index}`)
   const dependencySum = arity * (arity + 1) / 2
 

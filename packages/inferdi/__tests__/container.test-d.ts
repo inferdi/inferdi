@@ -1,15 +1,23 @@
 import {describe, it, expectTypeOf} from 'vitest'
 import {
   Container,
+  type AsyncLazy,
+  type AsyncLazySpec,
+  type AsyncSpec,
   type DependenciesMap,
   type Lazy,
   type LazySpec,
+  type Lifetime,
   type Module,
   type ScopeInputMap,
   type Spec,
   type SpecMap,
   type WithRequirements
 } from '../src/Container'
+// @ts-expect-error — RegistrationKind was removed in v6
+import type {RegistrationKind} from '../src/Container'
+
+void ({} as RegistrationKind)
 
 /*
  * ────────────────────────────────────────────────────────────────────────────
@@ -80,6 +88,146 @@ describe('Phase 4 — Container.Resolve', () => {
 
     expectTypeOf<Deps['a']>().toEqualTypeOf<1>()
     expectTypeOf<Deps['logger']>().toEqualTypeOf<L>()
+  })
+})
+
+describe('v6 — lifetime vocabulary and factory-first overloads', () => {
+  it('exposes Lifetime and Spec.lifetime', () => {
+    expectTypeOf<Lifetime>().toEqualTypeOf<'singleton' | 'scoped' | 'transient'>()
+    expectTypeOf<Spec<L, 'scoped'>['lifetime']>().toEqualTypeOf<'scoped'>()
+    // @ts-expect-error — kind was removed from the public Spec shape
+    type RemovedKind = Spec<L>['kind']
+    void ({} as RemovedKind)
+  })
+
+  it('supports all six factory-first call families', () => {
+    const singleton = new Container().registerFactory('value', () => 1 as const)
+    const transient = new Container().registerFactory(
+      'value',
+      () => 1 as const,
+      'transient'
+    )
+    const companion = new Container().registerFactory(
+      'value',
+      () => 1 as const,
+      'singleton',
+      'valueLazy'
+    )
+    const base = new Container().registerValue('dep', 1 as const)
+    const depsDefault = base.registerFactory(
+      'default',
+      (c) => c.get('dep'),
+      ['dep']
+    )
+    const depsLifetime = base.registerFactory(
+      'transient',
+      (c) => c.get('dep'),
+      ['dep'],
+      'transient'
+    )
+    const depsCompanion = base.registerFactory(
+      'singleton',
+      (c) => c.get('dep'),
+      ['dep'],
+      'singleton',
+      'singletonLazy'
+    )
+
+    expectTypeOf(singleton.get('value')).toEqualTypeOf<1>()
+    expectTypeOf(transient.get('value')).toEqualTypeOf<1>()
+    expectTypeOf(companion.get('valueLazy')).toEqualTypeOf<Lazy<1>>()
+    expectTypeOf(depsDefault.get('default')).toEqualTypeOf<1>()
+    expectTypeOf(depsLifetime.get('transient')).toEqualTypeOf<1>()
+    expectTypeOf(depsCompanion.get('singletonLazy')).toEqualTypeOf<Lazy<1>>()
+  })
+
+  it('preserves factory key inference for symbol, broad, and union keys', () => {
+    const token = Symbol('factory')
+    const symbolContainer = new Container().registerFactory(token, () => new L())
+    expectTypeOf(symbolContainer.get(token)).toEqualTypeOf<L>()
+
+    const broad = 'runtime' as string
+    const broadContainer = new Container().registerFactory(broad, () => 1)
+    expectTypeOf(broadContainer.get(broad)).toEqualTypeOf<number>()
+
+    const union = 'left' as 'left' | 'right'
+    const unionContainer = new Container().registerFactory(union, () => true)
+    expectTypeOf(unionContainer.get(union)).toEqualTypeOf<boolean>()
+  })
+
+  it('keeps factory inference across a long fluent chain', () => {
+    const chain = new Container()
+      .registerFactory('f00', () => 0 as const)
+      .registerFactory('f01', () => 1 as const)
+      .registerFactory('f02', () => 2 as const)
+      .registerFactory('f03', () => 3 as const)
+      .registerFactory('f04', () => 4 as const)
+      .registerFactory('f05', () => 5 as const)
+      .registerFactory('f06', () => 6 as const)
+      .registerFactory('f07', () => 7 as const)
+      .registerFactory('f08', () => 8 as const)
+      .registerFactory('f09', () => 9 as const)
+      .registerFactory('f10', () => 10 as const)
+      .registerFactory('f11', () => 11 as const)
+      .registerFactory('f12', () => 12 as const)
+      .registerFactory('f13', () => 13 as const)
+      .registerFactory('f14', () => 14 as const)
+      .registerFactory('f15', () => 15 as const)
+      .registerFactory('f16', () => 16 as const)
+      .registerFactory('f17', () => 17 as const)
+      .registerFactory('f18', () => 18 as const)
+      .registerFactory('f19', () => 19 as const)
+      .registerFactory('f20', () => 20 as const)
+      .registerFactory('f21', () => 21 as const)
+      .registerFactory('f22', () => 22 as const)
+      .registerFactory('f23', () => 23 as const)
+      .registerFactory('f24', () => 24 as const)
+      .registerFactory('f25', () => 25 as const)
+      .registerFactory('f26', () => 26 as const)
+      .registerFactory('f27', () => 27 as const)
+      .registerFactory('f28', () => 28 as const)
+      .registerFactory('f29', () => 29 as const)
+      .registerFactory('f30', () => 30 as const)
+      .registerFactory('f31', () => 31 as const)
+      .registerFactory('f32', () => 32 as const)
+      .registerFactory('f33', () => 33 as const)
+      .registerFactory('f34', () => 34 as const)
+      .registerFactory('f35', () => 35 as const)
+      .registerFactory('f36', () => 36 as const)
+      .registerFactory('f37', () => 37 as const)
+      .registerFactory('f38', () => 38 as const)
+      .registerFactory('f39', () => 39 as const)
+      .registerFactory('f40', () => 40 as const)
+      .registerFactory('f41', () => 41 as const)
+      .registerFactory('f42', () => 42 as const)
+      .registerFactory('f43', () => 43 as const)
+      .registerFactory('f44', () => 44 as const)
+      .registerFactory('f45', () => 45 as const)
+      .registerFactory('f46', () => 46 as const)
+      .registerFactory('f47', () => 47 as const)
+      .registerFactory('f48', () => 48 as const)
+      .registerFactory('f49', () => 49 as const)
+
+    expectTypeOf(chain.get('f00')).toEqualTypeOf<0>()
+    expectTypeOf(chain.get('f49')).toEqualTypeOf<49>()
+  })
+
+  it('exposes only supported contracts and root construction', () => {
+    new Container()
+    new Container({fast: false})
+    new Container({fast: true})
+    // @ts-expect-error — strict was replaced by fast
+    new Container({strict: false})
+    // @ts-expect-error — mode is no longer a public option
+    new Container({mode: 'fast'})
+    // @ts-expect-error — fast accepts booleans only
+    new Container({fast: 'true'})
+    // @ts-expect-error — safe is not a supported fast value
+    new Container({fast: 'safe'})
+    // @ts-expect-error — unknown options require an explicit cast
+    new Container({mode: 'future'})
+    // @ts-expect-error — parent construction is internal to createScope()
+    new Container(new Container())
   })
 })
 
@@ -183,7 +331,7 @@ describe('Phase 4 — duplicate key guard', () => {
   it('re-registering the same key — TS error', () => {
     const c = new Container().registerValue('x', 1)
 
-    // @ts-expect-error — 'x' is already registered, Exclude<K, keyof T> = never
+    // @ts-expect-error — 'x' overlaps an already registered key
     c.registerValue('x', 2)
   })
 
@@ -207,6 +355,38 @@ describe('Phase 4 — duplicate key guard', () => {
     // @ts-expect-error — fooLazy was already added by the lazyKey companion
     c.registerValue('fooLazy', {get: () => new L()})
   })
+
+  it('rejects partially overlapping union and broad primary keys', () => {
+    const c = new Container().registerValue('taken', 1)
+    const unionKey = 'taken' as 'taken' | 'fresh'
+    const broadKey = 'runtime' as string
+
+    if (false) {
+      // @ts-expect-error — value registrations use the same overlap guard
+      c.registerValue(unionKey, 2)
+      // @ts-expect-error — one possible union member is already registered
+      c.registerClass(unionKey, L, [])
+      // @ts-expect-error — a broad string may resolve to the registered key
+      c.registerFactory(broadKey, () => 2)
+      // @ts-expect-error — async registrations use the same overlap guard
+      c.registerAsyncFactory(unionKey, async () => 2, [])
+    }
+  })
+
+  it('rejects partially overlapping lazy companion keys', () => {
+    const c = new Container().registerValue('taken', 1)
+    const existingOrFresh = 'fresh' as 'taken' | 'fresh'
+    const primaryOrCompanion = 'service' as 'service' | 'serviceLazy'
+
+    if (false) {
+      // @ts-expect-error — a lazy key may resolve to an existing graph key
+      c.registerClass('service', L, [], 'singleton', existingOrFresh)
+      // @ts-expect-error — primary and lazy keys may resolve to the same value
+      c.registerFactory('service', () => new L(), 'singleton', primaryOrCompanion)
+      // @ts-expect-error — async lazy companions use the same overlap guard
+      c.registerAsyncFactory('service', async () => new L(), [], 'singleton', existingOrFresh)
+    }
+  })
 })
 
 describe('Phase 4 — Lazy companion via lazyKey', () => {
@@ -224,7 +404,7 @@ describe('Phase 4 — Lazy companion via lazyKey', () => {
   })
 
   it('lazyKey cannot equal the primary key', () => {
-    // @ts-expect-error — Exclude<LK, keyof T | K> rejects key === lazyKey
+    // @ts-expect-error — primary and lazy keys overlap
     new Container().registerClass('foo', L, [], 'singleton', 'foo')
   })
 
@@ -240,11 +420,9 @@ describe('Phase 4 — Lazy companion via lazyKey', () => {
     expectTypeOf(c.get('fooLazy')).toEqualTypeOf<Lazy<L>>()
   })
 
-  it('registerFactory supports the default singleton kind with a lazyKey', () => {
-    const c = new Container().registerFactory('foo', () => new L(), undefined, 'fooLazy')
-
-    expectTypeOf(c.get('foo')).toEqualTypeOf<L>()
-    expectTypeOf(c.get('fooLazy')).toEqualTypeOf<Lazy<L>>()
+  it('registerFactory requires an explicit lifetime with a lazyKey', () => {
+    // @ts-expect-error — companion calls must spell the target lifetime
+    new Container().registerFactory('foo', () => new L(), undefined, 'fooLazy')
   })
 
   it('registerFactory lazyKey cannot equal or collide with another key', () => {
@@ -333,7 +511,7 @@ describe('Phase 4 — symbol keys', () => {
     expectTypeOf(c.get(SYM)).toEqualTypeOf<'x'>()
   })
 
-  it('re-registering the same unique symbol — TS error via Exclude<K, keyof T>', () => {
+  it('re-registering the same unique symbol — TS error via overlap guard', () => {
     const SYM = Symbol('s')
     const c = new Container().registerValue(SYM, 1)
     // @ts-expect-error — duplicate symbol key
@@ -353,11 +531,11 @@ describe('Phase 4 — symbol keys', () => {
     expectTypeOf(c.get('svcLazy')).toEqualTypeOf<Lazy<L>>()
   })
 
-  it('Module<TIn, TOut> with symbol keys', () => {
+  it('Module<TRequirements, TProvides> with symbol keys', () => {
     const CFG = Symbol('cfg')
     const MAILER = Symbol('mailer')
     /*
-     * v3: Module<TIn, TOut> uses the Spec-shaped DependenciesMap directly.
+     * Module<TRequirements, TProvides> uses the Spec-shaped DependenciesMap directly.
      * Wrap flat `{ key: ServiceType }` maps in `SpecMap<...>` to default each
      * entry to singleton
      */
@@ -374,6 +552,182 @@ describe('Phase 4 — symbol keys', () => {
       .registerClass(LOG, L, [])
       .registerClass('repo', R, [])
     c.registerClass('svc', S, ['repo', LOG])
+  })
+})
+
+describe('v6 — requirements-based named modules', () => {
+  type ConfigRequirement = {
+    config: Spec<{env: string}, 'singleton'>
+  }
+  type MailerProvides = {
+    mailer: Spec<L, 'singleton'>
+  }
+
+  const mailerModule: Module<ConfigRequirement, MailerProvides> = (c) => {
+    expectTypeOf(c.get('config')).toEqualTypeOf<{env: string}>()
+    // @ts-expect-error — a named module callback sees requirements only
+    c.get('extra')
+    return c.registerClass('mailer', L, [])
+  }
+
+  it('accepts extra actual registrations and preserves them in the result', () => {
+    const actual = new Container()
+      .registerValue('extra', 1 as const)
+      .registerValue('config', {env: 'test' as const})
+    const result = actual.use(mailerModule)
+
+    expectTypeOf(result.get('extra')).toEqualTypeOf<1>()
+    expectTypeOf(result.get('config')).toEqualTypeOf<{readonly env: 'test'}>()
+    expectTypeOf(result.get('mailer')).toEqualTypeOf<L>()
+  })
+
+  it('rejects missing requirements and output collisions', () => {
+    // @ts-expect-error — config is missing
+    new Container().use(mailerModule)
+
+    const collision = new Container()
+      .registerValue('config', {env: 'test'})
+      .registerClass('mailer', L, [])
+    // @ts-expect-error — mailer collides with the complete actual graph
+    collision.use(mailerModule)
+  })
+
+  it('uses exact lifetime compatibility in both directions', () => {
+    const actualTransient = new Container()
+      .registerFactory('config', () => ({env: 'test'}), 'transient')
+    // @ts-expect-error — transient does not satisfy a singleton requirement
+    actualTransient.use(mailerModule)
+
+    type TransientRequirement = {
+      config: Spec<{env: string}, 'transient'>
+    }
+    const transientModule: Module<TransientRequirement, MailerProvides> =
+      (c) => c.registerClass('mailer', L, [])
+    const actualSingleton = new Container().registerValue('config', {env: 'test'})
+    // @ts-expect-error — singleton does not satisfy a transient requirement
+    actualSingleton.use(transientModule)
+  })
+
+  it('checks sync and async compatibility separately', () => {
+    type SyncRequirement = {dependency: Spec<L>}
+    type AsyncRequirement = {dependency: AsyncSpec<L>}
+    type Output = {output: Spec<string>}
+    const syncModule: Module<SyncRequirement, Output> = (c) =>
+      c.registerFactory('output', () => c.get('dependency').constructor.name)
+    const asyncModule: Module<AsyncRequirement, Output> = (c) =>
+      c.registerValue('output', 'async' as string)
+    const syncActual = new Container().registerClass('dependency', L, [])
+    const asyncActual = new Container().registerAsyncFactory(
+      'dependency',
+      async () => new L(),
+      []
+    )
+
+    // @ts-expect-error — async actual never satisfies a sync requirement
+    asyncActual.use(syncModule)
+    // @ts-expect-error — sync actual does not satisfy an async requirement
+    syncActual.use(asyncModule)
+    expectTypeOf(asyncActual.use(asyncModule).get('output')).toEqualTypeOf<string>()
+  })
+
+  it('refines module outputs from already-provided scope inputs', () => {
+    interface RequestContext {
+      readonly requestId: string
+    }
+    interface AuthContext {
+      readonly userId: string
+    }
+    class PublicHandler {
+      constructor(readonly request: RequestContext) {}
+    }
+    class AccountHandler {
+      constructor(
+        readonly request: RequestContext,
+        readonly auth: AuthContext
+      ) {}
+    }
+    type Inputs = ScopeInputMap<{
+      request: RequestContext
+      auth: AuthContext
+    }>
+    type Provides = {
+      publicHandler: WithRequirements<
+        Spec<PublicHandler, 'scoped'>,
+        'request'
+      >
+      publicHandlerLazy: WithRequirements<
+        LazySpec<PublicHandler, 'scoped'>,
+        'request'
+      >
+      accountHandler: WithRequirements<
+        Spec<AccountHandler, 'scoped'>,
+        'request' | 'auth'
+      >
+    }
+    const handlers: Module<Inputs, Provides> = (c) => c
+      .registerClass(
+        'publicHandler',
+        PublicHandler,
+        ['request'],
+        'scoped',
+        'publicHandlerLazy'
+      )
+      .registerClass(
+        'accountHandler',
+        AccountHandler,
+        ['request', 'auth'],
+        'scoped'
+      )
+    const root = new Container().declareScopeInputs<{
+      request: RequestContext
+      auth: AuthContext
+    }>()
+    const requestScope = root.createScope({
+      request: {requestId: 'request'}
+    })
+    const withHandlers = requestScope.use(handlers)
+
+    expectTypeOf(withHandlers.get('publicHandler')).toEqualTypeOf<PublicHandler>()
+    expectTypeOf(withHandlers.get('publicHandlerLazy')).toEqualTypeOf<Lazy<PublicHandler>>()
+    // @ts-expect-error — auth remains missing
+    withHandlers.get('accountHandler')
+
+    const accountScope = withHandlers.createScope({auth: {userId: 'user'}})
+    expectTypeOf(accountScope.get('accountHandler')).toEqualTypeOf<AccountHandler>()
+  })
+
+  it('preserves async lazy state and symbol or union output keys', () => {
+    const DEP = Symbol('dep')
+    const TARGET = Symbol('target')
+    const TARGET_LAZY = Symbol('targetLazy')
+    const unionKey = 'left' as 'left' | 'right'
+    class AsyncService {
+      constructor(readonly dep: L) {}
+    }
+    type Requirements = SpecMap<Record<typeof DEP, L>>
+    type Provides = {
+      [TARGET]: AsyncSpec<AsyncService>
+      [TARGET_LAZY]: AsyncLazySpec<AsyncService, 'singleton'>
+    }
+    const asyncModule: Module<Requirements, Provides> = (c) =>
+      c.registerAsyncFactory(
+        TARGET,
+        async (dep: L) => new AsyncService(dep),
+        [DEP],
+        'singleton',
+        TARGET_LAZY
+      )
+    const unionModule: Module<Requirements, SpecMap<Record<typeof unionKey, L>>> =
+      (c) => c.registerClass(unionKey, L, [])
+    const actual = new Container()
+      .registerValue(DEP, new L())
+      .registerValue('extra', true as const)
+      .use(asyncModule)
+      .use(unionModule)
+
+    expectTypeOf(actual.get(TARGET_LAZY)).toEqualTypeOf<AsyncLazy<AsyncService>>()
+    expectTypeOf(actual.get(unionKey)).toEqualTypeOf<L>()
+    expectTypeOf(actual.get('extra')).toEqualTypeOf<true>()
   })
 })
 
@@ -425,7 +779,7 @@ describe('Phase 4 — override types', () => {
  * ────────────────────────────────────────────────────────────────────────────
  * v3.0 — Compile-time lifetime guard (Variant C)
  *
- * `AllowedDeps<T, Kind>` filters the visible keyspace inside a registration so
+ * `AllowedDeps<T, L>` filters the visible keyspace inside a registration so
  * that singleton consumers cannot inject scoped/transient deps. The runtime
  * guard in get() still fires for `as`-cast bypasses; these tests cover the
  * TypeScript-level coverage.
@@ -530,7 +884,7 @@ describe('Phase 8 — compile-time lifetime guard', () => {
   })
 
   it('scoped class can depend on a transient class', () => {
-    // Per runtime semantics: scoped/transient targets accept any kind of dep
+    // Per runtime semantics: scoped/transient targets accept any dependency lifetime
     new Container()
       .registerClass('dep', Dep, [], 'transient')
       .registerClass('consumer', Consumer, ['dep'], 'scoped')
@@ -580,16 +934,45 @@ describe('Phase 8 — compile-time lifetime guard', () => {
     }, 'singleton')
   })
 
-  it('an explicit non-singleton generic requires the matching runtime kind', () => {
+  it('an explicit non-singleton generic requires the matching runtime lifetime', () => {
     if (false) {
-      // @ts-expect-error — the type-level kind cannot differ from the omitted runtime default
+      // @ts-expect-error — the type-level lifetime cannot differ from the omitted runtime default
       new Container().registerClass<'dep', Dep, [], 'scoped'>('dep', Dep, [])
-      // @ts-expect-error — the type-level kind cannot differ from the omitted runtime default
+      // @ts-expect-error — the type-level lifetime cannot differ from the omitted runtime default
       new Container().registerFactory<'dep', Dep, 'scoped'>('dep', () => new Dep())
     }
 
     new Container().registerClass<'dep', Dep, [], 'scoped'>('dep', Dep, [], 'scoped')
     new Container().registerFactory<'dep', Dep, 'scoped'>('dep', () => new Dep(), 'scoped')
+  })
+
+  it('treats a target lifetime that may be singleton as singleton-safe', () => {
+    const lifetime: 'singleton' | 'scoped' = Math.random() > 0.5
+      ? 'singleton'
+      : 'scoped'
+    const c = new Container().registerClass('dep', Dep, [], 'scoped')
+
+    // @ts-expect-error — runtime selection may create a singleton consumer
+    c.registerClass('classConsumer', Consumer, ['dep'], lifetime)
+    c.registerFactory('factoryConsumer', (resolver) => {
+      // @ts-expect-error — possibly-singleton factories cannot see scoped keys
+      resolver.get('dep')
+      return new Consumer(new Dep())
+    }, lifetime)
+    // @ts-expect-error — deps-aware factories apply the same conservative filter
+    c.registerFactory('depsFactoryConsumer', () => new Consumer(new Dep()), ['dep'], lifetime)
+    // @ts-expect-error — declarative async factories apply the same filter
+    c.registerAsyncFactory('asyncConsumer', async (dep: Dep) => new Consumer(dep), ['dep'], lifetime)
+  })
+
+  it('allows short-lived lifetime unions to depend on short-lived services', () => {
+    const lifetime: 'scoped' | 'transient' = Math.random() > 0.5
+      ? 'scoped'
+      : 'transient'
+
+    new Container()
+      .registerClass('dep', Dep, [], 'scoped')
+      .registerClass('consumer', Consumer, ['dep'], lifetime)
   })
 })
 
@@ -600,7 +983,7 @@ describe('Phase 8 — Spec / SpecMap helpers', () => {
     expectTypeOf<M['cfg']>().toEqualTypeOf<Spec<{port: number}, 'singleton'>>()
   })
 
-  it('SpecMap with explicit kind sets every entry to that kind', () => {
+  it('SpecMap with an explicit lifetime applies it to every entry', () => {
     type M = SpecMap<{req: {id: string}}, 'scoped'>
     expectTypeOf<M['req']>().toEqualTypeOf<Spec<{id: string}, 'scoped'>>()
   })
@@ -985,7 +1368,7 @@ describe('scope inputs — requirement propagation', () => {
     // @ts-expect-error — a singleton class cannot depend on a scoped input
     root.registerClass('publicService', PublicService, ['request'])
     // @ts-expect-error — a default singleton deps-aware factory cannot select it
-    root.registerFactory('requestId', ['request'], (c) => c.get('request').requestId)
+    root.registerFactory('requestId', (c) => c.get('request').requestId, ['request'])
   })
 
   it('gives deps-aware factories a resolver-only selection view', () => {
@@ -993,7 +1376,7 @@ describe('scope inputs — requirement propagation', () => {
       .registerValue('logger', new L())
       .registerValue('other', 1 as const)
 
-    const built = root.registerFactory('message', ['logger'], (c) => {
+    const built = root.registerFactory('message', (c) => {
       expectTypeOf(c.get('logger')).toEqualTypeOf<L>()
       expectTypeOf(c.has('other')).toEqualTypeOf<boolean>()
       // @ts-expect-error — an unlisted ready dependency is hidden
@@ -1005,7 +1388,7 @@ describe('scope inputs — requirement propagation', () => {
       // @ts-expect-error — the resolver has no disposal API
       c.dispose()
       return 'message' as const
-    })
+    }, ['logger'])
 
     expectTypeOf(built.get('message')).toEqualTypeOf<'message'>()
     // @ts-expect-error — duplicate-key guards still apply to the result key
@@ -1013,7 +1396,7 @@ describe('scope inputs — requirement propagation', () => {
 
     const transientRoot = root.registerClass('transient', L, [], 'transient')
     // @ts-expect-error — the default singleton overload keeps the lifetime filter
-    transientRoot.registerFactory('invalid', ['transient'], () => 'invalid')
+    transientRoot.registerFactory('invalid', () => 'invalid', ['transient'])
   })
 
   it('propagates scoped factory requirements to result and lazy companion', () => {
@@ -1021,8 +1404,8 @@ describe('scope inputs — requirement propagation', () => {
       .declareScopeInputs<{auth: AuthContext}>()
       .registerFactory(
         'userId',
-        ['auth'],
         (c) => c.get('auth').userId,
+        ['auth'],
         'scoped',
         'userIdLazy'
       )

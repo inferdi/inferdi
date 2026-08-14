@@ -27,7 +27,7 @@ export const router = t.router({
  * scope between batched procedures on the same request, breaking later calls.)
  */
 export async function handleTrpcRequest(req: Request): Promise<Response> {
-  await using scope = await createRequestScope(root, {
+  await using scope = createRequestScope(root, {
     requestId: req.headers.get('x-request-id') ?? crypto.randomUUID(),
     userId: req.headers.get('authorization') ?? undefined
   })

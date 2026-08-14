@@ -51,7 +51,7 @@ describe('registerClass construct IC lanes', () => {
       )
 
       for (let lane = 0; lane < constructors.length; lane++) {
-        const container = new Container({strict: false}) as unknown as RuntimeContainer
+        const container = new Container({fast: true}) as unknown as RuntimeContainer
         const deps = Array.from({length: arity}, (_, index) => `a${arity}l${lane}d${index}`)
         const expected = deps.map((_, index) => arity * 1_000 + lane * 10 + index)
 
@@ -65,7 +65,7 @@ describe('registerClass construct IC lanes', () => {
         expect(value.values).toEqual(expected)
       }
 
-      const reused = new Container({strict: false}) as unknown as RuntimeContainer
+      const reused = new Container({fast: true}) as unknown as RuntimeContainer
       const reusedDeps = Array.from({length: arity}, (_, index) => `reused${index}`)
       const reusedExpected = reusedDeps.map((_, index) => arity * 10_000 + index)
       for (let index = 0; index < reusedDeps.length; index++) {
@@ -77,7 +77,7 @@ describe('registerClass construct IC lanes', () => {
       expect(reusedValue.id).toBe(arity * 100)
       expect(reusedValue.values).toEqual(reusedExpected)
 
-      const overflow = new Container({strict: false}) as unknown as RuntimeContainer
+      const overflow = new Container({fast: true}) as unknown as RuntimeContainer
       const overflowDeps = Array.from({length: arity}, (_, index) => `overflow${index}`)
       const overflowExpected = overflowDeps.map((_, index) => arity * 100_000 + index)
       for (let index = 0; index < overflowDeps.length; index++) {

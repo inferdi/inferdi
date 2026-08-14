@@ -1,59 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/zh/reference/errors#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "首页"
-          "item": "https://inferdi.com/zh/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "参考"
-          "item": "https://inferdi.com/zh/reference/api"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "错误"
-          "item": "https://inferdi.com/zh/reference/errors"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/zh/reference/errors#article"
-      "headline": "InferDI 错误参考"
-      "name": "错误"
-      "description": "InferDI 针对依赖图和生命周期误用抛出的每一个明确错误——未知的键、检测到循环、生命周期违规、已释放的容器——附带消息形态，让注册错误在测试中尽早暴露。"
-      "url": "https://inferdi.com/zh/reference/errors"
-      "mainEntityOfPage": "https://inferdi.com/zh/reference/errors"
-      "inLanguage": "zh-CN"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-07-31"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, 错误, 异常, 未知的键, 检测到循环, 生命周期违规, 已释放的容器, 依赖注入"
-      "articleSection": "参考"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # 错误
 
 InferDI 会针对依赖图和生命周期的误用抛出明确的错误。请让这些消息在测试中保持可见，以便注册错误能尽早暴露。
@@ -69,8 +13,13 @@ InferDI 会针对依赖图和生命周期的误用抛出明确的错误。请让
 | 违反单例生命周期 | `Singleton "x" cannot depend on scoped "y"...` |
 | 同步循环依赖 | `Circular dependency detected: a -> b -> a...` |
 | 对异步资源进行同步释放 | `Sync [Symbol.dispose] called on a resource whose .dispose() returned a Promise...` |
+| 对缓存的异步初始化进行同步释放 | `Sync [Symbol.dispose] called on a container that cached a Promise from an async factory...` |
 | 延迟覆盖 | `Cannot override "k" because it has already been resolved...` |
 | 在已释放的容器上覆盖 | `Cannot override on a disposed container (key: "k")` |
+
+同步释放会在报告误用前观察缓存原生 Promise 的 rejection。之后发生的拒绝不会进入 `unhandledRejection`，但同步路径仍无法等待或关闭资源。它也不会调用自定义 Promise-like 值的 `.then()`。
+
+异步释放期间，失败的依赖及其下游注册可能用同一个 `Error` 对象拒绝。InferDI 只报告该对象一次。不同对象仍是 `AggregateError` 中不同的原因，即使消息文本相同。
 
 ## 异步工厂之间的循环
 

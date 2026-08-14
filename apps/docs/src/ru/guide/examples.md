@@ -1,66 +1,6 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ru/guide/examples#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Главная"
-          "item": "https://inferdi.com/ru/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Руководство"
-          "item": "https://inferdi.com/ru/guide/quick-start"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Примеры"
-          "item": "https://inferdi.com/ru/guide/examples"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ru/guide/examples#article"
-      "headline": "Примеры InferDI — паттерны для фреймворков и сред выполнения"
-      "name": "Примеры"
-      "description": "Карта справочных примеров InferDI по бэкендам, API-слоям, full-stack-фреймворкам, средам выполнения, фронтендам и воркерам. Каждая группа показывает, где построить корень, создать scope запроса и очистить его."
-      "url": "https://inferdi.com/ru/guide/examples"
-      "mainEntityOfPage": "https://inferdi.com/ru/guide/examples"
-      "inLanguage": "ru-RU"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, примеры, паттерны, внедрение зависимостей, scope запроса, фреймворки, среды выполнения"
-      "articleSection": "Руководство"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Примеры
 
-Репозиторий хранит примеры как справочные фрагменты только для GitHub. Корневой пакет не устанавливает зависимости фреймворков, не проверяет типы в `examples/` и не публикует этот каталог в npm.
-
-Скопируйте подходящий шаблон в приложение и установите зависимости фреймворка уже там.
-
-Каждая группа ниже повторяет одну директорию в [`examples/`](https://github.com/inferdi/inferdi/tree/main/examples). Откройте страницу группы, чтобы сравнить примеры этой группы на одной странице.
+Выберите границу, которой владеет приложение, и сравните, как в этой экосистеме создаётся, публикуется и освобождается скоуп. Каждая группа соответствует директории в [`examples/`](https://github.com/inferdi/inferdi/tree/main/examples).
 
 ## Начните отсюда
 
@@ -81,3 +21,7 @@ schema:
 Используйте `examples/_shared/container.ts` как граф приложения для серверных примеров. Остальные страницы групп показывают владение жизненным циклом: где scope создаётся, где становится доступен и где очищается.
 
 В серверных и worker-примерах сравнивайте hooks жизненного цикла фреймворка или платформы. Во фронтенд-примерах сравнивайте границы mount и unmount.
+
+::: info Справочные фрагменты
+Корневой workspace не устанавливает все зависимости фреймворков и не проверяет типы в `examples/`. Скопируйте нужный шаблон в приложение, установите его зависимости и адаптируйте общий граф к своим типам.
+:::

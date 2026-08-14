@@ -24,7 +24,7 @@ export const yoga = createYoga<GraphQLContext>({
     }
   }),
   context: async ({ request }) => ({
-    container: await createRequestScope(root, {
+    container: createRequestScope(root, {
       requestId: crypto.randomUUID(),
       userId: request.headers.get('authorization') ?? undefined
     })

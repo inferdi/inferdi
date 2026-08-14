@@ -1,59 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ru/adapters/koa#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Главная"
-          "item": "https://inferdi.com/ru/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Адаптеры"
-          "item": "https://inferdi.com/ru/adapters/"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Адаптер Koa"
-          "item": "https://inferdi.com/ru/adapters/koa"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ru/adapters/koa#article"
-      "headline": "Адаптер Koa для InferDI — @inferdi/koa"
-      "name": "Адаптер Koa"
-      "description": "@inferdi/koa — это middleware для Koa v3: оно создаёт один scope запроса, выставляет его как ctx.state.di и освобождает после события Node response finish или close — с типизированными ключами state и cleanup-хуками."
-      "url": "https://inferdi.com/ru/adapters/koa"
-      "mainEntityOfPage": "https://inferdi.com/ru/adapters/koa"
-      "inLanguage": "ru-RU"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript, Koa v3, @inferdi/inferdi"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, Koa, Koa v3, middleware, ctx.state.di, жизненный цикл ответа, dependency injection"
-      "articleSection": "Адаптеры"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "@inferdi/koa"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js >=18"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Адаптер Koa
 
 [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) - это middleware для Koa v3. Оно создаёт один scope запроса, выставляет его как `ctx.state.di` и очищает после события Node response `finish` или `close`.
@@ -67,17 +11,20 @@ pnpm add -D @types/koa
 
 ```ts
 import Koa from 'koa'
-import { inferdiKoa, type InferdiScopeOf } from '@inferdi/koa'
+import { inferdiKoa, type InferdiKoaState } from '@inferdi/koa'
 ```
 
 ## Scope запроса
 
 ```ts
 const root = buildRootContainer()
+const openRequestScope = (request: RequestContext) =>
+  root.createScope({ request })
+type RequestScope = ReturnType<typeof openRequestScope>
 
 declare module 'koa' {
   interface DefaultState {
-    di: InferdiScopeOf<typeof root>
+    di: RequestScope
   }
 }
 
@@ -85,12 +32,11 @@ const app = new Koa()
 
 app.use(inferdiKoa({
   container: root,
-  setupScope: (scope, ctx) => {
-    const request = scope.get('request')
-    request.requestId = crypto.randomUUID()
-    request.userId = ctx.get('x-user-id') || undefined
-    request.ip = ctx.ip
-  },
+  createScope: (_root, ctx) => openRequestScope({
+    requestId: crypto.randomUUID(),
+    userId: ctx.get('x-user-id') || undefined,
+    ip: ctx.ip
+  })
 }))
 
 app.use(async (ctx) => {
@@ -103,15 +49,23 @@ app.use(async (ctx) => {
 
 ```ts
 import type { DefaultState, ParameterizedContext } from 'koa'
-import { type InferdiKoaState, type InferdiScopeOf } from '@inferdi/koa'
+import { type InferdiKoaState } from '@inferdi/koa'
 
 type AppState =
   & DefaultState
-  & InferdiKoaState<InferdiScopeOf<typeof root>, 'container'>
+  & InferdiKoaState<RequestScope, 'container'>
 
 type AppContext = ParameterizedContext<AppState>
 
-app.use(inferdiKoa({ container: root, key: 'container' }))
+app.use(inferdiKoa({
+  container: root,
+  key: 'container',
+  createScope: (_root, ctx) => openRequestScope({
+    requestId: crypto.randomUUID(),
+    userId: ctx.get('x-user-id') || undefined,
+    ip: ctx.ip
+  })
+}))
 
 app.use(async (ctx: AppContext) => {
   ctx.body = await ctx.state.container.get('users').profile('42')
@@ -125,7 +79,7 @@ app.use(async (ctx: AppContext) => {
 | `container` | обязательна | Корневой контейнер. Middleware его не очищает. |
 | `key` | `'di'` | Ключ в Koa state. |
 | `createScope` | `root.createScope()` | Пользовательское создание scope запроса. |
-| `setupScope` | нет | Наполняет scope до следующего middleware. |
+| `setupScope` | нет | Выполняет дополнительную инициализацию после создания scope. |
 | `disposeScope` | `scope.dispose()` | Пользовательская очистка. |
 | `autoDispose` | `true` | `false` или предикат `false` передаёт владение. |
 | `onDisposeError` | `ctx.app.emit('error')` | Приёмник ошибок очистки. |

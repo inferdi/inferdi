@@ -2,7 +2,7 @@
 
 Use InferDI scopes at page, route, screen, or large feature-module boundaries. Avoid creating a scope for tiny leaf components such as buttons or inputs; pass the page/feature scope down through the framework context mechanism.
 
-Register page/route/screen context and feature view models as `scoped` on the root. When a page or feature mounts, create a scope, hydrate the scoped context instance, and provide that scope to child components.
+Declare page, route, or screen context as scope inputs. Register feature view models as `scoped`, then provide the ready scope to child components when that feature mounts.
 
 Unmount hooks in React, React Native, Vue, and Svelte are synchronous. If a scope may contain async factories or async disposers, call `scope.dispose().catch(console.error)` from the cleanup hook. The framework will not await that promise, but this avoids using synchronous `[Symbol.dispose]()` on a container that may hold async resources.
 

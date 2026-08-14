@@ -48,8 +48,8 @@ A zero-dependency, **decorator-free**, strongly typed DI container for modern Ty
   - [Scopes & Native Teardown](#scopes--native-teardown)
     - [Scope Inputs and Profiles](#scope-inputs-and-profiles)
     - [Async Factories](#async-factories)
-  - [Strict Lifetime Guards](#strict-lifetime-guards)
-    - [Fast Mode: `new Container({ strict: false })`](#fast-mode-new-container-strict-false)
+  - [Runtime Lifetime Guards](#runtime-lifetime-guards)
+    - [`fast` option](#runtime-contracts)
 - **Advanced Usage**
   - [Lazy Injection](#lazy-injection)
   - [Symbol Keys](#symbol-keys)
@@ -79,7 +79,7 @@ InferDI gives TypeScript applications an explicit, typed dependency graph withou
   TypeScript checks constructor arguments, missing keys, duplicate keys, and lifetime boundaries at the registration site.
 
 - 🛑 **Lifetime checks**
-  A singleton cannot depend on a scoped or transient service. TypeScript rejects that graph, and strict mode catches cast-based or dynamic-key bypasses at runtime.
+  A singleton cannot depend on a scoped or transient service. TypeScript rejects that graph, and the default runtime checks catch cast-based or dynamic-key bypasses.
 
 - ♻️ **Native `using` teardown**
   Scopes dispose owned instances in **LIFO order** and collect multiple cleanup failures in one `AggregateError`.
@@ -477,15 +477,15 @@ const container = new Container()
   .registerClass('userRepo', UserRepo, ['pgPool'])
 ```
 
-Factories follow the same lifetime rules as classes — pass the kind as the third argument: `registerFactory('cache', factory, 'scoped')`. An optional fourth `lazyKey` registers the same lifetime-preserving `Lazy<V>` companion as `registerClass`: `registerFactory('cache', factory, 'scoped', 'cacheLazy')`. To use the default singleton lifetime with a companion, pass `undefined` as the kind. Inside a **singleton** factory the container parameter is narrowed via `AllowedDeps<T, 'singleton'>`, so `c.get(...)` accepts singleton keys and singleton-target `Lazy` or `AsyncLazy` companions. Scoped, transient, and possibly short-lived companions are TypeScript errors in that factory body.
+Factories follow the same lifetime rules as classes — pass the lifetime as the third argument: `registerFactory('cache', factory, 'scoped')`. An optional fourth `lazyKey` registers the same lifetime-preserving `Lazy<V>` companion as `registerClass`: `registerFactory('cache', factory, 'singleton', 'cacheLazy')`. A companion always requires an explicit lifetime, including `'singleton'`. Inside a **singleton** factory the container parameter is narrowed via `AllowedDeps<T, 'singleton'>`, so `c.get(...)` accepts singleton keys and singleton-target `Lazy` or `AsyncLazy` companions. Scoped, transient, and possibly short-lived companions are TypeScript errors in that factory body.
 
 Factories that read scope inputs declare those edges with a dependency tuple. The tuple narrows the callback to a resolver-only view and carries input requirements to the result:
 
 ```ts
 root.registerFactory(
   'userId',
-  ['auth'],
   (c) => c.get('auth').userId,
+  ['auth'],
   'scoped'
 )
 ```
@@ -573,15 +573,15 @@ async function handle(request: Request) {
 await root[Symbol.asyncDispose]()           // or: await root.dispose()
 ```
 
-`createScope()` returns a child that owns scoped values. With the default
-`strict: true`, resolving one from the root throws:
+`createScope()` returns a child that owns scoped values. With runtime checks
+enabled by default, resolving one from the root throws:
 
 ```
 Error: Scoped "reqCtx" cannot be resolved from the root container. Use createScope().
 ```
 
-Call `scope.get('reqCtx')`, as in the example above. `strict: false` skips this
-runtime guard together with the cycle and lifetime guards.
+Call `scope.get('reqCtx')`, as in the example above. `{fast: true}` skips this
+runtime guard together with cycle and lifetime checks.
 
 ### Scope Inputs and Profiles
 
@@ -620,11 +620,11 @@ const openAuthenticatedScope = (
 
 `createScope(inputs)` copies enumerable own string and symbol properties into the child cache. A nested child inherits input values but gets a separate cache for scoped services. Input values remain application-owned; disposing the scope does not dispose them. If you refine a scope through another child, dispose the refined child before its parent.
 
-The input schema exists only in TypeScript. JavaScript, `any`, or a cast can seed unknown keys or shadow registrations. Pass a passive data record; getters and Proxy traps run during the shallow snapshot, and reentrant side effects are outside the API contract. Fast Mode supports input refinement, but its existing immutable-graph rule still requires registration to finish before the first `.get()` or `.createScope()`.
+The input schema exists only in TypeScript. JavaScript, `any`, or a cast can seed unknown keys or shadow registrations. Pass a passive data record; getters and Proxy traps run during the shallow snapshot, and reentrant side effects are outside the API contract. `{fast: true}` supports input refinement, but its fixed-graph rule still requires registration to finish before the first `.get()` or `.createScope()`.
 
-Named modules can describe input slots with `ScopeInputMap<M>` and carry requirements in their output with `WithRequirements<Spec<V, Kind>, Keys>`. Generic async-capable resolvers should use `Container.ReadyKeys<Container<T>>`; synchronous resolvers should use `Container.SyncReadyKeys<Container<T>>`. See [MIGRATION.md](./MIGRATION.md) for the `keyof T` migration.
+Named modules can describe input slots with `ScopeInputMap<M>` and carry requirements in their output with `WithRequirements<Spec<V, L>, Keys>`. Generic async-capable resolvers should use `Container.ReadyKeys<Container<T>>`; synchronous resolvers should use `Container.SyncReadyKeys<Container<T>>`. See [MIGRATION.md](./MIGRATION.md) for the `keyof T` migration.
 
-The container probes each owned instance in order: `Symbol.asyncDispose` → `Symbol.dispose` → plain `.dispose()`. If multiple disposers throw, all errors are collected into a single `AggregateError` so one failing resource never leaves the rest unclosed.
+The container probes each owned instance in order: `Symbol.asyncDispose` → `Symbol.dispose` → plain `.dispose()`. If multiple disposers throw, all errors are collected into a single `AggregateError` so one failing resource never leaves the rest unclosed. When dependency failure propagates through several cached Promises, async teardown reports the same `Error` object once; separate error objects remain separate causes.
 
 > **What gets disposed by which container.** Each container disposes only the instances it created. `root.dispose()` does **not** propagate into already-created child scopes — give scopes their own `await using` (or `dispose()` call) to release their resources. Forgetting to dispose a scope leaks every singleton/scoped instance it created.
 
@@ -643,7 +643,7 @@ try {
 
 InferDI supports two Promise models with separate contracts.
 
-Use `registerAsyncFactory` for a declarative async dependency graph. It receives positional dependency values, stores the final service type in `AsyncSpec<V, Kind>`, and propagates async status through dependent classes. Resolve the graph with `getAsync()`; TypeScript rejects `get()` for an async key or a union that may contain one.
+Use `registerAsyncFactory` for a declarative async dependency graph. It receives positional dependency values, stores the final service type in `AsyncSpec<V, L>`, and propagates async status through dependent classes. Resolve the graph with `getAsync()`; TypeScript rejects `get()` for an async key or a union that may contain one.
 
 ```ts
 class Repository {
@@ -684,7 +684,7 @@ const legacy = new Container()
 const promise = legacy.get('dbPromise')
 ```
 
-Owned async singleton/scoped registrations keep their Promise in the cache for the container lifetime. Use `await using`, `await container.dispose()`, or `container[Symbol.asyncDispose]()` even after initialization has fulfilled. Sync `using` cannot unwrap the cached Promise and reports a misuse.
+Owned async singleton/scoped registrations keep their Promise in the cache for the container lifetime. Use `await using`, `await container.dispose()`, or `container[Symbol.asyncDispose]()` even after initialization has fulfilled. Sync `using` cannot unwrap the cached Promise and reports a misuse. Before throwing, it observes a cached native Promise rejection so a later failure does not reach `unhandledRejection`; custom thenables are not assimilated.
 
 Pass a fifth `lazyKey` to `registerAsyncFactory` to create an `AsyncLazy<T>` companion. Resolving or injecting the wrapper does not start the factory. `wrapper.get()` returns the native Promise cached by singleton and scoped targets, so concurrent calls keep the same single-flight identity. Transient targets start once per call and remain caller-owned.
 
@@ -706,17 +706,17 @@ If dependency preflight fails after earlier initializations started, InferDI ret
 
 > The same boundary applies to lifetime checks after `await` in legacy factories or captured-container continuations. `AllowedDeps` protects normal typed code; keep dynamic dependency reads in the synchronous prelude.
 
-## Strict Lifetime Guards
+## Runtime Lifetime Guards
 
-| Kind        | Created                                         | Cached on                | Disposed by container |
+| Lifetime    | Created                                         | Cached on                | Disposed by container |
 | ----------- | ----------------------------------------------- | ------------------------ | --------------------- |
 | `singleton` | once per container that owns the registration | the owner container      | yes |
 | `scoped`    | once per child scope                            | the child scope          | yes |
 | `transient` | every time requested                            | never                    | no (caller owns it)   |
 
-With `strict: true`, `root.get(scopedKey)` throws because the root does not
-represent a scope. Resolve the key from a child returned by `createScope()`.
-Fast mode skips this runtime check.
+With the default `{fast: false}` contract, `root.get(scopedKey)` throws because
+the root does not represent a scope. Resolve the key from a child returned by
+`createScope()`. `{fast: true}` skips this runtime check.
 
 **The Lifetime Rule:** A singleton cannot directly depend on a scoped or transient service. That would freeze a short-lived value inside a long-lived cache. `InferDI` enforces this **at compile time**:
 
@@ -750,34 +750,38 @@ Error: Singleton "userService" cannot depend on scoped "requestCtx".
 Use Lazy<T> (register with a lazyKey companion) to get a fresh instance per access.
 ```
 
-### Fast Mode: `new Container({ strict: false })`
+### Runtime contracts
 
-If you fully trust the compile-time guard and want maximum throughput on the
-hot path, opt out of the runtime cycle / lifetime checks:
+`fast` defaults to `false`:
 
 ```ts
-const root = new Container({ strict: false })
+const defaultRoot = new Container()
+const explicitRoot = new Container({ fast: false })
+```
+
+This checked contract preserves the exact parent chain and keeps the graph
+mutable. Runtime cycle, lifetime, and root-scoped guards remain enabled.
+
+Set `fast: true` only for an audited fixed graph:
+
+```ts
+const root = new Container({ fast: true })
   .registerClass('logger', Logger, [])
 ```
 
-In `strict: false` mode `get()` drops the cycle bookkeeping (`resolving`
-push/pop + `Array#includes`), the singleton-stack push/pop, and the
-surrounding `try`/`finally` from the resolve path. Local transient resolves
-collapse to a bare `fn(this)` call. Fast scopes read the immutable root
-registry directly instead of walking the parent chain; a delegated singleton
-is mirrored into the scope cache after its first resolve. Strict scopes walk
-their exact parent chain on each local miss, so tree mutations remain visible
-without retaining per-scope lookup metadata. Registration skips defensive
-cache invalidation in Fast Mode. Owned-instance identity de-duplication runs
-once on the cold disposal path in both modes instead of scanning the queue
-during instance creation. The flag is inherited by every child created via
-`createScope()`.
+The fast contract drops cycle bookkeeping (`resolving` push/pop plus
+`Array#includes`), singleton-stack tracking, and the surrounding `try`/`finally`
+from guarded resolution. Local transient resolves collapse to `fn(this)`.
+Fixed scopes read the registry owner directly instead of walking the parent
+chain, then mirror delegated singletons into their local cache. The default
+contract walks the exact parent chain on each local miss, so mutations remain
+visible. Fast containers skip defensive registration-time cache invalidation.
+Owned-instance identity de-duplication still runs during disposal. Every child
+created through `createScope()` inherits its parent's contract.
 
-**`strict: true` is a floor under two independent problem classes — not
-just "type-substitution defense".** The compile-time guard covers a strict
-subset of what the runtime guard catches:
+The default runtime checks cover cases outside the compile-time guard:
 
-| Problem | Compile-time | Runtime (`strict: true`) |
+| Problem | Compile-time | Runtime (`fast: false`) |
 |---|---|---|
 | Root container resolves a scoped key | ✗ | ✓ |
 | Singleton depends on scoped/transient directly via `deps` or the narrowed `c` parameter | ✓ | ✓ |
@@ -789,8 +793,8 @@ subset of what the runtime guard catches:
 
 In particular, **the type system cannot see cycles**. A `Singleton →
 Singleton` cycle compiles cleanly (both ends pass the `AllowedDeps`
-filter); only `strict: true` reports it as `Circular dependency detected:
-a -> b -> a`, while `strict: false` lets V8 recurse until
+filter); the default contract reports it as
+`Circular dependency detected: a -> b -> a`, while `{fast: true}` lets V8 recurse until
 `RangeError: Maximum call stack size exceeded`. The same applies to
 `Transient ↔ Transient` cycles, which `AllowedDeps` never filters at all.
 
@@ -803,21 +807,21 @@ const root = new Container().registerClass('req', ReqCtx, [], 'scoped')
 root.registerFactory('logger', () => {
   // `root` here is the wide Container<T>, NOT the narrowed AllowedDeps view.
   // TypeScript happily compiles this:
-  return new Logger(root.get('req'))   // strict mode throws before construction
+  return new Logger(root.get('req'))   // fast: false throws before construction
 }, 'singleton')
 ```
 
-`strict: true` stops this at `root.get('req')` with the root-scope diagnostic.
-`strict: false` allows the read and may retain request state on the root.
+The default contract stops this at `root.get('req')` with the root-scope
+diagnostic. `{fast: true}` allows the read and may retain request state on the root.
 
-**Use `strict: false` only when you're certain that:**
+Use `{fast: true}` only when all of these conditions hold:
 
 - Your graph has no cycles (including `transient ↔ transient`).
 - Every factory reads dependencies **only** through its own `c` parameter —
   no captured outer container references.
 - All registrations go through the fluent API without `as`-casts to bypass
   `AllowedDeps`.
-- Any `Module<TIn, TOut>` declarations honestly describe their input shape.
+- Any `Module<TRequirements, TProvides>` declarations honestly describe their requirements.
 - Each runtime key is registered once through one linear fluent chain; older
   pre-widening container aliases are not reused for duplicate registration.
 - Every `register*` call finishes before the first `.get()` or `.createScope()`.
@@ -825,15 +829,14 @@ root.registerFactory('logger', () => {
   while scopes are live.
 - Child scopes are disposed before their ancestors.
 
-Fast mode deliberately trusts those lifecycle rules. Breaking them can leave a
-child using a stale locally cached singleton or make a post-activation
-registration invisible to descendants.
+The fast contract relies on those topology and lifecycle rules and trusts that
+the graph has no cycles or lifetime violations. Breaking the fixed
+contract can leave a child using a stale locally cached singleton or make a
+post-activation registration invisible to descendants.
 
-**Recommended workflow.** Develop and test in `strict: true` (the default).
-Your runtime tests transitively prove the graph is cycle-free and that no
-factory leaks short-lived state through a captured closure. Only after that
-audit, freeze the graph, and switch to `strict: false` for performance-sensitive
-production builds.
+Develop and test with the default checked mutable contract. Switch an audited,
+immutable production graph to `{fast: true}` only after runtime tests exercise
+its cycles, lifetime boundaries, scopes, overrides, and disposal paths.
 
 ## Lazy Injection
 
@@ -887,12 +890,12 @@ Promise-valued `registerFactory` keeps its synchronous graph contract:
 
 ```ts
 const legacy = new Container()
-  .registerFactory('db', () => connectDatabase(), undefined, 'dbLazy')
+  .registerFactory('db', () => connectDatabase(), 'singleton', 'dbLazy')
 
 legacy.get('dbLazy') // Lazy<Promise<Database>>
 ```
 
-**Lazy companions preserve the target's lifetime.** A singleton consumer may inject only `Lazy<singleton>` and `AsyncLazy<singleton>` companions. The compile-time filter rejects scoped, transient, mixed-lifetime, and managed-plus-unmanaged unions. Strict mode rejects the same short-lived wrapper after a cast bypass. Scoped and transient consumers may use companions for any target lifetime.
+**Lazy companions preserve the target's lifetime.** A singleton consumer may inject only `Lazy<singleton>` and `AsyncLazy<singleton>` companions. The compile-time filter rejects scoped, transient, mixed-lifetime, and managed-plus-unmanaged unions. With `fast: false`, runtime checks reject the same short-lived wrapper after a cast bypass. Scoped and transient consumers may use companions for any target lifetime.
 
 ```ts
 new Container()
@@ -909,7 +912,7 @@ Use [`AsyncLocalStorage`](https://nodejs.org/api/async_context.html) when a sing
 
 ## Symbol Keys
 
-Every `register*` method also accepts a `symbol` for the key. String and symbol keys mix freely in the same container — `deps` arrays, the `lazyKey` companion, factory bodies and `Module<TIn, TOut>` all accept both interchangeably. Using symbols unlocks three patterns that string keys cannot express:
+Every `register*` method also accepts a `symbol` for the key. String and symbol keys mix freely in the same container — `deps` arrays, the `lazyKey` companion, factory bodies and `Module<TRequirements, TProvides>` all accept both interchangeably. Using symbols unlocks three patterns that string keys cannot express:
 
 - **Collision-free private DI.** A local `Symbol(desc)` exists only inside the module that created it. Registering under it makes the service unreachable from outside without explicitly exporting the token.
 - **Cross-module sharing via `Symbol.for(name)`.** Two parts of the codebase agree on a name; `Symbol.for` returns the same token everywhere, so they share identity without importing each other.
@@ -934,7 +937,7 @@ c.get(CACHE)  // typed as RedisPool
 c.get('repo') // typed as UserRepo
 ```
 
-Lazy companions follow the same rule — pass any string or symbol as `lazyKey` to expose the `Lazy<V>` wrapper. The companion key kind does not have to match the primary key kind:
+Lazy companions follow the same rule — pass any string or symbol as `lazyKey` to expose the `Lazy<V>` wrapper. The companion key lifetime does not have to match the primary key lifetime:
 
 ```ts
 const DB       = Symbol('db')
@@ -977,12 +980,12 @@ const appContainer = new Container()
   })
 ```
 
-For named, **fixed-shape** module builders (e.g., test fixtures that always start from a specific base), use the exported `Module<TIn, TOut>` type — `TIn` must match the container's T exactly at the `.use()` call site. Because v3 carries lifetime kind alongside each entry, wrap flat `{ key: ServiceType }` shapes in `SpecMap<...>` (defaults every entry to singleton) or write `Spec<V, 'scoped' | 'transient'>` for mixed-kind modules:
+Named modules use `Module<TRequirements, TProvides>`. The actual graph may contain additional registrations, but every requirement must match by service type, exact lifetime, sync/async mode, lazy mode, and scope-input readiness. The callback sees only `Container<TRequirements>`; the result preserves the complete actual graph and adds `TProvides`. Outputs may not collide with any actual key. Wrap flat singleton requirements in `SpecMap<...>` or use explicit `Spec` entries for mixed lifetimes:
 
 ```ts
 import { Container, type Module, type Spec, type SpecMap } from '@inferdi/inferdi'
 
-// Always invoked on a container whose T is exactly { config: { env: string } } (singleton).
+// Requires config, while the actual graph may contain other registrations.
 const fixtureMailer: Module<SpecMap<{ config: { env: string } }>, SpecMap<{ mailer: Mailer }>> = (c) => {
   const { env } = c.get('config')
   return env === 'test'
@@ -990,7 +993,7 @@ const fixtureMailer: Module<SpecMap<{ config: { env: string } }>, SpecMap<{ mail
     : c.registerClass('mailer', RealMailer, [])
 }
 
-// Mixed-kind: TIn requires a scoped `req` and a singleton `cfg`.
+// Mixed-lifetime requirements: scoped `req` and singleton `cfg`.
 type ReqHandlerIn = SpecMap<{ cfg: Config }> & { req: Spec<ReqCtx, 'scoped'> }
 const reqHandler: Module<ReqHandlerIn, SpecMap<{ handler: Handler }>> = (c) =>
   c.registerClass('handler', Handler, ['cfg', 'req'])
@@ -1000,7 +1003,7 @@ const fixture = new Container()
   .use(fixtureMailer)
 ```
 
-> **Why no portable generic modules?** A function like `<T>(c: Container<T>) => c.registerClass('db', ...)` cannot type-check inside the body — `keyof T` collapses to `string` from the `DependenciesMap` upper bound and `Exclude<'db', string>` becomes `never`, blocking the call. This is the cost of the compile-time uniqueness guarantee on registration. Use inline lambdas for one-shot grouping; use `Module<TIn, TOut>` when input shape is known.
+The compiler reports stable diagnostics for missing requirements, incompatible requirements, and output collisions. Scope-input requirements refine exactly as equivalent inline registrations when the actual graph has already supplied those inputs.
 
 ## Querying with `.has()`
 
@@ -1020,7 +1023,7 @@ For a dynamic graph that may include async keys, use `getAsync()` after the guar
 
 ## Test Overrides
 
-In tests you almost always need to swap a real dependency for a mock. The `Exclude<K, keyof T>` guard on every `register*` method intentionally prevents re-registering a key in production — but in tests it gets in the way. Use `.override(key, value)`:
+In tests you almost always need to swap a real dependency for a mock. The overlap guard on every `register*` method prevents any key type that may name an existing registration. This includes a union with one occupied member and a broad `string` or `symbol` that may resolve to an occupied key. Broad and union keys remain valid when their possible values do not overlap the graph. Use `.override(key, value)` for intentional replacement:
 
 ```ts
 import { Container } from '@inferdi/inferdi'
@@ -1042,10 +1045,10 @@ const c = buildAppContainer()
 c.get('userRepo').save(/* ... */)         // uses the mocks
 ```
 
-**Strict guarantees:**
+**Override guarantees:**
 
 - 🛡️ **Type-safe.** `value` must satisfy the originally registered type (`T[K]`). Mocks have to structurally implement the production interface — no `as any` escape hatch.
-- ⛔ **Local-cache guard.** `.override()` throws if the key already has a value in this container's local cache. This catches locally resolved singleton/scoped registrations, `registerValue`, and repeated overrides. In strict mode, transient resolutions and ancestor-owned values resolved through a child are not cached locally, so the guard cannot observe them. Fast scopes may mirror delegated singletons locally and do not support mutation after activation. Always override **before** resolving the dependency graph; otherwise existing consumers can retain the original value while later resolves see the mock.
+- ⛔ **Local-cache guard.** `.override()` throws if the key already has a value in this container's local cache. This catches locally resolved singleton/scoped registrations, `registerValue`, and repeated overrides. With `fast: false`, transient resolutions and ancestor-owned values resolved through a child are not cached locally, so the guard cannot observe them. Fast scopes may mirror delegated singletons locally and do not support mutation after activation. Always override **before** resolving the dependency graph; otherwise existing consumers can retain the original value while later resolves see the mock.
 - 💥 **Disposed-container guard.** Throws on a disposed container.
 - 🧹 **Externally owned.** Like `registerValue`, the override value is **not** added to the container's disposal queue. The test suite owns the mock's lifetime.
 - 🔒 **Scope-local.** `.override()` mutates only the container it was called on. `root.createScope().override('db', mock)` leaves `root` untouched and is invisible to sibling scopes; a parent-level override propagates via the standard parent walk-up.
@@ -1109,7 +1112,7 @@ The container throws structured errors with actionable messages — surface thes
 | Trigger | Message |
 |---|---|
 | `.get(k)` on unregistered key | `Key "k" not found` |
-| Root resolves a scoped key in strict mode | `Scoped "k" cannot be resolved from the root container. Use createScope().` |
+| Root resolves a scoped key with `fast: false` | `Scoped "k" cannot be resolved from the root container. Use createScope().` |
 | Singleton depends on scoped/transient | `Singleton "x" cannot depend on scoped "y". Use Lazy<T> ...` |
 | Resolution loop (synchronous) | `Circular dependency detected: a -> b -> a. Consider breaking the cycle with Lazy<T> ...` |
 | Resolution loop (declarative async graph) | Rejected with the same synchronous circular-dependency diagnostic during preflight. |
@@ -1119,6 +1122,7 @@ The container throws structured errors with actionable messages — surface thes
 | `createScope()` after dispose | `Cannot create scope from a disposed container` |
 | `register*()` after dispose | `Cannot register on a disposed container (key: "k")` |
 | Sync `[Symbol.dispose]` over an async resource | `Sync [Symbol.dispose] called on a resource whose .dispose() returned a Promise. Use \`await using\` / container.dispose() for async teardown.` |
+| Sync `[Symbol.dispose]` over cached async initialization | `Sync [Symbol.dispose] called on a container that cached a Promise from an async factory. Use \`await using\` / container.dispose() for async teardown.` |
 | `.override()` after first resolve | `Cannot override "k" because it has already been resolved. Overrides must be applied before any .get() calls...` |
 | `.override()` on a disposed container | `Cannot override on a disposed container (key: "k")` |
 
@@ -1138,95 +1142,111 @@ import {
   type AsyncSpec,
   type Module,
   type DependenciesMap,
-  type RegistrationKind,
+  type Lifetime,
   type Spec,
   type SpecMap,
   type ContainerOptions,
 } from '@inferdi/inferdi'
 
+type NoKeyOverlap<
+  Candidate extends PropertyKey,
+  Existing extends PropertyKey
+> = [Candidate & Existing] extends [never] ? unknown : never
+
 class Container<T extends DependenciesMap = Record<never, never>> {
   // Public — use this to construct a root container.
   constructor(options?: ContainerOptions)
-  // Internal overload used by createScope() to wire the parent chain.
-  constructor(parent: Container<T>)
 
-  // Registration — each call returns a Container widened by Record<K, Spec<V, Kind>>.
-  // The `deps` tuple and the factory `c` are narrowed via `AllowedDeps<T, Kind>`:
+  // Registration — each call returns a Container widened by Record<K, Spec<V, L>>.
+  // The `deps` tuple and the factory `c` are narrowed via `AllowedDeps<T, L>`:
   // for a singleton target, only singleton entries and managed Lazy/AsyncLazy
-  // companions whose target kind is exactly 'singleton' are visible.
+  // companions whose target lifetime is exactly 'singleton' are visible.
   registerClass<
     K extends string | symbol,
     V,
     A extends readonly unknown[],
   >(
-    key: Exclude<K, keyof T>,
+    key: K & NoKeyOverlap<K, keyof T>,
     Ctor: new (...args: A) => V,
     deps: DepsOf<AllowedDeps<T, 'singleton'>, A>,
-    kind?: undefined,
+    lifetime?: undefined,
   ): Container<T & Record<K, Spec<V, 'singleton'>>>
 
-  registerClass<K, V, A, Kind extends RegistrationKind>(
-    key: Exclude<K, keyof T>,
+  registerClass<K extends string | symbol, V, A, L extends Lifetime>(
+    key: K & NoKeyOverlap<K, keyof T>,
     Ctor: new (...args: A) => V,
-    deps: DepsOf<AllowedDeps<T, Kind>, A>,
-    kind: Kind,
-  ): Container<T & Record<K, Spec<V, Kind>>>
+    deps: DepsOf<AllowedDeps<T, L>, A>,
+    lifetime: L,
+  ): Container<T & Record<K, Spec<V, L>>>
 
-  // Both registerClass overloads also have a five-argument lazyKey form. The
-  // companion is LazySpec, AsyncLazySpec, or their union based on ClassSpec.
+  // Both registerClass overloads also have a five-argument lazyKey form. It uses
+  // LK & NoKeyOverlap<LK, keyof T | K>; the companion is LazySpec,
+  // AsyncLazySpec, or their union based on ClassSpec.
 
   registerFactory<
     K extends string | symbol,
     V,
   >(
-    key: Exclude<K, keyof T>,
+    key: K & NoKeyOverlap<K, keyof T>,
     factory: (c: Container<AllowedDeps<T, 'singleton'>>) => V,
-    kind?: undefined,
+    lifetime?: undefined,
   ): Container<T & Record<K, Spec<V, 'singleton'>>>
 
-  registerFactory<K, V, Kind extends RegistrationKind>(
-    key: Exclude<K, keyof T>,
-    factory: (c: Container<AllowedDeps<T, Kind>>) => V,
-    kind: Kind,
-  ): Container<T & Record<K, Spec<V, Kind>>>
+  registerFactory<K extends string | symbol, V, L extends Lifetime>(
+    key: K & NoKeyOverlap<K, keyof T>,
+    factory: (c: Container<AllowedDeps<T, L>>) => V,
+    lifetime: L,
+  ): Container<T & Record<K, Spec<V, L>>>
 
-  // Both registerFactory overloads also have a four-argument lazyKey form.
-  // The return type additionally contains Record<LK, LazySpec<V, Kind>>.
+  // Deps-aware families place deps after factory. A lazy companion requires
+  // an explicit lifetime: registerFactory(key, factory, deps?, lifetime, lazyKey).
 
-  registerAsyncFactory<K, A, R>(
-    key: Exclude<K, keyof T>,
+  registerAsyncFactory<
+    K extends string | symbol,
+    A extends readonly unknown[],
+    R,
+  >(
+    key: K & NoKeyOverlap<K, keyof T>,
     factory: (...args: A) => R,
     deps: DepsOf<AllowedDeps<T, 'singleton'>, A>,
-    kind?: undefined
+    lifetime?: undefined
   ): Container<T & Record<K, AsyncSpec<Awaited<R>, 'singleton'>>>
 
-  registerAsyncFactory<K, A, R, Kind extends RegistrationKind>(
-    key: Exclude<K, keyof T>,
+  registerAsyncFactory<
+    K extends string | symbol,
+    A extends readonly unknown[],
+    R,
+    L extends Lifetime,
+  >(
+    key: K & NoKeyOverlap<K, keyof T>,
     factory: (...args: A) => R,
-    deps: DepsOf<AllowedDeps<T, Kind>, A>,
-    kind: Kind
-  ): Container<T & Record<K, AsyncSpec<Awaited<R>, Kind>>>
+    deps: DepsOf<AllowedDeps<T, L>, A>,
+    lifetime: L
+  ): Container<T & Record<K, AsyncSpec<Awaited<R>, L>>>
 
   // Both registerAsyncFactory overloads also have a five-argument lazyKey form.
-  // The return type adds Record<LK, AsyncLazySpec<Awaited<R>, Kind>>.
+  // The return type adds Record<LK, AsyncLazySpec<Awaited<R>, L>>.
 
   registerValue<K extends string | symbol, V>(
-    key: Exclude<K, keyof T>,
+    key: K & NoKeyOverlap<K, keyof T>,
     value: V,
   ): Container<T & Record<K, Spec<V, 'singleton'>>>
 
   // Test-only: replace an existing registration with a static value.
-  // Walks the parent chain to read the original kind and preserves it locally,
+  // Walks the parent chain to read the original lifetime and preserves it locally,
   // so `root.createScope().override('db', mock)` keeps the scoped semantics.
   // Throws if the container is disposed, the key was already resolved, or
   // the key is not registered anywhere in the chain.
   override<K extends keyof T>(key: K, value: T[K]['type']): this
 
-  use<R extends DependenciesMap>(fn: Module<T, R>): Container<T & R>
+  use<R extends DependenciesMap>(fn: (c: Container<T>) => Container<T & R>): Container<T & R>
+  use<Requirements extends DependenciesMap, Provides extends DependenciesMap>(
+    fn: Module<Requirements, Provides>
+  ): Container<T & Provides>
 
   // Scopes & resolution
   createScope(): Container<T>
-  // Sync-ready keys only. In strict mode, scoped keys require a child scope.
+  // Sync-ready keys only. With fast: false, scoped keys require a child scope.
   get<K extends keyof T>(key: K): T[K]['type']
   // Ready sync and declarative async keys; synchronous errors become rejections.
   getAsync<K extends keyof T>(key: K): Promise<Awaited<T[K]['type']>>
@@ -1279,47 +1299,45 @@ namespace Container {
 // Public types
 type Lazy<T> = { readonly get: () => T }
 type AsyncLazy<T> = { readonly get: () => Promise<T> }
-type RegistrationKind = 'singleton' | 'transient' | 'scoped'
+type Lifetime = 'singleton' | 'scoped' | 'transient'
 
 // Construction options.
 interface ContainerOptions {
-  // Toggle runtime cycle / lifetime guard inside get(). Default true.
-  // Inherited by child scopes spawned via createScope().
-  readonly strict?: boolean
+  readonly fast?: boolean
 }
 
-// Single registry entry — service type V plus its lifetime kind. `interface`
+// Single registry entry — service type V plus its lifetime. `interface`
 // (not type alias) so TS caches instantiations across long fluent chains.
-interface Spec<V, K extends RegistrationKind = 'singleton'> {
+interface Spec<V, L extends Lifetime = 'singleton'> {
   readonly type: V
-  readonly kind: K
+  readonly lifetime: L
 }
 
-interface AsyncSpec<V, K extends RegistrationKind = 'singleton'>
-  extends Spec<V, K> {
+interface AsyncSpec<V, L extends Lifetime = 'singleton'>
+  extends Spec<V, L> {
   readonly async: true
 }
 
 // Both managed companion specs also carry a private type-only mode brand.
 // Use these named exports in explicit Container and Module shapes.
-interface LazySpec<V, TargetKind extends RegistrationKind>
+interface LazySpec<V, TargetLifetime extends Lifetime>
   extends Spec<Lazy<V>, 'transient'> {
-  readonly lazyOf: TargetKind
+  readonly lazyOf: TargetLifetime
 }
 
-interface AsyncLazySpec<V, TargetKind extends RegistrationKind>
+interface AsyncLazySpec<V, TargetLifetime extends Lifetime>
   extends Spec<AsyncLazy<V>, 'transient'> {
-  readonly lazyOf: TargetKind
+  readonly lazyOf: TargetLifetime
 }
 
 // Brand a flat `{ key: ServiceType }` map as a SpecMap (defaults to singleton).
-type SpecMap<M, K extends RegistrationKind = 'singleton'> =
-  { [P in keyof M]: Spec<M[P], K> }
+type SpecMap<M, L extends Lifetime = 'singleton'> =
+  { [P in keyof M]: Spec<M[P], L> }
 
-type DependenciesMap = Record<string | symbol, Spec<unknown, RegistrationKind>>
+type DependenciesMap = Record<string | symbol, Spec<unknown, Lifetime>>
 
-type Module<TIn extends DependenciesMap, TOut extends DependenciesMap> =
-  (c: Container<TIn>) => Container<TIn & TOut>
+type Module<TRequirements extends DependenciesMap, TProvides extends DependenciesMap> =
+  (c: Container<TRequirements>) => Container<TRequirements & TProvides>
 ```
 
 ## Repository Structure

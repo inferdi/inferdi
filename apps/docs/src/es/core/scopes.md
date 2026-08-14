@@ -1,79 +1,24 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/es/core/scopes#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Inicio"
-          "item": "https://inferdi.com/es/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Conceptos básicos"
-          "item": "https://inferdi.com/es/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Scopes y limpieza"
-          "item": "https://inferdi.com/es/core/scopes"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/es/core/scopes#article"
-      "headline": "Scopes y limpieza en InferDI"
-      "name": "Scopes y limpieza"
-      "description": "Un scope acota los servicios locales a una petición a una sola unidad de trabajo: un scope hijo hereda cada registro del padre, pero cachea sus propias instancias y es dueño de su limpieza, con disposal en LIFO y soporte para using y await using."
-      "url": "https://inferdi.com/es/core/scopes"
-      "mainEntityOfPage": "https://inferdi.com/es/core/scopes"
-      "inLanguage": "es-ES"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, scopes, limpieza, disposal, scope hijo, using, await using, LIFO, inyección de dependencias"
-      "articleSection": "Conceptos básicos"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
-# Scopes y limpieza
+# Scopes y liberación de recursos
 
 Un scope acota el tiempo de vida de los servicios locales a una petición a una sola unidad de trabajo. Un scope hijo hereda cada registro del padre, pero cachea sus propias instancias con scope y es dueño de su limpieza, de modo que el scope creado para una petición nunca comparte estado con otra ni sobrevive a ella.
 
 ```ts
 const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
   .registerClass('db', Db, [])
-  .registerClass('request', RequestContext, [], 'scoped')
+  .registerClass('handler', RequestHandler, ['request', 'db'], 'scoped')
 
 async function handle(request: Request) {
-  await using scope = root.createScope()
-  const ctx = scope.get('request')
+  await using scope = root.createScope({ request })
+  return scope.get('handler').run()
 }
 ```
 
-`db` es un singleton de raíz. `request` se crea una vez por scope y se libera cuando el scope se libera.
+`db` es un singleton del root. La petición es una entrada externa que sigue perteneciendo a la aplicación, mientras que el scope crea y libera `handler`.
 
-Los registros `scoped` pertenecen a scopes hijos. Con `strict: true` (el valor predeterminado), `root.get('request')` lanza `Scoped "request" cannot be resolved from the root container. Use createScope().` Resuelve la clave desde el contenedor que devuelve `createScope()`. `strict: false` omite esta comprobación en tiempo de ejecución.
+Los registros `scoped` pertenecen a scopes hijos. Con `fast: false` (el valor predeterminado), resolver uno desde el root lanza `Scoped "key" cannot be resolved from the root container. Use createScope().` Resuelve la clave desde el contenedor que devuelve `createScope()`. `fast: true` omite esta comprobación en runtime.
 
-## Inputs de scope y perfiles
+## Entradas de scope
 
 Los inputs de scope representan valores externos que existen al abrir un scope, como una petición, el contexto de autenticación, un tenant o los datos de un job. Decláralos una vez y proporciona el subconjunto necesario mediante `createScope(inputs)`:
 
@@ -86,7 +31,7 @@ await using scope = root.createScope({request})
 scope.get('service')
 ```
 
-El tipo del contenedor registra los inputs proporcionados y oculta los servicios dependientes hasta que estén listos. Consulta [Entradas y perfiles de scope](./scope-inputs) para perfiles con nombre, refinamiento anidado, factorías con dependencias, tipos reutilizables y reglas de validación.
+El tipo del contenedor registra los inputs proporcionados y oculta los servicios dependientes hasta que estén listos. Consulta [Entradas de scope](./scope-inputs) para perfiles con nombre, refinamiento anidado, factorías con dependencias, tipos reutilizables y reglas de validación.
 
 ## Propiedad
 

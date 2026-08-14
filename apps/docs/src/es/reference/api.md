@@ -1,62 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/es/reference/api#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Inicio"
-          "item": "https://inferdi.com/es/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Referencia"
-          "item": "https://inferdi.com/es/reference/api"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Resumen de la API"
-          "item": "https://inferdi.com/es/reference/api"
-    - "@type": "APIReference"
-      "@id": "https://inferdi.com/es/reference/api#article"
-      "headline": "Resumen de la API del core de InferDI"
-      "name": "Resumen de la API"
-      "description": "Resumen de la API v6 de @inferdi/inferdi, incluidas entradas de scope, registerAsyncFactory, resolución según preparación, overrides y dispose."
-      "url": "https://inferdi.com/es/reference/api"
-      "mainEntityOfPage": "https://inferdi.com/es/reference/api"
-      "inLanguage": "es-ES"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "executableLibraryName": "@inferdi/inferdi"
-      "programmingModel": "Registro explícito, builder fluido"
-      "targetPlatform": "Node.js, Bun, Deno, Browser"
-      "keywords": "InferDI, API, Container, declareScopeInputs, ScopeInputMap, registerAsyncFactory, getAsync, AsyncSpec, ReadyKeys, dispose"
-      "articleSection": "Referencia"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Resumen de la API
 
 Esta página resume la API pública del core. Consulta el README del paquete y las declaraciones de TypeScript para ver las definiciones genéricas exactas.
@@ -74,7 +15,7 @@ import {
   type AsyncLazySpec,
   type AsyncSpec,
   type Module,
-  type RegistrationKind,
+  type Lifetime,
   type ScopeInputMap,
   type Spec,
   type SpecMap,
@@ -87,10 +28,12 @@ class Container<T extends DependenciesMap = Record<never, never>> {
   constructor(options?: ContainerOptions)
 
   declareScopeInputs<Inputs>()
-  registerClass(key, Ctor, deps, kind?, lazyKey?)
-  registerFactory(key, factory, kind?, lazyKey?)
-  registerFactory(key, deps, factory, kind?, lazyKey?)
-  registerAsyncFactory(key, factory, deps, kind?, lazyKey?)
+  registerClass(key, Ctor, deps, lifetime?, lazyKey?)
+  registerFactory(key, factory, lifetime?)
+  registerFactory(key, factory, lifetime, lazyKey)
+  registerFactory(key, factory, deps, lifetime?)
+  registerFactory(key, factory, deps, lifetime, lazyKey)
+  registerAsyncFactory(key, factory, deps, lifetime?, lazyKey?)
   registerValue(key, value)
   override(key, value)
   use(fn)
@@ -107,27 +50,32 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 }
 ```
 
+`fast` vale `false` por defecto: mantiene los checks de seguridad en runtime y
+la cadena de padres exacta y mutable. `{fast: true}` desactiva esos checks y
+trata el grafo como fijo, con búsqueda de padres aplanada y mirroring de
+singletons heredados. Los scopes hijos heredan la configuración de la raíz.
+
 ## Métodos de registro
 
 | Método | Entrada del callback | Tipo guardado en el grafo | Resolución |
 | --- | --- | --- | --- |
 | `registerClass` | Argumentos del constructor según `deps` | `Spec` o `AsyncSpec` propagado | `get` o `getAsync` |
 | `registerFactory(key, factory, ...)` | Contenedor filtrado por lifetime | `Spec<ReturnType>` | `get` |
-| `registerFactory(key, deps, factory, ...)` | Resolver limitado a `deps` | `Spec` con requisitos de inputs | `get` |
+| `registerFactory(key, factory, deps, ...)` | Resolver limitado a `deps` | `Spec` con requisitos de inputs | `get` |
 | `registerAsyncFactory` | Valores posicionales resueltos | `AsyncSpec<Awaited<ReturnType>>` | `getAsync` |
 | `registerValue` | Ninguna | `Spec` singleton de propiedad externa | `get` |
 
-`registerClass` y `registerFactory` aceptan los tiempos de vida `singleton`, `scoped` y `transient`, además de un acompañante opcional `lazyKey`. `registerValue` siempre es singleton y de propiedad externa.
+`registerClass` y `registerFactory` aceptan los tiempos de vida `singleton`, `scoped` y `transient`. Un acompañante de `registerFactory` requiere un lifetime explícito, incluido `'singleton'`. `registerValue` siempre es singleton y de propiedad externa.
 
-`registerAsyncFactory` acepta los mismos tiempos de vida y un quinto `lazyKey` opcional. El registro principal guarda el tipo final como `AsyncSpec`; el acompañante tiene tipo `AsyncLazySpec<Awaited<ReturnType>, Kind>`. Resuelve el destino con `getAsync()` y el wrapper con `get()`.
+`registerAsyncFactory` acepta los mismos tiempos de vida y un quinto `lazyKey` opcional. El registro principal guarda el tipo final como `AsyncSpec`; el acompañante tiene tipo `AsyncLazySpec<Awaited<ReturnType>, L>`. Resuelve el destino con `getAsync()` y el wrapper con `get()`.
 
 `registerAsyncFactory` y las llamadas a `registerClass` cuya tupla pueda seleccionar una clave asíncrona requieren dependencias readonly. InferDI clasifica las posiciones asíncronas una vez y conserva la referencia a la tupla. Los literales inline se infieren como readonly; las llamadas síncronas a `registerClass` siguen aceptando tuplas mutables.
 
 `registerAsyncFactory` y el `registerFactory` con dependencias usan distinto orden de argumentos y contrato de callback:
 
 ```ts
-registerFactory(key, deps, resolverFactory, kind, lazyKey)
-registerAsyncFactory(key, valueFactory, deps, kind, lazyKey)
+registerFactory(key, resolverFactory, deps, lifetime, lazyKey)
+registerAsyncFactory(key, valueFactory, deps, lifetime, lazyKey)
 ```
 
 `override` reemplaza un registro y `use` aplica un module builder. La comprobación de tiempo de `override` solo consulta la caché del contenedor actual. Detecta valores singleton/scoped guardados localmente, `registerValue` y overrides repetidos, pero no registra resoluciones transient ni valores propiedad de un ancestro resueltos desde un hijo. Aplica los overrides antes de resolver el grafo de dependencias.
@@ -142,7 +90,7 @@ registerAsyncFactory(key, valueFactory, deps, kind, lazyKey)
 | `getAsync()` | Todas las claves sync y async declarativas que estén listas |
 | `has()` | Cualquier string o symbol; solo demuestra que existe el registro |
 
-`has()` no demuestra que una clave esté lista o sea síncrona. Consulta [Entradas y perfiles de scope](../core/scope-inputs) para el refinamiento del estado de tipos y [Grafo de dependencias asíncrono](../core/async-dependency-graph) para el comportamiento Promise.
+`has()` no demuestra que una clave esté lista o sea síncrona. Consulta [Entradas de scope](../core/scope-inputs) para el refinamiento del estado de tipos y [Dependencias asíncronas](../core/async-dependencies) para el comportamiento Promise.
 
 ## Tipos del namespace
 
@@ -173,42 +121,42 @@ Los resolvers genéricos de v6 deben conservar el conjunto de claves aceptado. U
 ```ts
 type Lazy<T> = { readonly get: () => T }
 type AsyncLazy<T> = { readonly get: () => Promise<T> }
-type RegistrationKind = 'singleton' | 'transient' | 'scoped'
+type Lifetime = 'singleton' | 'scoped' | 'transient'
 type DependenciesMap = Record<
   string | symbol,
-  Spec<unknown, RegistrationKind>
+  Spec<unknown, Lifetime>
 >
 
 interface ContainerOptions {
-  readonly strict?: boolean
+  readonly fast?: boolean
 }
 
-interface Spec<V, K extends RegistrationKind = 'singleton'> {
+interface Spec<V, L extends Lifetime = 'singleton'> {
   readonly type: V
-  readonly kind: K
+  readonly lifetime: L
 }
 
-interface AsyncSpec<V, K extends RegistrationKind = 'singleton'>
-  extends Spec<V, K> {
+interface AsyncSpec<V, L extends Lifetime = 'singleton'>
+  extends Spec<V, L> {
   readonly async: true
 }
 
-interface LazySpec<V, TargetKind extends RegistrationKind>
+interface LazySpec<V, TargetLifetime extends Lifetime>
   extends Spec<Lazy<V>, 'transient'> {
-  readonly lazyOf: TargetKind
+  readonly lazyOf: TargetLifetime
 }
 
-interface AsyncLazySpec<V, TargetKind extends RegistrationKind>
+interface AsyncLazySpec<V, TargetLifetime extends Lifetime>
   extends Spec<AsyncLazy<V>, 'transient'> {
-  readonly lazyOf: TargetKind
+  readonly lazyOf: TargetLifetime
 }
 
-type SpecMap<M, K extends RegistrationKind = 'singleton'> = {
-  [P in keyof M]: Spec<M[P], K>
+type SpecMap<M, L extends Lifetime = 'singleton'> = {
+  [P in keyof M]: Spec<M[P], L>
 }
 
-type Module<TIn extends DependenciesMap, TOut extends DependenciesMap> =
-  (c: Container<TIn>) => Container<TIn & TOut>
+type Module<TRequirements extends DependenciesMap, TProvides extends DependenciesMap> =
+  (c: Container<TRequirements>) => Container<TRequirements & TProvides>
 ```
 
 `LazySpec` y `AsyncLazySpec` incluyen un discriminante privado solo de tipos.

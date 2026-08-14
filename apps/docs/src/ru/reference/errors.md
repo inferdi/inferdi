@@ -1,59 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ru/reference/errors#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Главная"
-          "item": "https://inferdi.com/ru/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Справочник"
-          "item": "https://inferdi.com/ru/reference/api"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Ошибки"
-          "item": "https://inferdi.com/ru/reference/errors"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/ru/reference/errors#article"
-      "headline": "Справочник ошибок InferDI"
-      "name": "Ошибки"
-      "description": "Все явные ошибки, которые InferDI бросает при неправильном использовании графа и жизненного цикла — неизвестный ключ, обнаружен цикл, нарушение времени жизни, очищенный контейнер — с формой сообщения, чтобы ошибки регистрации падали рано в тестах."
-      "url": "https://inferdi.com/ru/reference/errors"
-      "mainEntityOfPage": "https://inferdi.com/ru/reference/errors"
-      "inLanguage": "ru-RU"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-07-31"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, ошибки, исключения, неизвестный ключ, обнаружен цикл, нарушение времени жизни, очищенный контейнер, внедрение зависимостей"
-      "articleSection": "Справочник"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Ошибки
 
 InferDI бросает явные ошибки при неправильном использовании графа и жизненного цикла. Оставляйте эти сообщения видимыми в тестах, чтобы ошибки регистрации падали рано.
@@ -65,12 +9,17 @@ InferDI бросает явные ошибки при неправильном �
 | Resolve через очищенного предка | `Ancestor container is disposed (key: "k")` |
 | `createScope()` после dispose | `Cannot create scope from a disposed container` |
 | Регистрация после dispose | `Cannot register on a disposed container (key: "k")` |
-| Resolve scoped-ключа из root в strict mode | `Scoped "k" cannot be resolved from the root container. Use createScope().` |
+| Resolve scoped-ключа из root при `fast: false` | `Scoped "k" cannot be resolved from the root container. Use createScope().` |
 | Нарушение времени жизни singleton | `Singleton "x" cannot depend on scoped "y"...` |
 | Синхронный цикл | `Circular dependency detected: a -> b -> a...` |
 | Синхронный dispose для async-ресурса | `Sync [Symbol.dispose] called on a resource whose .dispose() returned a Promise...` |
+| Синхронный dispose закешированной async-инициализации | `Sync [Symbol.dispose] called on a container that cached a Promise from an async factory...` |
 | Поздний override | `Cannot override "k" because it has already been resolved...` |
 | Override на очищенном контейнере | `Cannot override on a disposed container (key: "k")` |
+
+Перед сообщением об ошибочном использовании sync dispose подписывается на rejection закешированного нативного Promise. Поздний отказ не попадёт в `unhandledRejection`, но синхронный путь всё равно не может дождаться ресурса или закрыть его. Пользовательский Promise-like объект не запускается через `.then()`.
+
+Во время async dispose зависимость и зависящие от неё регистрации могут отклонить Promise с одним объектом `Error`. InferDI сообщает этот объект один раз. Разные объекты остаются отдельными причинами `AggregateError`, даже если их сообщения совпадают.
 
 ## Циклы async-фабрик
 

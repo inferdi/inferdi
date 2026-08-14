@@ -1,57 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/ru/reference/manifesto#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Главная"
-          "item": "https://inferdi.com/ru/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Справочник"
-          "item": "https://inferdi.com/ru/reference/api"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "Архитектурный манифест ядра InferDI"
-          "item": "https://inferdi.com/ru/reference/manifesto"
-    - "@type": "Article"
-      "@id": "https://inferdi.com/ru/reference/manifesto#article"
-      "headline": "Архитектурный манифест ядра InferDI"
-      "name": "Архитектурный манифест ядра InferDI"
-      "description": "Архитектурный манифест, стоящий за InferDI: всё, что компилятор может проверить статически, должно проверяться статически, при нулевых накладных расходах во время выполнения, нуле зависимостей, нуле декораторов и сознательных компромиссах, которые из этого следуют."
-      "url": "https://inferdi.com/ru/reference/manifesto"
-      "mainEntityOfPage": "https://inferdi.com/ru/reference/manifesto"
-      "inLanguage": "ru-RU"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "keywords": "InferDI, манифест, архитектура, принципы проектирования, безопасность типов, нулевые накладные расходы, нуль зависимостей, внедрение зависимостей"
-      "articleSection": "Справочник"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # Архитектурный манифест ядра InferDI
 
 Этот документ задаёт правила для `@inferdi/inferdi` в `packages/inferdi`. Читайте его перед ревью PR, который меняет публичный API, систему типов, путь resolve в `get()`, форму регистрации, семантику scope или поведение очистки.
@@ -77,8 +23,8 @@ Resolve с попаданием в кеш остаётся быстрым пут
 Каждая публичная сигнатура должна делать неверные состояния графа невыразимыми там, где TypeScript способен выразить правило.
 
 - `register*` использует `K & ([K] extends [keyof T] ? never : unknown)`, чтобы повторные ключи падали при компиляции, а проблемный ключ оставался виден в ошибке.
-- `DepsOf<AllowedDeps<T, Kind>, A>` проверяет кортеж `deps` по позициям конструктора и структурной совместимости.
-- `AllowedDeps<T, Kind>` сужает контейнер, переданный в фабрики. Внутри singleton-фабрики `c.get('scoped')` является ошибкой типов.
+- `DepsOf<AllowedDeps<T, L>, A>` проверяет кортеж `deps` по позициям конструктора и структурной совместимости.
+- `AllowedDeps<T, L>` сужает контейнер, переданный в фабрики. Внутри singleton-фабрики `c.get('scoped')` является ошибкой типов.
 - `Spec`, `AsyncSpec`, `LazySpec`, `SpecMap`, `Module`, `Container.Resolve`, `Container.ResolveUnwrapped`, `Container.UnwrappedValue` и `Container.Providers` входят в контракт. Их изменение считается изменением публичного API.
 - Новая или изменённая публичная поверхность типов требует позитивных тестов типов и негативных `// @ts-expect-error` tests в `packages/inferdi/__tests__/container.test-d.ts`.
 
@@ -96,11 +42,11 @@ InferDI - это обычный TypeScript с таргетом ES2022. Не до
 
 ### 2.3 Время жизни является типом
 
-В core есть три вида регистрации: `singleton`, `scoped` и `transient`. Каждая регистрация несёт своё время жизни через `Spec<V, Kind>`.
+В core есть три вида регистрации: `singleton`, `scoped` и `transient`. Каждая регистрация несёт своё время жизни через `Spec<V, L>`.
 
-- Singleton не должен напрямую зависеть от scoped- или transient-сервиса. `AllowedDeps<T, Kind>` обеспечивает это на этапе компиляции, а `strict: true` - во время выполнения для кастов и динамических регистраций.
+- Singleton не должен напрямую зависеть от scoped- или transient-сервиса. `AllowedDeps<T, L>` обеспечивает это на этапе компиляции, а default `{fast: false}` — во время выполнения для кастов и динамических регистраций.
 - `Lazy<V>` сохраняет время жизни цели. Singleton-потребитель может инжектить только `LazySpec<V, 'singleton'>`. `Lazy<scoped>` и `Lazy<transient>` легальны для scoped- и transient-потребителей и нелегальны для singleton-потребителей.
-- Runtime-флаг `Registration.lazy` должен быть `true` только для lazy companion-регистраций, у которых target kind равен `'singleton'`.
+- Runtime-флаг `Registration.lazy` должен быть `true` только для lazy companion-регистраций, у которых target lifetime равен `'singleton'`.
 - Runtime-флаг `Registration.owned` равен `true` только для class/factory-регистраций, созданное значение которых принадлежит контейнеру. Для `registerValue`, `.override()` и lazy companion он равен `false`.
 - Значения из `registerValue` и `.override()` принадлежат внешнему коду. Они не попадают в очередь teardown.
 - `.override()` - тестовая лазейка. Он должен сохранять исходные `kind` и `lazy`, оставаться локальным для scope, отклонять неизвестные ключи, очищенные контейнеры и ключи, уже resolved на этом контейнере.
@@ -123,7 +69,7 @@ if (cached !== undefined) return ...
 - Вызов конструктора остаётся развёрнутым по arity для 0-7 аргументов. Путь 8+ использует `Reflect.construct` с packed array, собранным через `push`.
 - `get()` остаётся синхронным. Общие `resolving` array и `singletonStack` работают только потому, что resolve и preflight декларативных async-зависимостей атомарно выполняются на call stack. `getAsync()` добавляет Promise-границу вокруг того же resolver и не меняет эти стеки из continuation.
 - Декларативные async-регистрации используют те же `regs`, `cache`, scope lookup, ownership и disposal, что и синхронные. `Registration.async` — холодная метаинформация для классификации зависимостей при регистрации; `get()` её не читает.
-- `strict: false` может убрать runtime-проверки циклов и времени жизни после быстрого пути локального кеша. Fast scope может читать неизменяемый root registry напрямую и зеркалировать delegated singleton в локальный cache. Fast-дерево становится неизменяемым после первого resolve или создания scope.
+- `{fast: false}` — default checked mutable contract. `{fast: true}` убирает проверки циклов и времени жизни после быстрого пути локального кеша, читает registry owner напрямую и зеркалирует delegated singleton. Быстрое дерево неизменяемо после первого resolve или создания scope.
 
 `packages/inferdi/__tests__/container.bench.ts` не проверяется в CI. Ревьюеры должны требовать вывод бенчмарка для изменений в `get()`, форме объекта регистрации, представлении кеша, поиске scope, lazy companions или вызове конструктора. Локальная регрессия больше 5% в релевантном сценарии блокирует merge, если PR не содержит узкого письменного обоснования.
 
@@ -206,7 +152,7 @@ if (cached !== undefined) return ...
 | Нет детекта динамических циклов после Promise-границы             | Декларативные async-зависимости проходят синхронный preflight и используют существующий cycle guard. Вызовы из legacy Promise-valued фабрик или захваченных контейнеров после `await` выполняются после очистки resolve stack. Разделите такой цикл или поднимите общую инициализацию. |
 | Нет runtime-проверки времени жизни после async-границы            | `AllowedDeps` блокирует неверные типизированные фабрики, но `as`-cast и захваченные внешние контейнеры после `await` выполняются уже после очистки `singletonStack`. Полная защита потребовала бы async-context tracking. Читайте зависимости в синхронной части фабрики. |
 | Нет auto-cycle-breaking                                           | Циклы - архитектурные дефекты, если одна сторона не является явным lazy singleton companion. InferDI детектирует поддерживаемые runtime cycles и сообщает о них; он не создаёт proxies или partial instances.                                                     |
-| Нет generic `<T>(c: Container<T>) => ...` modules                 | `keyof T` схлопывается до верхней границы `DependenciesMap` внутри generic body. Используйте inline `.use()` lambdas или `Module<TIn, TOut>` с известной input shape.                                                                                             |
+| Нет generic `<T>(c: Container<T>) => ...` modules                 | `keyof T` схлопывается до верхней границы `DependenciesMap` внутри generic body. Используйте inline `.use()` lambdas или `Module<TRequirements, TProvides>` с объявленными requirements.                                                                         |
 | Нет dynamic DI resolver API                                       | `.has(key)` - разрешённая динамическая проверка. Статические ключи должны напрямую использовать `.get()`.                                                                                                                                                         |
 | Нет production override story                                     | `.override()` существует для тестов и hot-reload fixtures. Выбор production graph должен жить в `.use()` или обычном коде сборщика.                                                                                                                               |
 | Нет каскадного parent-to-child disposal                           | Каждый контейнер владеет своими экземплярами. Каскадный disposal сделал бы `dispose()` нелокальным side effect и сломал бы ownership scope.                                                                                                                       |

@@ -1,59 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/zh/core/modules#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "首页"
-          "item": "https://inferdi.com/zh/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "核心概念"
-          "item": "https://inferdi.com/zh/core/type-safety"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "模块"
-          "item": "https://inferdi.com/zh/core/modules"
-    - "@type": "TechArticle"
-      "@id": "https://inferdi.com/zh/core/modules#article"
-      "headline": "InferDI 中的模块 —— 用 .use() 组合构建器"
-      "name": "模块"
-      "description": "使用 .use() 将庞大的容器构建器拆分成更小的部分，同时在整个流式链路上保持完整的类型推断，并理解为什么泛型模块需要已知的输入形态。"
-      "url": "https://inferdi.com/zh/core/modules"
-      "mainEntityOfPage": "https://inferdi.com/zh/core/modules"
-      "inLanguage": "zh-CN"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-06-15"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "keywords": "InferDI, 模块, use, 容器组合, 类型推断, Module 类型, 依赖注入"
-      "articleSection": "核心概念"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # 模块
 
 使用 `.use()` 可以把一个庞大的容器构建器拆分成更小的部分，同时在整个流式链路上保持类型推断。
@@ -74,7 +18,7 @@ const appContainer = new Container()
 
 ## 具名模块
 
-对于可复用的固定形态模块，请使用导出的 `Module<TIn, TOut>` 类型。
+可复用的具名模块使用 `Module<TRequirements, TProvides>`，只声明所需项和新增项。实际图可以包含额外注册，结果会保留它们。
 
 ```ts
 import {
@@ -83,29 +27,22 @@ import {
   type SpecMap,
 } from '@inferdi/inferdi'
 
-type Base = SpecMap<{ config: { env: string } }>
-type Added = SpecMap<{ mailer: Mailer }>
+type Requirements = SpecMap<{ config: { env: string } }>
+type Provides = SpecMap<{ mailer: Mailer }>
 
-const addMailer: Module<Base, Added> = (c) => {
+const addMailer: Module<Requirements, Provides> = (c) => {
   const { env } = c.get('config')
   return env === 'test'
     ? c.registerClass('mailer', MockMailer, [])
     : c.registerClass('mailer', RealMailer, [])
 }
+
+const app = new Container()
+  .registerValue('config', {env: 'test'})
+  .registerValue('metrics', new Metrics())
+  .use(addMailer) // keeps config + metrics and adds mailer
 ```
 
-像 `<T>(c: Container<T>) => ...` 这样的泛型模块函数无法在函数体内部表达键的唯一性。请使用内联 lambda 或固定形态的 `Module<TIn, TOut>` 声明。
+回调只能看到 `Container<TRequirements>`。要求会按服务类型、精确生命周期、同步/异步模式、managed-lazy 模式和作用域输入就绪状态检查。输出不得与实际图中的任何键冲突；缺少要求、不兼容要求和输出冲突都有具名诊断。
 
-## 动态检查
-
-`.has(key)` 是针对动态键的类型守卫：
-
-```ts
-declare const key: string | symbol
-
-if (container.has(key)) {
-  container.get(key)
-}
-```
-
-`.has()` 从不解析值，并在已释放的容器上返回 `false`。
+如果键在运行时确定，请在解析前使用 [`.has()` 类型守卫](./type-safety#动态键)。

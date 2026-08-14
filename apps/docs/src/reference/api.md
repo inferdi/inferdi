@@ -1,62 +1,3 @@
----
-schema:
-  "@context": "https://schema.org"
-  "@graph":
-    - "@type": "BreadcrumbList"
-      "@id": "https://inferdi.com/reference/api#breadcrumb"
-      "itemListElement":
-        - "@type": "ListItem"
-          "position": 1
-          "name": "Home"
-          "item": "https://inferdi.com/"
-        - "@type": "ListItem"
-          "position": 2
-          "name": "Reference"
-          "item": "https://inferdi.com/reference/api"
-        - "@type": "ListItem"
-          "position": 3
-          "name": "API Summary"
-          "item": "https://inferdi.com/reference/api"
-    - "@type": "APIReference"
-      "@id": "https://inferdi.com/reference/api#article"
-      "headline": "InferDI Core API Summary"
-      "name": "API Summary"
-      "description": "A summary of the @inferdi/inferdi v6 core API, including scope inputs, registerAsyncFactory, readiness-aware resolution, overrides, and disposal."
-      "url": "https://inferdi.com/reference/api"
-      "mainEntityOfPage": "https://inferdi.com/reference/api"
-      "inLanguage": "en-US"
-      "datePublished": "2026-06-12"
-      "dateModified": "2026-08-11"
-      "dependencies": "TypeScript >=5.2, Node.js >=16"
-      "proficiencyLevel": "Intermediate"
-      "executableLibraryName": "@inferdi/inferdi"
-      "programmingModel": "Explicit registration, fluent builder"
-      "targetPlatform": "Node.js, Bun, Deno, Browser"
-      "keywords": "InferDI, API, Container, declareScopeInputs, ScopeInputMap, registerAsyncFactory, getAsync, AsyncSpec, ReadyKeys, dispose"
-      "articleSection": "Reference"
-      "isPartOf":
-        "@type": "WebSite"
-        "@id": "https://inferdi.com/#website"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "about":
-        "@type": "SoftwareApplication"
-        "name": "InferDI"
-        "applicationCategory": "DeveloperApplication"
-        "operatingSystem": "Node.js, Bun, Deno, Browser"
-      "author":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-      "publisher":
-        "@type": "Organization"
-        "name": "InferDI"
-        "url": "https://inferdi.com/"
-        "logo":
-          "@type": "ImageObject"
-          "url": "https://inferdi.com/logo.png"
----
-
 # API Summary
 
 This page summarizes the public core API. See the package README and TypeScript declarations for exact generic definitions.
@@ -74,7 +15,7 @@ import {
   type AsyncLazySpec,
   type AsyncSpec,
   type Module,
-  type RegistrationKind,
+  type Lifetime,
   type ScopeInputMap,
   type Spec,
   type SpecMap,
@@ -87,10 +28,12 @@ class Container<T extends DependenciesMap = Record<never, never>> {
   constructor(options?: ContainerOptions)
 
   declareScopeInputs<Inputs>()
-  registerClass(key, Ctor, deps, kind?, lazyKey?)
-  registerFactory(key, factory, kind?, lazyKey?)
-  registerFactory(key, deps, factory, kind?, lazyKey?)
-  registerAsyncFactory(key, factory, deps, kind?, lazyKey?)
+  registerClass(key, Ctor, deps, lifetime?, lazyKey?)
+  registerFactory(key, factory, lifetime?)
+  registerFactory(key, factory, lifetime, lazyKey)
+  registerFactory(key, factory, deps, lifetime?)
+  registerFactory(key, factory, deps, lifetime, lazyKey)
+  registerAsyncFactory(key, factory, deps, lifetime?, lazyKey?)
   registerValue(key, value)
   override(key, value)
   use(fn)
@@ -107,27 +50,32 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 }
 ```
 
+`fast` defaults to `false`: runtime safety checks stay enabled and scopes keep
+the exact mutable parent chain. `{fast: true}` disables those checks and treats
+the graph as fixed, enabling flattened parent lookup and inherited singleton
+mirroring. Child scopes inherit the root configuration.
+
 ## Registration Methods
 
 | Method | Callback input | Stored graph type | Resolve with |
 | --- | --- | --- | --- |
 | `registerClass` | Constructor arguments from `deps` | `Spec` or propagated `AsyncSpec` | `get` or `getAsync` |
 | `registerFactory(key, factory, ...)` | Lifetime-filtered container | `Spec<ReturnType>` | `get` |
-| `registerFactory(key, deps, factory, ...)` | Resolver limited to `deps` | Requirement-aware `Spec` | `get` |
+| `registerFactory(key, factory, deps, ...)` | Resolver limited to `deps` | Requirement-aware `Spec` | `get` |
 | `registerAsyncFactory` | Resolved positional values | `AsyncSpec<Awaited<ReturnType>>` | `getAsync` |
 | `registerValue` | None | Externally owned singleton `Spec` | `get` |
 
-`registerClass` and `registerFactory` accept `singleton`, `scoped`, and `transient` lifetimes, plus an optional `lazyKey` companion. `registerValue` is always singleton and externally owned.
+`registerClass` and `registerFactory` accept `singleton`, `scoped`, and `transient` lifetimes. A `registerFactory` companion requires an explicit lifetime, including `'singleton'`. `registerValue` is always singleton and externally owned.
 
-`registerAsyncFactory` accepts the same lifetimes and an optional fifth `lazyKey`. It records the final service type as `AsyncSpec`; the companion is `AsyncLazySpec<Awaited<ReturnType>, Kind>`. Dependent classes inherit async status from the target key, while a consumer of the wrapper remains synchronous. Use `getAsync()` for the target and `get()` for the wrapper.
+`registerAsyncFactory` accepts the same lifetimes and an optional fifth `lazyKey`. It records the final service type as `AsyncSpec`; the companion is `AsyncLazySpec<Awaited<ReturnType>, L>`. Dependent classes inherit async status from the target key, while a consumer of the wrapper remains synchronous. Use `getAsync()` for the target and `get()` for the wrapper.
 
 `registerAsyncFactory` and any `registerClass` call whose tuple may select an async key require readonly dependencies. InferDI classifies async positions once and retains the tuple reference. Inline literals infer readonly tuples; sync-only `registerClass` calls keep mutable-tuple compatibility.
 
 `registerAsyncFactory` and the deps-aware `registerFactory` use different argument orders and callback contracts:
 
 ```ts
-registerFactory(key, deps, resolverFactory, kind, lazyKey)
-registerAsyncFactory(key, valueFactory, deps, kind, lazyKey)
+registerFactory(key, resolverFactory, deps, lifetime, lazyKey)
+registerAsyncFactory(key, valueFactory, deps, lifetime, lazyKey)
 ```
 
 `override` replaces an existing registration and `use` applies a module builder. The `override` timing guard checks only the current container's cache. It catches locally cached singleton/scoped values, `registerValue`, and repeated overrides, but it does not record transient resolutions or ancestor-owned values resolved through a child. Apply overrides before resolving the dependency graph.
@@ -142,7 +90,7 @@ registerAsyncFactory(key, valueFactory, deps, kind, lazyKey)
 | `getAsync()` | All ready sync and declarative async keys |
 | `has()` | Any string or symbol; proves registration only |
 
-`has()` does not prove that a key is ready or synchronous. Read [Scope Inputs and Profiles](../core/scope-inputs) for type-state refinement and [Async Dependency Graph](../core/async-dependency-graph) for Promise behavior.
+`has()` does not prove that a key is ready or synchronous. Read [Scope Inputs](../core/scope-inputs) for type-state refinement and [Async Dependencies](../core/async-dependencies) for Promise behavior.
 
 ## Namespace Types
 
@@ -173,42 +121,42 @@ Generic v6 resolvers must preserve the accepted key set. Use `Container.SyncRead
 ```ts
 type Lazy<T> = { readonly get: () => T }
 type AsyncLazy<T> = { readonly get: () => Promise<T> }
-type RegistrationKind = 'singleton' | 'transient' | 'scoped'
+type Lifetime = 'singleton' | 'scoped' | 'transient'
 type DependenciesMap = Record<
   string | symbol,
-  Spec<unknown, RegistrationKind>
+  Spec<unknown, Lifetime>
 >
 
 interface ContainerOptions {
-  readonly strict?: boolean
+  readonly fast?: boolean
 }
 
-interface Spec<V, K extends RegistrationKind = 'singleton'> {
+interface Spec<V, L extends Lifetime = 'singleton'> {
   readonly type: V
-  readonly kind: K
+  readonly lifetime: L
 }
 
-interface AsyncSpec<V, K extends RegistrationKind = 'singleton'>
-  extends Spec<V, K> {
+interface AsyncSpec<V, L extends Lifetime = 'singleton'>
+  extends Spec<V, L> {
   readonly async: true
 }
 
-interface LazySpec<V, TargetKind extends RegistrationKind>
+interface LazySpec<V, TargetLifetime extends Lifetime>
   extends Spec<Lazy<V>, 'transient'> {
-  readonly lazyOf: TargetKind
+  readonly lazyOf: TargetLifetime
 }
 
-interface AsyncLazySpec<V, TargetKind extends RegistrationKind>
+interface AsyncLazySpec<V, TargetLifetime extends Lifetime>
   extends Spec<AsyncLazy<V>, 'transient'> {
-  readonly lazyOf: TargetKind
+  readonly lazyOf: TargetLifetime
 }
 
-type SpecMap<M, K extends RegistrationKind = 'singleton'> = {
-  [P in keyof M]: Spec<M[P], K>
+type SpecMap<M, L extends Lifetime = 'singleton'> = {
+  [P in keyof M]: Spec<M[P], L>
 }
 
-type Module<TIn extends DependenciesMap, TOut extends DependenciesMap> =
-  (c: Container<TIn>) => Container<TIn & TOut>
+type Module<TRequirements extends DependenciesMap, TProvides extends DependenciesMap> =
+  (c: Container<TRequirements>) => Container<TRequirements & TProvides>
 ```
 
 `LazySpec` and `AsyncLazySpec` carry a private type-only mode discriminant in

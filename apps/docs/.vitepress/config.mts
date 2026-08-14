@@ -1,16 +1,114 @@
+import { readFile } from 'node:fs/promises'
 import { defineConfig, type DefaultTheme } from 'vitepress'
 
 const repo = 'https://github.com/inferdi/inferdi'
 const siteUrl = 'https://inferdi.com'
+const websiteId = `${siteUrl}/#website`
+const organizationId = `${siteUrl}/#organization`
+const softwareId = `${siteUrl}/#software`
+const packageUrl = 'https://www.npmjs.com/package/@inferdi/inferdi'
 const base = process.env.DOCS_BASE ?? '/'
 const basePath = base.endsWith('/') ? base.slice(0, -1) : base
 const withBase = (path: `/${string}`) => `${basePath}${path}`
+const seoLocales = {
+  en: {
+    lang: 'en',
+    ogLocale: 'en_US',
+    description: 'A zero-dependency, decorator-free DI container with compiler-checked graphs, explicit lifetimes, and predictable disposal.'
+  },
+  ru: {
+    lang: 'ru',
+    ogLocale: 'ru_RU',
+    description: 'InferDI — DI-контейнер для TypeScript без зависимостей и декораторов, со статической проверкой типов.'
+  },
+  zh: {
+    lang: 'zh-Hans',
+    ogLocale: 'zh_CN',
+    description: 'InferDI 是面向 TypeScript 的零依赖、无装饰器、类型安全 DI 容器。'
+  },
+  ja: {
+    lang: 'ja',
+    ogLocale: 'ja_JP',
+    description: 'InferDI は TypeScript 向けの依存ゼロ、デコレーター不要、型安全な DI コンテナーです。'
+  },
+  es: {
+    lang: 'es',
+    ogLocale: 'es_ES',
+    description: 'InferDI es un contenedor DI para TypeScript, sin dependencias ni decoradores y con comprobación de tipos.'
+  }
+} as const
+type SeoLocale = keyof typeof seoLocales
+
+const localeOf = (relativePath: string): SeoLocale =>
+  relativePath.match(/^(ru|zh|ja|es)\//)?.[1] as SeoLocale ?? 'en'
+
+const unlocalizedPath = (relativePath: string) =>
+  relativePath.replace(/^(ru|zh|ja|es)\//, '')
+
+const localizedPath = (relativePath: string, locale: SeoLocale) => {
+  const route = unlocalizedPath(relativePath)
+  return locale === 'en' ? route : `${locale}/${route}`
+}
+
 const canonicalUrl = (relativePath: string) => {
   const path = relativePath
     .replace(/(^|\/)index\.md$/, '$1')
     .replace(/\.md$/, '')
 
   return new URL(path, `${siteUrl}/`).toString()
+}
+
+const pageSummary = async (relativePath: string, fallback: string) => {
+  if (relativePath === '404.md') return fallback
+
+  const sourceUrl = new URL(`../src/${relativePath}`, import.meta.url)
+  const pageSource = await readFile(sourceUrl, 'utf8')
+  const include = pageSource.trim().match(/^<!--@include:\s+(.+?)-->/)
+  const source = include
+    ? await readFile(new URL(include[1], sourceUrl), 'utf8')
+    : pageSource
+  const body = source
+    .replace(/^---\n[\s\S]*?\n---\n/, '')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/<script\b[\s\S]*?<\/script>/g, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+  const paragraphs = body
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .filter((block) =>
+      block.length > 0 &&
+      !block.startsWith('#') &&
+      !block.startsWith('|') &&
+      !block.startsWith('- ') &&
+      !block.startsWith('>') &&
+      !block.startsWith('<') &&
+      !/^\d+\.\s/.test(block) &&
+      !block.startsWith(':::') &&
+      !block.startsWith('<<<') &&
+      !block.startsWith('<!--')
+    )
+    .map((block) => block
+      .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/<[^>]+>/g, '')
+      .replace(/[`*_]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+    )
+    .filter(Boolean)
+
+  const selected: string[] = []
+  for (const paragraph of paragraphs) {
+    selected.push(paragraph)
+    if (selected.join(' ').length >= 120) break
+  }
+
+  const summary = (selected.join(' ') || fallback).replace(/"/g, "'")
+  if (summary.length <= 160) return summary
+
+  const shortened = summary.slice(0, 159)
+  const wordBoundary = shortened.lastIndexOf(' ')
+  return `${wordBoundary >= 100 ? shortened.slice(0, wordBoundary) : shortened}…`
 }
 
 const enNav: DefaultTheme.NavItem[] = [
@@ -89,15 +187,15 @@ const enSidebar: DefaultTheme.Sidebar = [
     text: 'Core Concepts',
     items: [
       { text: 'Type Safety', link: '/core/type-safety' },
-      { text: 'Lifetime Guards', link: '/core/lifetime-guards' },
-      { text: 'Scopes and Teardown', link: '/core/scopes' },
-      { text: 'Scope Inputs and Profiles', link: '/core/scope-inputs' },
+      { text: 'Lifetimes', link: '/core/lifetime-guards' },
+      { text: 'Scopes and Disposal', link: '/core/scopes' },
+      { text: 'Scope Inputs', link: '/core/scope-inputs' },
       { text: 'Factories', link: '/core/factories' },
-      { text: 'Async Dependency Graph', link: '/core/async-dependency-graph' },
-      { text: 'Modules', link: '/core/modules' },
+      { text: 'Async Dependencies', link: '/core/async-dependencies' },
       { text: 'Lazy Injection', link: '/core/lazy-injection' },
-      { text: 'Symbol Keys', link: '/core/symbol-keys' },
+      { text: 'Modules', link: '/core/modules' },
       { text: 'Testing and Overrides', link: '/core/testing' },
+      { text: 'Symbol Keys', link: '/core/symbol-keys' },
     ],
   },
   {
@@ -154,15 +252,15 @@ const ruSidebar: DefaultTheme.Sidebar = [
     text: 'Базовые принципы',
     items: [
       { text: 'Типобезопасность', link: '/ru/core/type-safety' },
-      { text: 'Контроль времени жизни', link: '/ru/core/lifetime-guards' },
-      { text: 'Скоупы и очистка', link: '/ru/core/scopes' },
-      { text: 'Данные и профили скоупа', link: '/ru/core/scope-inputs' },
+      { text: 'Время жизни', link: '/ru/core/lifetime-guards' },
+      { text: 'Скоупы и освобождение ресурсов', link: '/ru/core/scopes' },
+      { text: 'Входные данные скоупа', link: '/ru/core/scope-inputs' },
       { text: 'Фабрики', link: '/ru/core/factories' },
-      { text: 'Асинхронный граф зависимостей', link: '/ru/core/async-dependency-graph' },
-      { text: 'Модули', link: '/ru/core/modules' },
+      { text: 'Асинхронные зависимости', link: '/ru/core/async-dependencies' },
       { text: 'Ленивое внедрение', link: '/ru/core/lazy-injection' },
+      { text: 'Модули', link: '/ru/core/modules' },
+      { text: 'Тестирование и подмена', link: '/ru/core/testing' },
       { text: 'Символьные ключи', link: '/ru/core/symbol-keys' },
-      { text: 'Тестирование', link: '/ru/core/testing' },
     ],
   },
   {
@@ -219,15 +317,15 @@ const zhSidebar: DefaultTheme.Sidebar = [
     text: '核心概念',
     items: [
       { text: '类型安全', link: '/zh/core/type-safety' },
-      { text: '生命周期守卫', link: '/zh/core/lifetime-guards' },
-      { text: '作用域与清理', link: '/zh/core/scopes' },
-      { text: '作用域输入与配置', link: '/zh/core/scope-inputs' },
+      { text: '生命周期', link: '/zh/core/lifetime-guards' },
+      { text: '作用域与资源释放', link: '/zh/core/scopes' },
+      { text: '作用域输入', link: '/zh/core/scope-inputs' },
       { text: '工厂', link: '/zh/core/factories' },
-      { text: '异步依赖图', link: '/zh/core/async-dependency-graph' },
-      { text: '模块', link: '/zh/core/modules' },
+      { text: '异步依赖', link: '/zh/core/async-dependencies' },
       { text: '惰性注入', link: '/zh/core/lazy-injection' },
-      { text: 'Symbol 键', link: '/zh/core/symbol-keys' },
+      { text: '模块', link: '/zh/core/modules' },
       { text: '测试与覆盖', link: '/zh/core/testing' },
+      { text: 'Symbol 键', link: '/zh/core/symbol-keys' },
     ],
   },
   {
@@ -284,15 +382,15 @@ const jaSidebar: DefaultTheme.Sidebar = [
     text: 'コアコンセプト',
     items: [
       { text: '型安全性', link: '/ja/core/type-safety' },
-      { text: 'ライフタイムガード', link: '/ja/core/lifetime-guards' },
-      { text: 'スコープとクリーンアップ', link: '/ja/core/scopes' },
-      { text: 'スコープ入力とプロファイル', link: '/ja/core/scope-inputs' },
+      { text: 'ライフタイム', link: '/ja/core/lifetime-guards' },
+      { text: 'スコープとリソース破棄', link: '/ja/core/scopes' },
+      { text: 'スコープ入力', link: '/ja/core/scope-inputs' },
       { text: 'ファクトリー', link: '/ja/core/factories' },
-      { text: '非同期依存グラフ', link: '/ja/core/async-dependency-graph' },
-      { text: 'モジュール', link: '/ja/core/modules' },
+      { text: '非同期依存関係', link: '/ja/core/async-dependencies' },
       { text: '遅延注入', link: '/ja/core/lazy-injection' },
-      { text: 'Symbol キー', link: '/ja/core/symbol-keys' },
+      { text: 'モジュール', link: '/ja/core/modules' },
       { text: 'テストとオーバーライド', link: '/ja/core/testing' },
+      { text: 'Symbol キー', link: '/ja/core/symbol-keys' },
     ],
   },
   {
@@ -349,15 +447,15 @@ const esSidebar: DefaultTheme.Sidebar = [
     text: 'Conceptos básicos',
     items: [
       { text: 'Seguridad de tipos', link: '/es/core/type-safety' },
-      { text: 'Guardas de tiempo de vida', link: '/es/core/lifetime-guards' },
-      { text: 'Scopes y limpieza', link: '/es/core/scopes' },
-      { text: 'Entradas y perfiles de scope', link: '/es/core/scope-inputs' },
+      { text: 'Tiempos de vida', link: '/es/core/lifetime-guards' },
+      { text: 'Scopes y liberación de recursos', link: '/es/core/scopes' },
+      { text: 'Entradas de scope', link: '/es/core/scope-inputs' },
       { text: 'Factorías', link: '/es/core/factories' },
-      { text: 'Grafo de dependencias asíncrono', link: '/es/core/async-dependency-graph' },
-      { text: 'Módulos', link: '/es/core/modules' },
+      { text: 'Dependencias asíncronas', link: '/es/core/async-dependencies' },
       { text: 'Inyección perezosa', link: '/es/core/lazy-injection' },
-      { text: 'Claves Symbol', link: '/es/core/symbol-keys' },
+      { text: 'Módulos', link: '/es/core/modules' },
       { text: 'Pruebas y overrides', link: '/es/core/testing' },
+      { text: 'Claves Symbol', link: '/es/core/symbol-keys' },
     ],
   },
   {
@@ -389,8 +487,9 @@ const esSidebar: DefaultTheme.Sidebar = [
 ]
 
 export default defineConfig({
-  title: 'InferDI — Ultra-fast DI for modern TypeScript',
-  description: 'Build apps with next-gen DI for any modern runtime: ultra-fast architecture, clean domain logic, compiler-validated graphs, and first-class testability.',
+  title: 'InferDI — Typed dependency injection for TypeScript',
+  titleTemplate: 'InferDI TypeScript DI',
+  description: seoLocales.en.description,
   base,
   srcDir: './src',
   cacheDir: './.vitepress/cache',
@@ -398,6 +497,22 @@ export default defineConfig({
   cleanUrls: true,
   sitemap: {
     hostname: siteUrl,
+    transformItems(items) {
+      return items.map((item) => {
+        const english = item.links?.find((link) => link.lang === 'en')
+        if (english === undefined || item.links?.some((link) => link.lang === 'x-default')) {
+          return item
+        }
+
+        return {
+          ...item,
+          links: [
+            ...item.links,
+            { lang: 'x-default', url: english.url }
+          ]
+        }
+      })
+    }
   },
   vite: {
     esbuild: {
@@ -415,44 +530,228 @@ export default defineConfig({
   head: [
     ['link', { rel: 'icon', href: withBase('/logo.png') }],
     ['meta', { name: 'theme-color', content: '#5b5ff5' }],
-    ['meta', { property: 'og:url', content: 'https://inferdi.com/' }],
-    ['meta', { property: 'og:type', content: 'website' }],
-    ['meta', { property: 'og:title', content: 'InferDI — The only ultra-fast DI for modern TypeScript' }],
     ['meta', { property: 'og:image', content: 'https://inferdi.com/logo-twitter.png' }],
-    ['meta', { property: 'og:description', content: 'Build apps with next-gen dependency injection for modern runtimes — clean domain logic, compiler-validated graphs, safe lifetimes, and first-class testability without decorators or runtime bloat.' }],
-    ['meta', { property: 'twitter:card', content: 'summary_large_image' }],
-    ['meta', { property: 'twitter:site', content: '@inferdi_ts' }],
-    ['meta', { property: 'twitter:title', content: 'InferDI — The only ultra-fast DI for modern TypeScript' }],
-    ['meta', { property: 'twitter:image', content: 'https://inferdi.com/logo-twitter.png' }],
+    ['meta', { property: 'og:image:alt', content: 'InferDI' }],
+    ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
+    ['meta', { name: 'twitter:site', content: '@inferdi_ts' }],
+    ['meta', { name: 'twitter:image', content: 'https://inferdi.com/logo-twitter.png' }],
+    ['meta', { name: 'twitter:image:alt', content: 'InferDI' }]
   ],
-  transformPageData(pageData) {
-    if (pageData.relativePath === '404.md') return
-
+  async transformPageData(pageData) {
     pageData.frontmatter.head ??= []
+
+    if (pageData.relativePath === '404.md' || pageData.isNotFound) {
+      return
+    }
+
+    const locale = localeOf(pageData.relativePath)
+    const isHome = unlocalizedPath(pageData.relativePath) === 'index.md'
+    if (isHome) pageData.titleTemplate = false
+
+    pageData.description = pageData.frontmatter.description ??
+      await pageSummary(
+        pageData.relativePath,
+        `${pageData.title}. ${seoLocales[locale].description}`
+      )
+
     pageData.frontmatter.head.push([
       'link',
       {
         rel: 'canonical',
-        href: canonicalUrl(pageData.relativePath),
-      },
+        href: canonicalUrl(pageData.relativePath)
+      }
+    ])
+
+    for (const [alternateLocale, metadata] of Object.entries(seoLocales)) {
+      pageData.frontmatter.head.push([
+        'link',
+        {
+          rel: 'alternate',
+          hreflang: metadata.lang,
+          href: canonicalUrl(localizedPath(pageData.relativePath, alternateLocale as SeoLocale))
+        }
+      ])
+    }
+    pageData.frontmatter.head.push([
+      'link',
+      {
+        rel: 'alternate',
+        hreflang: 'x-default',
+        href: canonicalUrl(localizedPath(pageData.relativePath, 'en'))
+      }
     ])
   },
-  async transformHead({ pageData }) {
-    const { schema } = pageData.frontmatter
-    if (schema) {
-      return [
-        [
-          'script',
-          { type: 'application/ld+json' },
-          JSON.stringify(schema)
-        ]
-      ]
+  async transformHead({ pageData, title, description }) {
+    if (pageData.relativePath === '404.md' || pageData.isNotFound) {
+      return [['meta', { name: 'robots', content: 'noindex, nofollow' }]]
     }
+
+    const url = canonicalUrl(pageData.relativePath)
+    const locale = localeOf(pageData.relativePath)
+    const homeLabels = {
+      en: 'Home',
+      ru: 'Главная',
+      zh: '首页',
+      ja: 'ホーム',
+      es: 'Inicio'
+    } as const
+    const localeRoot = canonicalUrl(localizedPath('index.md', locale))
+    const isHome = unlocalizedPath(pageData.relativePath) === 'index.md'
+    const isRootHome = pageData.relativePath === 'index.md'
+    const pageTitle = pageData.title || title
+    const pageDescription = pageData.description || description
+    const sectionRoutes = {
+      guide: 'guide/quick-start.md',
+      core: 'core/type-safety.md',
+      adapters: 'adapters/index.md',
+      reference: 'reference/api.md'
+    } as const
+    const sectionLabels = {
+      en: { guide: 'Guide', core: 'Core Concepts', adapters: 'Adapters', reference: 'Reference', examples: 'Examples' },
+      ru: { guide: 'Руководство', core: 'Базовые принципы', adapters: 'Адаптеры', reference: 'Справочник', examples: 'Примеры' },
+      zh: { guide: '指南', core: '核心概念', adapters: '适配器', reference: '参考', examples: '示例' },
+      ja: { guide: 'ガイド', core: 'コアコンセプト', adapters: 'アダプター', reference: 'リファレンス', examples: '例' },
+      es: { guide: 'Guía', core: 'Conceptos básicos', adapters: 'Adaptadores', reference: 'Referencia', examples: 'Ejemplos' }
+    } as const
+    const routeSegments = unlocalizedPath(pageData.relativePath).replace(/\.md$/, '').split('/')
+    const breadcrumbItems = [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: homeLabels[locale],
+        item: localeRoot
+      }
+    ]
+    const addBreadcrumbParent = (name: string, relativePath: string) => {
+      const item = canonicalUrl(localizedPath(relativePath, locale))
+      if (item === url) return
+
+      breadcrumbItems.push({
+        '@type': 'ListItem',
+        position: breadcrumbItems.length + 1,
+        name,
+        item
+      })
+    }
+
+    if (routeSegments[0] === 'guide' && routeSegments[1] === 'examples') {
+      addBreadcrumbParent(sectionLabels[locale].examples, 'guide/examples.md')
+    } else {
+      const section = routeSegments[0] as keyof typeof sectionRoutes
+      if (section in sectionRoutes) {
+        addBreadcrumbParent(sectionLabels[locale][section], sectionRoutes[section])
+      }
+    }
+
+    breadcrumbItems.push({
+      '@type': 'ListItem',
+      position: breadcrumbItems.length + 1,
+      name: pageTitle,
+      item: url
+    })
+    const breadcrumbSchema = {
+      '@type': 'BreadcrumbList',
+      '@id': `${url}#breadcrumb`,
+      itemListElement: breadcrumbItems
+    }
+    const webPageSchema = {
+      '@type': 'WebPage',
+      '@id': `${url}#webpage`,
+      name: pageTitle,
+      description: pageDescription,
+      url,
+      inLanguage: seoLocales[locale].lang,
+      isPartOf: {
+        '@id': websiteId
+      },
+      about: {
+        '@id': softwareId
+      },
+      ...(!isHome
+        ? { breadcrumb: { '@id': `${url}#breadcrumb` } }
+        : {}),
+      ...(pageData.lastUpdated
+        ? { dateModified: new Date(pageData.lastUpdated).toISOString() }
+        : {})
+    }
+    const schema = {
+      '@context': 'https://schema.org',
+      '@graph': isRootHome
+        ? [
+            {
+              '@type': 'WebSite',
+              '@id': websiteId,
+              url: `${siteUrl}/`,
+              name: 'InferDI',
+              description: pageDescription,
+              publisher: {
+                '@id': organizationId
+              }
+            },
+            {
+              '@type': 'Organization',
+              '@id': organizationId,
+              name: 'InferDI',
+              url: `${siteUrl}/`,
+              logo: {
+                '@type': 'ImageObject',
+                url: `${siteUrl}/logo.png`
+              },
+              sameAs: [
+                repo,
+                'https://twitter.com/inferdi_ts'
+              ]
+            },
+            {
+              '@type': 'SoftwareApplication',
+              '@id': softwareId,
+              name: 'InferDI',
+              applicationCategory: 'DeveloperApplication',
+              operatingSystem: 'Node.js, Bun, Deno, Browser, Edge runtimes',
+              softwareVersion: '6.0.0',
+              programmingLanguage: 'TypeScript',
+              url: `${siteUrl}/`,
+              downloadUrl: packageUrl,
+              description: pageDescription,
+              license: `${repo}/blob/main/LICENSE`,
+              author: {
+                '@id': organizationId
+              },
+              offers: {
+                '@type': 'Offer',
+                price: 0,
+                url: packageUrl
+              }
+            },
+            webPageSchema
+          ]
+        : isHome
+          ? [webPageSchema]
+          : [breadcrumbSchema, webPageSchema]
+    }
+
+    return [
+      ['meta', { property: 'og:site_name', content: 'InferDI' }],
+      ['meta', { property: 'og:url', content: url }],
+      ['meta', { property: 'og:type', content: isHome ? 'website' : 'article' }],
+      ['meta', { property: 'og:title', content: title }],
+      ['meta', { property: 'og:description', content: pageDescription }],
+      ['meta', { property: 'og:locale', content: seoLocales[locale].ogLocale }],
+      ...Object.values(seoLocales)
+        .filter((metadata) => metadata.ogLocale !== seoLocales[locale].ogLocale)
+        .map((metadata) => [
+          'meta',
+          { property: 'og:locale:alternate', content: metadata.ogLocale }
+        ] as ['meta', Record<string, string>]),
+      ['meta', { name: 'twitter:title', content: title }],
+      ['meta', { name: 'twitter:description', content: pageDescription }],
+      ['script', { type: 'application/ld+json' }, JSON.stringify(schema)]
+    ]
   },
   markdown: {
     externalLinks: {
       target: '_blank',
-      rel: 'nofollow noopener noreferrer'
+      rel: 'noopener noreferrer'
     }
   },
   themeConfig: {
@@ -570,7 +869,7 @@ export default defineConfig({
   locales: {
     root: {
       label: 'English',
-      lang: 'en-US',
+      lang: 'en',
       themeConfig: {
         nav: enNav,
         sidebar: enSidebar,
@@ -592,9 +891,10 @@ export default defineConfig({
     },
     zh: {
       label: '简体中文',
-      lang: 'zh-CN',
+      lang: 'zh-Hans',
+      title: 'InferDI — TypeScript 类型安全依赖注入',
       link: '/zh/',
-      description: 'InferDI 简体中文文档。',
+      description: seoLocales.zh.description,
       themeConfig: {
         nav: zhNav,
         sidebar: zhSidebar,
@@ -620,9 +920,10 @@ export default defineConfig({
     },
     ja: {
       label: '日本語',
-      lang: 'ja-JP',
+      lang: 'ja',
+      title: 'InferDI — TypeScript の型安全な依存性注入',
       link: '/ja/',
-      description: 'InferDI の日本語ドキュメント。',
+      description: seoLocales.ja.description,
       themeConfig: {
         nav: jaNav,
         sidebar: jaSidebar,
@@ -648,9 +949,10 @@ export default defineConfig({
     },
     es: {
       label: 'Español',
-      lang: 'es-ES',
+      lang: 'es',
+      title: 'InferDI — Inyección de dependencias tipada para TypeScript',
       link: '/es/',
-      description: 'Documentación de InferDI en español.',
+      description: seoLocales.es.description,
       themeConfig: {
         nav: esNav,
         sidebar: esSidebar,
@@ -676,9 +978,10 @@ export default defineConfig({
     },
     ru: {
       label: 'Русский',
-      lang: 'ru-RU',
+      lang: 'ru',
+      title: 'InferDI — Типобезопасный DI-контейнер для TypeScript',
       link: '/ru/',
-      description: 'Документация InferDI на русском языке.',
+      description: seoLocales.ru.description,
       themeConfig: {
         nav: ruNav,
         sidebar: ruSidebar,
