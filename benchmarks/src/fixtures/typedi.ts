@@ -1,5 +1,5 @@
 import 'reflect-metadata'
-import { Service, Inject } from 'typedi'
+import { Container, Service, Inject } from 'typedi'
 
 /*
  * No-op decorator for classes registered manually via Container.of(id).set(...).
@@ -11,6 +11,13 @@ const ForceMetadata = (): ClassDecorator => () => {}
 export class Logger {
   log(_msg: string): void {}
 }
+
+export const ROOT_LOGGER_TOKEN = 'tdi.rootLogger'
+Container.set({
+  id: ROOT_LOGGER_TOKEN,
+  factory: () => Container.get(Logger),
+  global: true
+})
 
 @Service()
 export class Config {
@@ -39,7 +46,13 @@ export class TransientService {
  */
 @ForceMetadata()
 export class ScopedService {
-  constructor(public logger: Logger) {}
+  public disposeCount = 0
+
+  constructor(@Inject(ROOT_LOGGER_TOKEN) public logger: Logger) {}
+
+  [Symbol.dispose](): void { this.disposeCount++ }
+  dispose(): void { this.disposeCount++ }
+  destroy(): void { this.disposeCount++ }
 }
 
 // Wide4: root transient + singleton dependencies (see scenario 4a)

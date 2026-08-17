@@ -91,31 +91,30 @@ InferDI gives TypeScript applications an explicit, typed dependency graph withou
 
 InferDI keeps the hot path small: static type checks replace runtime reflection, resolve avoids `Proxy` traps, and constructors with 0-7 dependencies use direct `new Ctor(...)` calls. The benchmark suite measures the result across common DI workloads.
 
-The [`benchmarks/`](https://github.com/inferdi/inferdi/tree/main/benchmarks) workspace compares InferDI with **InversifyJS v8, Awilix v13 (PROXY and CLASSIC), TSyringe v4, TypeDI v0.10, and Typed Inject v5**. Numbers show operations per second on Node 22. Higher values win. Run `cd benchmarks && pnpm install --frozen-lockfile && pnpm run bench` to reproduce them.
+The [`benchmarks/`](https://github.com/inferdi/inferdi/tree/main/benchmarks) workspace compares InferDI with InversifyJS, Awilix, TSyringe, TypeDI, and Typed Inject. It reports the default `InferDI checked` contract and opt-in `InferDI fast` contract as separate subjects.
 
-![benchmarks](https://raw.githubusercontent.com/inferdi/inferdi/main/assets/benchmarking_results.png)
+The public runner builds InferDI's production ESM artifact, validates every adapter's dependency identities, and runs a balanced Latin-square block of eight rounds with every subject measured in a fresh Node process. Each subject occupies every process position once; each measurement uses a 50 ms warmup and a 100 ms timing window. The report publishes median `ns/op` and MAD for each workload. Registration, first resolve, scope creation, scoped resolve, and teardown remain separate tables; unsupported operations appear as `N/A`.
 
-| Scenario                                              | InferDI    | InversifyJS | Typed Inject | Awilix (PROXY) | Awilix (CLASSIC) | TSyringe | TypeDI |
-|-------------------------------------------------------|------------|-------------|--------------|----------------|------------------|----------|--------|
-| **1. Hot singleton resolve** (warm cache)             | **14.3 M** | 10.7 M      | 7.0 M        | 7.3 M          | 6.7 M            | 5.8 M    | 6.45 M |
-| **2. Transient resolve** (new instance per call)      | **9.75 M** | 6.1 M       | 4.1 M        | 3.45 M         | 3.0 M            | 2.5 M    | 1.6 M  |
-| **3. Deep graph** (10 levels, all transient)          | **2.3 M**  | 1.5 M       | 1.3 M        | 716 k          | 736 k            | 643 k    | 222 k  |
-| **4a. Wide graph** (4 deps, root transient)           | **8.25 M** | 4.9 M       | 3.4 M        | 2.2 M          | 2.3 M            | 1.65 M   | 1.1 M  |
-| **4b. Wide graph** (10 deps, root transient)          | **3.5 M**  | 1.9 M       | 2.6 M        | 1.2 M          | 1.3 M            | 938 k    | 458 k  |
-| **5. Container build + first resolve**                | **400 k**  | 13.2 k      | 223 k        | 10 k           | 8.3 k            | 206 k    | 282 k  |
-| **6. Scoped lifecycle** (create + resolve + cleanup)  | **2.85 M** | 35 k        | 2.45 M       | 330 k          | 430 k            | 1.1 M    | 665 k  |
-| **7. Lazy resolve** (deferred wrapper)                | **11.8 M** | 7.6 M       | 7.15 M       | 5.6 M          | 4.7 M            | 4.25 M   | 2.85 M |
+![benchmarks](https://raw.githubusercontent.com/inferdi/inferdi/main/assets/benchmarking_results.jpg)
 
-### Highlights
+| Scenario                     | InferDI (fast) | InferDI (default) | InversifyJS | Awilix PROXY | Awilix CLASSIC | TSyringe | TypeDI | Typed Inject |
+|------------------------------|---------------:|------------------:|------------:|-------------:|---------------:|---------:|-------:|-------------:|
+| Hot singleton resolve        |          1.00× |             1.00× |       1.76× |        6.49× |          6.66× |   13.05× | 11.51× |        7.76× |
+| Transient resolve            |          1.00× |             1.10× |       1.90× |        5.26× |          5.43× |    7.21× | 12.43× |        3.30× |
+| Deep graph (10 levels)       |          1.00× |             1.29× |       1.15× |        3.79× |          3.46× |    4.25× | 13.01× |        2.09× |
+| Wide graph (4 dependencies)  |          1.00× |             1.20× |       1.73× |        5.56× |          5.08× |    7.69× | 14.49× |        3.32× |
+| Wide graph (10 dependencies) |          1.00× |             1.07× |       2.09× |        3.62× |          3.03× |    5.20× | 11.86× |        1.71× |
+| Registration                 |          1.00× |             1.08× |      30.52× |       37.24× |         47.43× |    1.87× |    N/A |        1.79× |
+| First resolve                |          1.00× |             1.22× |      15.26× |        3.73× |          4.66× |    1.89× |  5.09× |        1.95× |
+| Scope creation               |          1.00× |             1.05× |      77.67× |       13.22× |         12.93× |    6.31× |  5.26× |        2.06× |
+| First scoped resolve         |          1.00× |             1.12× |      26.50× |        3.07× |          3.15× |    3.25× |  2.57× |        1.76× |
+| Warm scoped resolve          |          1.05× |             1.03× |       3.79× |       11.39× |         11.94× |    9.83× | 11.61× |        1.00× |
+| Sync teardown                |          1.01× |             1.00× |         N/A |          N/A |            N/A |      N/A |  1.27× |          N/A |
+| Async teardown               |          1.00× |             1.03× |         N/A |        3.54× |          3.65× |    5.40× |    N/A |        2.97× |
+| Lazy resolve                 |          1.00× |             1.01× |       3.41× |        6.14× |          6.59× |    8.23× | 14.39× |        4.06× |
 
-- **1.34× faster cached singleton resolve** than InversifyJS, the closest result in this scenario. InferDI reads a warm service from `Map.get()` without metadata lookup or a parent-chain walk.
-- **30× faster container build plus first resolve** than InversifyJS, and up to **48× faster** than Awilix. InferDI registers the graph from scratch through `Map.set` calls.
-- **Wide graphs stay competitive as arity grows.** With four dependencies, InferDI leads the next result by **1.68×**. With ten dependencies, it uses `Reflect.construct` and remains **1.35× ahead** of Typed Inject.
-- **InferDI leads all eight measured scenarios.** It leads the ten-level graph by **1.53×** over InversifyJS and the scoped lifecycle by **1.16×** over Typed Inject. The lifecycle result includes a synchronous `Symbol.dispose` call on each iteration.
-- **Typed Inject remains the closest baseline for scoped flows and 10-dependency graphs.** InversifyJS provides the closest result in several other resolve workloads.
-- **Scenario 5 measures different setup costs.** TypeDI and TSyringe register classes through decorator side effects at module evaluation. Their benchmark result measures child-context creation, while InferDI registers the full graph before the first resolve.
-
-Full methodology, fairness notes, fixture sources, and per-scenario reasoning: see [`benchmarks/README.md`](https://github.com/inferdi/inferdi/blob/main/benchmarks/README.md).
+> **ℹ️ Source data**
+> We generated the image and summary table above from [`benchmarks/results/public-2026-08-17T16-46-00-483Z.json`](https://github.com/inferdi/inferdi/blob/main/benchmarks/results/public-2026-08-17T16-46-00-483Z.json). Open the raw result to inspect the eight rounds, each scenario's normalized `ns/op` measurements and Tinybench samples, plus the recorded environment and dependency versions. The [`benchmarks/README.md`](https://github.com/inferdi/inferdi/blob/main/benchmarks/README.md) explains the workloads and aggregation method.
 
 ## Install
 

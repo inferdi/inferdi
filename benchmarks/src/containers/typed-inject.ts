@@ -5,12 +5,8 @@ import {
   L0, L1, L2, L3, L4, L5, L6, L7, L8, L9,
   LazyConsumer
 } from '../fixtures/typed-inject.js'
-import type { Resolver } from './types.js'
+import type { ColdGraph, Resolver, ScopeHandle } from './types.js'
 
-/*
- * Lazy for typed-inject: the factory must declare a static `inject` array (zero-reflection).
- * We attach it via `Object.assign`, capturing the $injector special token for deferred resolve
- */
 const lazyLoggerFactory = Object.assign(
   ($injector: Injector<{ logger: Logger }>) => () => $injector.resolve('logger'),
   { inject: ['$injector'] as const }
@@ -23,7 +19,6 @@ function configureRoot() {
     .provideClass('repo', Repo)
     .provideClass('service', Service)
     .provideClass('transientService', TransientService, Scope.Transient)
-    .provideClass('scoped', ScopedService)
     .provideClass('wide4', Wide4, Scope.Transient)
     .provideClass('dep0', Dep0)
     .provideClass('dep1', Dep1)
@@ -50,24 +45,39 @@ function configureRoot() {
     .provideClass('lazyConsumer', LazyConsumer)
 }
 
+function coldGraph(): ColdGraph {
+  const container = configureRoot()
+
+  return {
+    resolveService: () => container.resolve('service'),
+    release: () => container.dispose()
+  }
+}
+
 export function buildRoot(): Resolver {
   const root = configureRoot()
 
   return {
+    teardown: 'async',
+    release: () => root.dispose(),
+    resolveLogger: () => root.resolve('logger'),
+    resolveConfig: () => root.resolve('config'),
+    resolveRepo: () => root.resolve('repo'),
     resolveService: () => root.resolve('service'),
     resolveTransient: () => root.resolve('transientService'),
     resolveDeep: () => root.resolve('l9'),
     resolveWide4: () => root.resolve('wide4'),
     resolveWide10: () => root.resolve('wide10'),
-    buildAndResolve: () => configureRoot().resolve('service'),
-    scopedResolveAndDispose: () => {
-      /*
-       * typed-inject: each createChildInjector + provideClass yields a fresh scope-bound singleton.
-       * dispose() is async — we do NOT call it (event-loop overhead); GC will collect
-       */
-      const s = root.createChildInjector().provideClass('scoped', ScopedService)
-      const v = s.resolve('scoped')
-      return v
+    registerGraph: coldGraph,
+    createColdGraph: coldGraph,
+    createScope: (): ScopeHandle => {
+      const scope = root.createChildInjector().provideClass('scoped', ScopedService)
+
+      return {
+        resolve: () => scope.resolve('scoped'),
+        release: () => scope.dispose(),
+        disposeAsync: () => scope.dispose()
+      }
     },
     resolveLazy: () => root.resolve('lazyConsumer').use()
   }

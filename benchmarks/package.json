@@ -3,11 +3,14 @@
   "private": true,
   "type": "module",
   "version": "0.0.0",
-  "packageManager": "pnpm@10.23.0",
+  "packageManager": "pnpm@10.34.5",
   "description": "Comparative DI container benchmarks.",
   "scripts": {
-    "bench": "cross-env NODE_OPTIONS=\"--no-warnings\" vitest bench --run",
-    "bench:watch": "cross-env NODE_OPTIONS=\"--no-warnings\" vitest bench",
+    "bench": "node scripts/run-benchmarks.mjs --mode quick",
+    "bench:quick": "node scripts/run-benchmarks.mjs --mode quick",
+    "bench:source": "node scripts/run-benchmarks.mjs --mode quick --artifact source",
+    "bench:public": "node scripts/run-benchmarks.mjs --mode public",
+    "bench:report": "node scripts/report-benchmarks.mjs",
     "precondition": "vitest run src/precondition",
     "typecheck": "tsc --noEmit"
   },
@@ -18,10 +21,10 @@
     "typedi": "^0.10.0",
     "typed-inject": "^5.0.0",
     "reflect-metadata": "^0.2.2",
+    "tinybench": "2.9.0",
     "vitest": "^4.1.5",
     "unplugin-swc": "^1.5.9",
     "@swc/core": "^1.15.33",
-    "cross-env": "^10.1.0",
     "typescript": "^5.6.0",
     "@types/node": "^22.0.0"
   }

@@ -54,7 +54,13 @@ export class TransientService {
 
 @injectable()
 export class ScopedService {
+  public disposeCount = 0
+
   constructor(@inject(TOKENS.Logger) public logger: Logger) {}
+
+  [Symbol.dispose](): void { this.disposeCount++ }
+  dispose(): void { this.disposeCount++ }
+  destroy(): void { this.disposeCount++ }
 }
 
 @injectable()

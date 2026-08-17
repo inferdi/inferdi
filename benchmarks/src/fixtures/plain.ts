@@ -24,7 +24,13 @@ export class TransientService {
 }
 
 export class ScopedService {
+  public disposeCount = 0
+
   constructor(public logger: Logger) {}
+
+  [Symbol.dispose](): void { this.disposeCount++ }
+  dispose(): void { this.disposeCount++ }
+  destroy(): void { this.disposeCount++ }
 }
 
 export class Wide4 {

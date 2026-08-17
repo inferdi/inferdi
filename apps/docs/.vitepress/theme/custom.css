@@ -41,7 +41,7 @@
   vertical-align: top;
 }
 
-.vp-doc img[src$="benchmarking_results.png"] {
+.vp-doc img[src$="benchmarking_results.jpg"] {
   border: 1px solid var(--vp-c-divider);
   border-radius: 8px;
   background: var(--vp-c-bg);

@@ -1,34 +1,26 @@
 import { createContainer, asClass, asFunction, InjectionMode, type AwilixContainer } from 'awilix'
-
-/*
- * Awilix's cradle is typed via the generic parameter AwilixContainer<T>.
- * We register 30+ keys for benchmarks; describing the exact shape is not worth it — use Record<string, any>
- */
-type Cradle = Record<string, any>
-type Container = AwilixContainer<Cradle>
 import {
   Logger, Config, Repo, Service, TransientService, ScopedService,
   Wide4, Wide10, Dep0, Dep1, Dep2, Dep3, Dep4, Dep5, Dep6, Dep7, Dep8, Dep9,
   L0, L1, L2, L3, L4, L5, L6, L7, L8, L9,
   LazyConsumer
 } from '../fixtures/plain.js'
-import type { Resolver } from './types.js'
+import type { ColdGraph, Resolver, ScopeHandle } from './types.js'
 
-/*
- * PROXY mode: the factory receives the cradle proxy as its first argument.
- * asClass(Cls) in PROXY would call new Cls(cradle) — a positional constructor would get the proxy
- * in the first parameter and `undefined` for the rest → silent graph corruption. We use asFunction wrappers
- */
+type Cradle = Record<string, any>
+type Container = AwilixContainer<Cradle>
+
 function configureProxy(): Container {
-  const c: Container = createContainer<Cradle>({ injectionMode: InjectionMode.PROXY })
-  c.register({
+  const container: Container = createContainer<Cradle>({ injectionMode: InjectionMode.PROXY })
+  container.register({
     logger: asClass(Logger).singleton(),
     config: asClass(Config).singleton(),
     repo: asFunction(({ logger, config }) => new Repo(logger, config)).singleton(),
     service: asFunction(({ repo, logger }) => new Service(repo, logger)).singleton(),
     transientService: asFunction(({ repo, logger }) => new TransientService(repo, logger)).transient(),
-    scoped: asFunction(({ logger }) => new ScopedService(logger)).scoped(),
-    wide4: asFunction(({ logger, config, repo, service }) => new Wide4(logger, config, repo, service)).transient(),
+    scoped: asFunction(({ logger }) => new ScopedService(logger)).scoped().disposer((value) => value.dispose()),
+    wide4: asFunction(({ logger, config, repo, service }) =>
+      new Wide4(logger, config, repo, service)).transient(),
     dep0: asClass(Dep0).singleton(),
     dep1: asClass(Dep1).singleton(),
     dep2: asClass(Dep2).singleton(),
@@ -51,26 +43,21 @@ function configureProxy(): Container {
     l7: asFunction(({ l6 }) => new L7(l6)).transient(),
     l8: asFunction(({ l7 }) => new L8(l7)).transient(),
     l9: asFunction(({ l8 }) => new L9(l8)).transient(),
-    // Lazy via a cradle-bound closure (deferred resolve)
     lazyLogger: asFunction((cradle) => () => cradle.logger).singleton(),
     lazyConsumer: asFunction(({ lazyLogger }) => new LazyConsumer(lazyLogger)).singleton()
   })
-  return c
+  return container
 }
 
-/*
- * CLASSIC mode: Awilix parses the constructor source with a regex and resolves by parameter name.
- * asClass(Cls) → new Cls(...resolved positional dependencies) — compatible with plain TS classes
- */
 function configureClassic(): Container {
-  const c: Container = createContainer<Cradle>({ injectionMode: InjectionMode.CLASSIC })
-  c.register({
+  const container: Container = createContainer<Cradle>({ injectionMode: InjectionMode.CLASSIC })
+  container.register({
     logger: asClass(Logger).singleton(),
     config: asClass(Config).singleton(),
     repo: asClass(Repo).singleton(),
     service: asClass(Service).singleton(),
     transientService: asClass(TransientService).transient(),
-    scoped: asClass(ScopedService).scoped(),
+    scoped: asClass(ScopedService).scoped().disposer((value) => value.dispose()),
     wide4: asClass(Wide4).transient(),
     dep0: asClass(Dep0).singleton(),
     dep1: asClass(Dep1).singleton(),
@@ -93,36 +80,51 @@ function configureClassic(): Container {
     l7: asClass(L7).transient(),
     l8: asClass(L8).transient(),
     l9: asClass(L9).transient(),
-    // Lazy in CLASSIC: a 0-arg factory closing over `container` — there is no native deferred mode
-    lazyLogger: asFunction(() => () => c.cradle.logger).singleton(),
-    lazyConsumer: asFunction(() => new LazyConsumer(c.cradle.lazyLogger)).singleton()
+    lazyLogger: asFunction(() => () => container.cradle.logger).singleton(),
+    lazyConsumer: asFunction(() => new LazyConsumer(container.cradle.lazyLogger)).singleton()
   })
-  return c
+  return container
+}
+
+function coldGraph(configure: () => Container): ColdGraph {
+  const container = configure()
+
+  return {
+    resolveService: () => container.cradle.service,
+    release: () => container.dispose()
+  }
 }
 
 export function buildRootProxy(): Resolver {
-  const root = configureProxy()
-  return makeResolver(root, configureProxy)
+  return makeResolver(configureProxy(), configureProxy)
 }
 
 export function buildRootClassic(): Resolver {
-  const root = configureClassic()
-  return makeResolver(root, configureClassic)
+  return makeResolver(configureClassic(), configureClassic)
 }
 
-function makeResolver(root: Container, fresh: () => Container): Resolver {
+function makeResolver(root: Container, configure: () => Container): Resolver {
   return {
+    teardown: 'async',
+    release: () => root.dispose(),
+    resolveLogger: () => root.cradle.logger,
+    resolveConfig: () => root.cradle.config,
+    resolveRepo: () => root.cradle.repo,
     resolveService: () => root.cradle.service,
     resolveTransient: () => root.cradle.transientService,
     resolveDeep: () => root.cradle.l9,
     resolveWide4: () => root.cradle.wide4,
     resolveWide10: () => root.cradle.wide10,
-    buildAndResolve: () => fresh().cradle.service,
-    scopedResolveAndDispose: () => {
-      const s = root.createScope()
-      const v = s.cradle.scoped
-      // No cleanup — root does not track scopes. dispose() is async-only, not allowed in bench
-      return v
+    registerGraph: () => coldGraph(configure),
+    createColdGraph: () => coldGraph(configure),
+    createScope: (): ScopeHandle => {
+      const scope = root.createScope()
+
+      return {
+        resolve: () => scope.cradle.scoped,
+        release: () => scope.dispose(),
+        disposeAsync: () => scope.dispose()
+      }
     },
     resolveLazy: () => (root.cradle.lazyConsumer as LazyConsumer).use()
   }

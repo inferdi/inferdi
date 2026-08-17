@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.23.0",
+  "packageManager": "pnpm@10.34.5",
   "scripts": {
     "build": "pnpm -r --filter @inferdi/* build",
     "clean": "pnpm -r --filter @inferdi/* clean",
@@ -19,9 +19,14 @@
     "docs:preview": "pnpm --filter inferdi-docs run preview",
     "docs:stop": "pnpm --filter inferdi-docs run stop",
     "bench": "pnpm --filter @inferdi/inferdi bench",
-    "benchmarks:install": "pnpm --dir benchmarks install",
+    "benchmarks:install": "pnpm --dir benchmarks install --frozen-lockfile",
+    "benchmarks:typecheck": "pnpm --dir benchmarks run typecheck",
     "benchmarks:precondition": "pnpm --dir benchmarks run precondition",
-    "benchmarks:bench": "pnpm --dir benchmarks run bench"
+    "benchmarks:bench": "pnpm --dir benchmarks run bench",
+    "benchmarks:quick": "pnpm --dir benchmarks run bench:quick",
+    "benchmarks:source": "pnpm --dir benchmarks run bench:source",
+    "benchmarks:public": "pnpm --dir benchmarks run bench:public",
+    "benchmarks:report": "pnpm --dir benchmarks run bench:report"
   },
   "pnpm": {
     "overrides": {
@@ -29,7 +34,8 @@
       "esbuild": "0.28.1",
       "body-parser": "2.3.0",
       "find-my-way": "9.7.0",
-      "postcss": "8.5.18",
+      "postcss": "8.5.23",
+      "nanoid": "3.3.18",
       "fast-uri": "3.1.5"
     }
   }

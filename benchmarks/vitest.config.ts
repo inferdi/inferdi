@@ -2,6 +2,10 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vitest/config'
 import swc from 'unplugin-swc'
 
+const inferdiEntry = process.env.BENCH_INFERDI_ARTIFACT === 'production'
+  ? '../packages/inferdi/dist/index.js'
+  : '../packages/inferdi/src/index.ts'
+
 export default defineConfig({
   /*
    * CRITICAL: vitest 4.x uses oxc by default (not esbuild). We disable both so the swc plugin
@@ -22,18 +26,17 @@ export default defineConfig({
   ],
   test: {
     root: fileURLToPath(new URL('.', import.meta.url)),
-    include: ['src/benches/**/*.bench.ts', 'src/precondition/**/*.test.ts'],
+    include: ['src/runner/**/*.test.ts', 'src/precondition/**/*.test.{ts,mjs}'],
     exclude: ['**/node_modules/**', '../**'],
     pool: 'forks',
     isolate: true,
     benchmark: {
-      include: ['src/benches/**/*.bench.ts'],
       reporters: ['default']
     }
   },
   resolve: {
     alias: {
-      '@inferdi/inferdi': fileURLToPath(new URL('../packages/inferdi/src/index.ts', import.meta.url))
+      '@inferdi/inferdi': fileURLToPath(new URL(inferdiEntry, import.meta.url))
     }
   }
 })

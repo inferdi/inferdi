@@ -1,7 +1,7 @@
 import 'reflect-metadata'
 import { describe, expect, it } from 'vitest'
 import { Container } from 'typedi'
-import { ScopedService } from '../fixtures/typedi.js'
+import { Logger, ScopedService } from '../fixtures/typedi.js'
 
 /*
  * Scenario 6 for TypeDI would be fake if scope resolve returned the global singleton
@@ -36,12 +36,19 @@ describe('typedi scope isolation (precondition for bench 06)', () => {
     expect(v1).not.toBe(v2)
   })
 
-  it('ScopedService instance has Logger injected', () => {
-    const c = Container.of('inject-check')
-    c.set({ id: 'scoped', type: ScopedService })
-    const v = c.get<ScopedService>('scoped')
-    expect(v).toBeInstanceOf(ScopedService)
-    expect(v.logger).toBeDefined()
-    Container.reset('inject-check')
+  it('injects the root singleton logger into every scoped service', () => {
+    const a = Container.of('logger-a')
+    const b = Container.of('logger-b')
+    a.set({ id: 'scoped', type: ScopedService })
+    b.set({ id: 'scoped', type: ScopedService })
+    const scopedA = a.get<ScopedService>('scoped')
+    const scopedB = b.get<ScopedService>('scoped')
+    const logger = Container.get(Logger)
+
+    expect(scopedA.logger).toBe(logger)
+    expect(scopedB.logger).toBe(logger)
+    expect(scopedA).not.toBe(scopedB)
+    Container.reset('logger-a')
+    Container.reset('logger-b')
   })
 })

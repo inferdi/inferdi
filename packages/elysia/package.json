@@ -54,7 +54,7 @@
     "node": ">=20.0.0"
   },
   "peerDependencies": {
-    "@inferdi/inferdi": "^5.0.0",
+    "@inferdi/inferdi": "^6.0.0",
     "elysia": "^1.4.0"
   },
   "devDependencies": {

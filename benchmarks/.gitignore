@@ -2,3 +2,4 @@ node_modules
 .vitest-cache
 *.log
 package-lock.json
+results/quick-*.json
