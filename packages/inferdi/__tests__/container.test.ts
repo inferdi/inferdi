@@ -588,7 +588,7 @@ describe('Phase 2 — Lifetimes', () => {
         .registerClass('singleton', Service, ['scoped'] as never, 'singleton')
 
       expect(() => c.get('singleton')).toThrow(
-        /Singleton "singleton" cannot depend on scoped "scoped"/
+        /^Singleton "singleton" cannot depend on scoped "scoped"\. Change the consumer lifetime or redesign the dependency boundary\.$/
       )
     })
 
@@ -598,7 +598,7 @@ describe('Phase 2 — Lifetimes', () => {
         .registerClass('singleton', Service, ['transient'], 'singleton')
 
       expect(() => c.get('singleton')).toThrow(
-        /Singleton "singleton" cannot depend on transient "transient"/
+        /^Singleton "singleton" cannot depend on transient "transient"\. Change the consumer lifetime or redesign the dependency boundary\.$/
       )
     })
 
@@ -1173,7 +1173,7 @@ describe('Phase 7 — Test Overrides', () => {
     c.get('db')
 
     expect(() => c.override('db', new TrackableAsync())).toThrowError(
-      /Cannot override "db" because it has already been resolved/
+      /^Cannot override "db" because it has already been resolved\. Overrides must be applied before resolving the dependency graph to prevent inconsistent references and resource leaks\.$/
     )
   })
 

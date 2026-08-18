@@ -44,14 +44,18 @@ Broad and union keys remain valid when their possible values do not overlap the 
 Static keys are checked directly by `.get()`. When a key comes from runtime input, narrow it with `.has()` first:
 
 ```ts
+const container = new Container()
+  .registerValue('answer', 42)
+  .registerAsyncFactory('name', async () => 'InferDI', [])
+
 declare const key: string | symbol
 
 if (container.has(key)) {
-  container.get(key)
+  await container.getAsync(key)
 }
 ```
 
-`.has()` checks registration without resolving the value. It returns `false` for disposed containers, but it does not prove that required scope inputs are ready or that an async key can be passed to `.get()`.
+The concrete graph above has no missing scope inputs, and `.getAsync()` accepts either registered key regardless of its sync or async mode. `.has()` proves registration only. It returns `false` for disposed containers, but it does not prove that required scope inputs are ready or that a key can be passed to `.get()`.
 
 ## Lifetime in the Type
 

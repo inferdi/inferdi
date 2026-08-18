@@ -762,8 +762,7 @@ The same check fires at runtime as defense-in-depth — if you bypass the type
 system with an `as`-cast, you still get a clear diagnostic:
 
 ```
-Error: Singleton "userService" cannot depend on scoped "requestCtx".
-Use Lazy<T> (register with a lazyKey companion) to get a fresh instance per access.
+Error: Singleton "userService" cannot depend on scoped "requestCtx". Change the consumer lifetime or redesign the dependency boundary.
 ```
 
 ### Runtime contracts
@@ -1131,7 +1130,7 @@ The container throws structured errors with actionable messages — surface thes
 |---|---|
 | `.get(k)` on unregistered key | `Key "k" not found` |
 | Root resolves a scoped key with `fast: false` | `Scoped "k" cannot be resolved from the root container. Use createScope().` |
-| Singleton depends on scoped/transient | `Singleton "x" cannot depend on scoped "y". Use Lazy<T> ...` |
+| Singleton depends on scoped/transient | `Singleton "x" cannot depend on scoped "y". Change the consumer lifetime or redesign the dependency boundary.` |
 | Resolution loop (synchronous) | `Circular dependency detected: a -> b -> a. Consider breaking the cycle with Lazy<T> ...` |
 | Resolution loop (declarative async graph) | Rejected with the same synchronous circular-dependency diagnostic during preflight. |
 | Resolution loop after `await` in legacy/captured code | _Not detected._ May produce a Promise deadlock — see [Async Factories](#async-factories). |
@@ -1141,7 +1140,7 @@ The container throws structured errors with actionable messages — surface thes
 | `register*()` after dispose | `Cannot register on a disposed container (key: "k")` |
 | Sync `[Symbol.dispose]` over an async resource | `Sync [Symbol.dispose] called on a resource whose .dispose() returned a Promise. Use \`await using\` / container.dispose() for async teardown.` |
 | Sync `[Symbol.dispose]` over cached async initialization | `Sync [Symbol.dispose] called on a container that cached a Promise from an async factory. Use \`await using\` / container.dispose() for async teardown.` |
-| `.override()` after first resolve | `Cannot override "k" because it has already been resolved. Overrides must be applied before any .get() calls...` |
+| `.override()` after first resolve | `Cannot override "k" because it has already been resolved. Overrides must be applied before resolving the dependency graph...` |
 | `.override()` on a missing key after a cast bypass | `Cannot override "k": key is not registered` |
 | `.override()` on a disposed container | `Cannot override on a disposed container (key: "k")` |
 

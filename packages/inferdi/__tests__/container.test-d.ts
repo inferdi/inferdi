@@ -1491,12 +1491,19 @@ describe('scope inputs — helpers and compatibility', () => {
     void legacyResolve
   })
 
-  it('keeps has-to-get narrowing for ordinary graphs but not partial scopes', () => {
+  it('keeps has-to-resolve narrowing for ready graphs but not partial scopes', () => {
     const key = 'value' as string | symbol
     const ordinary = new Container().registerValue('value', 1)
 
     if (ordinary.has(key)) {
       ordinary.get(key)
+    }
+
+    const mixed = ordinary
+      .registerAsyncFactory('name', async () => 'InferDI', [])
+
+    if (mixed.has(key)) {
+      void mixed.getAsync(key)
     }
 
     const partial = new Container()

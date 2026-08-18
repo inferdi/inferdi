@@ -44,14 +44,18 @@ Las claves amplias y union siguen disponibles cuando sus valores posibles no se 
 `.get()` comprueba directamente las claves estáticas. Si una clave llega en runtime, acota primero su tipo con `.has()`:
 
 ```ts
+const container = new Container()
+  .registerValue('answer', 42)
+  .registerAsyncFactory('name', async () => 'InferDI', [])
+
 declare const key: string | symbol
 
 if (container.has(key)) {
-  container.get(key)
+  await container.getAsync(key)
 }
 ```
 
-`.has()` comprueba el registro sin resolver el valor. Devuelve `false` si el contenedor está liberado, pero no demuestra que las entradas de scope estén listas ni que una clave asíncrona pueda pasarse a `.get()`.
+El grafo concreto anterior no tiene inputs de scope pendientes, y `.getAsync()` acepta cualquiera de las claves registradas sin importar su modo sync o async. `.has()` solo demuestra que la clave está registrada. Devuelve `false` si el contenedor está liberado, pero no demuestra que los inputs de scope estén listos ni que la clave pueda pasarse a `.get()`.
 
 ## El tiempo de vida en el tipo
 

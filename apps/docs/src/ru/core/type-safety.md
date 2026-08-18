@@ -44,14 +44,18 @@ Broad- и union-ключи разрешены, пока их возможные 
 Статические ключи проверяются непосредственно в `.get()`. Если ключ приходит во время выполнения, сначала уточните его через `.has()`:
 
 ```ts
+const container = new Container()
+  .registerValue('answer', 42)
+  .registerAsyncFactory('name', async () => 'InferDI', [])
+
 declare const key: string | symbol
 
 if (container.has(key)) {
-  container.get(key)
+  await container.getAsync(key)
 }
 ```
 
-`.has()` проверяет регистрацию, не получая значение. Для очищенного контейнера метод возвращает `false`, но не доказывает готовность scope inputs и не делает async-ключ доступным через `.get()`.
+В графе выше нет незаполненных scope inputs, а `.getAsync()` принимает оба зарегистрированных ключа независимо от sync- или async-режима. `.has()` доказывает только факт регистрации. Для очищенного контейнера метод возвращает `false`, но не доказывает готовность scope inputs и не делает ключ доступным через `.get()`.
 
 ## Время жизни в типе
 

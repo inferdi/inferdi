@@ -23,8 +23,9 @@ declare const lazyMode: unique symbol
  *
  * Produced when you register a service with a non-empty `lazyKey` — the
  * container additionally registers a sibling key of the user's choice typed as
- * `Lazy<T>`. Inject the lazy companion when a long-lived consumer needs a
- * fresh per-access view of a short-lived service.
+ * `Lazy<T>`. Inject the lazy companion when target resolution should be deferred
+ * until its `.get()` is called. Lazy injection preserves the target lifetime and
+ * does not make short-lived services safe for singleton consumers.
  *
  * @example
  * ```ts
@@ -64,7 +65,7 @@ export type AsyncLazy<T> = { readonly get: () => Promise<T> }
  * The lifetime of a registration:
  * - `singleton` — one instance per owning container (default).
  * - `scoped` — one instance per `createScope()` child.
- * - `transient` — a new instance for every `.get()`; caller-owned, never disposed.
+ * - `transient` — a new instance for every resolve; caller-owned, never disposed.
  *
  * Exported so users can write `Spec<V, L>` and `SpecMap<M, L>` for
  * explicit `Container<...>` annotations and
@@ -732,7 +733,7 @@ interface DisposableLike {
  * **Lifetimes**
  * - `singleton` (default) — one instance per owning container.
  * - `scoped` — one instance per `createScope()` child.
- * - `transient` — a new instance for every `.get()`. Caller-owned, never disposed.
+ * - `transient` — a new instance for every resolve. Caller-owned, never disposed.
  *
  * **Compile-time lifetime guard.** Each entry in `T` carries its lifetime via
  * {@link Spec}. The container passed to a `registerFactory((c) => ...)` body
@@ -1258,9 +1259,9 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    * The type `V` is inferred from the factory's return value and is automatically
    * added to the container's map. The factory receives the container as its only
    * argument, structurally narrowed for the chosen lifetime. Inside a
-   * singleton factory only singleton keys and `Lazy<singleton>` companions are visible
-   * to `.get(...)`, so a leak of scoped/transient state into a singleton is a
-   * TypeScript error rather than a runtime exception.
+   * singleton factory only singleton keys and singleton-target `Lazy` / `AsyncLazy`
+   * companions are visible to `.get(...)`, so a leak of scoped/transient state into
+   * a singleton is a TypeScript error rather than a runtime exception.
    * Passing a `lazyKey` additionally registers a `Lazy<V>` wrapper under that
    * companion identifier, with the same lifetime-preserving behavior as
    * {@link Container.registerClass}.
@@ -1741,7 +1742,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     if (this.cache.has(key)) {
       throw new Error(
         `Cannot override "${String(key)}" because it has already been resolved. ` +
-          `Overrides must be applied before any .get() calls to ensure clean dependency graphs and prevent resource leaks.`
+          `Overrides must be applied before resolving the dependency graph to prevent inconsistent references and resource leaks.`
       )
     }
     /*
@@ -1997,7 +1998,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
             const parent = this.singletonStack[this.singletonStack.length - 1]!
             throw new Error(
               `Singleton "${String(parent)}" cannot depend on transient "${String(key)}". ` +
-              `Use Lazy<T> (register with a lazyKey companion) to get a fresh instance per access.`
+              `Change the consumer lifetime or redesign the dependency boundary.`
             )
           }
 
@@ -2212,7 +2213,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
         const parent = this.singletonStack[this.singletonStack.length - 1]!
         throw new Error(
           `Singleton "${String(parent)}" cannot depend on ${reg.kind} "${String(key)}". ` +
-          `Use Lazy<T> (register with a lazyKey companion) to get a fresh instance per access.`
+          `Change the consumer lifetime or redesign the dependency boundary.`
         )
       }
 

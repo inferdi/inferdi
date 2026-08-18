@@ -44,14 +44,18 @@ new Container()
 静态键由 `.get()` 直接检查。键来自运行时输入时，应先用 `.has()` 缩小类型：
 
 ```ts
+const container = new Container()
+  .registerValue('answer', 42)
+  .registerAsyncFactory('name', async () => 'InferDI', [])
+
 declare const key: string | symbol
 
 if (container.has(key)) {
-  container.get(key)
+  await container.getAsync(key)
 }
 ```
 
-`.has()` 只检查注册，不会解析值。容器已释放时返回 `false`，但它不能证明作用域输入已就绪，也不能证明异步键可传给 `.get()`。
+上面的具体依赖图没有缺失的作用域输入，`.getAsync()` 可以接受任一已注册键，无论其为同步还是异步模式。`.has()` 只证明键已注册。容器已释放时它返回 `false`，但它不能证明作用域输入已就绪，也不能证明键可传给 `.get()`。
 
 ## 类型中的生命周期
 

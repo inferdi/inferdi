@@ -1,7 +1,6 @@
 # Migration Guide
 
 This file collects the breaking-change checklists for each major version of `@inferdi/inferdi`.
-For new features and fixes within a major line, see the release notes on the GitHub Releases page.
 
 ## Table of Contents
 

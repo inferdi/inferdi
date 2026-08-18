@@ -44,14 +44,18 @@ new Container()
 静的キーは `.get()` で直接検証されます。実行時に得たキーは、先に `.has()` で型を絞り込みます。
 
 ```ts
+const container = new Container()
+  .registerValue('answer', 42)
+  .registerAsyncFactory('name', async () => 'InferDI', [])
+
 declare const key: string | symbol
 
 if (container.has(key)) {
-  container.get(key)
+  await container.getAsync(key)
 }
 ```
 
-`.has()` は登録だけを確認し、値を解決しません。破棄済みのコンテナーでは `false` を返しますが、スコープ入力の準備状態やキーが同期的かどうかは保証しません。
+上の具体的なグラフには不足しているスコープ入力がなく、`.getAsync()` は同期・非同期モードにかかわらず、どちらの登録済みキーも受け付けます。`.has()` が証明するのは登録だけです。破棄済みのコンテナーでは `false` を返しますが、スコープ入力の準備状態やキーを `.get()` に渡せるかどうかは保証しません。
 
 ## 型に含まれるライフタイム
 
