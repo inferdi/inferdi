@@ -31,7 +31,7 @@ const providers: TestProviders = {
 }
 ```
 
-管理対象の遅延 companion を含め、各サービスの具体的な型が保持されます。これらの Provider は自動登録されず、所有権もテスト側に残ります。
+管理対象の遅延 companion を含め、登録済みサービスの具体的な型が保持されます。`declareScopeInputs()` だけで宣言したキーは `createScope(inputs)` から渡すため、この map には含まれません。これらの Provider は自動登録されず、所有権もテスト側に残ります。
 
 ## オーバーライドのタイミング
 

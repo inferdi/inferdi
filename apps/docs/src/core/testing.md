@@ -31,7 +31,7 @@ const providers: TestProviders = {
 }
 ```
 
-The helper preserves every service type, including values behind managed lazy companions. It does not register the providers or transfer their ownership; the test decides how to apply and dispose them.
+The helper preserves every registered service type, including managed lazy companions. Keys declared only through `declareScopeInputs()` are excluded because `createScope(inputs)` supplies them. The type does not register providers or transfer ownership; the test decides how to apply and dispose them.
 
 ## Override Timing
 

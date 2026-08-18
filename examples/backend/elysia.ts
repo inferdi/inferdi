@@ -17,6 +17,7 @@ export const app = new Elysia()
         userId: request.headers.get('x-user-id') ?? undefined
       })
   }))
-  .get('/users/:id', ({ params, di }) =>
-    di.get('users').profile(params.id)
-  )
+  .get('/users/:id', async ({ params, di }) => {
+    const users = await di.getAsync('users')
+    return users.profile(params.id)
+  })

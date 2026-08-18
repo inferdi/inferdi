@@ -8,3 +8,5 @@ RPC and GraphQL integrations should create one InferDI scope **per HTTP request*
 - **Apollo / Yoga** with `@defer`/`@stream` continue streaming after `willSendResponse`/`onExecuteDone`. If your schema uses incremental delivery, dispose from a transport-level hook in your HTTP framework instead. The examples show the simple non-streaming pattern with a comment pointing to the streaming alternative.
 
 `await using` is appropriate only when the procedure/resolver wrapper fully owns the async operation boundary. If your server adapter has a separate response lifecycle, dispose the scope from that lifecycle instead.
+
+Dispose the shared root from the HTTP server's shutdown hook. Request scopes release request-owned services; the root owns the async `Database` singleton.

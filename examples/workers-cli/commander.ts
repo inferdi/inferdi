@@ -10,12 +10,7 @@ program
   .command('import-users <file>')
   .option('--dry-run')
   .action(async (file: string, options: { dryRun?: boolean }) => {
-    /*
-     * A CLI invocation is a bounded async unit: `await using` ties scope
-     * disposal to the action function's exit (success or throw), so the
-     * async `Database` factory in the shared root is closed before the
-     * process exits
-     */
+    /* A command invocation owns one operation scope */
     await using scope = root.createScope({
       request: { requestId: `cli:import-users:${Date.now()}` }
     })
@@ -26,8 +21,16 @@ program
     })
 
     /*
-     * Real implementation would stream `file` through scope.get('users')
-     * and write to scope.get('db'). The minimal demo just logs
+     * Real implementation would resolve `users` with `getAsync()` and stream
+     * records from `file`. The minimal demo logs the operation lifecycle
      */
     scope.get('audit').record('cli.import-users.done', { file })
   })
+
+export async function run(argv: string[] = process.argv) {
+  try {
+    await program.parseAsync(argv)
+  } finally {
+    await root.dispose()
+  }
+}

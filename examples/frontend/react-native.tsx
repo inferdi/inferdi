@@ -7,8 +7,8 @@ import {
   useState
 } from 'react'
 
-class ScreenContext {
-  screenName = ''
+type ScreenContext = {
+  readonly screenName: string
 }
 
 class DeviceStorage {
@@ -32,7 +32,7 @@ class SettingsViewModel {
 }
 
 const root = new Container()
-  .registerClass('screen', ScreenContext, [], 'scoped')
+  .declareScopeInputs<{ screen: ScreenContext }>()
   .registerClass('storage', DeviceStorage, [])
   .registerClass('settingsVm', SettingsViewModel, ['screen', 'storage'], 'scoped')
 
@@ -40,14 +40,9 @@ type AppContainer = typeof root
 type ScreenContainer = ReturnType<typeof createSettingsScreenScope>
 
 function createSettingsScreenScope(parent: AppContainer) {
-  const scope = parent.createScope()
-  try {
-    scope.get('screen').screenName = 'settings'
-    return scope
-  } catch (error) {
-    scope.dispose().catch(console.error)
-    throw error
-  }
+  return parent.createScope({
+    screen: { screenName: 'settings' }
+  })
 }
 
 const RootDIContext = createContext<AppContainer | null>(null)
@@ -61,17 +56,18 @@ export function SettingsScreenScope({ children }: PropsWithChildren) {
   const parent = useContext(RootDIContext)
   if (parent === null) throw new Error('DI provider is missing')
 
-  /*
-   * useState with a lazy initializer (not useMemo) — see the React example
-   * for the rationale: useMemo is not a guarantee, lazy useState is
-   */
-  const [scope] = useState(() => createSettingsScreenScope(parent))
+  const [scope, setScope] = useState<ScreenContainer | null>(null)
 
   useEffect(() => {
+    const nextScope = createSettingsScreenScope(parent)
+    setScope(nextScope)
+
     return () => {
-      scope.dispose().catch(console.error)
+      nextScope.dispose().catch(console.error)
     }
-  }, [scope])
+  }, [parent])
+
+  if (scope === null) return null
 
   return <ScreenDIContext.Provider value={scope}>{children}</ScreenDIContext.Provider>
 }

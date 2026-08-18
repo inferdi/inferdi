@@ -1,36 +1,52 @@
 import { waitUntil } from '@vercel/functions'
-
-import {
-  buildRootContainer,
-  createRequestScope
-} from '../_shared/container.js'
+import { Container } from '@inferdi/inferdi'
 
 export const runtime = 'edge'
 
-const root = buildRootContainer()
+type RequestContext = {
+  readonly requestId: string
+}
+
+class ProfilesService {
+  constructor(private readonly request: RequestContext) {}
+
+  async get(id: string) {
+    return { id, requestId: this.request.requestId, name: 'Edge User' }
+  }
+}
+
+class AuditService {
+  record(event: string, meta: Record<string, unknown>) {
+    console.info(event, meta)
+  }
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('audit', AuditService, [])
+  .registerClass('profiles', ProfilesService, ['request'], 'scoped')
 
 export async function GET(request: Request) {
-  const scope = createRequestScope(root, {
-    requestId: request.headers.get('x-vercel-id') ?? crypto.randomUUID()
+  await using scope = root.createScope({
+    request: {
+      requestId: request.headers.get('x-vercel-id') ?? crypto.randomUUID()
+    }
   })
 
-  try {
-    const profile = await scope.get('users').profile('me')
+  const profile = await scope.get('profiles').get('me')
+  const audit = scope.get('audit')
 
-    /*
-     * Background work that touches scoped services must complete BEFORE the
-     * scope is disposed. Chaining via `.finally` ensures the background
-     * promise (which still reads RequestContext / Logger from the scope)
-     * is sequenced before the dispose — never in parallel with it
-     */
-    const background = (async () => {
-      scope.get('audit').record('request.completed', { url: request.url })
-    })()
-    waitUntil(background.finally(() => scope.dispose()))
+  /*
+   * The background task captures a root singleton and plain data. It does not
+   * retain the request scope after this bounded handler returns.
+   */
+  waitUntil(
+    Promise.resolve()
+      .then(() => audit.record('request.completed', { url: request.url }))
+      .catch((error) => {
+        console.error('Failed to record request completion', error)
+      })
+  )
 
-    return Response.json(profile)
-  } catch (error) {
-    await scope.dispose()
-    throw error
-  }
+  return Response.json(profile)
 }

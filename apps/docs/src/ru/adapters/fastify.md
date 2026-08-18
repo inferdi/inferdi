@@ -42,7 +42,8 @@ declare module 'fastify' {
 
 await app.register(inferdiFastify, {
   container: root,
-  createScope: (_root, request) => openRequestScope(request)
+  createScope: (_root, request) => openRequestScope(request),
+  disposeRootOnClose: true
 })
 
 app.get('/users/:id', async (request) => {

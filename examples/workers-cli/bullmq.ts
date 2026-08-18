@@ -20,3 +20,8 @@ export const worker = new Worker('email', async (job: Job<{ to: string }>) => {
   scope.get('audit').record('email.sent', { name: job.name, to: job.data.to })
   // Real implementation would call scope.get('mailer').send(job.data)
 })
+
+export async function closeWorker() {
+  await worker.close()
+  await root.dispose()
+}

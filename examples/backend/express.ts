@@ -36,7 +36,8 @@ app.use(inferdiExpress({
 
 app.get('/users/:id', async (req, res, next) => {
   try {
-    res.json(await req.di.get('users').profile(req.params.id))
+    const users = await req.di.getAsync('users')
+    res.json(await users.profile(req.params.id))
   } catch (error) {
     next(error)
   }

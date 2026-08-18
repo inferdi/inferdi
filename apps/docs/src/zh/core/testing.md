@@ -31,7 +31,7 @@ const providers: TestProviders = {
 }
 ```
 
-该类型保留每项服务的具体类型，包括受管理的惰性伴生键。InferDI 不会自动注册或接管这些 provider，它们仍由测试代码管理。
+该类型保留每项已注册服务的具体类型，包括受管理的惰性伴生键。仅通过 `declareScopeInputs()` 声明的键不会出现在映射中，因为它们由 `createScope(inputs)` 提供。InferDI 不会自动注册或接管这些 provider，它们仍由测试代码管理。
 
 ## 覆盖时机
 
@@ -42,7 +42,7 @@ const logger = c.get('logger')
 c.override('logger', mockLogger)
 ```
 
-第二行会抛出异常，因为 singleton 值已缓存在当前容器中。该检查有意只依赖本地缓存：它也能发现缓存在当前作用域中的 scoped 值、`registerValue` 和重复覆盖。在可变的严格模式下，transient 解析以及通过子容器解析但由祖先容器拥有的值不会进入本地缓存，因此不会被记录。固定 scope 可以把委托解析的 singleton 镜像到本地缓存中，并且不支持激活后的变更。已经返回的 transient 仍由原调用方持有，之后的解析则会返回 mock。这是需要了解的契约边界，并不意味着应当延迟覆盖；在解析依赖图之前完成所有覆盖才能避免图发生割裂。
+第二行会抛出异常，因为 singleton 值已缓存在当前容器中。该检查有意只依赖本地缓存：它也能发现缓存在当前作用域中的 scoped 值、`registerValue` 和重复覆盖。在默认 `{fast: false}` 下，transient 解析以及通过子容器解析但由祖先容器拥有的值不会进入本地缓存，因此不会被记录。Fast scope 可以把委托解析的 singleton 镜像到本地缓存中，并且不支持激活后的变更。已经返回的 transient 仍由原调用方持有，之后的解析则会返回 mock。这是需要了解的契约边界，并不意味着应当延迟覆盖；在解析依赖图之前完成所有覆盖才能避免图发生割裂。
 
 ## 所有权
 

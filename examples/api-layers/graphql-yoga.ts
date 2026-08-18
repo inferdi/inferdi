@@ -18,8 +18,8 @@ export const yoga = createYoga<GraphQLContext>({
     `,
     resolvers: {
       Query: {
-        user: (_parent, args: { id: string }, ctx) =>
-          ctx.container.get('users').profile(args.id)
+        user: async (_parent, args: { id: string }, ctx) =>
+          (await ctx.container.getAsync('users')).profile(args.id)
       }
     }
   }),

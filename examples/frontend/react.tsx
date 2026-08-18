@@ -14,8 +14,8 @@ import {
  * singleton services on the root, page-level scope on mount
  */
 
-class FeatureContext {
-  featureName = ''
+type FeatureContext = {
+  readonly featureName: string
 }
 
 class ApiClient {
@@ -39,7 +39,7 @@ class ProjectsViewModel {
 }
 
 const root = new Container()
-  .registerClass('feature', FeatureContext, [], 'scoped')
+  .declareScopeInputs<{ feature: FeatureContext }>()
   .registerClass('api', ApiClient, [])
   .registerClass('projectsVm', ProjectsViewModel, ['feature', 'api'], 'scoped')
 
@@ -47,14 +47,9 @@ type AppContainer = typeof root
 type PageContainer = ReturnType<typeof createProjectsPageScope>
 
 function createProjectsPageScope(parent: AppContainer) {
-  const scope = parent.createScope()
-  try {
-    scope.get('feature').featureName = 'projects'
-    return scope
-  } catch (error) {
-    scope.dispose().catch(console.error)
-    throw error
-  }
+  return parent.createScope({
+    feature: { featureName: 'projects' }
+  })
 }
 
 const RootDIContext = createContext<AppContainer | null>(null)
@@ -68,24 +63,22 @@ export function ProjectsPage({ children }: PropsWithChildren) {
   const parent = useContext(RootDIContext)
   if (parent === null) throw new Error('DI provider is missing')
 
-  /*
-   * useState with a lazy initializer is the correct primitive for "create
-   * exactly once per mounted instance". `useMemo` is documented as an
-   * optimization, not a guarantee — under concurrent rendering React may
-   * re-run the factory at any time and the discarded scope would leak
-   * because `useEffect` cleanup only runs on the kept render
-   */
-  const [scope] = useState(() => createProjectsPageScope(parent))
+  const [scope, setScope] = useState<PageContainer | null>(null)
 
   useEffect(() => {
+    const nextScope = createProjectsPageScope(parent)
+    setScope(nextScope)
+
     /*
-     * React cleanup is synchronous. Use async dispose explicitly so scopes
-     * with async factories/disposers do not go through sync [Symbol.dispose]()
+     * React may replay effects in Strict Mode. Each setup owns the scope that
+     * its cleanup disposes, including the development-only replay.
      */
     return () => {
-      scope.dispose().catch(console.error)
+      nextScope.dispose().catch(console.error)
     }
-  }, [scope])
+  }, [parent])
+
+  if (scope === null) return null
 
   return <PageDIContext.Provider value={scope}>{children}</PageDIContext.Provider>
 }

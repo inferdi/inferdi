@@ -19,7 +19,7 @@ Ese es todo el trabajo. Los adaptadores son una fina capa de pegamento del ciclo
 En modo con scope, cada adaptador ejecuta los mismos pasos para cada petición:
 
 1. **Crea** el scope a partir del contenedor raíz (`createScope`, por defecto `root.createScope()`) cuando comienza la petición.
-2. **Expone** el scope en la ubicación nativa del framework (`request.di`, `ctx.state.di`, `c.var.di`, o la clave de contexto de Elysia) *antes* de que se ejecute la configuración, de modo que un fallo de configuración y tus hooks de limpieza observen todos el mismo slot.
+2. **Expone** el scope en la ubicación nativa del framework. Hono, Koa, Express y Elysia lo exponen antes de la configuración. Fastify expone `request.di` después de que la configuración tenga éxito y solo lo expone de forma temporal durante la limpieza de un fallo de configuración. Los hooks de limpieza ven el slot público, mientras que los manejadores de errores nunca reciben un scope a medio construir.
 3. **Configura** el scope con `setupScope` si hace falta inicialización adicional antes de los handlers. Puede ser asíncrono.
 4. **Atiende** la petición: los handlers de rutas y los manejadores de errores del framework resuelven servicios desde el scope expuesto.
 5. **Libera** el scope en el punto de finalización seguro del framework (`disposeScope`, por defecto `scope.dispose()`), salvo que se haya transferido la propiedad.

@@ -1,45 +1,76 @@
-import {
-  buildRootContainer,
-  createRequestScope,
-  type RootContainer
-} from '../_shared/container.js'
-
-type Env = Record<string, string | undefined>
+import { Container } from '@inferdi/inferdi'
 
 /*
- * Workers re-uses the module-scope between requests for as long as the
- * isolate is warm. Lazily build the root once per isolate from the bindings
- * passed into `fetch`. `env` typically contains DATABASE_URL/LOG_LEVEL so
- * `readConfig(env)` validates inside buildRootContainer
+ * `Env` and the Worker runtime types come from `pnpm wrangler types`.
+ * The Wrangler config declares a D1 binding named DB and a Queue producer
+ * binding named AUDIT_QUEUE.
  */
-let root: RootContainer | undefined
 
-export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    root ??= buildRootContainer(env)
+type RequestContext = {
+  readonly requestId: string
+}
 
-    const scope = createRequestScope(root, {
-      requestId: request.headers.get('cf-ray') ?? crypto.randomUUID()
-    })
+type AuditMessage = {
+  readonly event: string
+  readonly requestId: string
+  readonly url: string
+}
 
-    try {
-      const profile = await scope.get('users').profile('me')
+class ProfilesService {
+  constructor(
+    private readonly request: RequestContext,
+    private readonly db: D1Database
+  ) {}
 
-      /*
-       * Background work that touches scoped services must complete BEFORE the
-       * scope is disposed. `.finally` sequences disposal after the background
-       * work, so the scoped `RequestContext` / async `Database` are still alive
-       * while the audit record is being written
-       */
-      const background = (async () => {
-        scope.get('audit').record('request.completed', { url: request.url })
-      })()
-      ctx.waitUntil(background.finally(() => scope.dispose()))
+  async get(id: string) {
+    const profile = await this.db
+      .prepare('select id, name from users where id = ?1')
+      .bind(id)
+      .first<{ id: string; name: string }>()
 
-      return Response.json(profile)
-    } catch (error) {
-      await scope.dispose()
-      throw error
+    return profile ?? { id, name: 'Unknown' }
+  }
+
+  auditMessage(url: string): AuditMessage {
+    return {
+      event: 'profile.read',
+      requestId: this.request.requestId,
+      url
     }
   }
 }
+
+const root = new Container()
+  .declareScopeInputs<{
+    request: RequestContext
+    db: D1Database
+  }>()
+  .registerClass('profiles', ProfilesService, ['request', 'db'], 'scoped')
+
+export default {
+  async fetch(request, env, ctx): Promise<Response> {
+    await using scope = root.createScope({
+      request: {
+        requestId: request.headers.get('cf-ray') ?? crypto.randomUUID()
+      },
+      db: env.DB
+    })
+
+    const profiles = scope.get('profiles')
+    const profile = await profiles.get('me')
+
+    ctx.waitUntil(
+      env.AUDIT_QUEUE
+        .send(profiles.auditMessage(request.url))
+        .catch((error) => {
+          console.error(JSON.stringify({
+            event: 'audit.enqueue.failed',
+            requestId: request.headers.get('cf-ray'),
+            error: String(error)
+          }))
+        })
+    )
+
+    return Response.json(profile)
+  }
+} satisfies ExportedHandler<Env>

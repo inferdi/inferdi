@@ -73,4 +73,4 @@ For more complex helpers or factories, JSDoc type imports are valid JavaScript c
 /** @typedef {import('@inferdi/inferdi').Container} Container */
 ```
 
-Runtime features work fully in JavaScript: scopes, singleton/scoped/transient lifetimes, factories, lazy companions, strict runtime guards, and disposal. The strongest graph checks still come from TypeScript, but `// @ts-check` plus JSDoc gives JavaScript projects useful editor feedback.
+Runtime features work in JavaScript: scopes, lifetimes, factories, lazy companions, default runtime guards and disposal. TypeScript provides the complete graph checks; `// @ts-check` plus JSDoc still gives JavaScript projects useful editor feedback.

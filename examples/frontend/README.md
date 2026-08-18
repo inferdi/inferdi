@@ -6,12 +6,21 @@ Declare page, route, or screen context as scope inputs. Register feature view mo
 
 Unmount hooks in React, React Native, Vue, and Svelte are synchronous. If a scope may contain async factories or async disposers, call `scope.dispose().catch(console.error)` from the cleanup hook. The framework will not await that promise, but this avoids using synchronous `[Symbol.dispose]()` on a container that may hold async resources.
 
-In React, create the scope via lazy `useState` — **not `useMemo`**:
+In React and React Native, create the scope in an effect after the component commits:
 
 ```tsx
-const [scope] = useState(() => createPageScope(parent))
+const [scope, setScope] = useState<PageContainer | null>(null)
+
+useEffect(() => {
+  const nextScope = createPageScope(parent)
+  setScope(nextScope)
+
+  return () => {
+    nextScope.dispose().catch(console.error)
+  }
+}, [parent])
 ```
 
-`useMemo` is documented as an optimization with no guarantee; under concurrent rendering it can drop the memoized value, and the discarded scope would never reach the cleanup function in `useEffect`. Lazy `useState` initializers run exactly once per mounted component instance.
+React can call lazy state initializers more than once in development Strict Mode. Creating a resource during render can leak the instance from a discarded render. Effect setup runs after commit, and React pairs every setup with its cleanup, including Strict Mode's development replay. Render a fallback until the scope is ready.
 
-Frontend examples deliberately keep their own minimal builders rather than importing `_shared/container.ts`, because the shared module targets server-side resources (`Database`, `process.env`) that do not exist in the browser. The patterns are identical — scoped page/route context, singleton API clients, async dispose from cleanup hooks.
+Frontend examples keep their own minimal builders because `_shared/container.ts` targets server resources such as `Database` and `process.env`. They declare page or screen data with `declareScopeInputs()`, keep API clients on the root and dispose feature scopes from cleanup hooks.

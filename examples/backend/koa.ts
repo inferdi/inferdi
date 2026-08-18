@@ -28,5 +28,6 @@ app.use(inferdiKoa({
 }))
 app.use(async (ctx) => {
   const id = ctx.path.split('/').pop() ?? ''
-  ctx.body = await ctx.state.di.get('users').profile(id)
+  const users = await ctx.state.di.getAsync('users')
+  ctx.body = await users.profile(id)
 })

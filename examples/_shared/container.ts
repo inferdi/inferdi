@@ -7,25 +7,28 @@
  * This module demonstrates the InferDI features that matter in production:
  *
  *   1. registerValue('config', ...)  — static config (env-validated).
- *   2. registerFactory('db', ...) — resource construction with LIFO async
- *      disposal via Symbol.asyncDispose.
+ *   2. registerAsyncFactory('db', ...) — declarative async initialization
+ *      with LIFO disposal via Symbol.asyncDispose.
  *   3. registerClass with a `Lazy<V>` companion — singletons can defer
  *      resolution of another singleton dependency via a Lazy wrapper, which
  *      is useful for breaking init-time cycles. The lifetime guard rejects
  *      `Lazy<scoped>` / `Lazy<transient>` in singleton consumers — Lazy
  *      preserves the target's lifetime, it does not lift short-lived
  *      services into singleton scope.
- *   4. Module<TIn, TOut> — reusable registration unit composed via `.use()`.
+ *   4. Module<TRequirements, TProvides> — reusable registration unit composed
+ *      via `.use()`.
  *   5. declareScopeInputs() + createScope({ request }) — typed request data
  *      supplied at the lifecycle boundary.
  *   6. Container.Providers<...> — typed shape for mock-factory test fixtures.
  *
- * All adapters in this directory consume this builder; in your own project
- * the same shape lives in `src/container.ts` and frameworks adapt to it
+ * Most server examples consume this builder. Edge examples with native
+ * bindings use local graphs. In an application this shape belongs in
+ * `src/container.ts` or `src/di/`.
  */
 
 import {
   Container,
+  type AsyncSpec,
   type Lazy,
   type LazySpec,
   type Module,
@@ -43,7 +46,17 @@ export type AppConfig = {
   readonly logLevel: 'debug' | 'info' | 'warn' | 'error'
 }
 
-export function readConfig(env: Record<string, string | undefined> = process.env): AppConfig {
+type RuntimeGlobal = typeof globalThis & {
+  readonly process?: {
+    readonly env: Record<string, string | undefined>
+  }
+}
+
+function runtimeEnv(): Record<string, string | undefined> {
+  return (globalThis as RuntimeGlobal).process?.env ?? {}
+}
+
+export function readConfig(env: Record<string, string | undefined> = runtimeEnv()): AppConfig {
   const databaseUrl = env.DATABASE_URL ?? 'postgres://localhost/app'
   const raw = env.LOG_LEVEL ?? 'info'
   if (raw !== 'debug' && raw !== 'info' && raw !== 'warn' && raw !== 'error') {
@@ -77,6 +90,10 @@ export class Logger {
 export class Database {
   // A real implementation would hold a `pg.Pool` here
   constructor(private readonly config: AppConfig) {}
+
+  static connect(config: AppConfig): Promise<Database> {
+    return Promise.resolve(new Database(config))
+  }
 
   async query<T>(_sql: string, _params: readonly unknown[] = []): Promise<readonly T[]> {
     return []
@@ -149,30 +166,27 @@ export class UserService {
 /*
  * ---------------------------------------------------------------------------
  * 3. Module — group platform services so any adapter can `.use(coreModule)`.
- *    The `Module<TIn, TOut>` signature documents what the module needs (TIn)
- *    and what it adds (TOut), and the compiler enforces both.
+ *    `Module<TRequirements, TProvides>` documents required and added
+ *    registrations, and the compiler enforces both sides.
  * ---------------------------------------------------------------------------
  */
 
 type CoreIn = SpecMap<{ config: AppConfig }>
 type CoreOut =
-  & SpecMap<{ logger: Logger; clock: Clock; db: Database; audit: AuditService }>
+  & SpecMap<{ logger: Logger; clock: Clock; audit: AuditService }>
   & {
+      db: AsyncSpec<Database>
       clockLazy: LazySpec<Clock, 'singleton'>
     }
 
 export const coreModule: Module<CoreIn, CoreOut> = (c) =>
   c
     .registerClass('logger', Logger, ['config'])
-    /*
-     * The pool is created synchronously and disposed asynchronously via
-     * `Symbol.asyncDispose` — the common production shape. For a fully async
-     * factory (`registerFactory('db', async (c) => …)`) `c.get('db')` would
-     * return a `Promise<Database>` that callers await; the resolved instance
-     * is still unwrapped and disposed correctly on `scope.dispose()`. The
-     * sync factory keeps consumer signatures simple here
-     */
-    .registerFactory('db', (c) => new Database(c.get('config')))
+    .registerAsyncFactory(
+      'db',
+      (config: AppConfig) => Database.connect(config),
+      ['config']
+    )
     /*
      * Singleton `clock` + Lazy<singleton> companion under 'clockLazy'.
      * `clock` is stateless so a singleton is appropriate; the companion lets
@@ -192,7 +206,7 @@ export const coreModule: Module<CoreIn, CoreOut> = (c) =>
  * ---------------------------------------------------------------------------
  */
 
-export function buildRootContainer(env: Record<string, string | undefined> = process.env) {
+export function buildRootContainer(env: Record<string, string | undefined> = runtimeEnv()) {
   return new Container()
     .registerValue('config', readConfig(env))
     .declareScopeInputs<{ request: RequestContext }>()

@@ -22,8 +22,8 @@ const typeDefs = `#graphql
 
 const resolvers = {
   Query: {
-    user: (_parent: unknown, args: { id: string }, ctx: GraphQLContext) =>
-      ctx.container.get('users').profile(args.id)
+    user: async (_parent: unknown, args: { id: string }, ctx: GraphQLContext) =>
+      (await ctx.container.getAsync('users')).profile(args.id)
   }
 }
 

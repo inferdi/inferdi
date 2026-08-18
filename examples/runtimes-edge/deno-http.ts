@@ -19,6 +19,7 @@ Deno.serve(async (request) => {
    * The handler is a bounded async unit for non-streaming responses, so
    * `await using` is the compact form of try/finally + async dispose
    */
-  const profile = await scope.get('users').profile('me')
+  const users = await scope.getAsync('users')
+  const profile = await users.profile('me')
   return Response.json(profile)
 })

@@ -6,7 +6,7 @@
 
 | 示例 | 展示内容 |
 | --- | --- |
-| [`react.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react.tsx) | React 功能作用域，配合惰性 `useState` 与清理 |
+| [`react.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react.tsx) | React 功能作用域，在提交后创建并由 effect 清理 |
 | [`react-native.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react-native.tsx) | React Native 屏幕作用域 |
 | [`vue.ts`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/vue.ts) | Vue 3 provide/inject 作用域边界 |
 | [`svelte.ts`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/svelte.ts) | Svelte context 作用域边界 |

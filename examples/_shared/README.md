@@ -1,18 +1,18 @@
 # Shared Container Builder
 
-`container.ts` is the **flagship** InferDI example. It is the file to read if you want to see the patterns InferDI was designed for, before getting distracted by framework wiring.
+`container.ts` is the canonical InferDI example. Start there to see the container graph before reading framework wiring.
 
-Every adapter in `examples/` imports its registrations from here, so the per-framework files contain only the wiring that is actually framework-specific. Copy `container.ts` (or its idea) into your own project and adapt the framework adapter from this directory.
+Most server examples import their registrations from here, so framework files contain lifecycle wiring. Edge examples with native bindings keep local graphs. Copy the structure into your application and adapt the matching framework example.
 
 ## What it demonstrates
 
 - **`registerValue('config', readConfig())`** — static config loaded once at boot.
-- **`registerFactory('db', async (c) => …)`** — an async factory whose `Promise` is cached, awaited on every consumer, and unwrapped on dispose so `Symbol.asyncDispose` runs on the resolved pool.
-- **LIFO `Symbol.asyncDispose`** — `Database` implements it, so `await scope.dispose()` waits for the pool to close in reverse-creation order.
+- **`registerAsyncFactory('db', factory, ['config'])`** registers the final `Database` type as an async graph node. Singleton and scoped async registrations cache one initialization promise, and consumers resolve propagated async nodes through `getAsync()`.
+- **LIFO `Symbol.asyncDispose`** — `Database` implements it, so `await root.dispose()` waits for the root-owned pool to close in reverse-creation order.
 - **`Lazy<Clock>` companion key** — a singleton target resolved only when `AuditService` first needs it. Lazy injection preserves the target lifetime; it cannot make a scoped or transient dependency safe for a singleton.
-- **`Module<TIn, TOut>` + `.use(coreModule)`** — a reusable registration unit with documented inputs and outputs.
+- **`Module<TRequirements, TProvides>` + `.use(coreModule)`** — a reusable registration unit with checked requirements and provided registrations.
 - **`declareScopeInputs()` + `createScope({ request })`** — request data enters the graph at the lifecycle boundary. The returned scope type records that the input is ready.
-- **`Container.Providers<typeof builder>`** (in `mocks.ts` example below) — a typed shape for mock-factory fixtures in tests.
+- **`Container.Providers<typeof builder>`** (in `testing.ts`) — a typed shape for mock-factory fixtures. Declared scope inputs are supplied by `createScope()` and do not appear in this map.
 
 ## Why one shared file
 
@@ -23,5 +23,5 @@ The same `Database`/`Logger`/`AuditService`/`UserService` graph appears in every
 [`testing.ts`](./testing.ts) shows the test-only APIs that production code should not touch:
 
 - **`.override(key, value)`** — replace a key with a mock. Refuses to run after the key has been resolved, so "mock applied too late" fails loudly at the override call instead of in a confused downstream assertion.
-- **`Container.Providers<typeof builder>`** — typed mock-factory fixture; the compiler enforces that every registered key has a thunk returning the correct shape.
+- **`Container.Providers<typeof builder>`** — typed mock-factory fixture; the compiler checks each registered provider while excluding declared scope inputs.
 - **`Container.Resolve<typeof builder>`** — flat `{ key: ServiceType }` view of the registered map, useful for typing test helpers and handler arguments.

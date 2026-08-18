@@ -265,7 +265,7 @@ import {
   buildRootContainer,
   createRequestScope,
   type RequestContainer,
-  type RootContainer,
+  type RootContainer
 } from './container.js'
 
 const root = buildRootContainer()
@@ -287,13 +287,15 @@ await app.register(inferdiFastify, {
   createScope: (root: RootContainer, request: FastifyRequest) =>
     createRequestScope(root, {
       requestId: request.id,
-      ip: request.ip,
+      ip: request.ip
     }),
+  disposeRootOnClose: true
 })
 
 app.get('/users/:id', async (request) => {
   const { id } = request.params as { id: string }
-  return request.di.get('users').profile(id)
+  const users = await request.di.getAsync('users')
+  return users.profile(id)
 })
 ```
 
@@ -309,25 +311,29 @@ pnpm add @inferdi/inferdi @inferdi/hono hono
 
 ```ts
 import { Hono } from 'hono'
-import { inferdiHono, type InferdiHonoEnv } from '@inferdi/hono'
-import { buildRootContainer } from './container.js'
+import { inferdiHono, type InferdiHonoScopeEnv } from '@inferdi/hono'
+import {
+  buildRootContainer,
+  createRequestScope,
+  type RequestContainer
+} from './container.js'
 
 const root = buildRootContainer()
-type AppEnv = InferdiHonoEnv<typeof root>
+type AppEnv = InferdiHonoScopeEnv<RequestContainer>
 
 const app = new Hono<AppEnv>()
 
 app.use('*', inferdiHono({
   container: root,
-  setupScope: (scope, c) => {
-    const ctx = scope.get('request')
-    ctx.requestId = crypto.randomUUID()
-    ctx.userId = c.req.header('x-user-id')
-  },
+  createScope: (_root, c) => createRequestScope(root, {
+    requestId: crypto.randomUUID(),
+    userId: c.req.header('x-user-id')
+  })
 }))
 
 app.get('/users/:id', async (c) => {
-  return c.json(await c.var.di.get('users').profile(c.req.param('id')))
+  const users = await c.var.di.getAsync('users')
+  return c.json(await users.profile(c.req.param('id')))
 })
 ```
 
@@ -344,31 +350,35 @@ pnpm add -D @types/koa
 
 ```ts
 import Koa from 'koa'
-import { inferdiKoa, type InferdiScopeOf } from '@inferdi/koa'
-import { buildRootContainer } from './container.js'
+import { inferdiKoa } from '@inferdi/koa'
+import {
+  buildRootContainer,
+  createRequestScope,
+  type RequestContainer
+} from './container.js'
 
 const root = buildRootContainer()
 const app = new Koa()
 
 declare module 'koa' {
   interface DefaultState {
-    di: InferdiScopeOf<typeof root>
+    di: RequestContainer
   }
 }
 
 app.use(inferdiKoa({
   container: root,
-  setupScope: (scope, ctx) => {
-    const request = scope.get('request')
-    request.requestId = crypto.randomUUID()
-    request.userId = ctx.get('x-user-id') || undefined
-    request.ip = ctx.ip
-  },
+  createScope: (_root, ctx) => createRequestScope(root, {
+    requestId: crypto.randomUUID(),
+    userId: ctx.get('x-user-id') || undefined,
+    ip: ctx.ip
+  })
 }))
 
 app.use(async (ctx) => {
   const id = ctx.path.split('/').pop() ?? ''
-  ctx.body = await ctx.state.di.get('users').profile(id)
+  const users = await ctx.state.di.getAsync('users')
+  ctx.body = await users.profile(id)
 })
 ```
 
@@ -385,10 +395,11 @@ pnpm add -D @types/express
 
 ```ts
 import express from 'express'
-import { inferdiExpress, type InferdiScopeOf } from '@inferdi/express'
+import { inferdiExpress } from '@inferdi/express'
 import {
   buildRootContainer,
   createRequestScope,
+  type RequestContainer
 } from './container.js'
 
 const root = buildRootContainer()
@@ -397,7 +408,7 @@ const app = express()
 declare global {
   namespace Express {
     interface Request {
-      di: InferdiScopeOf<typeof root>
+      di: RequestContainer
     }
   }
 }
@@ -410,13 +421,14 @@ app.use(inferdiExpress({
       userId: Array.isArray(req.headers['x-user-id'])
         ? req.headers['x-user-id'][0]
         : req.headers['x-user-id'],
-      ip: req.ip,
-    }),
+      ip: req.ip
+    })
 }))
 
 app.get('/users/:id', async (req, res, next) => {
   try {
-    res.json(await req.di.get('users').profile(req.params.id))
+    const users = await req.di.getAsync('users')
+    res.json(await users.profile(req.params.id))
   } catch (error) {
     next(error)
   }
@@ -438,7 +450,7 @@ import { Elysia } from 'elysia'
 import { inferdiElysia } from '@inferdi/elysia'
 import {
   buildRootContainer,
-  createRequestScope,
+  createRequestScope
 } from './container.js'
 
 const root = buildRootContainer()
@@ -449,15 +461,18 @@ const app = new Elysia()
     createScope: (root, { request }) =>
       createRequestScope(root, {
         requestId: crypto.randomUUID(),
-        userId: request.headers.get('x-user-id') ?? undefined,
-      }),
+        userId: request.headers.get('x-user-id') ?? undefined
+      })
   }))
-  .get('/users/:id', ({ di, params }) =>
-    di.get('users').profile(params.id),
-  )
+  .get('/users/:id', async ({ di, params }) => {
+    const users = await di.getAsync('users')
+    return users.profile(params.id)
+  })
 ```
 
 Elysia streaming routes should call `skipInferdiDispose(context)` and dispose the scope when stream or background work ends. The adapter uses both `onError` and `onAfterResponse` so validation failures after `derive` do not leak request scopes.
+
+Request adapters dispose request-owned scopes. The application owns the root and its singleton resources. The Fastify example enables `disposeRootOnClose`; use the corresponding server or process shutdown hook with the other adapters.
 
 ## Factories
 
@@ -1102,7 +1117,7 @@ const mocks: Container.Providers<ReturnType<typeof buildContainer>> = {
 }
 ```
 
-The lazy companion's entry returns the `Lazy<V>` wrapper (`{ get: () => V }`), not the unwrapped value — this matches the container's actual registration shape.
+The lazy companion's entry returns the `Lazy<V>` wrapper (`{ get: () => V }`), not the unwrapped value — this matches the container's actual registration shape. Keys declared only through `declareScopeInputs()` are excluded because callers provide them through `createScope(inputs)`.
 
 ## Errors
 
@@ -1288,10 +1303,11 @@ namespace Container {
   type UnwrappedValue<C, K extends keyof Resolve<C>> = ResolveUnwrapped<C>[K]
 
   // Flatten a built container into a record of zero-arg provider thunks,
-  // one per registered key. Lazy and AsyncLazy companions keep the wrapper shape.
+  // one per registered key. Declared scope inputs are excluded. Lazy and
+  // AsyncLazy companions keep the wrapper shape.
   // Useful for typing mock-factory fixtures in tests.
   type Providers<C> = C extends Container<infer U>
-    ? { [K in keyof U]: () => U[K]['type'] }
+    ? { [K in RegistrationKeys<U>]: () => U[K]['type'] }
     : never
 }
 

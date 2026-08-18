@@ -64,7 +64,7 @@ new Container()
   .registerClass('users', UserService, ['request'], 'singleton')
 ```
 
-运行时严格模式仍作为针对 `as` 类型转换、动态键、捕获的外层容器以及依赖循环的纵深防御手段。
+默认 `{fast: false}` 的运行时检查仍作为针对 `as` 类型转换、动态键、捕获的外层容器以及依赖循环的纵深防御手段。
 
 ## 就绪状态与异步状态
 

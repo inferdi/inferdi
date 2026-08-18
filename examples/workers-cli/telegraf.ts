@@ -32,6 +32,7 @@ export const bot = new Telegraf<BotContext>(process.env.BOT_TOKEN!)
 
 bot.use(withContainer)
 bot.start(async (ctx) => {
-  const profile = await ctx.container.get('users').profile(String(ctx.from?.id ?? 'anonymous'))
+  const users = await ctx.container.getAsync('users')
+  const profile = await users.profile(String(ctx.from?.id ?? 'anonymous'))
   await ctx.reply(`Hello ${profile.name}`)
 })

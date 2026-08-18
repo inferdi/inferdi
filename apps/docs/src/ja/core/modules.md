@@ -24,7 +24,7 @@ const appContainer = new Container()
 import {
   Container,
   type Module,
-  type SpecMap,
+  type SpecMap
 } from '@inferdi/inferdi'
 
 type Requirements = SpecMap<{ config: { env: string } }>
@@ -38,7 +38,7 @@ const addMailer: Module<Requirements, Provides> = (c) => {
 }
 
 const app = new Container()
-  .registerValue('config', {env: 'test'})
+  .registerValue('config', { env: 'test' })
   .registerValue('metrics', new Metrics())
   .use(addMailer) // keeps config + metrics and adds mailer
 ```

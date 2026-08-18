@@ -18,6 +18,7 @@
     "docs:view": "pnpm --filter inferdi-docs run view",
     "docs:preview": "pnpm --filter inferdi-docs run preview",
     "docs:stop": "pnpm --filter inferdi-docs run stop",
+    "examples:typecheck": "pnpm --filter @inferdi/inferdi exec tsc --project ../../examples/tsconfig.shared.json",
     "bench": "pnpm --filter @inferdi/inferdi bench",
     "benchmarks:install": "pnpm --dir benchmarks install --frozen-lockfile",
     "benchmarks:typecheck": "pnpm --dir benchmarks run typecheck",

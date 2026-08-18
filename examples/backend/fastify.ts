@@ -8,8 +8,6 @@ import {
   type RequestContainer
 } from '../_shared/container.js'
 
-const root = buildRootContainer()
-
 declare module 'fastify' {
   interface FastifyInstance {
     di: RootContainer
@@ -25,6 +23,7 @@ function normalizeHeader(value: string | string[] | undefined): string | undefin
 }
 
 export function buildServer(): FastifyInstance {
+  const root = buildRootContainer()
   const app = Fastify()
 
   app.register(inferdiFastify, {
@@ -35,12 +34,14 @@ export function buildServer(): FastifyInstance {
         requestId: request.id,
         ip: request.ip,
         userId: normalizeHeader(request.headers['x-user-id'])
-      })
+      }),
+    disposeRootOnClose: true
   })
 
   app.get('/users/:id', async (request) => {
     const { id } = request.params as { id: string }
-    return request.di.get('users').profile(id)
+    const users = await request.di.getAsync('users')
+    return users.profile(id)
   })
 
   return app

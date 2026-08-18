@@ -127,7 +127,7 @@ type Deps = SpecMap<{ clock: Clock }> & {
 
 ## Migration to 3.0
 
-v3 moves lifetime safety into the type system. Runtime behavior stays compatible, and strict runtime guards remain defense-in-depth.
+v3 moves lifetime safety into the type system. Runtime behavior stays compatible, and the default runtime guards remain defense-in-depth.
 
 Main changes:
 

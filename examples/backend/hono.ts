@@ -21,6 +21,7 @@ app.use('*', inferdiHono({
 }))
 
 app.get('/users/:id', async (c) => {
-  const user = await c.var.di.get('users').profile(c.req.param('id'))
+  const users = await c.var.di.getAsync('users')
+  const user = await users.profile(c.req.param('id'))
   return c.json(user)
 })

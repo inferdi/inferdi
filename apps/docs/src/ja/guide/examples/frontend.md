@@ -6,7 +6,7 @@
 
 | 例 | 内容 |
 | --- | --- |
-| [`react.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react.tsx) | 遅延 `useState` とクリーンアップを伴う React の機能スコープ |
+| [`react.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react.tsx) | commit 後に作成し effect で破棄する React の機能スコープ |
 | [`react-native.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react-native.tsx) | React Native の画面スコープ |
 | [`vue.ts`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/vue.ts) | Vue 3 の provide/inject によるスコープ境界 |
 | [`svelte.ts`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/svelte.ts) | Svelte の context によるスコープ境界 |

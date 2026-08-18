@@ -34,7 +34,8 @@ export async function getProfileAction(formData: FormData) {
     }
   })
 
-  const profile = await scope.get('users').profile(userId ?? 'me')
+  const users = await scope.getAsync('users')
+  const profile = await users.profile(userId ?? 'me')
   revalidatePath('/profile')
   return profile
 }

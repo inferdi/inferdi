@@ -3,7 +3,7 @@
  * production code SHOULD NOT touch but tests rely on heavily:
  *
  *   1. .override(key, value) — replace a registered key with a mock. Walks
- *      up to find the original `kind`, preserves it on the local override,
+ *      up to find the original lifetime, preserves it on the local override,
  *      and refuses if the key has already been resolved on this container.
  *   2. Container.Providers<typeof builder> — typed mock-factory fixture.
  *   3. Container.Resolve<typeof builder> — flat `{ key: ServiceType }` view
@@ -28,33 +28,71 @@ import {
 /*
  * --- Mock implementations ---------------------------------------------------
  *
- * Each mock structurally satisfies the production class. The compile-time
- * guard rejects any mock that drops a public method — no `as any` needed
+ * Each mock extends its production class. The compiler checks every override
+ * without weakening the provider type.
  */
 
-class MockLogger implements Pick<Logger, 'info' | 'error'> {
+const testConfig = { databaseUrl: 'memory://test', logLevel: 'debug' } as const
+
+class MockLogger extends Logger {
   readonly entries: { level: 'info' | 'error'; message: string; meta: Record<string, unknown> | undefined }[] = []
-  info(message: string, meta?: Record<string, unknown>) {
+
+  constructor() {
+    super(testConfig)
+  }
+
+  override info(message: string, meta?: Record<string, unknown>) {
     this.entries.push({ level: 'info', message, meta })
   }
-  error(message: string, meta?: Record<string, unknown>) {
+
+  override error(message: string, meta?: Record<string, unknown>) {
     this.entries.push({ level: 'error', message, meta })
   }
 }
 
-class MockDatabase implements Pick<Database, 'query' | typeof Symbol.asyncDispose> {
+class MockDatabase extends Database {
   closed = false
-  async query<T>(_sql: string, _params: readonly unknown[] = []): Promise<readonly T[]> {
-    return [{ id: '1', name: 'Mock User' }] as unknown as readonly T[]
+
+  constructor() {
+    super(testConfig)
   }
+
+  override async query<T>(_sql: string, _params: readonly unknown[] = []): Promise<readonly T[]> {
+    return []
+  }
+
   async [Symbol.asyncDispose]() {
     this.closed = true
   }
 }
 
-class MockClock {
-  constructor(private readonly fixedNow: Date) {}
-  now() { return this.fixedNow }
+class MockClock extends Clock {
+  constructor(private readonly fixedNow: Date) {
+    super()
+  }
+  override now() { return this.fixedNow }
+}
+
+class MockAuditService extends AuditService {
+  constructor() {
+    super(new MockLogger(), { get: () => new MockClock(new Date('2026-05-15T00:00:00Z')) })
+  }
+
+  override record() {}
+}
+
+class MockUserService extends UserService {
+  constructor() {
+    super(
+      { requestId: 'test' },
+      new MockDatabase(),
+      new MockAuditService()
+    )
+  }
+
+  override async profile() {
+    return { id: 'test', name: 'Test User' }
+  }
 }
 
 /*
@@ -73,13 +111,12 @@ export function buildTestContainer(): RootContainer {
   const clock = new MockClock(new Date('2026-05-15T00:00:00Z'))
 
   return buildRootContainer()
-    .override('logger', logger as unknown as Logger)
-    .override('db', db as unknown as Database)
+    .override('logger', logger)
+    .override('db', db)
     /*
-     * 'clock' is transient — the override replaces the factory result for
-     * every .get('clock') call
+     * 'clock' is a singleton, so this fixed value is shared by test scopes
      */
-    .override('clock', clock as unknown as Clock)
+    .override('clock', clock)
 }
 
 /*
@@ -95,14 +132,13 @@ export function buildTestContainer(): RootContainer {
 type ProviderMap = Container.Providers<RootContainer>
 
 export const mockProviders: ProviderMap = {
-  config: () => ({ databaseUrl: 'memory://test', logLevel: 'debug' }),
-  logger: () => new MockLogger() as unknown as Logger,
-  db: () => new MockDatabase() as unknown as Database,
-  clock: () => new MockClock(new Date('2026-05-15T00:00:00Z')) as unknown as Clock,
-  clockLazy: () => ({ get: () => new MockClock(new Date('2026-05-15T00:00:00Z')) as unknown as Clock }),
-  audit: () => ({ record: () => {} }) as unknown as AuditService,
-  request: () => ({ requestId: 'test', userId: undefined, ip: undefined }),
-  users: () => ({ profile: async () => ({ id: 'test', name: 'Test User' }) }) as unknown as UserService
+  config: () => testConfig,
+  logger: () => new MockLogger(),
+  db: () => new MockDatabase(),
+  clock: () => new MockClock(new Date('2026-05-15T00:00:00Z')),
+  clockLazy: () => ({ get: () => new MockClock(new Date('2026-05-15T00:00:00Z')) }),
+  audit: () => new MockAuditService(),
+  users: () => new MockUserService()
 }
 
 /*

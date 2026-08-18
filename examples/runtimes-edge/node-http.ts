@@ -36,7 +36,8 @@ export const server = createServer((req, res) => {
     })
 
     try {
-      const body = await scope.get('users').profile('me')
+      const users = await scope.getAsync('users')
+      const body = await users.profile('me')
       res.writeHead(200, { 'content-type': 'application/json' })
       res.end(JSON.stringify(body))
     } catch (error) {

@@ -129,7 +129,7 @@ type Deps = SpecMap<{ clock: Clock }> & {
 
 ## Migración a 3.0
 
-v3 traslada la seguridad de los tiempos de vida al sistema de tipos. El comportamiento en runtime se mantiene compatible, y los guards estrictos de runtime siguen siendo defensa en profundidad.
+v3 traslada la seguridad de los tiempos de vida al sistema de tipos. El comportamiento en runtime se mantiene compatible, y los guards de runtime predeterminados siguen siendo defensa en profundidad.
 
 Cambios principales:
 

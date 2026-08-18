@@ -36,9 +36,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
    * before serializing the response. `await using` ties scope disposal to
    * the same boundary — Remix never streams data out of a loader after it
    * returns, so the scope is safe to tear down here
-   */
+  */
   await using scope = await scopeFor(request)
-  return json(await scope.get('users').profile('me'))
+  const users = await scope.getAsync('users')
+  return json(await users.profile('me'))
 }
 
 export async function action({ request }: ActionFunctionArgs) {

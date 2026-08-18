@@ -39,9 +39,9 @@ Each container disposes only instances it created.
 
 | Instance | Owner |
 | --- | --- |
-| Root singleton | Root container |
+| Singleton registered on the root, even when resolved through a child | Root container |
+| Singleton registered on a child | That child container |
 | Scoped service | Request scope |
-| Singleton first resolved on a child | That child container |
 | Transient | Caller |
 
 `root.dispose()` does not cascade into already-created child scopes. Dispose scopes at their own lifecycle boundary.

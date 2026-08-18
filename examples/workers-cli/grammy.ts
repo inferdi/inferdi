@@ -26,6 +26,7 @@ export const bot = new Bot<BotContext>(process.env.BOT_TOKEN!)
 
 bot.use(withContainer)
 bot.command('help', async (ctx) => {
-  const profile = await ctx.container.get('users').profile(String(ctx.from?.id ?? 'anonymous'))
+  const users = await ctx.container.getAsync('users')
+  const profile = await users.profile(String(ctx.from?.id ?? 'anonymous'))
   await ctx.reply(`Chat profile: ${profile.name}`)
 })

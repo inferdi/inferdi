@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": [
+      "ES2022",
+      "DOM",
+      "ESNext.Disposable"
+    ],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "baseUrl": "..",
+    "paths": {
+      "@inferdi/inferdi": [
+        "packages/inferdi/src/index.ts"
+      ]
+    }
+  },
+  "include": [
+    "_shared/container.ts",
+    "_shared/testing.ts"
+  ]
+}

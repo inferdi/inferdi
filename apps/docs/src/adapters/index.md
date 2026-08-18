@@ -19,7 +19,7 @@ Adapters manage request-scope lifecycle. The core package stays zero-dependency 
 In scoped mode every adapter runs the same steps for each request:
 
 1. **Create** the scope from the root container (`createScope`, default `root.createScope()`) when the request begins.
-2. **Expose** it at the framework-native location (`request.di`, `ctx.state.di`, `c.var.di`, or the Elysia context key) *before* setup runs, so a setup failure and your cleanup hooks all observe the same slot.
+2. **Expose** it at the framework-native location. Hono, Koa, Express, and Elysia expose it before setup. Fastify exposes `request.di` after setup succeeds and only exposes it temporarily while cleaning up a setup failure. Cleanup hooks still observe the public slot; error handlers never receive a half-built scope.
 3. **Set up** the scope with `setupScope` when additional initialization is needed before handlers run. It may be async.
 4. **Handle** the request: route handlers and the framework's error handlers resolve services from the exposed scope.
 5. **Dispose** the scope at the framework's safe completion point (`disposeScope`, default `scope.dispose()`), unless ownership was transferred.

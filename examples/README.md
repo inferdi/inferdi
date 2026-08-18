@@ -2,11 +2,11 @@
 
 These examples show recommended InferDI integration patterns for common TypeScript frameworks and runtimes.
 
-They are reference snippets for GitHub readers. The root package intentionally does not install framework dependencies, does not typecheck this directory, and does not publish `examples/` to npm. Copy the pattern into your application and install the framework dependencies there.
+They are reference snippets for GitHub readers and are not published to npm. The root workspace does not install example-only framework dependencies. `pnpm run examples:typecheck` checks the canonical shared graph against the current container source; copy a framework pattern into your application and typecheck it with that framework's dependencies.
 
 ## Start here
 
-[**`_shared/container.ts`**](./_shared) is the **canonical** example. Read it first — it shows the features InferDI was designed for (async factory with LIFO `Symbol.asyncDispose`, `Lazy<T>` companion keys for transient deps in singletons, `Module<TIn, TOut>` composition, and the compile-time lifetime guard). All framework adapters import their container from there, so the per-framework files contain only the wiring that is actually framework-specific.
+[**`_shared/container.ts`**](./_shared) is the canonical example. It shows declarative async registrations with propagated `AsyncSpec`, LIFO `Symbol.asyncDispose`, a `Lazy<T>` companion for a singleton dependency, `Module<TRequirements, TProvides>` composition and the compile-time lifetime guard. Framework examples import this graph and focus on lifecycle wiring.
 
 ## Categories
 
@@ -25,6 +25,7 @@ They are reference snippets for GitHub readers. The root package intentionally d
 - Declare runtime request, job, or route data with `declareScopeInputs()` and provide it to `createScope(inputs)`.
 - Register services that consume those inputs as `scoped` or `transient`.
 - Dispose request/job scopes explicitly when that unit of work is done.
+- Dispose the root container once when the application shuts down. Disposing a child scope does not dispose singletons owned by the root.
 - Do not inject scoped or transient services directly into singletons.
 - Use `await using` when the function boundary owns all async work, such as CLI commands, queue jobs, Next.js Server Actions, and non-streaming fetch handlers.
 - In HTTP frameworks, prefer framework completion hooks or response finish/close events so streaming and aborted connections still clean up scopes.

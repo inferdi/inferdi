@@ -14,7 +14,9 @@ type Ctx = { container: RequestContainer }
 const t = initTRPC.context<Ctx>().create()
 
 export const router = t.router({
-  me: t.procedure.query(({ ctx }) => ctx.container.get('users').profile('me'))
+  me: t.procedure.query(async ({ ctx }) =>
+    (await ctx.container.getAsync('users')).profile('me')
+  )
 })
 
 /*

@@ -16,19 +16,18 @@ Deno.serve(async (request, info) => {
   })
 
   try {
-    const profile = await scope.get('users').profile('me')
+    const users = await scope.getAsync('users')
+    const profile = await users.profile('me')
 
     /*
-     * Async background work that uses scoped services. MUST finish before
-     * dispose — chaining via `.finally` guarantees that. Running it in
-     * `Promise.all([background, scope.dispose()])` would tear down the
-     * scope while the background promise is still reading from it
+     * `completed` settles after Deno finishes sending the response. Attach
+     * disposal there so streaming responses retain their request scope.
      */
-    const background = (async () => {
-      scope.get('audit').record('request.completed', { path: new URL(request.url).pathname })
-    })()
-
-    info.waitUntil(background.finally(() => scope.dispose()))
+    void info.completed
+      .then(() => scope.dispose())
+      .catch((error) => {
+        console.error('Failed to dispose Deno request scope', error)
+      })
 
     return Response.json(profile)
   } catch (error) {

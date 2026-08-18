@@ -14,11 +14,7 @@ export const cli = yargs(hideBin(process.argv))
         .positional('target', { type: 'string', demandOption: true })
         .option('verbose', { type: 'boolean', default: false }),
     async (argv) => {
-      /*
-       * Each CLI invocation owns a fresh scope; `await using` disposes the
-       * shared `Database` factory deterministically before the action
-       * resolves (and therefore before the Node process exits)
-       */
+      /* Each command invocation owns one operation scope */
       await using scope = root.createScope({
         request: { requestId: `cli:sync:${Date.now()}` }
       })
@@ -30,3 +26,11 @@ export const cli = yargs(hideBin(process.argv))
     }
   )
   .strict()
+
+export async function run() {
+  try {
+    await cli.parseAsync()
+  } finally {
+    await root.dispose()
+  }
+}

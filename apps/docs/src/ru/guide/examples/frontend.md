@@ -6,7 +6,7 @@
 
 | Пример | Что показывает |
 | --- | --- |
-| [`react.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react.tsx) | feature scope в React с ленивым `useState` и очисткой |
+| [`react.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react.tsx) | feature scope в React, созданный после commit и очищаемый effect-хуком |
 | [`react-native.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react-native.tsx) | scope экрана в React Native |
 | [`vue.ts`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/vue.ts) | граница scope через provide/inject во Vue 3 |
 | [`svelte.ts`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/svelte.ts) | граница scope через context в Svelte |

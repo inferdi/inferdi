@@ -57,7 +57,7 @@ const root = new Container()
   .registerFactory('supabase', (c) => {
     const { url, key } = c.get('supabaseEnv')
     return createClient(url, key)
-  })
+  }, ['supabaseEnv'])
   .registerClass('profiles', ProfilesService, ['request', 'supabase'], 'scoped')
 
 Deno.serve(async (request) => {
@@ -70,15 +70,14 @@ Deno.serve(async (request) => {
     const profiles = scope.get('profiles')
     const result = await profiles.list()
 
-    /*
-     * Background work that uses scoped services. `EdgeRuntime.waitUntil` keeps
-     * the function instance alive until the promise settles, so we sequence
-     * dispose AFTER the audit write — never in parallel with it. Without the
-     * `.finally(scope.dispose)` the scoped supabase client and RequestContext
-     * would be torn down while the audit write is still in flight
-     */
+    /* The audit call needs the scoped RequestContext until it settles */
     EdgeRuntime.waitUntil(
-      profiles.audit('profiles.listed').finally(() => scope.dispose())
+      profiles
+        .audit('profiles.listed')
+        .finally(() => scope.dispose())
+        .catch((error) => {
+          console.error('Failed to write request audit', error)
+        })
     )
 
     return Response.json(result)

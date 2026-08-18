@@ -2,16 +2,16 @@
 
 Los ejemplos de runtime usan una raíz a nivel de módulo y crean un scope por petición. Los manejadores acotados pueden usar `await using`; el trabajo en streaming o en segundo plano debe liberarse una vez que ese trabajo termine.
 
-La mayoría de los ejemplos comparten [`examples/_shared/container.ts`](https://github.com/inferdi/inferdi/blob/main/examples/_shared/container.ts). Supabase Edge Functions usa un cambio de factoría local manteniendo la misma disciplina de scope de petición.
+La mayoría de los ejemplos comparten [`examples/_shared/container.ts`](https://github.com/inferdi/inferdi/blob/main/examples/_shared/container.ts). Cloudflare Workers y Supabase Edge Functions crean grafos locales alrededor de los bindings de su plataforma.
 
 | Ejemplo | Muestra |
 | --- | --- |
 | [`node-http.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/node-http.ts) | Ciclo de vida HTTP de bajo nivel en Node con limpieza en la respuesta |
 | [`bun-serve.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/bun-serve.ts) | Scope de petición de `serve` de Bun |
 | [`deno-http.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/deno-http.ts) | Scope de petición HTTP de Deno |
-| [`cloudflare-workers.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/cloudflare-workers.ts) | Scope de petición de Cloudflare Workers y secuenciación de `ctx.waitUntil` |
+| [`cloudflare-workers.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/cloudflare-workers.ts) | Tipos de bindings generados por Wrangler, D1, Queues y `ctx.waitUntil` con errores gestionados |
 | [`vercel-edge.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/vercel-edge.ts) | Scope de petición de Vercel Edge y limpieza en segundo plano |
-| [`deno-deploy.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/deno-deploy.ts) | Scope de petición de Deno Deploy y limpieza con `info.waitUntil` |
+| [`deno-deploy.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/deno-deploy.ts) | Limpieza de Deno Deploy mediante `Deno.ServeHandlerInfo.completed` |
 | [`supabase-edge-functions.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/supabase-edge-functions.ts) | Supabase Edge Functions con un cambio de factoría personalizado |
 
 ## Node HTTP
@@ -33,6 +33,8 @@ Archivo del repositorio: [`examples/runtimes-edge/bun-serve.ts`](https://github.
 Archivo del repositorio: [`examples/runtimes-edge/deno-http.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/deno-http.ts)
 
 ## Cloudflare Workers
+
+Configura los bindings `DB` y `AUDIT_QUEUE` en `wrangler.jsonc` y ejecuta `pnpm wrangler types`. El ejemplo usa la interfaz `Env` generada y mantiene el trabajo en segundo plano independiente del scope de petición.
 
 <<< ../../../../../../examples/runtimes-edge/cloudflare-workers.ts
 

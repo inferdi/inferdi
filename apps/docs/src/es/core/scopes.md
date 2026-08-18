@@ -39,9 +39,9 @@ Cada contenedor libera solo las instancias que creó.
 
 | Instancia | Propietario |
 | --- | --- |
-| Singleton de raíz | Contenedor raíz |
+| Singleton registrado en la raíz, aunque se resuelva desde un hijo | Contenedor raíz |
+| Singleton registrado en un contenedor hijo | Ese contenedor hijo |
 | Servicio con scope | Scope de petición |
-| Singleton resuelto por primera vez en un hijo | Ese contenedor hijo |
 | Transitorio | Llamante |
 
 `root.dispose()` no cascadea hacia los scopes hijos ya creados. Libera los scopes en su propio límite de ciclo de vida.
