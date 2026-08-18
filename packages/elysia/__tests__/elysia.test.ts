@@ -189,6 +189,32 @@ describe('@inferdi/elysia', () => {
     expect(disposed).toEqual([customScope])
   })
 
+  it('awaits async disposal before later afterResponse hooks', async () => {
+    const root = new TestRoot()
+    const lifecycle: string[] = []
+    const app = new Elysia()
+      .use(inferdiElysia({
+        container: root,
+        disposeScope: async () => {
+          await delay(1)
+          lifecycle.push('disposed')
+        }
+      }))
+      .onAfterResponse(() => {
+        lifecycle.push('afterResponse')
+      })
+      .get('/ok', () => ({ ok: true }))
+
+    const response = await app.handle(request('/ok'))
+
+    await vi.waitFor(() => {
+      expect(lifecycle).toHaveLength(2)
+    })
+
+    expect(response.status).toBe(200)
+    expect(lifecycle).toEqual(['disposed', 'afterResponse'])
+  })
+
   it('supports custom createScope without setupScope', async () => {
     const root = new TestRoot()
     const customScope = new TestScope()
@@ -803,11 +829,13 @@ describe('@inferdi/elysia', () => {
       .get('/ok', () => ({ ok: true }))
 
     const response = await app.handle(request('/ok'))
-    await waitForAfterResponse()
+
+    await vi.waitFor(() => {
+      expect(logged).toEqual([[disposeError, 'afterResponse']])
+    })
 
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ ok: true })
-    expect(logged).toEqual([[disposeError, 'afterResponse']])
     expect(consoleError).not.toHaveBeenCalled()
 
     consoleError.mockRestore()

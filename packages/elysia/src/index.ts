@@ -872,7 +872,7 @@ export function inferdiElysia(options: unknown): unknown {
         state.error = error
       }
     })
-    .onAfterResponse({ as: 'scoped' }, ({ request }) =>
+    .onAfterResponse({ as: 'scoped' }, async ({ request }) =>
       useDefaultDisposePath
         ? disposeDefaultOnce(request)
         : disposeOnce(request)
