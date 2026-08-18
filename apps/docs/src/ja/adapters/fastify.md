@@ -56,16 +56,16 @@ Fastify の `app.register` は、インラインフックに対してプラグ�
 
 ## オプション
 
-| オプション | デフォルト | 説明 |
-| --- | --- | --- |
-| `container` | 必須 | `app.di` として公開されるルートコンテナ。 |
-| `scopePerRequest` | `true` | ルート専用モードにするには `false` を設定します。 |
-| `createScope` | `root.createScope()` | カスタムのリクエストスコープ作成。非同期でもかまいません。 |
-| `setupScope` | なし | スコープ作成後に追加の初期化を行います。 |
-| `disposeScope` | `scope.dispose()` | カスタムの破棄。同期でも非同期でもかまいません。 |
-| `autoDispose` | `true` | `false` または `false` を返す述語は、所有権をアプリケーションコードに移譲します。 |
-| `disposeRootOnClose` | `false` | `fastify.close()` 中にルートを破棄します。 |
-| `onDisposeError` | `request.log.error` | リクエストスコープの破棄失敗のシンク。 |
+| オプション                | デフォルト                | 説明                                                |
+|----------------------|----------------------|---------------------------------------------------|
+| `container`          | 必須                   | `app.di` として公開されるルートコンテナ。                         |
+| `scopePerRequest`    | `true`               | ルート専用モードにするには `false` を設定します。                     |
+| `createScope`        | `root.createScope()` | カスタムのリクエストスコープ作成。非同期でもかまいません。                     |
+| `setupScope`         | なし                   | スコープ作成後に追加の初期化を行います。                              |
+| `disposeScope`       | `scope.dispose()`    | カスタムの破棄。同期でも非同期でもかまいません。                          |
+| `autoDispose`        | `true`               | `false` または `false` を返す述語は、所有権をアプリケーションコードに移譲します。 |
+| `disposeRootOnClose` | `false`              | `fastify.close()` 中にルートを破棄します。                    |
+| `onDisposeError`     | `request.log.error`  | リクエストスコープの破棄失敗のシンク。                               |
 
 ## ルート専用モード
 

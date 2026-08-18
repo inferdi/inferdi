@@ -121,16 +121,16 @@ await app.register(inferdiFastify, {
 })
 ```
 
-| Option | Default | Description |
-| --- | --- | --- |
-| `container` | — | **Required.** The root container. Must structurally provide `createScope()`; a `dispose()` is required only when `disposeRootOnClose: true`. Exposed as `app.di`. |
-| `scopePerRequest` | `true` | Set to `false` for [root-only mode](#root-only-mode). |
-| `createScope` | `root.createScope()` | Overrides how a per-request scope is created. May be async. |
-| `setupScope` | — | Hydrates the scope before it is assigned to `request.di`. Runs in `onRequest`. May be async. |
-| `disposeScope` | `scope.dispose()` | Overrides request-scope disposal. May be sync or async. |
-| `autoDispose` | `true` | Set to `false`, or return `false` from a predicate, when application code owns disposal. |
-| `disposeRootOnClose` | `false` | Dispose the root container on `fastify.close()`. Set it when the Fastify instance owns the root container's lifetime. Requires a disposable root: the type narrows to `false` when `container` has no `dispose()`. |
-| `onDisposeError` | `request.log.error(...)` | Optional sink for **request-scope** disposal failures. Returning normally marks the error handled; otherwise it is logged. Disposal runs in `onResponse` (the response is already sent), so a failure here is never surfaced to the client. |
+| Option               | Default                  | Description                                                                                                                                                                                                                                 |
+|----------------------|--------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `container`          | —                        | **Required.** The root container. Must structurally provide `createScope()`; a `dispose()` is required only when `disposeRootOnClose: true`. Exposed as `app.di`.                                                                           |
+| `scopePerRequest`    | `true`                   | Set to `false` for [root-only mode](#root-only-mode).                                                                                                                                                                                       |
+| `createScope`        | `root.createScope()`     | Overrides how a per-request scope is created. May be async.                                                                                                                                                                                 |
+| `setupScope`         | —                        | Hydrates the scope before it is assigned to `request.di`. Runs in `onRequest`. May be async.                                                                                                                                                |
+| `disposeScope`       | `scope.dispose()`        | Overrides request-scope disposal. May be sync or async.                                                                                                                                                                                     |
+| `autoDispose`        | `true`                   | Set to `false`, or return `false` from a predicate, when application code owns disposal.                                                                                                                                                    |
+| `disposeRootOnClose` | `false`                  | Dispose the root container on `fastify.close()`. Set it when the Fastify instance owns the root container's lifetime. Requires a disposable root: the type narrows to `false` when `container` has no `dispose()`.                          |
+| `onDisposeError`     | `request.log.error(...)` | Optional sink for **request-scope** disposal failures. Returning normally marks the error handled; otherwise it is logged. Disposal runs in `onResponse` (the response is already sent), so a failure here is never surfaced to the client. |
 
 `InferdiScope.dispose()` may be synchronous or asynchronous — a sync `dispose()`
 resolves the response in the same tick without scheduling a microtask.
@@ -244,13 +244,13 @@ export const inferdiFastify: InferdiFastifyPlugin
 
 ## Related
 
-| Package | JSR | npm | Description |
-| --- | --- | --- | --- |
+| Package                                                                             | JSR                                    | npm                                                   | Description                                                         |
+|-------------------------------------------------------------------------------------|----------------------------------------|-------------------------------------------------------|---------------------------------------------------------------------|
 | [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) | [JSR](https://jsr.io/@inferdi/inferdi) | [npm](https://www.npmjs.com/package/@inferdi/inferdi) | Core DI container — zero-dependency, decorator-free, strongly typed |
-| [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | [JSR](https://jsr.io/@inferdi/fastify) | [npm](https://www.npmjs.com/package/@inferdi/fastify) | Fastify v5 request-scope adapter |
-| [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) | [JSR](https://jsr.io/@inferdi/hono) | [npm](https://www.npmjs.com/package/@inferdi/hono) | Hono request-scope middleware |
-| [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) | [JSR](https://jsr.io/@inferdi/koa) | [npm](https://www.npmjs.com/package/@inferdi/koa) | Koa v3 request-scope middleware |
-| [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | [JSR](https://jsr.io/@inferdi/express) | [npm](https://www.npmjs.com/package/@inferdi/express) | Express 5 request-scope middleware |
-| [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) | [JSR](https://jsr.io/@inferdi/elysia) | [npm](https://www.npmjs.com/package/@inferdi/elysia) | Elysia request-scope plugin |
+| [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | [JSR](https://jsr.io/@inferdi/fastify) | [npm](https://www.npmjs.com/package/@inferdi/fastify) | Fastify v5 request-scope adapter                                    |
+| [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono)       | [JSR](https://jsr.io/@inferdi/hono)    | [npm](https://www.npmjs.com/package/@inferdi/hono)    | Hono request-scope middleware                                       |
+| [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa)         | [JSR](https://jsr.io/@inferdi/koa)     | [npm](https://www.npmjs.com/package/@inferdi/koa)     | Koa v3 request-scope middleware                                     |
+| [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | [JSR](https://jsr.io/@inferdi/express) | [npm](https://www.npmjs.com/package/@inferdi/express) | Express 5 request-scope middleware                                  |
+| [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)   | [JSR](https://jsr.io/@inferdi/elysia)  | [npm](https://www.npmjs.com/package/@inferdi/elysia)  | Elysia request-scope plugin                                         |
 
 The project repository lives at [inferdi/inferdi](https://github.com/inferdi/inferdi). This adapter targets [Fastify](https://fastify.dev) v5.

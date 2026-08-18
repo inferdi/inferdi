@@ -2,11 +2,11 @@
 
 InferDI está escrito en TypeScript, pero los proyectos de JavaScript consumen el paquete npm compilado a través del mapa de exports del paquete.
 
-| Ejemplo | Muestra |
-| --- | --- |
-| [`node-esm.mjs`](https://github.com/inferdi/inferdi/blob/main/examples/javascript/node-esm.mjs) | Importación ESM en Node con `// @ts-check` y tipos de constructor mediante JSDoc |
-| [`node-commonjs.cjs`](https://github.com/inferdi/inferdi/blob/main/examples/javascript/node-commonjs.cjs) | `require()` de CommonJS en Node a través del mapa de exports del paquete |
-| [`browser-vite.js`](https://github.com/inferdi/inferdi/blob/main/examples/javascript/browser-vite.js) | ESM orientado al navegador para Vite u otro bundler |
+| Ejemplo                                                                                                   | Muestra                                                                          |
+|-----------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------|
+| [`node-esm.mjs`](https://github.com/inferdi/inferdi/blob/main/examples/javascript/node-esm.mjs)           | Importación ESM en Node con `// @ts-check` y tipos de constructor mediante JSDoc |
+| [`node-commonjs.cjs`](https://github.com/inferdi/inferdi/blob/main/examples/javascript/node-commonjs.cjs) | `require()` de CommonJS en Node a través del mapa de exports del paquete         |
+| [`browser-vite.js`](https://github.com/inferdi/inferdi/blob/main/examples/javascript/browser-vite.js)     | ESM orientado al navegador para Vite u otro bundler                              |
 
 ## Node ESM
 

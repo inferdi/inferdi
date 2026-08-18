@@ -4,10 +4,10 @@ Full-stack examples use scopes for loaders, actions, route handlers, and server 
 
 Both examples share [`examples/_shared/container.ts`](https://github.com/inferdi/inferdi/blob/main/examples/_shared/container.ts). Compare the operation boundary that each framework awaits.
 
-| Example | Shows |
-| --- | --- |
+| Example                                                                                                    | Shows                                                         |
+|------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------|
 | [`next-app-router.ts`](https://github.com/inferdi/inferdi/blob/main/examples/fullstack/next-app-router.ts) | Next.js App Router request and Server Action scope boundaries |
-| [`remix.ts`](https://github.com/inferdi/inferdi/blob/main/examples/fullstack/remix.ts) | Remix loader and action scope boundaries |
+| [`remix.ts`](https://github.com/inferdi/inferdi/blob/main/examples/fullstack/remix.ts)                     | Remix loader and action scope boundaries                      |
 
 ## Next.js App Router
 

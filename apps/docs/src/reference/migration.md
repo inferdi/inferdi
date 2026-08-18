@@ -4,11 +4,17 @@ InferDI records breaking changes by major version. The source of truth remains [
 
 ## Migration to 6.0
 
+This summary assumes an upgrade from stable `5.0.7`. Upgrade every installed
+`@inferdi/*` package to `6.0.0`; the adapters require
+`@inferdi/inferdi@^6.0.0`.
+
 - Replace `RegistrationKind` with `Lifetime` and `Spec.kind` with `Spec.lifetime`; no deprecated alias remains.
-- Move deps-aware sync factories from `registerFactory(key, deps, factory, ...)` to `registerFactory(key, factory, deps, ...)`. A sync factory companion requires an explicit lifetime, including `'singleton'`.
-- Replace the previous runtime-check opt-out with `{fast: true}`. The prerelease `mode` option was removed. `fast` defaults to `false`, which keeps runtime checks enabled and the graph mutable; `fast: true` selects the unchecked fixed contract.
+- Stable v5 had no deps-aware `registerFactory` overload. V6 adds `registerFactory(key, factory, deps, ...)`; only users of the v6 prerelease form `registerFactory(key, deps, factory, ...)` must reorder arguments. A sync factory companion requires an explicit lifetime, including `'singleton'`.
+- Replace v5 `{strict: false}` with `{fast: true}` and `{strict: true}` with the default or `{fast: false}`. The boolean polarity is reversed. The prerelease `mode` option was removed.
 - Named `Module<TRequirements, TProvides>` accepts actual graphs with extra registrations, preserves them, checks exact requirements, and rejects output collisions. `new Container(parent)` is no longer public; use `createScope()`.
 - Registration now rejects any key type that may overlap an existing primary or lazy key. Narrow broad or union keys to a fresh member, or use `.override()` for intentional replacement.
+- V6 adds type-only scope inputs through `declareScopeInputs<Inputs>()` and `createScope(inputs)`. Existing zero-argument scopes keep their v5 behavior.
+- V6 adds `registerAsyncFactory`, `AsyncSpec`, and `getAsync()` for declarative async dependencies. Promise-valued `registerFactory` remains a synchronous graph service and still resolves through `get()`.
 - Async teardown reports a shared rejection object once when dependency failure propagates through several cached Promises. Sync teardown observes native-Promise rejection before throwing an async-misuse error.
 
 ### Generic Resolver Helpers Use Ready Keys

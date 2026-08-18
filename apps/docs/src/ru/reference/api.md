@@ -50,10 +50,13 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 }
 ```
 
-`fast` по умолчанию равен `false`: runtime-проверки включены, а scope сохраняют
-точную mutable parent chain. `{fast: true}` отключает эти проверки и считает
-граф фиксированным, включая flattened parent lookup и mirroring унаследованных
-singleton. Дочерние scope наследуют конфигурацию root.
+`fast` по умолчанию равен `false`: runtime-проверки циклов и lifetime включены,
+а scope сохраняют точную mutable parent chain. `{fast: true}` отключает этот
+учёт и считает граф фиксированным, включая flattened parent lookup и mirroring
+унаследованных singleton. Дочерние scope наследуют конфигурацию root. В
+fast-дереве завершите все вызовы `register*`, `.use()` и `.override()` до
+первого resolve или `createScope()` и освобождайте дочерние контейнеры раньше
+предков.
 
 ## Методы регистрации
 
@@ -62,23 +65,25 @@ singleton. Дочерние scope наследуют конфигурацию ro
 | `registerClass` | Аргументы конструктора из `deps` | `Spec` или распространённый `AsyncSpec` | `get` или `getAsync` |
 | `registerFactory(key, factory, ...)` | Контейнер, отфильтрованный по lifetime | `Spec<ReturnType>` | `get` |
 | `registerFactory(key, factory, deps, ...)` | Resolver только для `deps` | `Spec` с требованиями inputs | `get` |
-| `registerAsyncFactory` | Разрешённые позиционные значения | `AsyncSpec<Awaited<ReturnType>>` | `getAsync` |
+| `registerAsyncFactory` | Позиционные значения; декларативные async-зависимости ожидаются | `AsyncSpec<Awaited<ReturnType>>` | `getAsync` |
 | `registerValue` | Нет | Внешний singleton `Spec` | `get` |
 
-`registerClass` и `registerFactory` принимают lifetimes `singleton`, `scoped` и `transient`. Для companion у `registerFactory` lifetime указывается явно, включая `'singleton'`. `registerValue` всегда создаёт singleton, которым владеет внешний код.
+`registerClass`, `registerFactory` и `registerAsyncFactory` принимают lifetimes `singleton`, `scoped` и `transient`. Для companion у `registerFactory` lifetime указывается явно, включая `'singleton'`. `registerValue` всегда создаёт singleton, которым владеет внешний код.
 
-`registerAsyncFactory` принимает те же lifetimes и опциональный пятый `lazyKey`. Основная запись хранит итоговый тип как `AsyncSpec`, companion имеет тип `AsyncLazySpec<Awaited<ReturnType>, L>`. Цель разрешается через `getAsync()`, wrapper — через `get()`.
+Параметр `lazyKey` у `registerClass` или `registerFactory` добавляет управляемый `LazySpec`. Для класса, который получил async-статус от зависимостей, вместо него добавляется `AsyncLazySpec`. Возвращающий Promise `registerFactory` остаётся синхронным `Spec<Promise<T>>`, а его companion — `Lazy<Promise<T>>`; используйте `registerAsyncFactory`, если граф должен хранить итоговый тип сервиса.
+
+`registerAsyncFactory` принимает те же lifetimes и опциональный пятый `lazyKey`. Основная запись хранит итоговый тип как `AsyncSpec`, companion имеет тип `AsyncLazySpec<Awaited<ReturnType>, L>`. Зависимые классы наследуют async-статус целевого ключа, а потребитель wrapper остаётся синхронным. Цель разрешается через `getAsync()`, wrapper — через `get()`.
 
 `registerAsyncFactory` и вызовы `registerClass`, чей кортеж может выбрать async-ключ, требуют readonly-кортеж зависимостей. InferDI один раз классифицирует async-позиции и сохраняет ссылку на кортеж. Литералы автоматически выводятся как readonly; sync-only вызовы `registerClass` сохраняют поддержку изменяемых кортежей.
 
-У `registerAsyncFactory` и deps-aware `registerFactory` разный порядок аргументов и контракт callback:
+У deps-aware `registerFactory` и `registerAsyncFactory` одинаковый порядок аргументов, но разные контракты callback. Первый получает resolver, ограниченный `deps`, второй — позиционные значения зависимостей:
 
 ```ts
 registerFactory(key, resolverFactory, deps, lifetime, lazyKey)
 registerAsyncFactory(key, valueFactory, deps, lifetime, lazyKey)
 ```
 
-`override` заменяет существующую регистрацию, а `use` применяет module builder. Проверка `override` смотрит только в кеш текущего контейнера. Она обнаруживает локально закешированные singleton/scoped-значения, `registerValue` и повторные overrides, но не отслеживает transient-resolve и значения предка, разрешённые через дочерний контейнер. Применяйте overrides до разрешения графа зависимостей.
+`override` заменяет существующую регистрацию, не являющуюся scope input, а `use` применяет module builder. Проверка `override` смотрит только в кеш текущего контейнера. Она обнаруживает локально закешированные singleton/scoped-значения, `registerValue` и повторные overrides, но никогда не отслеживает transient-resolve. В checked-режиме она также не видит singleton-значения предка, разрешённые через дочерний контейнер; fast-скоуп зеркалирует делегированные singleton в локальный кеш, поэтому проверка их обнаруживает. Применяйте overrides до разрешения графа зависимостей.
 
 ## Scope inputs и разрешение
 
@@ -90,7 +95,7 @@ registerAsyncFactory(key, valueFactory, deps, lifetime, lazyKey)
 | `getAsync()` | Все готовые sync- и декларативные async-ключи |
 | `has()` | Любой string или symbol; доказывает только наличие регистрации |
 
-`has()` не доказывает готовность или синхронность ключа. Type-state refinement описан в разделе [Входные данные скоупа](../core/scope-inputs), а Promise-поведение — в [Асинхронных зависимостях](../core/async-dependencies).
+`has()` не доказывает готовность или синхронность ключа. Объявленные scope inputs существуют только на уровне типов и не являются регистрациями, поэтому `has()` возвращает для них `false` даже после передачи значений в `createScope(inputs)`. Type-state refinement описан в разделе [Входные данные скоупа](../core/scope-inputs), а Promise-поведение — в [Асинхронных зависимостях](../core/async-dependencies).
 
 ## Типы namespace
 
@@ -112,7 +117,7 @@ namespace Container {
 | `Container.Resolve<C>` | Извлекает плоскую карту `{ key: Value }` из собранного контейнера. |
 | `Container.ResolveUnwrapped<C>` | Как `Resolve`, но distributive-разворачивает управляемые `LazySpec` и `AsyncLazySpec`; обычные wrapper-сервисы не меняются. |
 | `Container.UnwrappedValue<C, K>` | Находит один развёрнутый тип сервиса. |
-| `Container.Providers<C>` | Карта provider-thunks для тестов. |
+| `Container.Providers<C>` | Карта provider-thunks для тестов; объявленные scope inputs исключены. |
 
 Generic resolver в v6 должен сохранять допустимый набор ключей. Для `get()` используйте `Container.SyncReadyKeys<C>`, а для `getAsync()` — `Container.ReadyKeys<C>` вместо неограниченного `keyof T`.
 
@@ -163,7 +168,9 @@ type Module<TRequirements extends DependenciesMap, TProvides extends Dependencie
 управляемых companion в явных `Container` и `Module` shapes используйте эти
 именованные типы. Runtime-поля для discriminant нет, экспортировать его нельзя.
 
-`ScopeInputMap<M>` преобразует обязательные конечные string- и symbol-свойства в scoped inputs. Тип отклоняет optional- и numeric-ключи, `__proto__`, широкие index signatures и union-типы с разными наборами ключей. `WithRequirements<S, K>` переносит обязательные input keys на выход именованного модуля. Точные conditional definitions находятся в опубликованных TypeScript declarations.
+`Spec`, `AsyncSpec`, `LazySpec` и `AsyncLazySpec` описывают записи type-level графа; их поля не добавляются в разрешённые значения сервисов.
+
+`ScopeInputMap<M>` преобразует обязательные конечные string- и symbol-свойства в scoped inputs. Тип отклоняет optional- и numeric-ключи, `__proto__`, широкие index signatures и union-типы с разными наборами ключей. `WithRequirements<S, K>` прикрепляет обязательные input keys к записи графа и удобен в выходах именованных модулей. Точные conditional definitions находятся в опубликованных TypeScript declarations.
 
 ## Форма API адаптеров
 

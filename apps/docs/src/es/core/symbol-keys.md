@@ -19,10 +19,10 @@ c.get('repo')
 
 ## Cuándo usar symbols
 
-| Patrón | Token |
-| --- | --- |
-| Servicio privado local al módulo | `Symbol('name')` |
-| Identidad compartida sin imports | `Symbol.for('name')` |
+| Patrón                              | Token                     |
+|-------------------------------------|---------------------------|
+| Servicio privado local al módulo    | `Symbol('name')`          |
+| Identidad compartida sin imports    | `Symbol.for('name')`      |
 | Distinción nominal a nivel de tipos | constante `unique symbol` |
 
 Usa symbols locales para servicios privados recolectables. `Symbol.for(name)` se almacena en el registro global de symbols y nunca lo recolecta el recolector de basura.

@@ -43,12 +43,12 @@ import { Container } from 'jsr:@inferdi/inferdi'
 
 ## Requisitos
 
-| Runtime | Requisito |
-| --- | --- |
-| Node.js | 16 o más reciente para el paquete del núcleo |
-| Bun | 1.0 o más reciente |
-| Deno | 1.40 o más reciente |
-| TypeScript | 5.2 o posterior |
+| Runtime    | Requisito                                    |
+|------------|----------------------------------------------|
+| Node.js    | 16 o más reciente para el paquete del núcleo |
+| Bun        | 1.0 o más reciente                           |
+| Deno       | 1.40 o más reciente                          |
+| TypeScript | 5.2 o posterior                              |
 
 En versiones de Node anteriores a `Symbol.dispose` y `Symbol.asyncDispose` nativos, InferDI instala un polyfill de símbolos al importar para que la interoperabilidad con Explicit Resource Management siga funcionando.
 

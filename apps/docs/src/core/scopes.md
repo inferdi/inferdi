@@ -37,12 +37,12 @@ The container type tracks which inputs have been provided and hides dependent se
 
 Each container disposes only instances it created.
 
-| Instance | Owner |
-| --- | --- |
-| Singleton registered on the root, even when resolved through a child | Root container |
-| Singleton registered on a child | That child container |
-| Scoped service | Request scope |
-| Transient | Caller |
+| Instance                                                             | Owner                |
+|----------------------------------------------------------------------|----------------------|
+| Singleton registered on the root, even when resolved through a child | Root container       |
+| Singleton registered on a child                                      | That child container |
+| Scoped service                                                       | Request scope        |
+| Transient                                                            | Caller               |
 
 `root.dispose()` does not cascade into already-created child scopes. Dispose scopes at their own lifecycle boundary.
 

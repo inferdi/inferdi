@@ -13,6 +13,31 @@ For new features and fixes within a major line, see the release notes on the Git
 
 ## Migration to 6.0
 
+This section assumes an upgrade from the latest stable v5 release, `5.0.7`.
+Upgrade every installed `@inferdi/*` package to `6.0.0` in the same change;
+the adapters declare `@inferdi/inferdi@^6.0.0` as a peer dependency.
+
+### Upgrade checklist
+
+1. Replace `RegistrationKind` with `Lifetime`, and replace structural
+   `Spec.kind` fields with `Spec.lifetime`.
+2. Replace `ContainerOptions.strict` with `fast`, preserving the inverted
+   boolean meaning described below.
+3. Replace public `new Container(parent)` calls with `parent.createScope()`.
+4. Give `registerFactory(..., lazyKey)` an explicit lifetime; replace the v5
+   `undefined` shorthand with `'singleton'` where needed.
+5. Recompile generic resolver helpers and use `Container.SyncReadyKeys` or
+   `Container.ReadyKeys` where `keyof T` no longer satisfies `.get()`.
+6. Use the named `LazySpec` and `AsyncLazySpec` exports in explicit graph
+   shapes. Do not reproduce managed companion specs structurally.
+7. Fix newly reported module-requirement, output-collision, and registration-key
+   overlap errors instead of casting around them.
+
+Existing container-aware calls without a companion, and calls that already pass
+an explicit lifetime before `lazyKey`, keep their argument order. A Promise
+returned from `registerFactory` also keeps its v5 meaning: the Promise itself
+remains the synchronous graph value.
+
 ### Lifetime vocabulary
 
 The public type model now uses one vocabulary consistently:
@@ -24,23 +49,29 @@ The public type model now uses one vocabulary consistently:
 There is no deprecated alias. Runtime registration objects may still use an
 internal `kind` field, but it is not part of the public API.
 
-### `registerFactory` is factory-first
+### Deps-aware `registerFactory` overloads are new
 
-Dependency-aware factories now put the callback before the dependency tuple:
+Stable v5 had no dependency-tuple overload for `registerFactory`. V6 keeps the
+existing container-aware overloads and adds three deps-aware forms:
 
 ```ts
-// Before
-container.registerFactory('userId', ['auth'], resolver, 'scoped')
-
-// After
-container.registerFactory('userId', resolver, ['auth'], 'scoped')
+registerFactory(key, factory, deps)
+registerFactory(key, factory, deps, lifetime)
+registerFactory(key, factory, deps, lifetime, lazyKey)
 ```
 
-The supported families are `key, factory`, optional explicit lifetime, and
-optional deps after the factory. A `lazyKey` always requires an explicit
-lifetime, including `'singleton'`:
+The deps-aware callback receives a resolver limited to the declared keys. The
+tuple records type-level edges and scope-input requirements; InferDI does not
+resolve it into positional callback arguments.
+
+A `registerFactory` call with a `lazyKey` requires an explicit lifetime,
+including `'singleton'`:
 
 ```ts
+// v5 allowed this shorthand
+container.registerFactory('clock', factory, undefined, 'clockLazy')
+
+// v6 requires the target lifetime
 container.registerFactory('clock', factory, 'singleton', 'clockLazy')
 container.registerFactory(
   'userId',
@@ -51,24 +82,40 @@ container.registerFactory(
 )
 ```
 
-### Runtime contracts use `fast`
-
-InferDI 6 exposes two runtime contracts:
+One v6 prerelease exposed the tuple before the callback. Only prerelease users
+need this reorder:
 
 ```ts
-new Container()              // checked, mutable graph
-new Container({fast: false}) // same contract, explicit
-new Container({fast: true})  // unchecked, fixed graph
+// v6 prerelease
+container.registerFactory('userId', ['auth'], resolver, 'scoped')
+
+// v6 stable
+container.registerFactory('userId', resolver, ['auth'], 'scoped')
 ```
 
-Replace the previous runtime-check opt-out with `{fast: true}`. The prerelease
-`mode` option and its checked fixed contract were removed. `fast` defaults to
-`false`, which keeps cycle and lifetime checks enabled and preserves the exact
-mutable parent chain. `{fast: true}` disables those checks and enables fixed
-topology optimizations. Fixed graphs must finish registration and overrides
-before the first resolve or `createScope()`, and child scopes must be disposed
-before ancestors. Only the literal value `true` enables the fast contract;
-unknown values passed through a cast use the checked mutable contract.
+### Runtime contracts use `fast`
+
+V5 named the runtime-check option `strict`; v6 names the unchecked fixed-graph
+contract `fast`. The boolean polarity is reversed:
+
+```ts
+// v5                              // v6
+new Container()                    // new Container()
+new Container({strict: true})      // new Container({fast: false})
+new Container({strict: false})     // new Container({fast: true})
+```
+
+For a runtime boolean that previously meant "enable checks", preserve its
+meaning with `fast: strict === false`; do not pass the old value through as
+`fast: strict`.
+
+The prerelease `mode` option and its checked fixed contract were removed.
+`fast` defaults to `false`, which keeps cycle and lifetime checks enabled and
+preserves the exact mutable parent chain. `{fast: true}` disables those checks
+and enables fixed-topology optimizations. Fixed graphs must finish registration
+and overrides before the first resolve or `createScope()`, and child scopes must
+be disposed before ancestors. Only the literal value `true` enables the fast
+contract; unknown values passed through a cast use the checked mutable contract.
 
 ### Named modules declare requirements
 
@@ -105,6 +152,89 @@ replacement is intentional. Broad and union `string | symbol` keys remain
 supported when their possible values do not intersect the graph. A `lazyKey`
 uses the same check against both existing registrations and its primary key.
 
+### Scope inputs and profiles are additive
+
+V6 adds `declareScopeInputs<Inputs>()` and `createScope(inputs)`. Existing
+zero-argument `createScope()` calls keep their v5 behavior. A declaration adds
+type-only scoped entries; the child scope receives the runtime values:
+
+```ts
+interface RequestContext {
+  readonly requestId: string
+}
+
+declare const request: RequestContext
+
+class Handler {
+  constructor(readonly request: RequestContext) {}
+}
+
+const root = new Container()
+  .declareScopeInputs<{request: RequestContext}>()
+  .registerClass('handler', Handler, ['request'], 'scoped')
+
+const scope = root.createScope({request})
+scope.get('handler')
+```
+
+The `.get()` and `.getAsync()` key sets exclude an input and every dependent
+service until a scope provides the required values. Input requirements
+propagate through class dependency tuples, deps-aware sync factories,
+declarative async factories, and managed lazy companions. Scope-input values
+remain application-owned.
+
+Named modules can describe the same contract with `ScopeInputMap<M>` and attach
+requirements to outputs with `WithRequirements<S, K>`. Applications that do not
+adopt scope inputs need no source changes for this feature.
+
+### Declarative async dependencies are additive
+
+V6 separates a Promise-valued synchronous service from declarative async
+initialization:
+
+| Registration                                    | Graph value               | Dependency injection             | Resolve with |
+|-------------------------------------------------|---------------------------|----------------------------------|--------------|
+| `registerFactory('dbPromise', () => connect())` | `Promise<Database>`       | Injects the Promise by identity  | `get()`      |
+| `registerAsyncFactory('db', connect, [])`       | `Database` in `AsyncSpec` | Injects the fulfilled `Database` | `getAsync()` |
+
+Do not replace Promise-valued `registerFactory` calls unless downstream
+services should receive the fulfilled value. Existing v5 code keeps working
+with the first contract.
+
+`registerAsyncFactory` resolves its dependency tuple and passes positional
+values to the callback. Annotate callback parameters when the tuple is not
+empty, or pass a function with an existing signature:
+
+```ts
+class Database {}
+
+class Repository {
+  constructor(readonly db: Database) {}
+}
+
+declare function connect(dsn: string): Promise<Database>
+
+const container = new Container()
+  .registerValue('config', {dsn: 'postgres://localhost/app'})
+  .registerAsyncFactory(
+    'db',
+    (config: {dsn: string}) => connect(config.dsn),
+    ['config']
+  )
+  .registerClass('repository', Repository, ['db'])
+
+const db = await container.getAsync('db')
+const repository = await container.getAsync('repository')
+
+// @ts-expect-error: async status propagated through Repository
+container.get('repository')
+```
+
+`getAsync()` accepts ready sync and declarative async keys. Classes inherit
+async status from declarative async dependencies. `registerAsyncFactory` and
+any `registerClass` tuple that may select an async key require readonly tuples;
+inline literals infer the required readonly shape.
+
 ### Teardown reports propagated failures once
 
 An async dependency failure can propagate through several cached initialization
@@ -120,11 +250,11 @@ invoke `.then()` on a custom Promise-like value.
 ### Generic resolver helpers use ready keys
 
 `.get()` now accepts ready sync keys whose scope-input requirements have been
-provided. Concrete containers without scope inputs keep the same sync key set.
-Generic sync helpers that use `K extends keyof T` must switch to
-`Container.SyncReadyKeys`; async-capable helpers for `getAsync()` should use
-`Container.ReadyKeys` because a generic `T extends DependenciesMap` may contain
-blocked entries.
+provided. Concrete v5-style graphs without scope inputs or `AsyncSpec` entries
+keep the same `.get()` key set. Generic sync helpers that use `K extends keyof T`
+must switch to `Container.SyncReadyKeys`; async-capable helpers for `getAsync()`
+should use `Container.ReadyKeys` because a generic `T extends DependenciesMap`
+may contain blocked entries.
 
 ```ts
 // Before
@@ -169,10 +299,10 @@ type Output = {
 ```
 
 `registerAsyncFactory` accepts a fifth `lazyKey` and produces
-`AsyncLazy<Awaited<R>>`. Async-propagated classes produce the same wrapper. A
-class whose dependency key may choose a sync or async registration exposes
-`Lazy<T> | AsyncLazy<T>`. Promise-valued `registerFactory` keeps the previous
-`Lazy<Promise<T>>` contract.
+`AsyncLazy<Awaited<R>>`. A `registerClass` call with a `lazyKey` produces the
+same wrapper when the class inherits async status. A class whose dependency key
+may choose a sync or async registration exposes `Lazy<T> | AsyncLazy<T>`.
+Promise-valued `registerFactory` keeps the previous `Lazy<Promise<T>>` contract.
 
 `Container.ResolveUnwrapped` now unwraps managed sync, async, and mixed
 companions distributively. Hand-written `Spec<Lazy<T>, 'transient'>` and

@@ -74,15 +74,15 @@ app.use(async (ctx: AppContext) => {
 
 ## Options
 
-| Option | Default | Description |
-| --- | --- | --- |
-| `container` | required | Root container. Never disposed by this middleware. |
-| `key` | `'di'` | Koa state key. |
-| `createScope` | `root.createScope()` | Custom request scope creation. |
-| `setupScope` | none | Runs after creation and before downstream middleware. |
-| `disposeScope` | `scope.dispose()` | Custom disposal. |
-| `autoDispose` | `true` | `false` or predicate `false` transfers ownership. |
-| `onDisposeError` | `ctx.app.emit('error')` | Cleanup failure sink. |
+| Option           | Default                 | Description                                           |
+|------------------|-------------------------|-------------------------------------------------------|
+| `container`      | required                | Root container. Never disposed by this middleware.    |
+| `key`            | `'di'`                  | Koa state key.                                        |
+| `createScope`    | `root.createScope()`    | Custom request scope creation.                        |
+| `setupScope`     | none                    | Runs after creation and before downstream middleware. |
+| `disposeScope`   | `scope.dispose()`       | Custom disposal.                                      |
+| `autoDispose`    | `true`                  | `false` or predicate `false` transfers ownership.     |
+| `onDisposeError` | `ctx.app.emit('error')` | Cleanup failure sink.                                 |
 
 ## Streaming
 

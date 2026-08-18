@@ -4,12 +4,12 @@ Los ejemplos de frontend crean scopes en los límites de página, ruta, pantalla
 
 Compara dónde crea el scope cada framework, cómo se proporciona el scope a los hijos y cómo se ejecuta la limpieza al desmontar.
 
-| Ejemplo | Muestra |
-| --- | --- |
-| [`react.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react.tsx) | Scope de funcionalidad en React creado tras el commit y liberado por un efecto |
-| [`react-native.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react-native.tsx) | Scope de pantalla en React Native |
-| [`vue.ts`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/vue.ts) | Límite de scope con provide/inject en Vue 3 |
-| [`svelte.ts`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/svelte.ts) | Límite de scope con context en Svelte |
+| Ejemplo                                                                                               | Muestra                                                                        |
+|-------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|
+| [`react.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react.tsx)               | Scope de funcionalidad en React creado tras el commit y liberado por un efecto |
+| [`react-native.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react-native.tsx) | Scope de pantalla en React Native                                              |
+| [`vue.ts`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/vue.ts)                     | Límite de scope con provide/inject en Vue 3                                    |
+| [`svelte.ts`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/svelte.ts)               | Límite de scope con context en Svelte                                          |
 
 ## React
 

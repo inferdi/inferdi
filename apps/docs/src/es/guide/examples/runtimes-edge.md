@@ -4,15 +4,15 @@ Los ejemplos de runtime usan una raíz a nivel de módulo y crean un scope por p
 
 La mayoría de los ejemplos comparten [`examples/_shared/container.ts`](https://github.com/inferdi/inferdi/blob/main/examples/_shared/container.ts). Cloudflare Workers y Supabase Edge Functions crean grafos locales alrededor de los bindings de su plataforma.
 
-| Ejemplo | Muestra |
-| --- | --- |
-| [`node-http.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/node-http.ts) | Ciclo de vida HTTP de bajo nivel en Node con limpieza en la respuesta |
-| [`bun-serve.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/bun-serve.ts) | Scope de petición de `serve` de Bun |
-| [`deno-http.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/deno-http.ts) | Scope de petición HTTP de Deno |
-| [`cloudflare-workers.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/cloudflare-workers.ts) | Tipos de bindings generados por Wrangler, D1, Queues y `ctx.waitUntil` con errores gestionados |
-| [`vercel-edge.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/vercel-edge.ts) | Scope de petición de Vercel Edge y limpieza en segundo plano |
-| [`deno-deploy.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/deno-deploy.ts) | Limpieza de Deno Deploy mediante `Deno.ServeHandlerInfo.completed` |
-| [`supabase-edge-functions.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/supabase-edge-functions.ts) | Supabase Edge Functions con un cambio de factoría personalizado |
+| Ejemplo                                                                                                                        | Muestra                                                                                        |
+|--------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------|
+| [`node-http.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/node-http.ts)                             | Ciclo de vida HTTP de bajo nivel en Node con limpieza en la respuesta                          |
+| [`bun-serve.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/bun-serve.ts)                             | Scope de petición de `serve` de Bun                                                            |
+| [`deno-http.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/deno-http.ts)                             | Scope de petición HTTP de Deno                                                                 |
+| [`cloudflare-workers.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/cloudflare-workers.ts)           | Tipos de bindings generados por Wrangler, D1, Queues y `ctx.waitUntil` con errores gestionados |
+| [`vercel-edge.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/vercel-edge.ts)                         | Scope de petición de Vercel Edge y limpieza en segundo plano                                   |
+| [`deno-deploy.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/deno-deploy.ts)                         | Limpieza de Deno Deploy mediante `Deno.ServeHandlerInfo.completed`                             |
+| [`supabase-edge-functions.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/supabase-edge-functions.ts) | Supabase Edge Functions con un cambio de factoría personalizado                                |
 
 ## Node HTTP
 

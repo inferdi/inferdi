@@ -43,12 +43,12 @@ import { Container } from 'jsr:@inferdi/inferdi'
 
 ## Requirements
 
-| Runtime | Requirement |
-| --- | --- |
-| Node.js | 16 or newer for the core package |
-| Bun | 1.0 or newer |
-| Deno | 1.40 or newer |
-| TypeScript | 5.2 or newer |
+| Runtime    | Requirement                      |
+|------------|----------------------------------|
+| Node.js    | 16 or newer for the core package |
+| Bun        | 1.0 or newer                     |
+| Deno       | 1.40 or newer                    |
+| TypeScript | 5.2 or newer                     |
 
 On Node versions before native `Symbol.dispose` and `Symbol.asyncDispose`, InferDI installs a symbol polyfill on import so Explicit Resource Management interop still works.
 

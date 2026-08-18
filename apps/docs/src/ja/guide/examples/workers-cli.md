@@ -4,13 +4,13 @@
 
 これらは [`examples/_shared/container.ts`](https://github.com/inferdi/inferdi/blob/main/examples/_shared/container.ts) を共有しています。各ライブラリがアプリケーションコードに渡す作業単位を比較してください。
 
-| 例 | 内容 |
-| --- | --- |
-| [`telegraf.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/telegraf.ts) | Telegraf の更新スコープ |
-| [`grammy.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/grammy.ts) | Grammy の更新スコープ |
-| [`bullmq.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/bullmq.ts) | BullMQ のジョブスコープ |
+| 例                                                                                                | 内容                  |
+|--------------------------------------------------------------------------------------------------|---------------------|
+| [`telegraf.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/telegraf.ts)   | Telegraf の更新スコープ    |
+| [`grammy.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/grammy.ts)       | Grammy の更新スコープ      |
+| [`bullmq.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/bullmq.ts)       | BullMQ のジョブスコープ     |
 | [`commander.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/commander.ts) | Commander のコマンドスコープ |
-| [`yargs.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/yargs.ts) | Yargs のコマンドスコープ |
+| [`yargs.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/yargs.ts)         | Yargs のコマンドスコープ     |
 
 ## Telegraf
 

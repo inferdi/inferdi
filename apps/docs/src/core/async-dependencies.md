@@ -6,10 +6,10 @@
 
 InferDI supports two contracts because a Promise can be either the service itself or the initialization boundary for a service.
 
-| API | Graph value | Injection | Resolve with |
-| --- | --- | --- | --- |
-| `registerFactory('dbPromise', () => connect())` | `Promise<Database>` | The Promise object by identity | `get()` |
-| `registerAsyncFactory('db', connect, [])` | `Database` in `AsyncSpec` | The fulfilled `Database` | `getAsync()` |
+| API                                             | Graph value               | Injection                      | Resolve with |
+|-------------------------------------------------|---------------------------|--------------------------------|--------------|
+| `registerFactory('dbPromise', () => connect())` | `Promise<Database>`       | The Promise object by identity | `get()`      |
+| `registerAsyncFactory('db', connect, [])`       | `Database` in `AsyncSpec` | The fulfilled `Database`       | `getAsync()` |
 
 Use `registerAsyncFactory` when downstream services need the fulfilled value. Keep a Promise-valued `registerFactory` only when the Promise itself belongs in your synchronous graph.
 
@@ -91,11 +91,11 @@ Annotate each callback parameter, or pass a function with an existing signature,
 
 ## Scheduling and Caching
 
-| Lifetime | Initialization | Ownership |
-| --- | --- | --- |
+| Lifetime    | Initialization                             | Ownership        |
+|-------------|--------------------------------------------|------------------|
 | `singleton` | One native Promise in the owning container | Owning container |
-| `scoped` | One native Promise per resolving scope | Resolving scope |
-| `transient` | A new initialization for each call | Caller |
+| `scoped`    | One native Promise per resolving scope     | Resolving scope  |
+| `transient` | A new initialization for each call         | Caller           |
 
 Concurrent callers share singleton and scoped initialization. A rejected cached Promise stays as the failed state; InferDI does not retry it. Open a new scope or rebuild the root when retry belongs to the application lifecycle.
 

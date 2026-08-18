@@ -4,15 +4,15 @@
 
 ほとんどの例は [`examples/_shared/container.ts`](https://github.com/inferdi/inferdi/blob/main/examples/_shared/container.ts) を共有しています。Cloudflare Workers と Supabase Edge Functions は、プラットフォーム binding を使うローカルなコンテナーグラフを構築します。
 
-| 例 | 内容 |
-| --- | --- |
-| [`node-http.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/node-http.ts) | レスポンスのクリーンアップを伴う低レベルな Node HTTP ライフサイクル |
-| [`bun-serve.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/bun-serve.ts) | Bun `serve` のリクエストスコープ |
-| [`deno-http.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/deno-http.ts) | Deno HTTP のリクエストスコープ |
-| [`cloudflare-workers.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/cloudflare-workers.ts) | Wrangler が生成した binding 型、D1、Queues、エラー処理付き `ctx.waitUntil` |
-| [`vercel-edge.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/vercel-edge.ts) | Vercel Edge のリクエストスコープとバックグラウンドのクリーンアップ |
-| [`deno-deploy.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/deno-deploy.ts) | `Deno.ServeHandlerInfo.completed` による Deno Deploy のクリーンアップ |
-| [`supabase-edge-functions.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/supabase-edge-functions.ts) | カスタムファクトリーの差し替えを用いた Supabase Edge Functions |
+| 例                                                                                                                              | 内容                                                         |
+|--------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------|
+| [`node-http.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/node-http.ts)                             | レスポンスのクリーンアップを伴う低レベルな Node HTTP ライフサイクル                    |
+| [`bun-serve.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/bun-serve.ts)                             | Bun `serve` のリクエストスコープ                                     |
+| [`deno-http.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/deno-http.ts)                             | Deno HTTP のリクエストスコープ                                       |
+| [`cloudflare-workers.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/cloudflare-workers.ts)           | Wrangler が生成した binding 型、D1、Queues、エラー処理付き `ctx.waitUntil` |
+| [`vercel-edge.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/vercel-edge.ts)                         | Vercel Edge のリクエストスコープとバックグラウンドのクリーンアップ                    |
+| [`deno-deploy.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/deno-deploy.ts)                         | `Deno.ServeHandlerInfo.completed` による Deno Deploy のクリーンアップ |
+| [`supabase-edge-functions.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/supabase-edge-functions.ts) | カスタムファクトリーの差し替えを用いた Supabase Edge Functions                |
 
 ## Node HTTP
 

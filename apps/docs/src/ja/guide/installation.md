@@ -43,12 +43,12 @@ import { Container } from 'jsr:@inferdi/inferdi'
 
 ## 要件
 
-| ランタイム | 要件 |
-| --- | --- |
-| Node.js | コアパッケージには 16 以降 |
-| Bun | 1.0 以降 |
-| Deno | 1.40 以降 |
-| TypeScript | 5.2 以降 |
+| ランタイム      | 要件              |
+|------------|-----------------|
+| Node.js    | コアパッケージには 16 以降 |
+| Bun        | 1.0 以降          |
+| Deno       | 1.40 以降         |
+| TypeScript | 5.2 以降          |
 
 ネイティブの `Symbol.dispose` および `Symbol.asyncDispose` より前の Node バージョンでは、InferDI はインポート時にシンボルのポリフィルをインストールするため、Explicit Resource Management の相互運用が引き続き機能します。
 

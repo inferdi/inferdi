@@ -117,14 +117,14 @@ app.use(inferdiExpress({
 }))
 ```
 
-| Option | Default | Description |
-| --- | --- | --- |
-| `container` | — | **Required.** The root container. Must structurally provide `createScope()`. The root is never disposed by this middleware. |
-| `createScope` | `root.createScope()` | Overrides how a request scope is created. May be async. |
-| `setupScope` | — | Hydrates the scope before it is exposed to route handlers. May be async. |
-| `disposeScope` | `scope.dispose()` | Overrides request-scope disposal. May be async. |
-| `autoDispose` | `true` | Set to `false`, or return `false`, when application code owns disposal. |
-| `onDisposeError` | — | Optional per-error sink for cleanup failures — during setup teardown and after response completion alike. Returning normally marks the error handled. |
+| Option           | Default              | Description                                                                                                                                           |
+|------------------|----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `container`      | —                    | **Required.** The root container. Must structurally provide `createScope()`. The root is never disposed by this middleware.                           |
+| `createScope`    | `root.createScope()` | Overrides how a request scope is created. May be async.                                                                                               |
+| `setupScope`     | —                    | Hydrates the scope before it is exposed to route handlers. May be async.                                                                              |
+| `disposeScope`   | `scope.dispose()`    | Overrides request-scope disposal. May be async.                                                                                                       |
+| `autoDispose`    | `true`               | Set to `false`, or return `false`, when application code owns disposal.                                                                               |
+| `onDisposeError` | —                    | Optional per-error sink for cleanup failures — during setup teardown and after response completion alike. Returning normally marks the error handled. |
 
 If `setupScope` fails after a scope has been created, the middleware disposes
 that half-built scope before calling `next(error)`. **Only** the original setup
@@ -210,13 +210,13 @@ export function skipInferdiDispose(req: Request): void
 
 ## Related
 
-| Package | JSR | npm | Description |
-| --- | --- | --- | --- |
+| Package                                                                             | JSR                                    | npm                                                   | Description                                                         |
+|-------------------------------------------------------------------------------------|----------------------------------------|-------------------------------------------------------|---------------------------------------------------------------------|
 | [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) | [JSR](https://jsr.io/@inferdi/inferdi) | [npm](https://www.npmjs.com/package/@inferdi/inferdi) | Core DI container — zero-dependency, decorator-free, strongly typed |
-| [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | [JSR](https://jsr.io/@inferdi/fastify) | [npm](https://www.npmjs.com/package/@inferdi/fastify) | Fastify v5 request-scope adapter |
-| [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) | [JSR](https://jsr.io/@inferdi/hono) | [npm](https://www.npmjs.com/package/@inferdi/hono) | Hono request-scope middleware |
-| [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) | [JSR](https://jsr.io/@inferdi/koa) | [npm](https://www.npmjs.com/package/@inferdi/koa) | Koa v3 request-scope middleware |
-| [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | [JSR](https://jsr.io/@inferdi/express) | [npm](https://www.npmjs.com/package/@inferdi/express) | Express 5 request-scope middleware |
-| [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) | [JSR](https://jsr.io/@inferdi/elysia) | [npm](https://www.npmjs.com/package/@inferdi/elysia) | Elysia request-scope plugin |
+| [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | [JSR](https://jsr.io/@inferdi/fastify) | [npm](https://www.npmjs.com/package/@inferdi/fastify) | Fastify v5 request-scope adapter                                    |
+| [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono)       | [JSR](https://jsr.io/@inferdi/hono)    | [npm](https://www.npmjs.com/package/@inferdi/hono)    | Hono request-scope middleware                                       |
+| [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa)         | [JSR](https://jsr.io/@inferdi/koa)     | [npm](https://www.npmjs.com/package/@inferdi/koa)     | Koa v3 request-scope middleware                                     |
+| [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | [JSR](https://jsr.io/@inferdi/express) | [npm](https://www.npmjs.com/package/@inferdi/express) | Express 5 request-scope middleware                                  |
+| [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)   | [JSR](https://jsr.io/@inferdi/elysia)  | [npm](https://www.npmjs.com/package/@inferdi/elysia)  | Elysia request-scope plugin                                         |
 
 The project repository lives at [inferdi/inferdi](https://github.com/inferdi/inferdi). This adapter targets [Express](https://expressjs.com) 5.

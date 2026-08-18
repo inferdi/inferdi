@@ -37,12 +37,12 @@ El tipo del contenedor registra los inputs proporcionados y oculta los servicios
 
 Cada contenedor libera solo las instancias que creó.
 
-| Instancia | Propietario |
-| --- | --- |
-| Singleton registrado en la raíz, aunque se resuelva desde un hijo | Contenedor raíz |
-| Singleton registrado en un contenedor hijo | Ese contenedor hijo |
-| Servicio con scope | Scope de petición |
-| Transitorio | Llamante |
+| Instancia                                                         | Propietario         |
+|-------------------------------------------------------------------|---------------------|
+| Singleton registrado en la raíz, aunque se resuelva desde un hijo | Contenedor raíz     |
+| Singleton registrado en un contenedor hijo                        | Ese contenedor hijo |
+| Servicio con scope                                                | Scope de petición   |
+| Transitorio                                                       | Llamante            |
 
 `root.dispose()` no cascadea hacia los scopes hijos ya creados. Libera los scopes en su propio límite de ciclo de vida.
 

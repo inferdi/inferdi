@@ -2,11 +2,11 @@
 
 `Lazy<T>` and `AsyncLazy<T>` defer resolution until you call `.get()`. The target's registration mode selects the return type.
 
-| Target | Companion |
-| --- | --- |
-| Sync registration | `Lazy<T>` with `get(): T` |
-| Declarative async registration | `AsyncLazy<T>` with `get(): Promise<T>` |
-| Class with a sync/async union dependency | `Lazy<T> \| AsyncLazy<T>` |
+| Target                                   | Companion                               |
+|------------------------------------------|-----------------------------------------|
+| Sync registration                        | `Lazy<T>` with `get(): T`               |
+| Declarative async registration           | `AsyncLazy<T>` with `get(): Promise<T>` |
+| Class with a sync/async union dependency | `Lazy<T> \| AsyncLazy<T>`               |
 
 ```ts
 import { Container, type Lazy } from '@inferdi/inferdi'

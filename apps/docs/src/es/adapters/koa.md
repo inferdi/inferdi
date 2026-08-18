@@ -74,15 +74,15 @@ app.use(async (ctx: AppContext) => {
 
 ## Opciones
 
-| Opción | Por defecto | Descripción |
-| --- | --- | --- |
-| `container` | requerido | Contenedor raíz. Este middleware nunca lo libera. |
-| `key` | `'di'` | Clave del state de Koa. |
-| `createScope` | `root.createScope()` | Creación personalizada del scope de petición. |
-| `setupScope` | ninguno | Ejecuta inicialización adicional después de crear el scope. |
-| `disposeScope` | `scope.dispose()` | Liberación personalizada. |
-| `autoDispose` | `true` | `false` o un predicado `false` transfiere la propiedad. |
-| `onDisposeError` | `ctx.app.emit('error')` | Sumidero de fallos de limpieza. |
+| Opción           | Por defecto             | Descripción                                                 |
+|------------------|-------------------------|-------------------------------------------------------------|
+| `container`      | requerido               | Contenedor raíz. Este middleware nunca lo libera.           |
+| `key`            | `'di'`                  | Clave del state de Koa.                                     |
+| `createScope`    | `root.createScope()`    | Creación personalizada del scope de petición.               |
+| `setupScope`     | ninguno                 | Ejecuta inicialización adicional después de crear el scope. |
+| `disposeScope`   | `scope.dispose()`       | Liberación personalizada.                                   |
+| `autoDispose`    | `true`                  | `false` o un predicado `false` transfiere la propiedad.     |
+| `onDisposeError` | `ctx.app.emit('error')` | Sumidero de fallos de limpieza.                             |
 
 ## Streaming
 

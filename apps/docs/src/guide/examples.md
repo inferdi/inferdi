@@ -6,15 +6,15 @@ Choose the boundary your application owns, then compare how that ecosystem creat
 
 Read [`examples/_shared/container.ts`](https://github.com/inferdi/inferdi/blob/main/examples/_shared/container.ts) first. Most server-side examples import this builder so their files can focus on framework wiring.
 
-| Group | What to compare |
-| --- | --- |
-| [JavaScript usage](/guide/examples/javascript) | Node ESM, Node CommonJS, and browser bundler usage |
-| [Backend frameworks](/guide/examples/backend) | Fastify, Hono, Koa, Express, and Elysia request-scope adapters |
-| [API layers](/guide/examples/api-layers) | tRPC, Apollo Server, and GraphQL Yoga request-scope boundaries |
-| [Full-stack frameworks](/guide/examples/fullstack) | Next.js App Router and Remix loader/action scopes |
+| Group                                                        | What to compare                                                                       |
+|--------------------------------------------------------------|---------------------------------------------------------------------------------------|
+| [JavaScript usage](/guide/examples/javascript)               | Node ESM, Node CommonJS, and browser bundler usage                                    |
+| [Backend frameworks](/guide/examples/backend)                | Fastify, Hono, Koa, Express, and Elysia request-scope adapters                        |
+| [API layers](/guide/examples/api-layers)                     | tRPC, Apollo Server, and GraphQL Yoga request-scope boundaries                        |
+| [Full-stack frameworks](/guide/examples/fullstack)           | Next.js App Router and Remix loader/action scopes                                     |
 | [Runtimes and edge platforms](/guide/examples/runtimes-edge) | Node HTTP, Bun, Deno, Cloudflare Workers, Vercel Edge, Deno Deploy, and Supabase Edge |
-| [Frontend frameworks](/guide/examples/frontend) | React, React Native, Vue, and Svelte feature scopes |
-| [Bots, queues, and CLI](/guide/examples/workers-cli) | Telegraf, Grammy, BullMQ, Commander, and Yargs operation scopes |
+| [Frontend frameworks](/guide/examples/frontend)              | React, React Native, Vue, and Svelte feature scopes                                   |
+| [Bots, queues, and CLI](/guide/examples/workers-cli)         | Telegraf, Grammy, BullMQ, Commander, and Yargs operation scopes                       |
 
 ## How to Read the Groups
 

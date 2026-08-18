@@ -6,10 +6,10 @@
 
 Una Promise puede ser el propio servicio o el límite de inicialización de un servicio. InferDI ofrece un contrato para cada caso.
 
-| API | Valor del grafo | Inyección | Resolución |
-| --- | --- | --- | --- |
-| `registerFactory('dbPromise', () => connect())` | `Promise<Database>` | El objeto Promise por identity | `get()` |
-| `registerAsyncFactory('db', connect, [])` | `Database` en `AsyncSpec` | El `Database` fulfilled | `getAsync()` |
+| API                                             | Valor del grafo           | Inyección                      | Resolución   |
+|-------------------------------------------------|---------------------------|--------------------------------|--------------|
+| `registerFactory('dbPromise', () => connect())` | `Promise<Database>`       | El objeto Promise por identity | `get()`      |
+| `registerAsyncFactory('db', connect, [])`       | `Database` en `AsyncSpec` | El `Database` fulfilled        | `getAsync()` |
 
 Usa `registerAsyncFactory` cuando los servicios dependientes necesiten el valor inicializado. Conserva una `registerFactory` que devuelve Promise solo si la propia Promise forma parte del grafo síncrono.
 
@@ -91,11 +91,11 @@ Anota el tipo de cada parámetro del callback, o pasa una función con firma pre
 
 ## Planificación y caché
 
-| Lifetime | Inicialización | Propiedad |
-| --- | --- | --- |
+| Lifetime    | Inicialización                                  | Propiedad              |
+|-------------|-------------------------------------------------|------------------------|
 | `singleton` | Una Promise nativa en el contenedor propietario | Contenedor propietario |
-| `scoped` | Una Promise nativa por scope que resuelve | Scope que resuelve |
-| `transient` | Una inicialización nueva por llamada | Código que llama |
+| `scoped`    | Una Promise nativa por scope que resuelve       | Scope que resuelve     |
+| `transient` | Una inicialización nueva por llamada            | Código que llama       |
 
 Las llamadas concurrentes comparten la inicialización singleton y scoped. Una Promise rechazada en caché conserva el estado fallido; InferDI no reintenta. Abre un scope nuevo o reconstruye el root cuando el ciclo de vida de la aplicación requiera otro intento.
 

@@ -4,15 +4,15 @@ Runtime examples use a module-level root and create one scope per request. Bound
 
 Most examples share [`examples/_shared/container.ts`](https://github.com/inferdi/inferdi/blob/main/examples/_shared/container.ts). Cloudflare Workers and Supabase Edge Functions use platform bindings in local container graphs.
 
-| Example | Shows |
-| --- | --- |
-| [`node-http.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/node-http.ts) | Low-level Node HTTP lifecycle with response cleanup |
-| [`bun-serve.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/bun-serve.ts) | Bun `serve` request scope |
-| [`deno-http.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/deno-http.ts) | Deno HTTP request scope |
-| [`cloudflare-workers.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/cloudflare-workers.ts) | Wrangler-generated bindings, D1, Queues and handled `ctx.waitUntil` work |
-| [`vercel-edge.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/vercel-edge.ts) | Vercel Edge request scope and background cleanup |
-| [`deno-deploy.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/deno-deploy.ts) | Deno Deploy cleanup through `Deno.ServeHandlerInfo.completed` |
-| [`supabase-edge-functions.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/supabase-edge-functions.ts) | Supabase Edge Functions with a custom factory swap |
+| Example                                                                                                                        | Shows                                                                    |
+|--------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------|
+| [`node-http.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/node-http.ts)                             | Low-level Node HTTP lifecycle with response cleanup                      |
+| [`bun-serve.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/bun-serve.ts)                             | Bun `serve` request scope                                                |
+| [`deno-http.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/deno-http.ts)                             | Deno HTTP request scope                                                  |
+| [`cloudflare-workers.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/cloudflare-workers.ts)           | Wrangler-generated bindings, D1, Queues and handled `ctx.waitUntil` work |
+| [`vercel-edge.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/vercel-edge.ts)                         | Vercel Edge request scope and background cleanup                         |
+| [`deno-deploy.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/deno-deploy.ts)                         | Deno Deploy cleanup through `Deno.ServeHandlerInfo.completed`            |
+| [`supabase-edge-functions.ts`](https://github.com/inferdi/inferdi/blob/main/examples/runtimes-edge/supabase-edge-functions.ts) | Supabase Edge Functions with a custom factory swap                       |
 
 ## Node HTTP
 

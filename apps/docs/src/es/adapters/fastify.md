@@ -56,16 +56,16 @@ El `app.register` de Fastify no puede inferir los genéricos del plugin con sufi
 
 ## Opciones
 
-| Opción | Por defecto | Descripción |
-| --- | --- | --- |
-| `container` | requerido | Contenedor raíz expuesto como `app.di`. |
-| `scopePerRequest` | `true` | Establece `false` para el modo solo raíz. |
-| `createScope` | `root.createScope()` | Creación personalizada del scope de petición. Puede ser asíncrona. |
-| `setupScope` | ninguno | Ejecuta inicialización adicional después de crear el scope. |
-| `disposeScope` | `scope.dispose()` | Liberación personalizada. Puede ser síncrona o asíncrona. |
-| `autoDispose` | `true` | `false` o un predicado `false` transfiere la propiedad al código de la aplicación. |
-| `disposeRootOnClose` | `false` | Libera la raíz durante `fastify.close()`. |
-| `onDisposeError` | `request.log.error` | Sumidero para los fallos de liberación del scope de petición. |
+| Opción               | Por defecto          | Descripción                                                                        |
+|----------------------|----------------------|------------------------------------------------------------------------------------|
+| `container`          | requerido            | Contenedor raíz expuesto como `app.di`.                                            |
+| `scopePerRequest`    | `true`               | Establece `false` para el modo solo raíz.                                          |
+| `createScope`        | `root.createScope()` | Creación personalizada del scope de petición. Puede ser asíncrona.                 |
+| `setupScope`         | ninguno              | Ejecuta inicialización adicional después de crear el scope.                        |
+| `disposeScope`       | `scope.dispose()`    | Liberación personalizada. Puede ser síncrona o asíncrona.                          |
+| `autoDispose`        | `true`               | `false` o un predicado `false` transfiere la propiedad al código de la aplicación. |
+| `disposeRootOnClose` | `false`              | Libera la raíz durante `fastify.close()`.                                          |
+| `onDisposeError`     | `request.log.error`  | Sumidero para los fallos de liberación del scope de petición.                      |
 
 ## Modo solo raíz
 

@@ -6,13 +6,13 @@ Adapters manage request-scope lifecycle. The core package stays zero-dependency 
 
 ## Packages
 
-| Package | Framework | Scope location | Root-only mode |
-| --- | --- | --- | --- |
-| [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | Fastify v5 | `request.di` | yes |
-| [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) | Hono v4 | `c.var.di` | no |
-| [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) | Koa v3 | `ctx.state.di` | no |
-| [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | Express 5 | `req.di` | no |
-| [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) | Elysia v1 | `context.di` | yes |
+| Package                                                                             | Framework  | Scope location | Root-only mode |
+|-------------------------------------------------------------------------------------|------------|----------------|----------------|
+| [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | Fastify v5 | `request.di`   | yes            |
+| [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono)       | Hono v4    | `c.var.di`     | no             |
+| [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa)         | Koa v3     | `ctx.state.di` | no             |
+| [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | Express 5  | `req.di`       | no             |
+| [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)   | Elysia v1  | `context.di`   | yes            |
 
 ## Common Lifecycle Contract
 
@@ -26,15 +26,15 @@ In scoped mode every adapter runs the same steps for each request:
 
 ### Shared options
 
-| Option | Default | Purpose |
-| --- | --- | --- |
-| `container` | required | Root container exposed to the app. Adapters never dispose it (except Fastify's opt-in `disposeRootOnClose`). |
-| `createScope` | `root.createScope()` | Build the per-request scope. Pass declared request inputs here. May be async. |
-| `setupScope` | none | Run additional initialization before handlers. May be async. |
-| `disposeScope` | `scope.dispose()` | Custom teardown. May be sync or async. |
-| `autoDispose` | `true` | `false`, or a predicate returning `false`, hands disposal to your code. |
-| `onDisposeError` | per-adapter sink | Receives request-scope disposal failures: Fastify `request.log.error`, Koa `ctx.app.emit('error')`, others `console.error`. |
-| `skipInferdiDispose(...)` | — | Marks one request as application-owned for streaming or background work. |
+| Option                    | Default              | Purpose                                                                                                                     |
+|---------------------------|----------------------|-----------------------------------------------------------------------------------------------------------------------------|
+| `container`               | required             | Root container exposed to the app. Adapters never dispose it (except Fastify's opt-in `disposeRootOnClose`).                |
+| `createScope`             | `root.createScope()` | Build the per-request scope. Pass declared request inputs here. May be async.                                               |
+| `setupScope`              | none                 | Run additional initialization before handlers. May be async.                                                                |
+| `disposeScope`            | `scope.dispose()`    | Custom teardown. May be sync or async.                                                                                      |
+| `autoDispose`             | `true`               | `false`, or a predicate returning `false`, hands disposal to your code.                                                     |
+| `onDisposeError`          | per-adapter sink     | Receives request-scope disposal failures: Fastify `request.log.error`, Koa `ctx.app.emit('error')`, others `console.error`. |
+| `skipInferdiDispose(...)` | —                    | Marks one request as application-owned for streaming or background work.                                                    |
 
 ### Error and ownership rules
 
@@ -45,10 +45,10 @@ In scoped mode every adapter runs the same steps for each request:
 
 ## Important Differences
 
-| Adapter | Difference |
-| --- | --- |
-| Fastify | Disposes in `onResponse`; abort cleanup uses `onRequestAbort`; root disposal can be opted into with `disposeRootOnClose`. |
-| Hono | Disposes after `await next()`; streaming helpers can return before stream work finishes, so streaming routes often need `skipInferdiDispose`. |
-| Koa | Waits for Node response `finish` or `close`, so normal stream bodies do not need a skip. |
-| Express | Cannot detect a handled downstream route error from callback middleware; a skipped failed request remains application-owned. |
-| Elysia | Cleanup is bound to `onAfterResponse`; if that hook is never reached, resources held by the scope cannot be released by the adapter. |
+| Adapter | Difference                                                                                                                                    |
+|---------|-----------------------------------------------------------------------------------------------------------------------------------------------|
+| Fastify | Disposes in `onResponse`; abort cleanup uses `onRequestAbort`; root disposal can be opted into with `disposeRootOnClose`.                     |
+| Hono    | Disposes after `await next()`; streaming helpers can return before stream work finishes, so streaming routes often need `skipInferdiDispose`. |
+| Koa     | Waits for Node response `finish` or `close`, so normal stream bodies do not need a skip.                                                      |
+| Express | Cannot detect a handled downstream route error from callback middleware; a skipped failed request remains application-owned.                  |
+| Elysia  | Cleanup is bound to `onAfterResponse`; if that hook is never reached, resources held by the scope cannot be released by the adapter.          |

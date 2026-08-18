@@ -4,13 +4,13 @@ Bot updates, queue jobs, and CLI commands are bounded async operations. The exam
 
 They share [`examples/_shared/container.ts`](https://github.com/inferdi/inferdi/blob/main/examples/_shared/container.ts). Compare the unit of work that each library hands to application code.
 
-| Example | Shows |
-| --- | --- |
-| [`telegraf.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/telegraf.ts) | Telegraf update scope |
-| [`grammy.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/grammy.ts) | Grammy update scope |
-| [`bullmq.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/bullmq.ts) | BullMQ job scope |
+| Example                                                                                          | Shows                   |
+|--------------------------------------------------------------------------------------------------|-------------------------|
+| [`telegraf.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/telegraf.ts)   | Telegraf update scope   |
+| [`grammy.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/grammy.ts)       | Grammy update scope     |
+| [`bullmq.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/bullmq.ts)       | BullMQ job scope        |
 | [`commander.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/commander.ts) | Commander command scope |
-| [`yargs.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/yargs.ts) | Yargs command scope |
+| [`yargs.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/yargs.ts)         | Yargs command scope     |
 
 ## Telegraf
 

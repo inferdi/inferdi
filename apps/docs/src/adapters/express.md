@@ -54,14 +54,14 @@ The adapter does not globally augment `Express.Request` with `any`, `unknown`, o
 
 ## Options
 
-| Option | Default | Description |
-| --- | --- | --- |
-| `container` | required | Root container. Never disposed by this middleware. |
-| `createScope` | `root.createScope()` | Custom request scope creation. |
-| `setupScope` | none | Runs after creation and before route handlers. |
-| `disposeScope` | `scope.dispose()` | Custom disposal. |
-| `autoDispose` | `true` | `false` or predicate `false` transfers ownership. |
-| `onDisposeError` | `console.error` | Cleanup failure sink. |
+| Option           | Default              | Description                                        |
+|------------------|----------------------|----------------------------------------------------|
+| `container`      | required             | Root container. Never disposed by this middleware. |
+| `createScope`    | `root.createScope()` | Custom request scope creation.                     |
+| `setupScope`     | none                 | Runs after creation and before route handlers.     |
+| `disposeScope`   | `scope.dispose()`    | Custom disposal.                                   |
+| `autoDispose`    | `true`               | `false` or predicate `false` transfers ownership.  |
+| `onDisposeError` | `console.error`      | Cleanup failure sink.                              |
 
 ## Streaming and Background Work
 

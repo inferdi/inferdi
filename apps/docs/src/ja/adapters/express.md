@@ -54,14 +54,14 @@ app.get('/users/:id', async (req, res, next) => {
 
 ## オプション
 
-| オプション | デフォルト | 説明 |
-| --- | --- | --- |
-| `container` | 必須 | ルートコンテナ。このミドルウェアによって破棄されることはありません。 |
-| `createScope` | `root.createScope()` | カスタムのリクエストスコープ作成。 |
-| `setupScope` | なし | スコープ作成後に追加の初期化を行います。 |
-| `disposeScope` | `scope.dispose()` | カスタムの破棄。 |
-| `autoDispose` | `true` | `false` または `false` を返す述語は所有権を移譲します。 |
-| `onDisposeError` | `console.error` | クリーンアップ失敗のシンク。 |
+| オプション            | デフォルト                | 説明                                   |
+|------------------|----------------------|--------------------------------------|
+| `container`      | 必須                   | ルートコンテナ。このミドルウェアによって破棄されることはありません。   |
+| `createScope`    | `root.createScope()` | カスタムのリクエストスコープ作成。                    |
+| `setupScope`     | なし                   | スコープ作成後に追加の初期化を行います。                 |
+| `disposeScope`   | `scope.dispose()`    | カスタムの破棄。                             |
+| `autoDispose`    | `true`               | `false` または `false` を返す述語は所有権を移譲します。 |
+| `onDisposeError` | `console.error`      | クリーンアップ失敗のシンク。                       |
 
 ## ストリーミングとバックグラウンド作業
 

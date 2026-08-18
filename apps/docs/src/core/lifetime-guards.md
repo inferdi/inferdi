@@ -2,11 +2,11 @@
 
 InferDI has three lifetimes:
 
-| Lifetime | Created | Cached on | Disposed by container |
-| --- | --- | --- | --- |
-| `singleton` | once per owning container | owner container | yes |
-| `scoped` | once per child scope | child scope | yes |
-| `transient` | every resolve | never | no |
+| Lifetime    | Created                   | Cached on       | Disposed by container |
+|-------------|---------------------------|-----------------|-----------------------|
+| `singleton` | once per owning container | owner container | yes                   |
+| `scoped`    | once per child scope      | child scope     | yes                   |
+| `transient` | every resolve             | never           | no                    |
 
 With the default `{fast: false}`, resolving a `scoped` key from the root throws `Scoped "key" cannot be resolved from the root container. Use createScope().` Call `createScope()`, then resolve scoped services from its result.
 

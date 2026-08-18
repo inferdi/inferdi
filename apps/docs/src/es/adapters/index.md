@@ -6,13 +6,13 @@ Ese es todo el trabajo. Los adaptadores son una fina capa de pegamento del ciclo
 
 ## Paquetes
 
-| Paquete | Framework | Ubicación del scope | Modo solo raíz |
-| --- | --- | --- | --- |
-| [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | Fastify v5 | `request.di` | sí |
-| [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) | Hono v4 | `c.var.di` | no |
-| [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) | Koa v3 | `ctx.state.di` | no |
-| [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | Express 5 | `req.di` | no |
-| [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) | Elysia v1 | `context.di` | sí |
+| Paquete                                                                             | Framework  | Ubicación del scope | Modo solo raíz |
+|-------------------------------------------------------------------------------------|------------|---------------------|----------------|
+| [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | Fastify v5 | `request.di`        | sí             |
+| [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono)       | Hono v4    | `c.var.di`          | no             |
+| [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa)         | Koa v3     | `ctx.state.di`      | no             |
+| [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | Express 5  | `req.di`            | no             |
+| [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)   | Elysia v1  | `context.di`        | sí             |
 
 ## Contrato común del ciclo de vida
 
@@ -26,15 +26,15 @@ En modo con scope, cada adaptador ejecuta los mismos pasos para cada petición:
 
 ### Opciones compartidas
 
-| Opción | Por defecto | Propósito |
-| --- | --- | --- |
-| `container` | requerido | Contenedor raíz expuesto a la aplicación. Los adaptadores nunca lo liberan (excepto el `disposeRootOnClose` opcional de Fastify). |
-| `createScope` | `root.createScope()` | Construye el scope y recibe aquí las entradas declaradas de la petición. Puede ser asíncrono. |
-| `setupScope` | ninguno | Ejecuta inicialización adicional antes de los handlers. Puede ser asíncrono. |
-| `disposeScope` | `scope.dispose()` | Limpieza personalizada. Puede ser síncrona o asíncrona. |
-| `autoDispose` | `true` | `false`, o un predicado que devuelve `false`, cede la liberación a tu código. |
-| `onDisposeError` | sumidero por adaptador | Recibe los fallos de liberación del scope de petición: Fastify `request.log.error`, Koa `ctx.app.emit('error')`, los demás `console.error`. |
-| `skipInferdiDispose(...)` | — | Marca una petición como propiedad de la aplicación para streaming o trabajo en segundo plano. |
+| Opción                    | Por defecto            | Propósito                                                                                                                                   |
+|---------------------------|------------------------|---------------------------------------------------------------------------------------------------------------------------------------------|
+| `container`               | requerido              | Contenedor raíz expuesto a la aplicación. Los adaptadores nunca lo liberan (excepto el `disposeRootOnClose` opcional de Fastify).           |
+| `createScope`             | `root.createScope()`   | Construye el scope y recibe aquí las entradas declaradas de la petición. Puede ser asíncrono.                                               |
+| `setupScope`              | ninguno                | Ejecuta inicialización adicional antes de los handlers. Puede ser asíncrono.                                                                |
+| `disposeScope`            | `scope.dispose()`      | Limpieza personalizada. Puede ser síncrona o asíncrona.                                                                                     |
+| `autoDispose`             | `true`                 | `false`, o un predicado que devuelve `false`, cede la liberación a tu código.                                                               |
+| `onDisposeError`          | sumidero por adaptador | Recibe los fallos de liberación del scope de petición: Fastify `request.log.error`, Koa `ctx.app.emit('error')`, los demás `console.error`. |
+| `skipInferdiDispose(...)` | —                      | Marca una petición como propiedad de la aplicación para streaming o trabajo en segundo plano.                                               |
 
 ### Reglas de errores y de propiedad
 
@@ -45,10 +45,10 @@ En modo con scope, cada adaptador ejecuta los mismos pasos para cada petición:
 
 ## Diferencias importantes
 
-| Adaptador | Diferencia |
-| --- | --- |
-| Fastify | Libera en `onResponse`; la limpieza por aborto usa `onRequestAbort`; la liberación de la raíz puede activarse con `disposeRootOnClose`. |
-| Hono | Libera después de `await next()`; los helpers de streaming pueden devolver antes de que termine el trabajo del stream, por lo que las rutas de streaming a menudo necesitan `skipInferdiDispose`. |
-| Koa | Espera al `finish` o `close` de la respuesta de Node, por lo que los cuerpos de stream normales no necesitan un skip. |
-| Express | No puede detectar un error de ruta gestionado aguas abajo desde un middleware basado en callbacks; una petición fallida omitida permanece como propiedad de la aplicación. |
-| Elysia | La limpieza está vinculada a `onAfterResponse`; si ese hook nunca se alcanza, el adaptador no puede liberar los recursos retenidos por el scope. |
+| Adaptador | Diferencia                                                                                                                                                                                        |
+|-----------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Fastify   | Libera en `onResponse`; la limpieza por aborto usa `onRequestAbort`; la liberación de la raíz puede activarse con `disposeRootOnClose`.                                                           |
+| Hono      | Libera después de `await next()`; los helpers de streaming pueden devolver antes de que termine el trabajo del stream, por lo que las rutas de streaming a menudo necesitan `skipInferdiDispose`. |
+| Koa       | Espera al `finish` o `close` de la respuesta de Node, por lo que los cuerpos de stream normales no necesitan un skip.                                                                             |
+| Express   | No puede detectar un error de ruta gestionado aguas abajo desde un middleware basado en callbacks; una petición fallida omitida permanece como propiedad de la aplicación.                        |
+| Elysia    | La limpieza está vinculada a `onAfterResponse`; si ese hook nunca se alcanza, el adaptador no puede liberar los recursos retenidos por el scope.                                                  |

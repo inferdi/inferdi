@@ -6,10 +6,10 @@
 
 Promise はサービス自体を表す場合と、サービスの初期化境界を表す場合があります。InferDI はそれぞれに別の契約を用意しています。
 
-| API | グラフの値 | 注入される値 | 解決方法 |
-| --- | --- | --- | --- |
-| `registerFactory('dbPromise', () => connect())` | `Promise<Database>` | 同じ identity の Promise オブジェクト | `get()` |
-| `registerAsyncFactory('db', connect, [])` | `AsyncSpec` 内の `Database` | fulfilled `Database` | `getAsync()` |
+| API                                             | グラフの値                     | 注入される値                       | 解決方法         |
+|-------------------------------------------------|---------------------------|------------------------------|--------------|
+| `registerFactory('dbPromise', () => connect())` | `Promise<Database>`       | 同じ identity の Promise オブジェクト | `get()`      |
+| `registerAsyncFactory('db', connect, [])`       | `AsyncSpec` 内の `Database` | fulfilled `Database`         | `getAsync()` |
 
 下流サービスが初期化済みの値を必要とする場合は `registerAsyncFactory` を使います。同期グラフに Promise 自体を置く場合だけ Promise-valued `registerFactory` を使ってください。
 
@@ -91,11 +91,11 @@ callback はコンテナではなく値を受け取ります。そのため、Ty
 
 ## スケジューリングとキャッシュ
 
-| ライフタイム | 初期化 | 所有権 |
-| --- | --- | --- |
-| `singleton` | 所有コンテナ内の native Promise 1 つ | 所有コンテナ |
-| `scoped` | 解決するスコープごとに native Promise 1 つ | 解決するスコープ |
-| `transient` | 呼び出しごとに新しい初期化 | 呼び出し元 |
+| ライフタイム      | 初期化                            | 所有権      |
+|-------------|--------------------------------|----------|
+| `singleton` | 所有コンテナ内の native Promise 1 つ    | 所有コンテナ   |
+| `scoped`    | 解決するスコープごとに native Promise 1 つ | 解決するスコープ |
+| `transient` | 呼び出しごとに新しい初期化                  | 呼び出し元    |
 
 並行する呼び出しは singleton と scoped の初期化を共有します。キャッシュされた rejected Promise は失敗状態のままで、InferDI は retry しません。再試行が必要なら、アプリケーションのライフサイクルに合わせて新しいスコープを開くか root を再構築します。
 

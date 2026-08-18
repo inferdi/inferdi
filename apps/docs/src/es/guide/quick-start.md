@@ -100,21 +100,21 @@ El tipo del scope devuelto registra que `request` está disponible. `root.get('u
 
 Los registros usan `singleton` por defecto. Indica otro tiempo de vida cuando el valor pertenezca al scope o al código que lo solicita.
 
-| Tiempo de vida | Creación | Caché | Responsable de liberar |
-| --- | --- | --- | --- |
-| `singleton` | una vez | el contenedor que lo crea | ese contenedor |
-| `scoped` | una vez por scope hijo | el scope hijo | ese scope |
-| `transient` | en cada resolución | ninguna | el llamador |
+| Tiempo de vida | Creación               | Caché                     | Responsable de liberar |
+|----------------|------------------------|---------------------------|------------------------|
+| `singleton`    | una vez                | el contenedor que lo crea | ese contenedor         |
+| `scoped`       | una vez por scope hijo | el scope hijo             | ese scope              |
+| `transient`    | en cada resolución     | ninguna                   | el llamador            |
 
 Un singleton no puede depender directamente de un servicio scoped o transient. InferDI aplica esta regla en los tipos y, por defecto, vuelve a comprobarla en runtime.
 
 ## Siguiente paso
 
-| Si necesitas… | Continúa con |
-| --- | --- |
-| entender las comprobaciones del grafo en compilación | [Seguridad de tipos](../core/type-safety) |
-| modelar una petición, un tenant o los datos de una tarea | [Entradas de scope](../core/scope-inputs) |
-| inicializar una dependencia de forma asíncrona | [Dependencias asíncronas](../core/async-dependencies) |
-| cerrar bases de datos y otros recursos con seguridad | [Scopes y liberación de recursos](../core/scopes) |
-| conectar scopes con un framework web | [Adaptadores](../adapters/) |
-| ver ejemplos completos de frameworks y runtimes | [Ejemplos](./examples) |
+| Si necesitas…                                            | Continúa con                                          |
+|----------------------------------------------------------|-------------------------------------------------------|
+| entender las comprobaciones del grafo en compilación     | [Seguridad de tipos](../core/type-safety)             |
+| modelar una petición, un tenant o los datos de una tarea | [Entradas de scope](../core/scope-inputs)             |
+| inicializar una dependencia de forma asíncrona           | [Dependencias asíncronas](../core/async-dependencies) |
+| cerrar bases de datos y otros recursos con seguridad     | [Scopes y liberación de recursos](../core/scopes)     |
+| conectar scopes con un framework web                     | [Adaptadores](../adapters/)                           |
+| ver ejemplos completos de frameworks y runtimes          | [Ejemplos](./examples)                                |

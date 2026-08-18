@@ -4,11 +4,17 @@ InferDI registra los cambios incompatibles por versión major. La fuente de verd
 
 ## Migración a 6.0
 
+Este resumen presupone una actualización desde la versión estable `5.0.7`.
+Actualiza todos los paquetes `@inferdi/*` instalados a `6.0.0`; los adaptadores
+requieren `@inferdi/inferdi@^6.0.0`.
+
 - Sustituye `RegistrationKind` por `Lifetime` y `Spec.kind` por `Spec.lifetime`; no queda alias obsoleto.
-- Mueve `deps` en factorías sync a `registerFactory(key, factory, deps, ...)`. Un acompañante exige lifetime explícito, incluido `'singleton'`.
-- Sustituye la opción anterior que desactivaba los checks de runtime por `{fast: true}`. La opción `mode` de la prerelease se eliminó. `fast` vale `false` por defecto: mantiene los checks y el grafo mutable; `fast: true` selecciona el contrato unchecked fixed.
+- La versión estable v5 no tenía un overload de `registerFactory` con deps. V6 añade `registerFactory(key, factory, deps, ...)`; solo los usuarios de la forma prerelease `registerFactory(key, deps, factory, ...)` deben reordenar los argumentos. Un acompañante de factoría sync exige un lifetime explícito, incluido `'singleton'`.
+- Sustituye `{strict: false}` de v5 por `{fast: true}`, y `{strict: true}` por el valor predeterminado o `{fast: false}`. La polaridad del booleano se invierte. La opción prerelease `mode` se eliminó.
 - Un `Module<TRequirements, TProvides>` con nombre acepta grafos reales con registros extra, los conserva, comprueba requisitos exactos y rechaza colisiones de outputs. `new Container(parent)` deja de ser público; usa `createScope()`.
 - El registro rechaza ahora cualquier tipo de clave que pueda solaparse con una clave principal o lazy existente. Acota las claves amplias o union a un miembro nuevo, o usa `.override()` para un reemplazo intencional.
+- V6 añade inputs de scope solo de tipos mediante `declareScopeInputs<Inputs>()` y `createScope(inputs)`. Los scopes existentes sin argumentos conservan el comportamiento de v5.
+- V6 añade `registerAsyncFactory`, `AsyncSpec` y `getAsync()` para dependencias async declarativas. Un `registerFactory` que devuelve una Promise sigue siendo un servicio síncrono del grafo y se resuelve mediante `get()`.
 - El teardown async informa una vez de un objeto de rechazo compartido cuando un fallo de dependencia se propaga por varias Promises en caché. El teardown sync observa el rechazo de una Promise nativa antes de lanzar el error de uso async incorrecto.
 
 ### Los resolvers genéricos usan claves listas

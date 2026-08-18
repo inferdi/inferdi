@@ -6,13 +6,13 @@
 
 ## パッケージ
 
-| パッケージ | フレームワーク | スコープの場所 | ルート専用モード |
-| --- | --- | --- | --- |
-| [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | Fastify v5 | `request.di` | あり |
-| [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) | Hono v4 | `c.var.di` | なし |
-| [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) | Koa v3 | `ctx.state.di` | なし |
-| [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | Express 5 | `req.di` | なし |
-| [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) | Elysia v1 | `context.di` | あり |
+| パッケージ                                                                               | フレームワーク    | スコープの場所        | ルート専用モード |
+|-------------------------------------------------------------------------------------|------------|----------------|----------|
+| [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | Fastify v5 | `request.di`   | あり       |
+| [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono)       | Hono v4    | `c.var.di`     | なし       |
+| [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa)         | Koa v3     | `ctx.state.di` | なし       |
+| [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | Express 5  | `req.di`       | なし       |
+| [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)   | Elysia v1  | `context.di`   | あり       |
 
 ## 共通のライフサイクル契約
 
@@ -26,15 +26,15 @@
 
 ### 共通オプション
 
-| オプション | デフォルト | 目的 |
-| --- | --- | --- |
-| `container` | 必須 | アプリに公開されるルートコンテナ。アダプターはこれを破棄しません（Fastify のオプトインの `disposeRootOnClose` を除く）。 |
-| `createScope` | `root.createScope()` | リクエストスコープを構築し、宣言済みの入力をここで渡します。非同期でもかまいません。 |
-| `setupScope` | なし | ハンドラー実行前に追加の初期化を行います。非同期でもかまいません。 |
-| `disposeScope` | `scope.dispose()` | カスタムのクリーンアップ。同期でも非同期でもかまいません。 |
-| `autoDispose` | `true` | `false`、または `false` を返す述語を指定すると、破棄をあなたのコードに委ねます。 |
-| `onDisposeError` | アダプターごとのシンク | リクエストスコープの破棄失敗を受け取ります。Fastify は `request.log.error`、Koa は `ctx.app.emit('error')`、その他は `console.error`。 |
-| `skipInferdiDispose(...)` | — | ストリーミングやバックグラウンド作業のために、1 つのリクエストをアプリケーション所有としてマークします。 |
+| オプション                     | デフォルト                | 目的                                                                                                      |
+|---------------------------|----------------------|---------------------------------------------------------------------------------------------------------|
+| `container`               | 必須                   | アプリに公開されるルートコンテナ。アダプターはこれを破棄しません（Fastify のオプトインの `disposeRootOnClose` を除く）。                             |
+| `createScope`             | `root.createScope()` | リクエストスコープを構築し、宣言済みの入力をここで渡します。非同期でもかまいません。                                                              |
+| `setupScope`              | なし                   | ハンドラー実行前に追加の初期化を行います。非同期でもかまいません。                                                                       |
+| `disposeScope`            | `scope.dispose()`    | カスタムのクリーンアップ。同期でも非同期でもかまいません。                                                                           |
+| `autoDispose`             | `true`               | `false`、または `false` を返す述語を指定すると、破棄をあなたのコードに委ねます。                                                        |
+| `onDisposeError`          | アダプターごとのシンク          | リクエストスコープの破棄失敗を受け取ります。Fastify は `request.log.error`、Koa は `ctx.app.emit('error')`、その他は `console.error`。 |
+| `skipInferdiDispose(...)` | —                    | ストリーミングやバックグラウンド作業のために、1 つのリクエストをアプリケーション所有としてマークします。                                                   |
 
 ### エラーと所有権のルール
 
@@ -45,10 +45,10 @@
 
 ## 重要な違い
 
-| アダプター | 違い |
-| --- | --- |
-| Fastify | `onResponse` で破棄します。中断時のクリーンアップは `onRequestAbort` を使用します。ルートの破棄は `disposeRootOnClose` でオプトインできます。 |
-| Hono | `await next()` の後に破棄します。ストリーミングヘルパーはストリーム作業が終わる前に戻ることがあるため、ストリーミングルートではしばしば `skipInferdiDispose` が必要です。 |
-| Koa | Node レスポンスの `finish` または `close` を待つため、通常のストリームボディにはスキップは不要です。 |
-| Express | コールバックミドルウェアから処理済みのダウンストリームのルートエラーを検出できません。スキップされた失敗したリクエストはアプリケーション所有のままになります。 |
-| Elysia | クリーンアップは `onAfterResponse` にバインドされています。そのフックに到達しなかった場合、スコープが保持するリソースはアダプターによって解放できません。 |
+| アダプター   | 違い                                                                                                      |
+|---------|---------------------------------------------------------------------------------------------------------|
+| Fastify | `onResponse` で破棄します。中断時のクリーンアップは `onRequestAbort` を使用します。ルートの破棄は `disposeRootOnClose` でオプトインできます。       |
+| Hono    | `await next()` の後に破棄します。ストリーミングヘルパーはストリーム作業が終わる前に戻ることがあるため、ストリーミングルートではしばしば `skipInferdiDispose` が必要です。 |
+| Koa     | Node レスポンスの `finish` または `close` を待つため、通常のストリームボディにはスキップは不要です。                                          |
+| Express | コールバックミドルウェアから処理済みのダウンストリームのルートエラーを検出できません。スキップされた失敗したリクエストはアプリケーション所有のままになります。                         |
+| Elysia  | クリーンアップは `onAfterResponse` にバインドされています。そのフックに到達しなかった場合、スコープが保持するリソースはアダプターによって解放できません。                  |

@@ -109,17 +109,17 @@ new Elysia().use(inferdiElysia({
 }))
 ```
 
-| Option | Default | Description |
-| --- | --- | --- |
-| `container` | — | **Required.** The root container. Must structurally provide `createScope()`. |
-| `key` | `'di'` | Elysia context key used in handlers. |
-| `scopePerRequest` | `true` | Set to `false` for [root-only mode](#root-only-mode). |
-| `createScope` | `root.createScope()` | Overrides how a request scope is created. May be async. |
-| `setupScope` | — | Hydrates the scope before validation and before route handlers. May be async. |
-| `setupValidatedScope` | — | Hydrates the scope after Elysia validation. May be async. |
-| `disposeScope` | `scope.dispose()` | Overrides request-scope disposal. May be async. |
-| `autoDispose` | `true` | Set to `false`, or return `false`, when application code owns disposal. |
-| `onDisposeError` | `console.error` fallback | Optional sink for cleanup failures. Returning normally marks the error as handled. |
+| Option                | Default                  | Description                                                                        |
+|-----------------------|--------------------------|------------------------------------------------------------------------------------|
+| `container`           | —                        | **Required.** The root container. Must structurally provide `createScope()`.       |
+| `key`                 | `'di'`                   | Elysia context key used in handlers.                                               |
+| `scopePerRequest`     | `true`                   | Set to `false` for [root-only mode](#root-only-mode).                              |
+| `createScope`         | `root.createScope()`     | Overrides how a request scope is created. May be async.                            |
+| `setupScope`          | —                        | Hydrates the scope before validation and before route handlers. May be async.      |
+| `setupValidatedScope` | —                        | Hydrates the scope after Elysia validation. May be async.                          |
+| `disposeScope`        | `scope.dispose()`        | Overrides request-scope disposal. May be async.                                    |
+| `autoDispose`         | `true`                   | Set to `false`, or return `false`, when application code owns disposal.            |
+| `onDisposeError`      | `console.error` fallback | Optional sink for cleanup failures. Returning normally marks the error as handled. |
 
 If `setupScope` fails after a scope has been created, the plugin disposes that
 scope and rethrows **only** the original setup error. A disposal failure during
@@ -271,13 +271,13 @@ export function skipInferdiDispose(context: { request: Request }): void
 
 ## Related
 
-| Package | JSR | npm | Description |
-| --- | --- | --- | --- |
+| Package                                                                             | JSR                                    | npm                                                   | Description                                                         |
+|-------------------------------------------------------------------------------------|----------------------------------------|-------------------------------------------------------|---------------------------------------------------------------------|
 | [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) | [JSR](https://jsr.io/@inferdi/inferdi) | [npm](https://www.npmjs.com/package/@inferdi/inferdi) | Core DI container — zero-dependency, decorator-free, strongly typed |
-| [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | [JSR](https://jsr.io/@inferdi/fastify) | [npm](https://www.npmjs.com/package/@inferdi/fastify) | Fastify v5 request-scope adapter |
-| [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) | [JSR](https://jsr.io/@inferdi/hono) | [npm](https://www.npmjs.com/package/@inferdi/hono) | Hono request-scope middleware |
-| [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) | [JSR](https://jsr.io/@inferdi/koa) | [npm](https://www.npmjs.com/package/@inferdi/koa) | Koa v3 request-scope middleware |
-| [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | [JSR](https://jsr.io/@inferdi/express) | [npm](https://www.npmjs.com/package/@inferdi/express) | Express 5 request-scope middleware |
-| [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) | [JSR](https://jsr.io/@inferdi/elysia) | [npm](https://www.npmjs.com/package/@inferdi/elysia) | Elysia request-scope plugin |
+| [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | [JSR](https://jsr.io/@inferdi/fastify) | [npm](https://www.npmjs.com/package/@inferdi/fastify) | Fastify v5 request-scope adapter                                    |
+| [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono)       | [JSR](https://jsr.io/@inferdi/hono)    | [npm](https://www.npmjs.com/package/@inferdi/hono)    | Hono request-scope middleware                                       |
+| [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa)         | [JSR](https://jsr.io/@inferdi/koa)     | [npm](https://www.npmjs.com/package/@inferdi/koa)     | Koa v3 request-scope middleware                                     |
+| [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | [JSR](https://jsr.io/@inferdi/express) | [npm](https://www.npmjs.com/package/@inferdi/express) | Express 5 request-scope middleware                                  |
+| [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)   | [JSR](https://jsr.io/@inferdi/elysia)  | [npm](https://www.npmjs.com/package/@inferdi/elysia)  | Elysia request-scope plugin                                         |
 
 The project repository lives at [inferdi/inferdi](https://github.com/inferdi/inferdi). This adapter targets [Elysia](https://elysiajs.com).

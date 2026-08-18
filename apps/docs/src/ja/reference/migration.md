@@ -4,11 +4,17 @@ InferDI は破壊的変更をメジャーバージョンごとに記録してい
 
 ## 6.0 へのマイグレーション
 
+この要約は安定版 `5.0.7` からのアップグレードを前提としています。
+インストール済みのすべての `@inferdi/*` パッケージを `6.0.0` に更新してください。
+アダプターは `@inferdi/inferdi@^6.0.0` を要求します。
+
 - `RegistrationKind` を `Lifetime` に、`Spec.kind` を `Spec.lifetime` に置き換えます。deprecated alias はありません。
-- 同期ファクトリーの deps は `registerFactory(key, factory, deps, ...)` の順になります。コンパニオンでは `'singleton'` を含むライフタイムを明示します。
-- 以前のランタイムチェック無効化オプションを `{fast: true}` に置き換えます。プレリリースの `mode` オプションは削除されました。`fast` のデフォルトは `false` で、ランタイムチェックと可変グラフを維持します。`fast: true` は unchecked fixed 契約を選択します。
+- 安定版 v5 には deps-aware な `registerFactory` overload がありませんでした。V6 は `registerFactory(key, factory, deps, ...)` を追加します。引数の並べ替えが必要なのは、プレリリース形式の `registerFactory(key, deps, factory, ...)` を使用した場合だけです。同期ファクトリーのコンパニオンには `'singleton'` を含む明示的なライフタイムが必要です。
+- v5 の `{strict: false}` を `{fast: true}` に、`{strict: true}` をデフォルトまたは `{fast: false}` に置き換えます。boolean の極性は反転します。プレリリースの `mode` オプションは削除されました。
 - 名前付き `Module<TRequirements, TProvides>` は追加登録を含む実際のグラフを受け入れて保持し、要件を厳密に検査し、出力衝突を拒否します。`new Container(parent)` は非公開になり、子は `createScope()` で作成します。
 - 登録は、既存の主キーまたは lazy キーと重複する可能性があるキー型を拒否します。broad / union キーを新しい候補へ絞り込むか、意図した置き換えには `.override()` を使用してください。
+- V6 は `declareScopeInputs<Inputs>()` と `createScope(inputs)` による type-only のスコープ入力を追加します。既存の引数なしスコープは v5 の動作を維持します。
+- V6 は宣言的 async 依存関係向けに `registerAsyncFactory`、`AsyncSpec`、`getAsync()` を追加します。Promise-valued な `registerFactory` は同期グラフサービスのままで、引き続き `get()` で解決します。
 - 依存の失敗が複数のキャッシュ済み Promise へ伝播した場合、async teardown は共有された rejection オブジェクトを一度だけ報告します。sync teardown は async 誤用エラーをスローする前にネイティブ Promise の rejection を監視します。
 
 ### ジェネリック resolver では準備済みキーを使う

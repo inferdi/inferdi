@@ -2,13 +2,13 @@
 
 Una resolución en caliente lee `Map.get(key)` y llama a `new Ctor(...)` de forma directa cuando necesita construir el servicio. Los escenarios cubren estas decisiones del runtime:
 
-| Decisión en runtime | Efecto |
-| --- | --- |
-| Registros explícitos | La construcción del contenedor es un `Map.set` plano por servicio. No hay efectos secundarios de decoradores, parsers de nombres de constructor ni tablas de metadatos que preparar. |
+| Decisión en runtime                    | Efecto                                                                                                                                                                                                 |
+|----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Registros explícitos                   | La construcción del contenedor es un `Map.set` plano por servicio. No hay efectos secundarios de decoradores, parsers de nombres de constructor ni tablas de metadatos que preparar.                   |
 | Servicios singleton y scoped cacheados | Una resolución en caliente lee de `cache.get(key)` antes de que se ejecute la contabilidad de ciclos y tiempos de vida. El recurso a `cache.has(key)` existe solo para valores `undefined` explícitos. |
-| Llamadas directas al constructor | Las clases con 0-7 dependencias usan una ruta `new Ctor(...)` directa. Los constructores más grandes recurren a `Reflect.construct`. |
-| Factorías asíncronas | La `Promise` de la factoría se cachea tal cual, de modo que las llamadas concurrentes comparten una única inicialización en curso mientras `.get()` permanece síncrono. |
-| Contrato de runtime | Default/`fast: false` mantiene los checks y una cadena de padres exacta y mutable. `fast: true` desactiva los checks y activa la búsqueda de scopes con topología fija. |
+| Llamadas directas al constructor       | Las clases con 0-7 dependencias usan una ruta `new Ctor(...)` directa. Los constructores más grandes recurren a `Reflect.construct`.                                                                   |
+| Factorías asíncronas                   | La `Promise` de la factoría se cachea tal cual, de modo que las llamadas concurrentes comparten una única inicialización en curso mientras `.get()` permanece síncrono.                                |
+| Contrato de runtime                    | Default/`fast: false` mantiene los checks y una cadena de padres exacta y mutable. `fast: true` desactiva los checks y activa la búsqueda de scopes con topología fija.                                |
 
 ## Conjunto de benchmarks
 

@@ -50,47 +50,52 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 }
 ```
 
-`fast` vale `false` por defecto: mantiene los checks de seguridad en runtime y
-la cadena de padres exacta y mutable. `{fast: true}` desactiva esos checks y
-trata el grafo como fijo, con búsqueda de padres aplanada y mirroring de
-singletons heredados. Los scopes hijos heredan la configuración de la raíz.
+`fast` vale `false` por defecto: mantiene los checks de ciclos y lifetimes en
+runtime y la cadena de padres exacta y mutable. `{fast: true}` desactiva ese
+seguimiento y trata el grafo como fijo, con búsqueda de padres aplanada y
+mirroring de singletons heredados. Los scopes hijos heredan la configuración de
+la raíz. En un árbol fast, completa todas las llamadas a `register*`, `.use()` y
+`.override()` antes de la primera resolución o `createScope()`, y libera los
+hijos antes que sus ancestros.
 
 ## Métodos de registro
 
-| Método | Entrada del callback | Tipo guardado en el grafo | Resolución |
-| --- | --- | --- | --- |
-| `registerClass` | Argumentos del constructor según `deps` | `Spec` o `AsyncSpec` propagado | `get` o `getAsync` |
-| `registerFactory(key, factory, ...)` | Contenedor filtrado por lifetime | `Spec<ReturnType>` | `get` |
-| `registerFactory(key, factory, deps, ...)` | Resolver limitado a `deps` | `Spec` con requisitos de inputs | `get` |
-| `registerAsyncFactory` | Valores posicionales resueltos | `AsyncSpec<Awaited<ReturnType>>` | `getAsync` |
-| `registerValue` | Ninguna | `Spec` singleton de propiedad externa | `get` |
+| Método                                     | Entrada del callback                                             | Tipo guardado en el grafo             | Resolución         |
+|--------------------------------------------|------------------------------------------------------------------|---------------------------------------|--------------------|
+| `registerClass`                            | Argumentos del constructor según `deps`                          | `Spec` o `AsyncSpec` propagado        | `get` o `getAsync` |
+| `registerFactory(key, factory, ...)`       | Contenedor filtrado por lifetime                                 | `Spec<ReturnType>`                    | `get`              |
+| `registerFactory(key, factory, deps, ...)` | Resolver limitado a `deps`                                       | `Spec` con requisitos de inputs       | `get`              |
+| `registerAsyncFactory`                     | Valores posicionales; espera las dependencias async declarativas | `AsyncSpec<Awaited<ReturnType>>`      | `getAsync`         |
+| `registerValue`                            | Ninguna                                                          | `Spec` singleton de propiedad externa | `get`              |
 
-`registerClass` y `registerFactory` aceptan los tiempos de vida `singleton`, `scoped` y `transient`. Un acompañante de `registerFactory` requiere un lifetime explícito, incluido `'singleton'`. `registerValue` siempre es singleton y de propiedad externa.
+`registerClass`, `registerFactory` y `registerAsyncFactory` aceptan los tiempos de vida `singleton`, `scoped` y `transient`. Un acompañante de `registerFactory` requiere un lifetime explícito, incluido `'singleton'`. `registerValue` siempre es singleton y de propiedad externa.
 
-`registerAsyncFactory` acepta los mismos tiempos de vida y un quinto `lazyKey` opcional. El registro principal guarda el tipo final como `AsyncSpec`; el acompañante tiene tipo `AsyncLazySpec<Awaited<ReturnType>, L>`. Resuelve el destino con `getAsync()` y el wrapper con `get()`.
+Un `lazyKey` en `registerClass` o `registerFactory` añade un `LazySpec` administrado. Una clase cuyo estado async se haya propagado desde sus dependencias añade un `AsyncLazySpec` en su lugar. Un `registerFactory` que devuelve una Promise sigue siendo un `Spec<Promise<T>>` síncrono, y su acompañante sigue siendo `Lazy<Promise<T>>`; usa `registerAsyncFactory` cuando el grafo deba guardar el tipo final del servicio.
+
+`registerAsyncFactory` acepta los mismos tiempos de vida y un quinto `lazyKey` opcional. El registro principal guarda el tipo final como `AsyncSpec`; el acompañante tiene tipo `AsyncLazySpec<Awaited<ReturnType>, L>`. Las clases dependientes heredan el estado async de la clave de destino, mientras que quien consume el wrapper sigue siendo síncrono. Resuelve el destino con `getAsync()` y el wrapper con `get()`.
 
 `registerAsyncFactory` y las llamadas a `registerClass` cuya tupla pueda seleccionar una clave asíncrona requieren dependencias readonly. InferDI clasifica las posiciones asíncronas una vez y conserva la referencia a la tupla. Los literales inline se infieren como readonly; las llamadas síncronas a `registerClass` siguen aceptando tuplas mutables.
 
-`registerAsyncFactory` y el `registerFactory` con dependencias usan distinto orden de argumentos y contrato de callback:
+El `registerFactory` con dependencias y `registerAsyncFactory` usan el mismo orden de argumentos, pero distintos contratos de callback. El primero recibe un resolver limitado a `deps`; el segundo recibe los valores de las dependencias por posición:
 
 ```ts
 registerFactory(key, resolverFactory, deps, lifetime, lazyKey)
 registerAsyncFactory(key, valueFactory, deps, lifetime, lazyKey)
 ```
 
-`override` reemplaza un registro y `use` aplica un module builder. La comprobación de tiempo de `override` solo consulta la caché del contenedor actual. Detecta valores singleton/scoped guardados localmente, `registerValue` y overrides repetidos, pero no registra resoluciones transient ni valores propiedad de un ancestro resueltos desde un hijo. Aplica los overrides antes de resolver el grafo de dependencias.
+`override` reemplaza un registro existente que no sea un scope input y `use` aplica un module builder. La comprobación de tiempo de `override` solo consulta la caché del contenedor actual. Detecta valores singleton/scoped guardados localmente, `registerValue` y overrides repetidos, pero nunca registra resoluciones transient. En modo checked tampoco registra singletons propiedad de un ancestro resueltos desde un hijo; un hijo fast refleja los singletons delegados en su caché local, por lo que la comprobación sí los detecta. Aplica los overrides antes de resolver el grafo de dependencias.
 
 ## Entradas de scope y resolución
 
 `declareScopeInputs<Inputs>()` añade entradas scoped que solo existen en los tipos. `createScope(inputs)` proporciona cualquier subconjunto de valores pendientes y devuelve un contenedor cuyo conjunto de claves listas refleja las propiedades obligatorias recibidas. Los inputs siguen siendo propiedad de la aplicación.
 
-| API | Claves aceptadas |
-| --- | --- |
-| `get()` | Claves listas sin `AsyncSpec` |
-| `getAsync()` | Todas las claves sync y async declarativas que estén listas |
-| `has()` | Cualquier string o symbol; solo demuestra que existe el registro |
+| API          | Claves aceptadas                                                 |
+|--------------|------------------------------------------------------------------|
+| `get()`      | Claves listas sin `AsyncSpec`                                    |
+| `getAsync()` | Todas las claves sync y async declarativas que estén listas      |
+| `has()`      | Cualquier string o symbol; solo demuestra que existe el registro |
 
-`has()` no demuestra que una clave esté lista o sea síncrona. Consulta [Entradas de scope](../core/scope-inputs) para el refinamiento del estado de tipos y [Dependencias asíncronas](../core/async-dependencies) para el comportamiento Promise.
+`has()` no demuestra que una clave esté lista o sea síncrona. Los scope inputs declarados solo existen en los tipos y no son registros, así que `has()` devuelve `false` para ellos incluso después de proporcionar sus valores mediante `createScope(inputs)`. Consulta [Entradas de scope](../core/scope-inputs) para el refinamiento del estado de tipos y [Dependencias asíncronas](../core/async-dependencies) para el comportamiento Promise.
 
 ## Tipos del namespace
 
@@ -105,14 +110,14 @@ namespace Container {
 }
 ```
 
-| Tipo | Uso |
-| --- | --- |
-| `Container.ReadyKeys<C>` | Extrae las claves cuyos inputs de scope ya se proporcionaron; un resolver genérico puede pasarlas a `getAsync`. |
-| `Container.SyncReadyKeys<C>` | Extrae claves no asíncronas listas para que un resolver genérico las pase a `get`. |
-| `Container.Resolve<C>` | Extrae un mapa plano `{ key: Value }` de un contenedor construido. |
-| `Container.ResolveUnwrapped<C>` | Como `Resolve`, pero desenvuelve de forma distributiva los `LazySpec` y `AsyncLazySpec` administrados; los wrappers normales no cambian. |
-| `Container.UnwrappedValue<C, K>` | Busca el tipo de un único servicio desenvuelto. |
-| `Container.Providers<C>` | Crea un mapa de thunks de proveedores para pruebas. |
+| Tipo                             | Uso                                                                                                                                      |
+|----------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| `Container.ReadyKeys<C>`         | Extrae las claves cuyos inputs de scope ya se proporcionaron; un resolver genérico puede pasarlas a `getAsync`.                          |
+| `Container.SyncReadyKeys<C>`     | Extrae claves no asíncronas listas para que un resolver genérico las pase a `get`.                                                       |
+| `Container.Resolve<C>`           | Extrae un mapa plano `{ key: Value }` de un contenedor construido.                                                                       |
+| `Container.ResolveUnwrapped<C>`  | Como `Resolve`, pero desenvuelve de forma distributiva los `LazySpec` y `AsyncLazySpec` administrados; los wrappers normales no cambian. |
+| `Container.UnwrappedValue<C, K>` | Busca el tipo de un único servicio desenvuelto.                                                                                          |
+| `Container.Providers<C>`         | Crea un mapa de thunks de proveedores para pruebas; excluye los scope inputs declarados.                                                 |
 
 Los resolvers genéricos de v6 deben conservar el conjunto de claves aceptado. Usa `Container.SyncReadyKeys<C>` con `get()` y `Container.ReadyKeys<C>` con `getAsync()` en lugar de un `keyof T` sin restricciones.
 
@@ -163,7 +168,9 @@ type Module<TRequirements extends DependenciesMap, TProvides extends Dependencie
 Usa estas interfaces con nombre en formas explícitas de `Container` y `Module`.
 El discriminante no crea un campo de runtime y no se exporta.
 
-`ScopeInputMap<M>` convierte propiedades string/symbol obligatorias y finitas en entradas scoped. Rechaza claves opcionales o numéricas, `__proto__`, index signatures amplias y unions con distintos conjuntos de claves. `WithRequirements<S, K>` conserva las claves de entrada requeridas en la salida de un módulo con nombre. Las definiciones condicionales exactas están en las declaraciones TypeScript publicadas.
+`Spec`, `AsyncSpec`, `LazySpec` y `AsyncLazySpec` describen entradas del grafo de tipos; sus campos no se añaden a los valores de servicio resueltos.
+
+`ScopeInputMap<M>` convierte propiedades string/symbol obligatorias y finitas en entradas scoped. Rechaza claves opcionales o numéricas, `__proto__`, index signatures amplias y unions con distintos conjuntos de claves. `WithRequirements<S, K>` adjunta las claves de entrada requeridas a una entrada del grafo y resulta útil en las salidas de módulos con nombre. Las definiciones condicionales exactas están en las declaraciones TypeScript publicadas.
 
 ## Formas de la API de los adaptadores
 

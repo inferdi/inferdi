@@ -4,11 +4,16 @@ InferDI 按主版本记录破坏性变更。权威来源仍然是 [`packages/inf
 
 ## 迁移到 6.0
 
+本摘要假定从稳定版 `5.0.7` 升级。请将所有已安装的 `@inferdi/*` 包升级到
+`6.0.0`；适配器要求 `@inferdi/inferdi@^6.0.0`。
+
 - 将 `RegistrationKind` 替换为 `Lifetime`，将 `Spec.kind` 替换为 `Spec.lifetime`；不保留弃用别名。
-- 同步工厂的依赖参数改为 `registerFactory(key, factory, deps, ...)`。创建伴随项时必须显式传入生命周期，包括 `'singleton'`。
-- 将以前用于关闭运行时检查的选项替换为 `{fast: true}`。预发布的 `mode` 选项已移除。`fast` 默认为 `false`，此时运行时检查保持启用，依赖图保持可变；`fast: true` 选择 unchecked fixed 契约。
+- 稳定版 v5 没有带 deps 的 `registerFactory` overload。V6 新增 `registerFactory(key, factory, deps, ...)`；只有使用过预发布形式 `registerFactory(key, deps, factory, ...)` 的用户才需要调整参数顺序。同步工厂伴随项必须显式传入生命周期，包括 `'singleton'`。
+- 将 v5 的 `{strict: false}` 替换为 `{fast: true}`，将 `{strict: true}` 替换为默认值或 `{fast: false}`。boolean 的含义相反。预发布的 `mode` 选项已移除。
 - 具名 `Module<TRequirements, TProvides>` 接受带额外注册的实际图，保留这些项，精确检查要求并拒绝输出冲突。`new Container(parent)` 不再公开，请使用 `createScope()`。
 - 注册现在会拒绝任何可能与已有主键或 lazy 键重叠的键类型。请把宽泛键或联合键收窄到新成员；需要替换时使用 `.override()`。
+- V6 通过 `declareScopeInputs<Inputs>()` 和 `createScope(inputs)` 新增仅存在于类型层的作用域输入。现有无参数作用域保持 v5 的行为。
+- V6 为声明式异步依赖新增 `registerAsyncFactory`、`AsyncSpec` 和 `getAsync()`。返回 Promise 的 `registerFactory` 仍是同步图服务，并继续通过 `get()` 解析。
 - 依赖失败沿多个缓存 Promise 传播时，异步 teardown 只报告一次共享的 rejection 对象。同步 teardown 会在抛出异步误用错误前观察原生 Promise 的拒绝。
 
 ### 泛型 resolver 使用就绪键

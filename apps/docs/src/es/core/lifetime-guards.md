@@ -2,11 +2,11 @@
 
 InferDI tiene tres tiempos de vida:
 
-| Clase | Creado | Cacheado en | Liberado por el contenedor |
-| --- | --- | --- | --- |
-| `singleton` | una vez por contenedor propietario | contenedor propietario | sí |
-| `scoped` | una vez por scope hijo | scope hijo | sí |
-| `transient` | en cada resolución | nunca | no |
+| Clase       | Creado                             | Cacheado en            | Liberado por el contenedor |
+|-------------|------------------------------------|------------------------|----------------------------|
+| `singleton` | una vez por contenedor propietario | contenedor propietario | sí                         |
+| `scoped`    | una vez por scope hijo             | scope hijo             | sí                         |
+| `transient` | en cada resolución                 | nunca                  | no                         |
 
 Con el valor predeterminado `{fast: false}`, resolver una clave `scoped` desde la raíz lanza `Scoped "key" cannot be resolved from the root container. Use createScope().` Resuelve los servicios scoped desde un contenedor hijo devuelto por `createScope()`.
 

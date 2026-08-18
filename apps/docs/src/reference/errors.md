@@ -2,20 +2,20 @@
 
 InferDI throws explicit errors for graph and lifecycle misuse. Keep these messages visible in tests so registration mistakes fail early.
 
-| Trigger | Message shape |
-| --- | --- |
-| `.get(k)` on missing key | `Key "k" not found` |
-| Disposed container resolve | `Container is disposed (key: "k")` |
-| Disposed ancestor resolve | `Ancestor container is disposed (key: "k")` |
-| `createScope()` after dispose | `Cannot create scope from a disposed container` |
-| Registration after dispose | `Cannot register on a disposed container (key: "k")` |
-| Root resolves a scoped key with `fast: false` | `Scoped "k" cannot be resolved from the root container. Use createScope().` |
-| Singleton lifetime violation | `Singleton "x" cannot depend on scoped "y"...` |
-| Synchronous cycle | `Circular dependency detected: a -> b -> a...` |
-| Sync dispose over async resource | `Sync [Symbol.dispose] called on a resource whose .dispose() returned a Promise...` |
+| Trigger                                       | Message shape                                                                                |
+|-----------------------------------------------|----------------------------------------------------------------------------------------------|
+| `.get(k)` on missing key                      | `Key "k" not found`                                                                          |
+| Disposed container resolve                    | `Container is disposed (key: "k")`                                                           |
+| Disposed ancestor resolve                     | `Ancestor container is disposed (key: "k")`                                                  |
+| `createScope()` after dispose                 | `Cannot create scope from a disposed container`                                              |
+| Registration after dispose                    | `Cannot register on a disposed container (key: "k")`                                         |
+| Root resolves a scoped key with `fast: false` | `Scoped "k" cannot be resolved from the root container. Use createScope().`                  |
+| Singleton lifetime violation                  | `Singleton "x" cannot depend on scoped "y"...`                                               |
+| Synchronous cycle                             | `Circular dependency detected: a -> b -> a...`                                               |
+| Sync dispose over async resource              | `Sync [Symbol.dispose] called on a resource whose .dispose() returned a Promise...`          |
 | Sync dispose over cached async initialization | `Sync [Symbol.dispose] called on a container that cached a Promise from an async factory...` |
-| Late override | `Cannot override "k" because it has already been resolved...` |
-| Override on disposed container | `Cannot override on a disposed container (key: "k")` |
+| Late override                                 | `Cannot override "k" because it has already been resolved...`                                |
+| Override on disposed container                | `Cannot override on a disposed container (key: "k")`                                         |
 
 Sync disposal observes the rejection of a cached native Promise before reporting the misuse. A rejection that arrives later does not become an `unhandledRejection`, but sync disposal still cannot await or close the resource. It does not call `.then()` on a custom Promise-like value.
 

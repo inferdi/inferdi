@@ -56,16 +56,16 @@ Fastify's `app.register` cannot infer the plugin generics deeply enough for inli
 
 ## Options
 
-| Option | Default | Description |
-| --- | --- | --- |
-| `container` | required | Root container exposed as `app.di`. |
-| `scopePerRequest` | `true` | Set `false` for root-only mode. |
-| `createScope` | `root.createScope()` | Custom request scope creation. May be async. |
-| `setupScope` | none | Runs after creation and before exposure. May be async. |
-| `disposeScope` | `scope.dispose()` | Custom disposal. May be sync or async. |
-| `autoDispose` | `true` | `false` or predicate `false` transfers ownership to application code. |
-| `disposeRootOnClose` | `false` | Dispose root during `fastify.close()`. |
-| `onDisposeError` | `request.log.error` | Sink for request-scope disposal failures. |
+| Option               | Default              | Description                                                           |
+|----------------------|----------------------|-----------------------------------------------------------------------|
+| `container`          | required             | Root container exposed as `app.di`.                                   |
+| `scopePerRequest`    | `true`               | Set `false` for root-only mode.                                       |
+| `createScope`        | `root.createScope()` | Custom request scope creation. May be async.                          |
+| `setupScope`         | none                 | Runs after creation and before exposure. May be async.                |
+| `disposeScope`       | `scope.dispose()`    | Custom disposal. May be sync or async.                                |
+| `autoDispose`        | `true`               | `false` or predicate `false` transfers ownership to application code. |
+| `disposeRootOnClose` | `false`              | Dispose root during `fastify.close()`.                                |
+| `onDisposeError`     | `request.log.error`  | Sink for request-scope disposal failures.                             |
 
 ## Root-Only Mode
 

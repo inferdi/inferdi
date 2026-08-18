@@ -56,17 +56,17 @@ Routes must be registered after `.use(inferdiElysia(...))` in the typed Elysia c
 
 ## Options
 
-| Option | Default | Description |
-| --- | --- | --- |
-| `container` | required | Root container. |
-| `key` | `'di'` | Elysia context key. |
-| `scopePerRequest` | `true` | Set `false` for root-only mode. |
-| `createScope` | `root.createScope()` | Custom request scope creation. |
-| `setupScope` | none | Runs after creation and before validation. |
-| `setupValidatedScope` | none | Runs after Elysia validation. |
-| `disposeScope` | `scope.dispose()` | Custom disposal. |
-| `autoDispose` | `true` | `false` or predicate `false` transfers ownership. |
-| `onDisposeError` | `console.error` | Cleanup failure sink. |
+| Option                | Default              | Description                                       |
+|-----------------------|----------------------|---------------------------------------------------|
+| `container`           | required             | Root container.                                   |
+| `key`                 | `'di'`               | Elysia context key.                               |
+| `scopePerRequest`     | `true`               | Set `false` for root-only mode.                   |
+| `createScope`         | `root.createScope()` | Custom request scope creation.                    |
+| `setupScope`          | none                 | Runs after creation and before validation.        |
+| `setupValidatedScope` | none                 | Runs after Elysia validation.                     |
+| `disposeScope`        | `scope.dispose()`    | Custom disposal.                                  |
+| `autoDispose`         | `true`               | `false` or predicate `false` transfers ownership. |
+| `onDisposeError`      | `console.error`      | Cleanup failure sink.                             |
 
 ## Root-Only Mode
 

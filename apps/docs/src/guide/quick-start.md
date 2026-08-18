@@ -100,21 +100,21 @@ The returned scope type records that `request` is ready. Calling `root.get('user
 
 Registrations default to `singleton`. Pass a lifetime when a value belongs to a scope or to the caller.
 
-| Lifetime | Created | Cached by | Disposal owner |
-| --- | --- | --- | --- |
-| `singleton` | once | the container that creates it | that container |
-| `scoped` | once per child scope | the child scope | that scope |
-| `transient` | on every resolve | nobody | the caller |
+| Lifetime    | Created              | Cached by                     | Disposal owner |
+|-------------|----------------------|-------------------------------|----------------|
+| `singleton` | once                 | the container that creates it | that container |
+| `scoped`    | once per child scope | the child scope               | that scope     |
+| `transient` | on every resolve     | nobody                        | the caller     |
 
 A singleton cannot directly depend on a scoped or transient service. InferDI enforces this in types and, by default, checks it again at runtime.
 
 ## Choose the Next Page
 
-| If you need to… | Continue with |
-| --- | --- |
-| understand compile-time graph checks | [Type Safety](../core/type-safety) |
-| model request, tenant, or job data | [Scope Inputs](../core/scope-inputs) |
-| initialize a dependency asynchronously | [Async Dependencies](../core/async-dependencies) |
-| close databases and other resources safely | [Scopes and Disposal](../core/scopes) |
-| connect scopes to a web framework | [Framework Adapters](../adapters/) |
-| see complete framework and runtime examples | [Examples](./examples) |
+| If you need to…                             | Continue with                                    |
+|---------------------------------------------|--------------------------------------------------|
+| understand compile-time graph checks        | [Type Safety](../core/type-safety)               |
+| model request, tenant, or job data          | [Scope Inputs](../core/scope-inputs)             |
+| initialize a dependency asynchronously      | [Async Dependencies](../core/async-dependencies) |
+| close databases and other resources safely  | [Scopes and Disposal](../core/scopes)            |
+| connect scopes to a web framework           | [Framework Adapters](../adapters/)               |
+| see complete framework and runtime examples | [Examples](./examples)                           |

@@ -4,13 +4,13 @@ Cada ejemplo de backend construye el contenedor raíz una sola vez, crea un scop
 
 Comparten [`examples/_shared/container.ts`](https://github.com/inferdi/inferdi/blob/main/examples/_shared/container.ts), de modo que las diferencias que se muestran a continuación están en los hooks del ciclo de vida del framework y en las API de los adaptadores.
 
-| Ejemplo | Adaptador |
-| --- | --- |
+| Ejemplo                                                                                  | Adaptador                                                                           |
+|------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|
 | [`fastify.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/fastify.ts) | [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) |
-| [`hono.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/hono.ts) | [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) |
-| [`koa.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/koa.ts) | [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) |
+| [`hono.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/hono.ts)       | [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono)       |
+| [`koa.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/koa.ts)         | [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa)         |
 | [`express.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/express.ts) | [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) |
-| [`elysia.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/elysia.ts) | [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) |
+| [`elysia.ts`](https://github.com/inferdi/inferdi/blob/main/examples/backend/elysia.ts)   | [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)   |
 
 ## Fastify
 

@@ -638,7 +638,7 @@ The input schema exists only in TypeScript. JavaScript, `any`, or a cast can see
 
 Named modules can describe input slots with `ScopeInputMap<M>` and carry requirements in their output with `WithRequirements<Spec<V, L>, Keys>`. Generic async-capable resolvers should use `Container.ReadyKeys<Container<T>>`; synchronous resolvers should use `Container.SyncReadyKeys<Container<T>>`. See [MIGRATION.md](./MIGRATION.md) for the `keyof T` migration.
 
-The container probes each owned instance in order: `Symbol.asyncDispose` → `Symbol.dispose` → plain `.dispose()`. If multiple disposers throw, all errors are collected into a single `AggregateError` so one failing resource never leaves the rest unclosed. When dependency failure propagates through several cached Promises, async teardown reports the same `Error` object once; separate error objects remain separate causes.
+Async disposal probes each owned instance in order: `Symbol.asyncDispose` → `Symbol.dispose` → plain `.dispose()`. Sync `[Symbol.dispose]` skips async-only resources and reports a misuse if plain `.dispose()` returns a Promise or the container cached declarative async initialization. If multiple disposers throw, InferDI collects all errors in one `AggregateError` so one failure does not leave later resources unclosed. When dependency failure propagates through several cached Promises, async teardown reports the same `Error` object once; separate error objects remain separate causes.
 
 > **What gets disposed by which container.** Each container disposes only the instances it created. `root.dispose()` does **not** propagate into already-created child scopes — give scopes their own `await using` (or `dispose()` call) to release their resources. Forgetting to dispose a scope leaks every singleton/scoped instance it created.
 
@@ -666,7 +666,7 @@ class Repository {
 
 const root = new Container()
   .registerValue('config', {dsn: 'postgres://localhost/app'})
-  .registerAsyncFactory('db', async (config) => {
+  .registerAsyncFactory('db', async (config: {dsn: string}) => {
     const pool = new Pool({connectionString: config.dsn})
     await pool.connect()
     return pool
@@ -679,6 +679,8 @@ const repository = await scope.getAsync('repository')
 // @ts-expect-error — repository is part of the async graph
 scope.get('repository')
 ```
+
+When `deps` is not empty, annotate each callback parameter or pass a function with an existing signature. The tuple checks parameter types and order, but it does not provide contextual parameter inference.
 
 Declared dependencies are started synchronously in tuple order, then only keys marked as declarative async dependencies are awaited. Singleton and scoped registrations cache one native Promise, so concurrent callers share initialization and a rejection remains the stable failed state. Transients start once per call and remain caller-owned. Scope-input requirements and lifetime checks propagate through `AsyncSpec` the same way they do through `Spec`.
 
@@ -722,11 +724,11 @@ If dependency preflight fails after earlier initializations started, InferDI ret
 
 ## Runtime Lifetime Guards
 
-| Lifetime    | Created                                         | Cached on                | Disposed by container |
-| ----------- | ----------------------------------------------- | ------------------------ | --------------------- |
-| `singleton` | once per container that owns the registration | the owner container      | yes |
-| `scoped`    | once per child scope                            | the child scope          | yes |
-| `transient` | every time requested                            | never                    | no (caller owns it)   |
+| Lifetime    | Created                                       | Cached on           | Disposed by container |
+|-------------|-----------------------------------------------|---------------------|-----------------------|
+| `singleton` | once per container that owns the registration | the owner container | yes                   |
+| `scoped`    | once per child scope                          | the child scope     | yes                   |
+| `transient` | every time requested                          | never               | no (caller owns it)   |
 
 With the default `{fast: false}` contract, `root.get(scopedKey)` throws because
 the root does not represent a scope. Resolve the key from a child returned by
@@ -914,7 +916,7 @@ legacy.get('dbLazy') // Lazy<Promise<Database>>
 ```ts
 new Container()
   .registerClass('req', RequestContext, [], 'scoped', 'reqLazy')
-  // @ts-expect-error — Lazy<scoped> is not singleton-safe in v4.
+  // @ts-expect-error — Lazy<scoped> is not singleton-safe.
   .registerClass('app', AppService, ['reqLazy'], 'singleton')
 ```
 
@@ -951,7 +953,7 @@ c.get(CACHE)  // typed as RedisPool
 c.get('repo') // typed as UserRepo
 ```
 
-Lazy companions follow the same rule — pass any string or symbol as `lazyKey` to expose the `Lazy<V>` wrapper. The companion key lifetime does not have to match the primary key lifetime:
+Lazy companions follow the same rule: pass any string or symbol as `lazyKey` to expose the `Lazy<V>` wrapper. The primary and companion keys do not need to use the same key type:
 
 ```ts
 const DB       = Symbol('db')
@@ -965,8 +967,10 @@ const c = new Container()
   // String primary, symbol companion (or vice versa) — also accepted.
   .registerClass('cache', RedisPool, [], 'singleton', Symbol('cacheLazy'))
 
-c.get(DB_LAZY).get()      // typed as Lazy<PgPool>
-c.get('clockLazy').get()  // typed as Lazy<Clock>
+c.get(DB_LAZY)           // typed as Lazy<PgPool>
+c.get(DB_LAZY).get()     // typed as PgPool
+c.get('clockLazy')       // typed as Lazy<Clock>
+c.get('clockLazy').get() // typed as Clock
 ```
 
 > **⚡ Performance tip — symbol keys on the hottest paths.** The internal
@@ -1009,8 +1013,8 @@ const fixtureMailer: Module<SpecMap<{ config: { env: string } }>, SpecMap<{ mail
 
 // Mixed-lifetime requirements: scoped `req` and singleton `cfg`.
 type ReqHandlerIn = SpecMap<{ cfg: Config }> & { req: Spec<ReqCtx, 'scoped'> }
-const reqHandler: Module<ReqHandlerIn, SpecMap<{ handler: Handler }>> = (c) =>
-  c.registerClass('handler', Handler, ['cfg', 'req'])
+const reqHandler: Module<ReqHandlerIn, { handler: Spec<Handler, 'scoped'> }> = (c) =>
+  c.registerClass('handler', Handler, ['cfg', 'req'], 'scoped')
 
 const fixture = new Container()
   .registerValue('config', { env: 'test' })
@@ -1099,7 +1103,7 @@ This pattern keeps registration (the builder) and consumption (handlers, tests) 
 
 ## Provider Maps — `Container.Providers<C>`
 
-For tests that build a mock fixture as a record of zero-arg factories, `Container.Providers<C>` flattens the built container into `{ [K in keyof T]: () => T[K] }`. The compiler then enforces that every registered key is covered with a thunk returning the right shape — extraneous keys and missing keys are both surfaced as type errors.
+For tests that build a mock fixture as a record of zero-arg factories, `Container.Providers<C>` maps every registration key to a thunk returning that service type. The compiler reports extraneous keys, missing keys, and incompatible return values.
 
 ```ts
 import { Container } from '@inferdi/inferdi'
@@ -1138,6 +1142,7 @@ The container throws structured errors with actionable messages — surface thes
 | Sync `[Symbol.dispose]` over an async resource | `Sync [Symbol.dispose] called on a resource whose .dispose() returned a Promise. Use \`await using\` / container.dispose() for async teardown.` |
 | Sync `[Symbol.dispose]` over cached async initialization | `Sync [Symbol.dispose] called on a container that cached a Promise from an async factory. Use \`await using\` / container.dispose() for async teardown.` |
 | `.override()` after first resolve | `Cannot override "k" because it has already been resolved. Overrides must be applied before any .get() calls...` |
+| `.override()` on a missing key after a cast bypass | `Cannot override "k": key is not registered` |
 | `.override()` on a disposed container | `Cannot override on a disposed container (key: "k")` |
 
 ## Migration
@@ -1146,183 +1151,125 @@ Upgrading from a previous major version? See **[MIGRATION.md](https://github.com
 
 ## API Summary
 
+This section summarizes the public core API. See the published TypeScript declarations for exact generic signatures.
+
 ```ts
 import {
   Container,
+  type ContainerOptions,
+  type DependenciesMap,
   type Lazy,
   type AsyncLazy,
   type LazySpec,
   type AsyncLazySpec,
   type AsyncSpec,
   type Module,
-  type DependenciesMap,
   type Lifetime,
+  type ScopeInputMap,
   type Spec,
   type SpecMap,
-  type ContainerOptions,
+  type WithRequirements
 } from '@inferdi/inferdi'
 
-type NoKeyOverlap<
-  Candidate extends PropertyKey,
-  Existing extends PropertyKey
-> = [Candidate & Existing] extends [never] ? unknown : never
-
 class Container<T extends DependenciesMap = Record<never, never>> {
-  // Public — use this to construct a root container.
   constructor(options?: ContainerOptions)
 
-  // Registration — each call returns a Container widened by Record<K, Spec<V, L>>.
-  // The `deps` tuple and the factory `c` are narrowed via `AllowedDeps<T, L>`:
-  // for a singleton target, only singleton entries and managed Lazy/AsyncLazy
-  // companions whose target lifetime is exactly 'singleton' are visible.
-  registerClass<
-    K extends string | symbol,
-    V,
-    A extends readonly unknown[],
-  >(
-    key: K & NoKeyOverlap<K, keyof T>,
-    Ctor: new (...args: A) => V,
-    deps: DepsOf<AllowedDeps<T, 'singleton'>, A>,
-    lifetime?: undefined,
-  ): Container<T & Record<K, Spec<V, 'singleton'>>>
+  declareScopeInputs<Inputs>()
+  registerClass(key, Ctor, deps, lifetime?, lazyKey?)
+  registerFactory(key, factory, lifetime?)
+  registerFactory(key, factory, lifetime, lazyKey)
+  registerFactory(key, factory, deps, lifetime?)
+  registerFactory(key, factory, deps, lifetime, lazyKey)
+  registerAsyncFactory(key, factory, deps, lifetime?, lazyKey?)
+  registerValue(key, value)
+  override(key, value)
+  use(fn)
 
-  registerClass<K extends string | symbol, V, A, L extends Lifetime>(
-    key: K & NoKeyOverlap<K, keyof T>,
-    Ctor: new (...args: A) => V,
-    deps: DepsOf<AllowedDeps<T, L>, A>,
-    lifetime: L,
-  ): Container<T & Record<K, Spec<V, L>>>
+  createScope(inputs?)
+  get(syncReadyKey)
+  getAsync(readyKey): Promise
+  has(key): key is keyof T
 
-  // Both registerClass overloads also have a five-argument lazyKey form. It uses
-  // LK & NoKeyOverlap<LK, keyof T | K>; the companion is LazySpec,
-  // AsyncLazySpec, or their union based on ClassSpec.
-
-  registerFactory<
-    K extends string | symbol,
-    V,
-  >(
-    key: K & NoKeyOverlap<K, keyof T>,
-    factory: (c: Container<AllowedDeps<T, 'singleton'>>) => V,
-    lifetime?: undefined,
-  ): Container<T & Record<K, Spec<V, 'singleton'>>>
-
-  registerFactory<K extends string | symbol, V, L extends Lifetime>(
-    key: K & NoKeyOverlap<K, keyof T>,
-    factory: (c: Container<AllowedDeps<T, L>>) => V,
-    lifetime: L,
-  ): Container<T & Record<K, Spec<V, L>>>
-
-  // Deps-aware families place deps after factory. A lazy companion requires
-  // an explicit lifetime: registerFactory(key, factory, deps?, lifetime, lazyKey).
-
-  registerAsyncFactory<
-    K extends string | symbol,
-    A extends readonly unknown[],
-    R,
-  >(
-    key: K & NoKeyOverlap<K, keyof T>,
-    factory: (...args: A) => R,
-    deps: DepsOf<AllowedDeps<T, 'singleton'>, A>,
-    lifetime?: undefined
-  ): Container<T & Record<K, AsyncSpec<Awaited<R>, 'singleton'>>>
-
-  registerAsyncFactory<
-    K extends string | symbol,
-    A extends readonly unknown[],
-    R,
-    L extends Lifetime,
-  >(
-    key: K & NoKeyOverlap<K, keyof T>,
-    factory: (...args: A) => R,
-    deps: DepsOf<AllowedDeps<T, L>, A>,
-    lifetime: L
-  ): Container<T & Record<K, AsyncSpec<Awaited<R>, L>>>
-
-  // Both registerAsyncFactory overloads also have a five-argument lazyKey form.
-  // The return type adds Record<LK, AsyncLazySpec<Awaited<R>, L>>.
-
-  registerValue<K extends string | symbol, V>(
-    key: K & NoKeyOverlap<K, keyof T>,
-    value: V,
-  ): Container<T & Record<K, Spec<V, 'singleton'>>>
-
-  // Test-only: replace an existing registration with a static value.
-  // Walks the parent chain to read the original lifetime and preserves it locally,
-  // so `root.createScope().override('db', mock)` keeps the scoped semantics.
-  // Throws if the container is disposed, the key was already resolved, or
-  // the key is not registered anywhere in the chain.
-  override<K extends keyof T>(key: K, value: T[K]['type']): this
-
-  use<R extends DependenciesMap>(fn: (c: Container<T>) => Container<T & R>): Container<T & R>
-  use<Requirements extends DependenciesMap, Provides extends DependenciesMap>(
-    fn: Module<Requirements, Provides>
-  ): Container<T & Provides>
-
-  // Scopes & resolution
-  createScope(): Container<T>
-  // Sync-ready keys only. With fast: false, scoped keys require a child scope.
-  get<K extends keyof T>(key: K): T[K]['type']
-  // Ready sync and declarative async keys; synchronous errors become rejections.
-  getAsync<K extends keyof T>(key: K): Promise<Awaited<T[K]['type']>>
-  // Type-guard: narrows the key to keyof T inside the truthy branch.
-  // Returns false on a disposed container (regs is empty).
-  has<K extends string | symbol>(key: K): key is K & keyof T
-
-  // Lifecycle
   get disposed(): boolean
   dispose(): Promise<void>
   [Symbol.dispose](): void
   [Symbol.asyncDispose](): Promise<void>
 }
+```
 
+`fast` defaults to `false`, which keeps runtime cycle and lifetime checks and the exact mutable parent chain. `{fast: true}` disables that bookkeeping and treats the graph as fixed, enabling flattened parent lookup and inherited singleton mirroring. Child scopes inherit the root configuration. Finish every `register*`, `.use()`, and `.override()` call before the first resolve or `createScope()` in a fast tree, and dispose children before ancestors.
+
+### Registration Methods
+
+| Method | Callback input | Stored graph type | Resolve with |
+| --- | --- | --- | --- |
+| `registerClass` | Constructor arguments from `deps` | `Spec` or propagated `AsyncSpec` | `get` or `getAsync` |
+| `registerFactory(key, factory, ...)` | Lifetime-filtered container | `Spec<ReturnType>` | `get` |
+| `registerFactory(key, factory, deps, ...)` | Resolver limited to `deps` | Requirement-aware `Spec` | `get` |
+| `registerAsyncFactory` | Positional values; declarative async deps are awaited | `AsyncSpec<Awaited<ReturnType>>` | `getAsync` |
+| `registerValue` | None | Externally owned singleton `Spec` | `get` |
+
+`registerClass`, `registerFactory`, and `registerAsyncFactory` accept `singleton`, `scoped`, and `transient` lifetimes. A `registerFactory` companion requires an explicit lifetime, including `'singleton'`. `registerValue` is always singleton and externally owned.
+
+A `lazyKey` on `registerClass` or `registerFactory` adds a managed `LazySpec`. An async-propagated class instead adds an `AsyncLazySpec`. A Promise-valued `registerFactory` remains a synchronous `Spec<Promise<T>>`, and its companion remains `Lazy<Promise<T>>`; use `registerAsyncFactory` when the graph should store the final service type.
+
+`registerAsyncFactory` accepts the same lifetimes and an optional fifth `lazyKey`. It records the final service type as `AsyncSpec`; the companion is `AsyncLazySpec<Awaited<ReturnType>, L>`. Dependent classes inherit async status from the target key, while a consumer of the wrapper remains synchronous. Use `getAsync()` for the target and `get()` for the wrapper.
+
+`registerAsyncFactory` and any `registerClass` call whose tuple may select an async key require readonly dependencies. InferDI classifies async positions once and retains the tuple reference. Inline literals infer readonly tuples; sync-only `registerClass` calls keep mutable-tuple compatibility.
+
+The deps-aware `registerFactory` and `registerAsyncFactory` use the same argument order but different callback contracts. The former receives a resolver limited to `deps`; the latter receives the dependency values positionally:
+
+```ts
+registerFactory(key, resolverFactory, deps, lifetime, lazyKey)
+registerAsyncFactory(key, valueFactory, deps, lifetime, lazyKey)
+```
+
+`override` replaces an existing non-input registration, and `use` applies a module builder. The `override` timing guard checks only the current container's cache. It catches locally cached singleton or scoped values, `registerValue`, and repeated overrides, but never records transient resolutions. In checked mode it also does not record ancestor-owned singletons resolved through a child; a fast child mirrors delegated singletons into its local cache, so the guard catches those. Apply overrides before resolving the dependency graph.
+
+### Scope Inputs and Resolution
+
+`declareScopeInputs<Inputs>()` adds type-only scoped entries. `createScope(inputs)` supplies any subset of missing values and returns a container whose ready-key set reflects the provided required properties. Input values remain application-owned.
+
+| Surface | Accepted keys |
+| --- | --- |
+| `get()` | Ready keys without `AsyncSpec` |
+| `getAsync()` | All ready sync and declarative async keys |
+| `has()` | Any string or symbol; proves registration only |
+
+`has()` does not prove that a key is ready or synchronous. Declared scope inputs are type-only rather than registrations, so `has()` returns `false` for them even after `createScope(inputs)` supplies their values.
+
+### Namespace Types
+
+```ts
 namespace Container {
-  // Ready keys accepted by getAsync(), including declarative async entries.
   type ReadyKeys<C>
-
-  // Ready synchronous keys accepted by get().
   type SyncReadyKeys<C>
-
-  // Extract the registered map from a built container as a **flat**
-  // `{ key: ServiceType }` view — the Spec wrapper is unwrapped, so consumers
-  // see the same shape they always did pre-v3.
-  type Resolve<C> = C extends Container<infer U>
-    ? { [K in keyof U]: U[K]['type'] }
-    : never
-
-  // Same as Resolve, but distributively unwraps managed LazySpec and
-  // AsyncLazySpec companion entries. Ordinary wrapper services remain unchanged.
-  type ResolveUnwrapped<C> = C extends Container<infer U>
-    ? { [K in keyof U]: UnwrapSpec<U[K]> }
-    : never
-
-  // Look up a single key's unwrapped service type.
-  // For a Lazy<T>-registered key returns T (no wrapper); useful when overriding
-  // a Lazy<T> companion in tests:
-  //   const mock: Container.UnwrappedValue<typeof c, 'clockLazy'> = { now: () => 0 }
-  //   c.override('clockLazy', { get: () => mock })
-  type UnwrappedValue<C, K extends keyof Resolve<C>> = ResolveUnwrapped<C>[K]
-
-  // Flatten a built container into a record of zero-arg provider thunks,
-  // one per registered key. Declared scope inputs are excluded. Lazy and
-  // AsyncLazy companions keep the wrapper shape.
-  // Useful for typing mock-factory fixtures in tests.
-  type Providers<C> = C extends Container<infer U>
-    ? { [K in RegistrationKeys<U>]: () => U[K]['type'] }
-    : never
+  type Resolve<C>
+  type ResolveUnwrapped<C>
+  type UnwrappedValue<C, K>
+  type Providers<C>
 }
+```
 
-// Public types
+| Type | Use |
+| --- | --- |
+| `Container.ReadyKeys<C>` | Extract keys whose scope-input requirements have been provided; generic resolvers can pass them to `getAsync`. |
+| `Container.SyncReadyKeys<C>` | Extract ready non-async keys that generic resolvers can pass to `get`. |
+| `Container.Resolve<C>` | Extract a flat `{ key: Value }` map from a built container. |
+| `Container.ResolveUnwrapped<C>` | Like `Resolve`, but unwrap managed `LazySpec` and `AsyncLazySpec` entries to `T`; unmanaged wrapper services stay unchanged. |
+| `Container.UnwrappedValue<C, K>` | Look up one unwrapped service type. |
+| `Container.Providers<C>` | Create a map of provider thunks for tests; declared scope inputs are excluded. |
+
+Generic resolvers must preserve the accepted key set. Use `Container.SyncReadyKeys<C>` with `get()` and `Container.ReadyKeys<C>` with `getAsync()` instead of unconstrained `keyof T`.
+
+### Public Types
+
+```ts
+
 type Lazy<T> = { readonly get: () => T }
 type AsyncLazy<T> = { readonly get: () => Promise<T> }
 type Lifetime = 'singleton' | 'scoped' | 'transient'
 
-// Construction options.
-interface ContainerOptions {
-  readonly fast?: boolean
-}
-
-// Single registry entry — service type V plus its lifetime. `interface`
-// (not type alias) so TS caches instantiations across long fluent chains.
 interface Spec<V, L extends Lifetime = 'singleton'> {
   readonly type: V
   readonly lifetime: L
@@ -1333,8 +1280,6 @@ interface AsyncSpec<V, L extends Lifetime = 'singleton'>
   readonly async: true
 }
 
-// Both managed companion specs also carry a private type-only mode brand.
-// Use these named exports in explicit Container and Module shapes.
 interface LazySpec<V, TargetLifetime extends Lifetime>
   extends Spec<Lazy<V>, 'transient'> {
   readonly lazyOf: TargetLifetime
@@ -1345,15 +1290,25 @@ interface AsyncLazySpec<V, TargetLifetime extends Lifetime>
   readonly lazyOf: TargetLifetime
 }
 
-// Brand a flat `{ key: ServiceType }` map as a SpecMap (defaults to singleton).
-type SpecMap<M, L extends Lifetime = 'singleton'> =
-  { [P in keyof M]: Spec<M[P], L> }
+type SpecMap<M, L extends Lifetime = 'singleton'> = {
+  [P in keyof M]: Spec<M[P], L>
+}
 
 type DependenciesMap = Record<string | symbol, Spec<unknown, Lifetime>>
+
+interface ContainerOptions {
+  readonly fast?: boolean
+}
 
 type Module<TRequirements extends DependenciesMap, TProvides extends DependenciesMap> =
   (c: Container<TRequirements>) => Container<TRequirements & TProvides>
 ```
+
+`LazySpec` and `AsyncLazySpec` also carry a private type-only mode discriminant in the published declarations. Use the named interfaces for managed companions in explicit `Container` and `Module` shapes. The discriminant has no runtime field and is not exported.
+
+`Spec`, `AsyncSpec`, `LazySpec`, and `AsyncLazySpec` describe entries in the type-level graph; their fields are not properties added to resolved service values.
+
+`ScopeInputMap<M>` maps required finite string and symbol properties to scoped input entries. It rejects optional or numeric keys, `__proto__`, broad index signatures, and unions with different key sets. `WithRequirements<S, K>` attaches required input keys to a graph entry and is useful in named module outputs. The published TypeScript declarations contain their exact conditional definitions.
 
 ## Repository Structure
 

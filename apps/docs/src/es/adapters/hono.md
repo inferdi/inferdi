@@ -63,15 +63,15 @@ El adaptador no aumenta globalmente el `ContextVariableMap` de Hono, por lo que 
 
 ## Opciones
 
-| Opción | Por defecto | Descripción |
-| --- | --- | --- |
-| `container` | requerido | Contenedor raíz. Este middleware nunca lo libera. |
-| `key` | `'di'` | Clave de la variable de contexto. |
-| `createScope` | `root.createScope()` | Creación personalizada del scope de petición. |
-| `setupScope` | ninguno | Ejecuta inicialización adicional después de crear el scope. |
-| `disposeScope` | `scope.dispose()` | Liberación personalizada. |
-| `autoDispose` | `true` | `false` o un predicado `false` transfiere la propiedad. |
-| `onDisposeError` | `console.error` | Sumidero de fallos de limpieza. |
+| Opción           | Por defecto          | Descripción                                                 |
+|------------------|----------------------|-------------------------------------------------------------|
+| `container`      | requerido            | Contenedor raíz. Este middleware nunca lo libera.           |
+| `key`            | `'di'`               | Clave de la variable de contexto.                           |
+| `createScope`    | `root.createScope()` | Creación personalizada del scope de petición.               |
+| `setupScope`     | ninguno              | Ejecuta inicialización adicional después de crear el scope. |
+| `disposeScope`   | `scope.dispose()`    | Liberación personalizada.                                   |
+| `autoDispose`    | `true`               | `false` o un predicado `false` transfiere la propiedad.     |
+| `onDisposeError` | `console.error`      | Sumidero de fallos de limpieza.                             |
 
 ## Streaming
 

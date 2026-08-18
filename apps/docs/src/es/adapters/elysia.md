@@ -56,17 +56,17 @@ Las rutas deben registrarse después de `.use(inferdiElysia(...))` en la cadena 
 
 ## Opciones
 
-| Opción | Por defecto | Descripción |
-| --- | --- | --- |
-| `container` | requerido | Contenedor raíz. |
-| `key` | `'di'` | Clave de contexto de Elysia. |
-| `scopePerRequest` | `true` | Establece `false` para el modo solo raíz. |
-| `createScope` | `root.createScope()` | Creación personalizada del scope de petición. |
-| `setupScope` | ninguno | Ejecuta inicialización adicional después de crear el scope. |
-| `setupValidatedScope` | ninguno | Ejecuta inicialización adicional después de la validación de Elysia. |
-| `disposeScope` | `scope.dispose()` | Liberación personalizada. |
-| `autoDispose` | `true` | `false` o un predicado `false` transfiere la propiedad. |
-| `onDisposeError` | `console.error` | Sumidero de fallos de limpieza. |
+| Opción                | Por defecto          | Descripción                                                          |
+|-----------------------|----------------------|----------------------------------------------------------------------|
+| `container`           | requerido            | Contenedor raíz.                                                     |
+| `key`                 | `'di'`               | Clave de contexto de Elysia.                                         |
+| `scopePerRequest`     | `true`               | Establece `false` para el modo solo raíz.                            |
+| `createScope`         | `root.createScope()` | Creación personalizada del scope de petición.                        |
+| `setupScope`          | ninguno              | Ejecuta inicialización adicional después de crear el scope.          |
+| `setupValidatedScope` | ninguno              | Ejecuta inicialización adicional después de la validación de Elysia. |
+| `disposeScope`        | `scope.dispose()`    | Liberación personalizada.                                            |
+| `autoDispose`         | `true`               | `false` o un predicado `false` transfiere la propiedad.              |
+| `onDisposeError`      | `console.error`      | Sumidero de fallos de limpieza.                                      |
 
 ## Modo solo raíz
 

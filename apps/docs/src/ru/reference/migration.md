@@ -4,11 +4,17 @@ InferDI документирует breaking changes по major versions. Ист�
 
 ## Переход на 6.0
 
+Этот раздел описывает переход со стабильной `5.0.7`. Обновите все установленные
+пакеты `@inferdi/*` до `6.0.0`: адаптеры требуют
+`@inferdi/inferdi@^6.0.0`.
+
 - Замените `RegistrationKind` на `Lifetime`, а `Spec.kind` на `Spec.lifetime`; deprecated alias не оставлен.
-- Перенесите deps у sync-фабрик: `registerFactory(key, deps, factory, ...)` → `registerFactory(key, factory, deps, ...)`. Companion требует явный lifetime, включая `'singleton'`.
-- Замените прежнюю опцию отключения runtime-проверок на `{fast: true}`. Prerelease-опция `mode` удалена. По умолчанию `fast: false`: runtime-проверки включены, а граф остаётся mutable; `fast: true` выбирает unchecked fixed contract.
+- В стабильной v5 не было deps-aware overload для `registerFactory`. V6 добавляет `registerFactory(key, factory, deps, ...)`; менять порядок аргументов нужно только пользователям prerelease-формы `registerFactory(key, deps, factory, ...)`. Companion sync-фабрики требует явный lifetime, включая `'singleton'`.
+- Замените v5 `{strict: false}` на `{fast: true}`, а `{strict: true}` — на значение по умолчанию или `{fast: false}`. Смысл boolean инвертирован. Prerelease-опция `mode` удалена.
 - Именованный `Module<TRequirements, TProvides>` принимает actual graph с дополнительными регистрациями, сохраняет их, точно проверяет requirements и запрещает collisions outputs. `new Container(parent)` больше не public; используйте `createScope()`.
 - Регистрация теперь отклоняет любой тип ключа, который может пересечься с существующим основным или lazy-ключом. Сузьте broad- или union-ключ до нового значения либо используйте `.override()` для намеренной замены.
+- V6 добавляет type-only scope inputs через `declareScopeInputs<Inputs>()` и `createScope(inputs)`. Существующие scope без аргументов сохраняют поведение v5.
+- V6 добавляет `registerAsyncFactory`, `AsyncSpec` и `getAsync()` для декларативных async-зависимостей. Promise-valued `registerFactory` остаётся синхронным сервисом графа и по-прежнему разрешается через `get()`.
 - Async teardown сообщает общий объект rejection один раз, если ошибка зависимости прошла через несколько закешированных Promise. Sync teardown наблюдает rejection нативного Promise до выброса ошибки об async-использовании.
 
 ### Generic resolver использует готовые ключи
