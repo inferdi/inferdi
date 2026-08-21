@@ -18,6 +18,25 @@ class Service {
   constructor(public readonly repository: Repository) {}
 }
 
+interface AssimilatedService {
+  readonly assimilated: number
+}
+
+class ThenableService implements PromiseLike<AssimilatedService> {
+  constructor(public readonly seed: number) {}
+
+  public then<TResult1 = AssimilatedService, TResult2 = never>(
+    onfulfilled?: ((value: AssimilatedService) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+  ): PromiseLike<TResult1 | TResult2> {
+    return Promise.resolve({assimilated: this.seed}).then(onfulfilled, onrejected)
+  }
+}
+
+class AssimilatedConsumer {
+  constructor(public readonly service: AssimilatedService) {}
+}
+
 function deferred<T>(): {
   readonly promise: Promise<T>
   readonly resolve: (value: T) => void
@@ -430,6 +449,20 @@ describe('compact async dependency graph — classes and guards', () => {
     expect(service).toBeInstanceOf(Service)
     expect(service.repository).toBeInstanceOf(Repository)
     expect(service.repository.db).toBe(db)
+  })
+
+  it('assimilates an async class thenable before downstream injection', async () => {
+    const c = new Container()
+      .registerAsyncFactory('seed', async () => 1, [])
+      .registerClass('service', ThenableService, ['seed'])
+      .registerClass('consumer', AssimilatedConsumer, ['service'])
+
+    const service = await c.getAsync('service')
+    const consumer = await c.getAsync('consumer')
+
+    expect(service).toEqual({assimilated: 1})
+    expect(service).not.toBeInstanceOf(ThenableService)
+    expect(consumer.service).toBe(service)
   })
 
   it('detects a declared async cycle during synchronous preflight', async () => {

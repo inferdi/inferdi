@@ -5,11 +5,13 @@ import Fastify, {
   type FastifyInstance,
   type FastifyRequest
 } from 'fastify'
-import {describe, expect, it} from 'vitest'
+import {describe, expect, it, vi} from 'vitest'
+import {Container} from '@inferdi/inferdi'
 import {
   inferdiFastify,
   skipInferdiDispose,
-  type InferdiScope
+  type InferdiScope,
+  type ScopedOptions
 } from '../src/index'
 
 async function listenOn(app: FastifyInstance): Promise<number> {
@@ -33,6 +35,16 @@ type InstanceWithRoot = FastifyInstance & { di: TestRoot }
 
 function delay(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms))
+}
+
+function deferred<T = void>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
 }
 
 /*
@@ -187,6 +199,70 @@ describe('@inferdi/fastify', () => {
     expect(root.scopes[0]?.disposeCalls).toBe(1)
     expect(app.hasDecorator('di')).toBe(true)
     expect(app.hasRequestDecorator('di')).toBe(true)
+
+    await app.close()
+  })
+
+  it('resolves and disposes a real input-refined async Container scope', async () => {
+    const app = Fastify()
+    const resourceDisposed = deferred()
+    const laterOnResponse = deferred<boolean>()
+    let resourceDisposeCalls = 0
+    let scopeDisposeCalls = 0
+    const root = new Container()
+      .declareScopeInputs<{requestId: string}>()
+      .registerAsyncFactory(
+        'service',
+        async (requestId: string) => ({
+          requestId,
+          async dispose() {
+            await Promise.resolve()
+            resourceDisposeCalls += 1
+            resourceDisposed.resolve()
+          }
+        }),
+        ['requestId'],
+        'scoped'
+      )
+    const createRequestScope = (requestId: string) => root.createScope({ requestId })
+    type RequestScope = ReturnType<typeof createRequestScope>
+    const options: ScopedOptions<typeof root, RequestScope> = {
+      container: root,
+      createScope: (receivedRoot, request) => {
+        const scope = receivedRoot.createScope({
+          requestId: request.headers['x-request-id']?.toString() ?? ''
+        })
+        const dispose = scope.dispose.bind(scope)
+        vi.spyOn(scope, 'dispose').mockImplementation(() => {
+          scopeDisposeCalls += 1
+          return dispose()
+        })
+        return scope
+      }
+    }
+
+    app.register(inferdiFastify, options)
+    app.addHook('onResponse', async () => {
+      laterOnResponse.resolve(resourceDisposeCalls === 1)
+    })
+    app.get('/service', async (request) => {
+      const scope = (request as FastifyRequest & { di: RequestScope }).di
+      const service = await scope.getAsync('service')
+      return { requestId: service.requestId }
+    })
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/service',
+      headers: { 'x-request-id': 'fastify-request' }
+    })
+
+    expect(await laterOnResponse.promise).toBe(true)
+    await resourceDisposed.promise
+    expect(response.statusCode).toBe(200)
+    expect(JSON.parse(response.body)).toEqual({ requestId: 'fastify-request' })
+    expect(scopeDisposeCalls).toBe(1)
+    expect(resourceDisposeCalls).toBe(1)
 
     await app.close()
   })
@@ -713,6 +789,38 @@ describe('@inferdi/fastify', () => {
     await app.close()
   })
 
+  it.each([
+    ['autoDispose: false', false],
+    ['a false predicate', () => false]
+  ] as const)('keeps manual ownership after a handled route error with %s', async (_label, autoDispose) => {
+    const app = Fastify()
+    const root = new TestRoot()
+    const routeError = new Error('route failed')
+
+    app.register(inferdiFastify, { container: root, autoDispose })
+    app.setErrorHandler((error, _request, reply) => {
+      reply.code(409).send({ message: error.message })
+    })
+    app.get('/boom', async () => {
+      throw routeError
+    })
+
+    const response = await app.inject('/boom')
+    const scope = root.scopes[0]
+
+    try {
+      expect(response.statusCode).toBe(409)
+      expect(JSON.parse(response.body)).toEqual({ message: 'route failed' })
+      expect(scope?.disposed).toBe(false)
+      expect(scope?.disposeCalls).toBe(0)
+    } finally {
+      await scope?.dispose()
+      await app.close()
+    }
+
+    expect(scope?.disposeCalls).toBe(1)
+  })
+
   it('routes autoDispose predicate failures through cleanup and still disposes', async () => {
     const logged: unknown[] = []
     const app = Fastify({ loggerInstance: makeLogger(logged) })
@@ -823,15 +931,27 @@ describe('@inferdi/fastify', () => {
 
     app.register(inferdiFastify, { container: root })
     app.get('/manual', async (request) => {
+      const scope = (request as RequestWithScope).di
       skipInferdiDispose(request)
-      return { ok: true }
+      return scope?.get('users').profile('manual')
     })
     app.get('/auto', async () => ({ ok: true }))
 
-    await app.inject('/manual')
+    const manual = await app.inject('/manual')
     await app.inject('/auto')
 
-    expect(root.scopes[0]?.disposeCalls).toBe(0)
+    const scope = root.scopes[0]
+    try {
+      expect(manual.statusCode).toBe(200)
+      expect(JSON.parse(manual.body)).toEqual({ id: 'manual', requestId: '' })
+      expect(scope?.disposed).toBe(false)
+      expect(scope?.get('users').profile('after').id).toBe('after')
+      expect(scope?.disposeCalls).toBe(0)
+    } finally {
+      await scope?.dispose()
+    }
+
+    expect(scope?.disposeCalls).toBe(1)
     expect(root.scopes[1]?.disposeCalls).toBe(1)
 
     await app.close()

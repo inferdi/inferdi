@@ -12,6 +12,7 @@ import express, {
   type Response
 } from 'express'
 import {describe, expect, it, vi} from 'vitest'
+import {Container} from '@inferdi/inferdi'
 import {
   inferdiExpress,
   skipInferdiDispose,
@@ -181,6 +182,63 @@ describe('@inferdi/express', () => {
     expect(root.createScopeCalls).toBe(1)
     expect(root.scopes[0]?.disposeCalls).toBe(1)
     expect(root.scopes[0]?.disposed).toBe(true)
+  })
+
+  it('resolves an input-refined async service from a real Container', async () => {
+    const resourceDisposed = deferred()
+    let resourceDisposeCalls = 0
+    let scopeDisposeCalls = 0
+    const root = new Container()
+      .declareScopeInputs<{requestId: string}>()
+      .registerAsyncFactory(
+        'service',
+        async (requestId: string) => ({
+          requestId,
+          async dispose() {
+            resourceDisposeCalls += 1
+            resourceDisposed.resolve()
+          }
+        }),
+        ['requestId'],
+        'scoped'
+      )
+    const createRequestScope = (requestId: string) => root.createScope({ requestId })
+    type RequestScope = ReturnType<typeof createRequestScope>
+    const app = express()
+
+    app.use(inferdiExpress({
+      container: root,
+      createScope: (receivedRoot, req) => {
+        const scope = receivedRoot.createScope({
+          requestId: req.get('x-request-id') ?? ''
+        })
+        const dispose = scope.dispose.bind(scope)
+        vi.spyOn(scope, 'dispose').mockImplementation(() => {
+          scopeDisposeCalls += 1
+          return dispose()
+        })
+        return scope
+      }
+    }))
+    app.get('/service', async (req, res) => {
+      const scope = req.di as unknown as RequestScope
+      const service = await scope.getAsync('service')
+      res.json({ requestId: service.requestId })
+    })
+
+    const response = await withServer(app, async (baseUrl) => {
+      const result = await fetch(`${baseUrl}/service`, {
+        headers: { 'x-request-id': 'express-request' }
+      })
+      const body = await result.json()
+      await resourceDisposed.promise
+      return { body, status: result.status }
+    })
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({ requestId: 'express-request' })
+    expect(scopeDisposeCalls).toBe(1)
+    expect(resourceDisposeCalls).toBe(1)
   })
 
   it('keeps scoped state isolated between requests', async () => {
@@ -840,6 +898,60 @@ describe('@inferdi/express', () => {
     expect(root.scopes[0]?.disposeCalls).toBe(1)
   })
 
+  it('keeps the scope alive between chunks of a successful response stream', async () => {
+    const cleaned = deferred()
+    const firstChunkReceived = deferred()
+    const releaseResponse = deferred()
+    const root = new TestRoot()
+    root.nextScope = new TestScope({ onDispose: cleaned.resolve })
+    const app = express()
+
+    app.use(inferdiExpress({ container: root }))
+    app.get('/stream', async (req, res) => {
+      res.write('first-')
+      await releaseResponse.promise
+      expect(req.di.disposed).toBe(false)
+      res.end(req.di.get('users').profile('second').id)
+    })
+
+    const body = await withServer(app, async (baseUrl) => {
+      const responseBody = new Promise<string>((resolve, reject) => {
+        const request = httpRequest(`${baseUrl}/stream`, (response) => {
+          let received = ''
+          response.setEncoding('utf8')
+          response.on('data', (chunk: string) => {
+            received += chunk
+            if (received.includes('first-')) {
+              firstChunkReceived.resolve()
+            }
+          })
+          response.on('end', () => resolve(received))
+          response.on('error', reject)
+        })
+        request.on('error', reject)
+        request.end()
+      })
+
+      await firstChunkReceived.promise
+      const scope = root.scopes[0]
+
+      try {
+        expect(scope?.disposeCalls).toBe(0)
+        expect(scope?.disposed).toBe(false)
+        expect(scope?.get('users').profile('between').id).toBe('between')
+      } finally {
+        releaseResponse.resolve()
+      }
+
+      const received = await responseBody
+      await cleaned.promise
+      return received
+    })
+
+    expect(body).toBe('first-second')
+    expect(root.scopes[0]?.disposeCalls).toBe(1)
+  })
+
   it('preserves Express error handling and still disposes', async () => {
     const root = new TestRoot()
     const routeError = new Error('route failed')
@@ -906,7 +1018,14 @@ describe('@inferdi/express', () => {
      * The skip marker is honored despite the failure — the leak the other
      * adapters prevent is the documented Express trade-off
      */
-    expect(root.scopes[0]?.disposeCalls).toBe(0)
+    const scope = root.scopes[0]
+    try {
+      expect(scope?.disposeCalls).toBe(0)
+    } finally {
+      await scope?.dispose()
+    }
+
+    expect(scope?.disposeCalls).toBe(1)
   })
 
   it('does not emit unhandled rejections for response cleanup failures', async () => {
@@ -1090,6 +1209,45 @@ describe('@inferdi/express', () => {
     expect(booleanRoot.scopes[0]?.disposeCalls).toBe(0)
     expect(predicateRoot.scopes[0]?.disposeCalls).toBe(0)
     expect(predicateRoot.scopes[1]?.disposeCalls).toBe(1)
+  })
+
+  it.each([
+    ['autoDispose: false', false],
+    ['a false predicate', () => false]
+  ] as const)('keeps manual ownership after a handled route error with %s', async (_label, autoDispose) => {
+    const root = new TestRoot()
+    const routeError = new Error('route failed')
+    const errors: unknown[] = []
+    const app = express()
+
+    app.use(inferdiExpress({ container: root, autoDispose }))
+    app.get('/boom', (_req, _res, next) => {
+      next(routeError)
+    })
+    app.use((
+      error: unknown,
+      _req: Request,
+      res: Response,
+      _next: NextFunction
+    ) => {
+      errors.push(error)
+      res.status(409).json({ message: (error as Error).message })
+    })
+
+    const response = await requestJson(app, '/boom')
+    const scope = root.scopes[0]
+
+    try {
+      expect(response.status).toBe(409)
+      expect(response.body).toEqual({ message: 'route failed' })
+      expect(errors).toEqual([routeError])
+      expect(scope?.disposed).toBe(false)
+      expect(scope?.disposeCalls).toBe(0)
+    } finally {
+      await scope?.dispose()
+    }
+
+    expect(scope?.disposeCalls).toBe(1)
   })
 
   it('supports async autoDispose predicates that skip disposal', async () => {

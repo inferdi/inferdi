@@ -23,9 +23,15 @@ class UserService {
   }
 }
 
+class AsyncUserService {
+  constructor(readonly users: UserService) {}
+}
+
 const root = new Container()
   .registerClass('request', RequestContext, [], 'scoped')
   .registerClass('users', UserService, [], 'scoped')
+  .registerAsyncFactory('asyncUsersSource', async () => new UserService(), [], 'scoped')
+  .registerClass('asyncUsers', AsyncUserService, ['asyncUsersSource'], 'scoped')
 
 type RootContainer = typeof root
 type RequestContainer = ReturnType<RootContainer['createScope']>
@@ -36,7 +42,12 @@ class InputUserService {
 
 const inputRoot = new Container()
   .declareScopeInputs<{requestInput: RequestContext}>()
-  .registerClass('inputUsers', InputUserService, ['requestInput'], 'scoped')
+  .registerAsyncFactory(
+    'inputUsers',
+    async (request: RequestContext) => new InputUserService(request),
+    ['requestInput'],
+    'scoped'
+  )
 
 declare global {
   namespace Express {
@@ -52,7 +63,7 @@ describe('@inferdi/express types', () => {
 
     expectTypeOf<InferdiScopeOf<typeof inputRoot>>().toEqualTypeOf<typeof scope>()
     // @ts-expect-error — default adapter scope creation provides no inputs
-    scope.get('inputUsers')
+    scope.getAsync('inputUsers')
   })
 
   it('infers a refined scope from the custom createScope hook', () => {
@@ -62,7 +73,12 @@ describe('@inferdi/express types', () => {
         requestInput: new RequestContext()
       }),
       setupScope: (scope) => {
-        expectTypeOf(scope.get('inputUsers')).toEqualTypeOf<InputUserService>()
+        expectTypeOf(scope.getAsync('inputUsers')).toEqualTypeOf<
+          Promise<InputUserService>
+        >()
+
+        // @ts-expect-error — declarative async services require getAsync()
+        scope.get('inputUsers')
       }
     })
   })
@@ -86,6 +102,12 @@ describe('@inferdi/express types', () => {
     app.get('/users/:id', (req, res) => {
       expectTypeOf(req.di).toEqualTypeOf<RequestContainer>()
       expectTypeOf(req.di.get('users')).toEqualTypeOf<UserService>()
+      expectTypeOf(req.di.getAsync('asyncUsers')).toEqualTypeOf<
+        Promise<AsyncUserService>
+      >()
+
+      // @ts-expect-error — propagated async services require getAsync()
+      req.di.get('asyncUsers')
 
       // @ts-expect-error — missing DI keys remain compile errors
       req.di.get('missing')

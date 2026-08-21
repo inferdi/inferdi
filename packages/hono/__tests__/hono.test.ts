@@ -1,5 +1,7 @@
 import { Hono, type Context } from 'hono'
+import { streamText } from 'hono/streaming'
 import {describe, expect, it, vi} from 'vitest'
+import {Container} from '@inferdi/inferdi'
 import {
   inferdiHono,
   skipInferdiDispose,
@@ -9,6 +11,16 @@ import {
 
 function delay(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms))
+}
+
+function deferred<T = void>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
 }
 
 class TestScope implements InferdiScope {
@@ -104,6 +116,56 @@ describe('@inferdi/hono', () => {
     expect(root.createScopeCalls).toBe(1)
     expect(root.scopes[0]?.disposeCalls).toBe(1)
     expect(root.scopes[0]?.disposed).toBe(true)
+  })
+
+  it('resolves an input-refined async service from a real Container', async () => {
+    const resourceDisposed = deferred()
+    let resourceDisposeCalls = 0
+    let scopeDisposeCalls = 0
+    const root = new Container()
+      .declareScopeInputs<{requestId: string}>()
+      .registerAsyncFactory(
+        'service',
+        async (requestId: string) => ({
+          requestId,
+          async dispose() {
+            resourceDisposeCalls += 1
+            resourceDisposed.resolve()
+          }
+        }),
+        ['requestId'],
+        'scoped'
+      )
+    const app = new Hono()
+
+    app.use('*', inferdiHono({
+      container: root,
+      createScope: (receivedRoot, c) => {
+        const scope = receivedRoot.createScope({
+          requestId: c.req.header('x-request-id') ?? ''
+        })
+        const dispose = scope.dispose.bind(scope)
+        vi.spyOn(scope, 'dispose').mockImplementation(() => {
+          scopeDisposeCalls += 1
+          return dispose()
+        })
+        return scope
+      }
+    }))
+    app.get('/service', async (c) => {
+      const service = await c.var.di.getAsync('service')
+      return c.json({ requestId: service.requestId })
+    })
+
+    const response = await app.request('/service', {
+      headers: { 'x-request-id': 'hono-request' }
+    })
+    await resourceDisposed.promise
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ requestId: 'hono-request' })
+    expect(scopeDisposeCalls).toBe(1)
+    expect(resourceDisposeCalls).toBe(1)
   })
 
   it('keeps scoped state isolated between requests', async () => {
@@ -615,6 +677,35 @@ describe('@inferdi/hono', () => {
     expect(root.scopes[1]?.disposeCalls).toBe(1)
   })
 
+  it.each([
+    ['autoDispose: false', false],
+    ['a false predicate', () => false]
+  ] as const)('keeps manual ownership after a handled route error with %s', async (_label, autoDispose) => {
+    const root = new TestRoot()
+    const routeError = new Error('route failed')
+    const app = new Hono<InferdiHonoEnv<TestRoot>>()
+
+    app.use('*', inferdiHono({ container: root, autoDispose }))
+    app.onError((error, c) => json(error, c))
+    app.get('/boom', () => {
+      throw routeError
+    })
+
+    const response = await app.request('/boom')
+    const scope = root.scopes[0]
+
+    try {
+      expect(response.status).toBe(500)
+      expect(await response.json()).toEqual({ message: 'route failed' })
+      expect(scope?.disposed).toBe(false)
+      expect(scope?.disposeCalls).toBe(0)
+    } finally {
+      await scope?.dispose()
+    }
+
+    expect(scope?.disposeCalls).toBe(1)
+  })
+
   it('logs an aggregate of autoDispose predicate and cleanup failures', async () => {
     const root = new TestRoot()
     const predicateError = new Error('predicate failed')
@@ -765,6 +856,49 @@ describe('@inferdi/hono', () => {
     expect(response.status).toBe(200)
     expect(firstRoot.scopes[0]?.disposeCalls).toBe(0)
     expect(secondRoot.scopes[0]?.disposeCalls).toBe(0)
+  })
+
+  it('transfers a streaming scope until the stream callback disposes it', async () => {
+    const root = new TestRoot()
+    const streamStarted = deferred<TestScope>()
+    const releaseStream = deferred()
+    const streamDisposed = deferred()
+    const app = new Hono<InferdiHonoEnv<TestRoot>>()
+
+    app.use('*', inferdiHono({ container: root }))
+    app.get('/stream', (c) => {
+      const scope = c.var.di
+      skipInferdiDispose(c)
+      return streamText(c, async (stream) => {
+        streamStarted.resolve(scope)
+        try {
+          await releaseStream.promise
+          expect(scope.disposed).toBe(false)
+          await stream.write(scope.get('users').profile('stream').id)
+        } finally {
+          try {
+            await scope.dispose()
+          } finally {
+            streamDisposed.resolve()
+          }
+        }
+      })
+    })
+
+    const response = await app.request('/stream')
+    const scope = await streamStarted.promise
+
+    try {
+      expect(scope.disposeCalls).toBe(0)
+      expect(scope.disposed).toBe(false)
+    } finally {
+      releaseStream.resolve()
+      await streamDisposed.promise
+    }
+
+    expect(await response.text()).toBe('stream')
+    expect(scope.disposeCalls).toBe(1)
+    expect(scope.disposed).toBe(true)
   })
 
   it('skipInferdiDispose does not skip disposal when the request fails', async () => {

@@ -43,7 +43,12 @@ class InputUserService {
 
 const inputRoot = new Container()
   .declareScopeInputs<{requestInput: RequestContext}>()
-  .registerClass('inputUsers', InputUserService, ['requestInput'], 'scoped')
+  .registerAsyncFactory(
+    'inputUsers',
+    async (request: RequestContext) => new InputUserService(request),
+    ['requestInput'],
+    'scoped'
+  )
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -61,7 +66,7 @@ describe('@inferdi/fastify types', () => {
 
     expectTypeOf<InferdiScopeOf<typeof inputRoot>>().toEqualTypeOf<typeof scope>()
     // @ts-expect-error — default adapter scope creation provides no inputs
-    scope.get('inputUsers')
+    scope.getAsync('inputUsers')
   })
 
   it('infers a refined scope from the custom createScope hook', () => {
@@ -74,7 +79,19 @@ describe('@inferdi/fastify types', () => {
         requestInput: new RequestContext()
       }),
       setupScope: (scope) => {
-        expectTypeOf(scope.get('inputUsers')).toEqualTypeOf<InputUserService>()
+        expectTypeOf(scope).toEqualTypeOf<typeof refined>()
+        expectTypeOf(scope.getAsync('inputUsers')).toEqualTypeOf<
+          Promise<InputUserService>
+        >()
+
+        // @ts-expect-error — declarative async services require getAsync()
+        scope.get('inputUsers')
+      },
+      disposeScope: (scope) => {
+        expectTypeOf(scope).toEqualTypeOf<typeof refined>()
+        expectTypeOf(scope.getAsync('inputUsers')).toEqualTypeOf<
+          Promise<InputUserService>
+        >()
       }
     }
 

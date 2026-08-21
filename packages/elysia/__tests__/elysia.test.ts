@@ -1,5 +1,6 @@
 import { Elysia, t } from 'elysia'
 import {afterEach, describe, expect, it, vi} from 'vitest'
+import {Container} from '@inferdi/inferdi'
 import {
   inferdiElysia,
   skipInferdiDispose,
@@ -8,6 +9,16 @@ import {
 
 function delay(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms))
+}
+
+function deferred<T = void>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
 }
 
 async function waitForAfterResponse() {
@@ -104,6 +115,61 @@ describe('@inferdi/elysia', () => {
     expect(root.createScopeCalls).toBe(1)
     expect(root.scopes[0]?.disposeCalls).toBe(1)
     expect(root.scopes[0]?.disposed).toBe(true)
+  })
+
+  it('resolves and disposes a real input-refined async Container scope', async () => {
+    const resourceDisposed = deferred()
+    const laterAfterResponse = deferred<boolean>()
+    let resourceDisposeCalls = 0
+    let scopeDisposeCalls = 0
+    const root = new Container()
+      .declareScopeInputs<{requestId: string}>()
+      .registerAsyncFactory(
+        'service',
+        async (requestId: string) => ({
+          requestId,
+          async dispose() {
+            await Promise.resolve()
+            resourceDisposeCalls += 1
+            resourceDisposed.resolve()
+          }
+        }),
+        ['requestId'],
+        'scoped'
+      )
+    const app = new Elysia()
+      .use(inferdiElysia({
+        container: root,
+        createScope: (receivedRoot, { request }) => {
+          const scope = receivedRoot.createScope({
+            requestId: request.headers.get('x-request-id') ?? ''
+          })
+          const dispose = scope.dispose.bind(scope)
+          vi.spyOn(scope, 'dispose').mockImplementation(() => {
+            scopeDisposeCalls += 1
+            return dispose()
+          })
+          return scope
+        }
+      }))
+      .onAfterResponse(() => {
+        laterAfterResponse.resolve(resourceDisposeCalls === 1)
+      })
+      .get('/service', async ({ di }) => {
+        const service = await di.getAsync('service')
+        return { requestId: service.requestId }
+      })
+
+    const response = await app.handle(request('/service', {
+      headers: { 'x-request-id': 'elysia-request' }
+    }))
+
+    expect(await laterAfterResponse.promise).toBe(true)
+    await resourceDisposed.promise
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ requestId: 'elysia-request' })
+    expect(scopeDisposeCalls).toBe(1)
+    expect(resourceDisposeCalls).toBe(1)
   })
 
   it('keeps scoped state isolated between requests', async () => {
@@ -892,6 +958,39 @@ describe('@inferdi/elysia', () => {
     expect(predicateRoot.scopes[1]?.disposeCalls).toBe(1)
   })
 
+  it.each([
+    ['autoDispose: false', false],
+    ['a false predicate', () => false]
+  ] as const)('keeps manual ownership after a handled route error with %s', async (_label, autoDispose) => {
+    const root = new TestRoot()
+    const handled: { value?: unknown } = {}
+    const afterResponse = deferred()
+    const app = new Elysia()
+      .use(inferdiElysia({ container: root, autoDispose }))
+      .onError(jsonError(handled))
+      .onAfterResponse(() => {
+        afterResponse.resolve()
+      })
+      .get('/boom', () => {
+        throw new Error('route failed')
+      })
+
+    const response = await app.handle(request('/boom'))
+    await afterResponse.promise
+    const scope = root.scopes[0]
+
+    try {
+      expect(response.status).toBe(500)
+      expect(await response.json()).toEqual({ message: 'route failed' })
+      expect(scope?.disposed).toBe(false)
+      expect(scope?.disposeCalls).toBe(0)
+    } finally {
+      await scope?.dispose()
+    }
+
+    expect(scope?.disposeCalls).toBe(1)
+  })
+
   it('reports autoDispose failures and still attempts disposal', async () => {
     const root = new TestRoot()
     const predicateError = new Error('predicate failed')
@@ -1034,6 +1133,60 @@ describe('@inferdi/elysia', () => {
     expect(normal.status).toBe(200)
     expect(root.scopes[0]?.disposeCalls).toBe(0)
     expect(root.scopes[1]?.disposeCalls).toBe(1)
+  })
+
+  it('transfers a streaming scope until the stream callback disposes it', async () => {
+    const root = new TestRoot()
+    const streamStarted = deferred<TestScope>()
+    const releaseStream = deferred()
+    const afterResponse = deferred()
+    const streamDisposed = deferred()
+    const app = new Elysia()
+      .use(inferdiElysia({ container: root }))
+      .onAfterResponse(() => {
+        afterResponse.resolve()
+      })
+      .get('/stream', (context) => {
+        const scope = context.di
+        skipInferdiDispose(context)
+        return new Response(new ReadableStream({
+          async start(controller) {
+            streamStarted.resolve(scope)
+            try {
+              await releaseStream.promise
+              await afterResponse.promise
+              expect(scope.disposed).toBe(false)
+              const id = scope.get('users').profile('stream').id
+              controller.enqueue(new TextEncoder().encode(id))
+              controller.close()
+            } catch (error) {
+              controller.error(error)
+            } finally {
+              try {
+                await scope.dispose()
+              } finally {
+                streamDisposed.resolve()
+              }
+            }
+          }
+        }))
+      })
+
+    const response = await app.handle(request('/stream'))
+    const scope = await streamStarted.promise
+    await afterResponse.promise
+
+    try {
+      expect(scope.disposeCalls).toBe(0)
+      expect(scope.disposed).toBe(false)
+    } finally {
+      releaseStream.resolve()
+      await streamDisposed.promise
+    }
+
+    expect(await response.text()).toBe('stream')
+    expect(scope.disposeCalls).toBe(1)
+    expect(scope.disposed).toBe(true)
   })
 
   it('skipInferdiDispose skips disposal with custom autoDispose settings', async () => {

@@ -36,6 +36,29 @@ class Service {
   constructor(public readonly repository: Repository) {}
 }
 
+interface AssimilatedService {
+  readonly assimilated: number
+}
+
+class ThenableService implements PromiseLike<AssimilatedService> {
+  constructor(public readonly seed: number) {}
+
+  public then<TResult1 = AssimilatedService, TResult2 = never>(
+    onfulfilled?: ((value: AssimilatedService) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+  ): PromiseLike<TResult1 | TResult2> {
+    return Promise.resolve({assimilated: this.seed}).then(onfulfilled, onrejected)
+  }
+}
+
+class AssimilatedConsumer {
+  constructor(public readonly service: AssimilatedService) {}
+}
+
+class ThenableConsumer {
+  constructor(public readonly service: ThenableService) {}
+}
+
 class Pair {
   constructor(
     public readonly first: Database,
@@ -253,6 +276,79 @@ describe('async dependency graph types', () => {
     c.get('service')
 
     c.registerAsyncFactory('asyncFactoryConsumer', (db: Database) => db, ['db'])
+  })
+
+  it('models Promise assimilation for async and mixed thenable classes', () => {
+    const sync = new Container()
+      .registerValue('seed', 1)
+      .registerClass(
+        'service',
+        ThenableService,
+        ['seed'],
+        'singleton',
+        'serviceLazy'
+      )
+
+    expectTypeOf(sync.get('service')).toEqualTypeOf<ThenableService>()
+    expectTypeOf(sync.getAsync('service')).toEqualTypeOf<Promise<AssimilatedService>>()
+    expectTypeOf(sync.get('serviceLazy')).toEqualTypeOf<Lazy<ThenableService>>()
+
+    const async = new Container()
+      .registerAsyncFactory('seed', async () => 1, [])
+      .registerClass(
+        'service',
+        ThenableService,
+        ['seed'],
+        'singleton',
+        'serviceLazy'
+      )
+      .registerClass('consumer', AssimilatedConsumer, ['service'])
+
+    expectTypeOf(async.getAsync('service')).toEqualTypeOf<Promise<AssimilatedService>>()
+    expectTypeOf(async.getAsync('consumer')).toEqualTypeOf<Promise<AssimilatedConsumer>>()
+    expectTypeOf(async.get('serviceLazy')).toEqualTypeOf<AsyncLazy<AssimilatedService>>()
+    // @ts-expect-error — downstream classes receive the assimilated value
+    async.registerClass('invalidConsumer', ThenableConsumer, ['service'])
+
+    type AsyncResolved = Container.Resolve<typeof async>
+    type AsyncUnwrapped = Container.ResolveUnwrapped<typeof async>
+    expectTypeOf<AsyncResolved['service']>().toEqualTypeOf<AssimilatedService>()
+    expectTypeOf<AsyncResolved['serviceLazy']>()
+      .toEqualTypeOf<AsyncLazy<AssimilatedService>>()
+    expectTypeOf<AsyncUnwrapped['service']>().toEqualTypeOf<AssimilatedService>()
+    expectTypeOf<AsyncUnwrapped['serviceLazy']>().toEqualTypeOf<AssimilatedService>()
+    expectTypeOf<Container.UnwrappedValue<typeof async, 'service'>>()
+      .toEqualTypeOf<AssimilatedService>()
+    expectTypeOf<Container.UnwrappedValue<typeof async, 'serviceLazy'>>()
+      .toEqualTypeOf<AssimilatedService>()
+
+    const mixedBase = new Container()
+      .registerValue('localSeed', 1)
+      .registerAsyncFactory('remoteSeed', async () => 2, [])
+    const seedKey = 'localSeed' as 'localSeed' | 'remoteSeed'
+    const mixed = mixedBase.registerClass(
+      'service',
+      ThenableService,
+      [seedKey],
+      'singleton',
+      'serviceLazy'
+    )
+
+    expectTypeOf(mixed.getAsync('service')).toEqualTypeOf<Promise<AssimilatedService>>()
+    expectTypeOf(mixed.get('serviceLazy')).toEqualTypeOf<
+      Lazy<ThenableService> | AsyncLazy<AssimilatedService>
+    >()
+    // @ts-expect-error — the mixed key may select the async registration
+    mixed.get('service')
+
+    type MixedResolved = Container.Resolve<typeof mixed>
+    type MixedUnwrapped = Container.ResolveUnwrapped<typeof mixed>
+    expectTypeOf<MixedResolved['service']>()
+      .toEqualTypeOf<ThenableService | AssimilatedService>()
+    expectTypeOf<MixedUnwrapped['serviceLazy']>()
+      .toEqualTypeOf<ThenableService | AssimilatedService>()
+    expectTypeOf<Container.UnwrappedValue<typeof mixed, 'serviceLazy'>>()
+      .toEqualTypeOf<ThenableService | AssimilatedService>()
   })
 
   it('classifies mixed sync/async union dependencies conservatively', () => {

@@ -8,6 +8,7 @@ import type { AddressInfo } from 'node:net'
 import { PassThrough } from 'node:stream'
 import Koa, { type Context } from 'koa'
 import {describe, expect, it, vi} from 'vitest'
+import {Container} from '@inferdi/inferdi'
 import {
   inferdiKoa,
   skipInferdiDispose,
@@ -162,6 +163,59 @@ describe('@inferdi/koa', () => {
     expect(root.createScopeCalls).toBe(1)
     expect(root.scopes[0]?.disposeCalls).toBe(1)
     expect(root.scopes[0]?.disposed).toBe(true)
+  })
+
+  it('resolves an input-refined async service from a real Container', async () => {
+    const resourceDisposed = deferred()
+    let resourceDisposeCalls = 0
+    let scopeDisposeCalls = 0
+    const root = new Container()
+      .declareScopeInputs<{requestId: string}>()
+      .registerAsyncFactory(
+        'service',
+        async (requestId: string) => ({
+          requestId,
+          async dispose() {
+            resourceDisposeCalls += 1
+            resourceDisposed.resolve()
+          }
+        }),
+        ['requestId'],
+        'scoped'
+      )
+    const app = new Koa()
+      .use(inferdiKoa({
+        container: root,
+        createScope: (receivedRoot, ctx) => {
+          const scope = receivedRoot.createScope({
+            requestId: ctx.get('x-request-id')
+          })
+          const dispose = scope.dispose.bind(scope)
+          vi.spyOn(scope, 'dispose').mockImplementation(() => {
+            scopeDisposeCalls += 1
+            return dispose()
+          })
+          return scope
+        }
+      }))
+      .use(async (ctx) => {
+        const service = await ctx.state.di.getAsync('service')
+        ctx.body = { requestId: service.requestId }
+      })
+
+    const response = await withServer(app, async (baseUrl) => {
+      const result = await fetch(`${baseUrl}/service`, {
+        headers: { 'x-request-id': 'koa-request' }
+      })
+      const body = await result.json()
+      await resourceDisposed.promise
+      return { body, status: result.status }
+    })
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({ requestId: 'koa-request' })
+    expect(scopeDisposeCalls).toBe(1)
+    expect(resourceDisposeCalls).toBe(1)
   })
 
   it('keeps scoped state isolated between requests', async () => {
@@ -1033,6 +1087,42 @@ describe('@inferdi/koa', () => {
     expect(booleanRoot.scopes[0]?.disposeCalls).toBe(0)
     expect(predicateRoot.scopes[0]?.disposeCalls).toBe(0)
     expect(predicateRoot.scopes[1]?.disposeCalls).toBe(1)
+  })
+
+  it.each([
+    ['autoDispose: false', false],
+    ['a false predicate', () => false]
+  ] as const)('keeps manual ownership after a handled route error with %s', async (_label, autoDispose) => {
+    const root = new TestRoot()
+    const routeError = new Error('route failed')
+    const app = new Koa()
+
+    app.use(async (ctx, next) => {
+      try {
+        await next()
+      } catch (error) {
+        ctx.status = 409
+        ctx.body = { message: (error as Error).message }
+      }
+    })
+    app.use(inferdiKoa({ container: root, autoDispose }))
+    app.use(() => {
+      throw routeError
+    })
+
+    const response = await requestJson(app, '/boom')
+    const scope = root.scopes[0]
+
+    try {
+      expect(response.status).toBe(409)
+      expect(response.body).toEqual({ message: 'route failed' })
+      expect(scope?.disposed).toBe(false)
+      expect(scope?.disposeCalls).toBe(0)
+    } finally {
+      await scope?.dispose()
+    }
+
+    expect(scope?.disposeCalls).toBe(1)
   })
 
   it('routes autoDispose predicate failures through cleanup handling', async () => {

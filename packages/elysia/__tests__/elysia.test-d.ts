@@ -43,7 +43,12 @@ class InputUserService {
 
 const inputRoot = new Container()
   .declareScopeInputs<{requestInput: RequestContext}>()
-  .registerClass('inputUsers', InputUserService, ['requestInput'], 'scoped')
+  .registerAsyncFactory(
+    'inputUsers',
+    async (request: RequestContext) => new InputUserService(request),
+    ['requestInput'],
+    'scoped'
+  )
 
 describe('@inferdi/elysia types', () => {
   it('keeps the default createScope path in the unrefined type-state', () => {
@@ -51,19 +56,30 @@ describe('@inferdi/elysia types', () => {
 
     expectTypeOf<InferdiScopeOf<typeof inputRoot>>().toEqualTypeOf<typeof scope>()
     // @ts-expect-error — default adapter scope creation provides no inputs
-    scope.get('inputUsers')
+    scope.getAsync('inputUsers')
   })
 
   it('infers a refined scope from the custom createScope hook', () => {
-    inferdiElysia({
+    const plugin = inferdiElysia({
       container: inputRoot,
       createScope: (receivedRoot) => receivedRoot.createScope({
         requestInput: new RequestContext()
-      }),
-      setupScope: (scope) => {
-        expectTypeOf(scope.get('inputUsers')).toEqualTypeOf<InputUserService>()
-      }
+      })
     })
+    const app = new Elysia()
+      .use(plugin)
+      .get('/input-users', ({ di }) => {
+        expectTypeOf(di.getAsync('inputUsers')).toEqualTypeOf<
+          Promise<InputUserService>
+        >()
+
+        // @ts-expect-error — declarative async services require getAsync()
+        di.get('inputUsers')
+
+        return 'ok'
+      })
+
+    void app
   })
 
   it('accepts InferDI containers through structural root and scope types', () => {
