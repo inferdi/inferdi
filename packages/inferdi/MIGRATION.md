@@ -31,6 +31,8 @@ the adapters declare `@inferdi/inferdi@^6.0.0` as a peer dependency.
    shapes. Do not reproduce managed companion specs structurally.
 7. Fix newly reported module-requirement, output-collision, and registration-key
    overlap errors instead of casting around them.
+8. Update consumers of async-propagated classes that implement `PromiseLike<T>`
+   to accept `Awaited<T>` instead of the class instance.
 
 Existing container-aware calls without a companion, and calls that already pass
 an explicit lifetime before `lazyKey`, keep their argument order. A Promise
@@ -233,6 +235,38 @@ container.get('repository')
 async status from declarative async dependencies. `registerAsyncFactory` and
 any `registerClass` tuple that may select an async key require readonly tuples;
 inline literals infer the required readonly shape.
+
+### Async class results follow Promise assimilation
+
+An async-propagated `registerClass` now records `Awaited<V>` as its service type
+when the constructed class type is `V`. This corrects the previous type, which
+claimed that `getAsync()` and downstream constructors received the original
+instance even when it implemented `PromiseLike<T>`. Native Promise resolution
+instead assimilates that instance and exposes `T`.
+
+```ts
+class ThenableService {
+  constructor(readonly seed: number) {}
+
+  then(resolve: (value: {value: number}) => void) {
+    resolve({value: this.seed})
+  }
+}
+
+class Consumer {
+  constructor(readonly service: {value: number}) {}
+}
+
+new Container()
+  .registerAsyncFactory('seed', async () => 1, [])
+  .registerClass('service', ThenableService, ['seed'])
+  .registerClass('consumer', Consumer, ['service'])
+```
+
+Synchronous `get()` keeps returning `V` for a class with only synchronous
+dependencies. A mixed sync/async dependency keeps `V` in its synchronous graph
+branch and uses `Awaited<V>` in its async branch. Ordinary non-thenable classes
+are unchanged because `Awaited<V>` is `V` for those types.
 
 ### Teardown reports propagated failures once
 

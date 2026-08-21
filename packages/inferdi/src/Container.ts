@@ -410,9 +410,9 @@ type ClassSpec<
   V,
   L extends Lifetime
 > = 'async' extends DepAsyncStates<T, D>[number]
-  ? AsyncSpec<V, L>
+  ? AsyncSpec<Awaited<V>, L>
   : 'mixed' extends DepAsyncStates<T, D>[number]
-    ? Spec<V, L> | AsyncSpec<V, L>
+    ? Spec<V, L> | AsyncSpec<Awaited<V>, L>
     : Spec<V, L>
 
 type LazyCompanion<S> =
