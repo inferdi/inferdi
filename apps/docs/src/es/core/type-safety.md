@@ -35,6 +35,8 @@ new Container()
 
 Las pruebas usan `.override()` cuando el reemplazo es intencional.
 
+Sigue usando el contenedor ampliado que devuelve cada registro. Una referencia anterior no contiene el tipo de grafo de la cadena actual; consulta [Malas prácticas](./bad-practices).
+
 El guard de unicidad comprueba todo el conjunto de valores representado por el tipo de la clave. Si una clave tiene el tipo `'dsn' | 'replica'` después de registrar `'dsn'`, TypeScript rechaza la llamada porque el valor de runtime podría sobrescribir `'dsn'`. La misma regla se aplica a un `string` o `symbol` amplio y a `lazyKey`, que no puede solaparse con la clave principal ni con una clave existente.
 
 Las claves amplias y union siguen disponibles cuando sus valores posibles no se solapan con el grafo. Un `string` amplio es válido en un contenedor vacío o después de registros compuestos solo por symbols. Acota una clave de runtime a un miembro nuevo antes de registrarla; usa `.override()` cuando quieras reemplazar un registro.

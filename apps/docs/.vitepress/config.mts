@@ -187,6 +187,7 @@ const enSidebar: DefaultTheme.Sidebar = [
     text: 'Core Concepts',
     items: [
       { text: 'Type Safety', link: '/core/type-safety' },
+      { text: 'Bad Practices', link: '/core/bad-practices' },
       { text: 'Lifetimes', link: '/core/lifetime-guards' },
       { text: 'Scopes and Disposal', link: '/core/scopes' },
       { text: 'Scope Inputs', link: '/core/scope-inputs' },
@@ -252,6 +253,7 @@ const ruSidebar: DefaultTheme.Sidebar = [
     text: 'Базовые принципы',
     items: [
       { text: 'Типобезопасность', link: '/ru/core/type-safety' },
+      { text: 'Плохие практики', link: '/ru/core/bad-practices' },
       { text: 'Время жизни', link: '/ru/core/lifetime-guards' },
       { text: 'Скоупы и освобождение ресурсов', link: '/ru/core/scopes' },
       { text: 'Входные данные скоупа', link: '/ru/core/scope-inputs' },
@@ -317,6 +319,7 @@ const zhSidebar: DefaultTheme.Sidebar = [
     text: '核心概念',
     items: [
       { text: '类型安全', link: '/zh/core/type-safety' },
+      { text: '不良实践', link: '/zh/core/bad-practices' },
       { text: '生命周期', link: '/zh/core/lifetime-guards' },
       { text: '作用域与资源释放', link: '/zh/core/scopes' },
       { text: '作用域输入', link: '/zh/core/scope-inputs' },
@@ -382,6 +385,7 @@ const jaSidebar: DefaultTheme.Sidebar = [
     text: 'コアコンセプト',
     items: [
       { text: '型安全性', link: '/ja/core/type-safety' },
+      { text: 'バッドプラクティス', link: '/ja/core/bad-practices' },
       { text: 'ライフタイム', link: '/ja/core/lifetime-guards' },
       { text: 'スコープとリソース破棄', link: '/ja/core/scopes' },
       { text: 'スコープ入力', link: '/ja/core/scope-inputs' },
@@ -447,6 +451,7 @@ const esSidebar: DefaultTheme.Sidebar = [
     text: 'Conceptos básicos',
     items: [
       { text: 'Seguridad de tipos', link: '/es/core/type-safety' },
+      { text: 'Malas prácticas', link: '/es/core/bad-practices' },
       { text: 'Tiempos de vida', link: '/es/core/lifetime-guards' },
       { text: 'Scopes y liberación de recursos', link: '/es/core/scopes' },
       { text: 'Entradas de scope', link: '/es/core/scope-inputs' },

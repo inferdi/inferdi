@@ -35,6 +35,8 @@ new Container()
 
 Tests use `.override()` when replacement is intentional.
 
+Keep using the widened container returned by each registration. Reusing an older builder reference bypasses the graph type carried by the current chain; see [Bad Practices](./bad-practices).
+
 The uniqueness guard checks the complete set of values represented by the key type. If a candidate is typed as `'dsn' | 'replica'` after `'dsn'` has been registered, TypeScript rejects the call because the runtime value may overwrite `'dsn'`. The same rule applies to a broad `string` or `symbol` and to `lazyKey`, which must not overlap the primary key or any existing key.
 
 Broad and union keys remain valid when their possible values do not overlap the graph. A broad string is valid on an empty container or after symbol-only registrations. Narrow a runtime key to a known fresh member before registering it; use `.override()` when replacement is the goal.
