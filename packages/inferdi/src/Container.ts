@@ -697,6 +697,8 @@ interface Registration<T extends DependenciesMap, K extends keyof T> {
   readonly async?: true
 }
 
+type AsyncDependencyPlan = number | readonly number[] | undefined
+
 /*
  * Projects the constructor parameter types onto the allowed DI-map keys.
  * Prevents passing a deps key whose value is not assignable to the corresponding argument.
@@ -880,9 +882,10 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   }
 
   /** @internal */
-  private asyncDependencyIndices(
+  private asyncDependencyPlan(
     keys: readonly (keyof T)[]
-  ): number[] | undefined {
+  ): AsyncDependencyPlan {
+    let first = -1
     let indices: number[] | undefined
 
     for (let i = 0; i < keys.length; i++) {
@@ -893,7 +896,11 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
 
         if (reg !== undefined) {
           if (reg.async === true) {
-            (indices ??= []).push(i)
+            if (first === -1) {
+              first = i
+            } else {
+              (indices ??= [first]).push(i)
+            }
           }
           break
         }
@@ -902,13 +909,13 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       }
     }
 
-    return indices
+    return indices ?? (first === -1 ? undefined : first)
   }
 
   /** @internal */
   private resolveAsyncDependencies(
     keys: readonly (keyof T)[],
-    asyncIndices: readonly number[],
+    asyncPlan: AsyncDependencyPlan,
     invoke: (args: unknown[]) => unknown
   ): Promise<unknown> {
     const values: unknown[] = []
@@ -928,19 +935,40 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       throw error
     }
 
-    const pending: unknown[] = []
-
-    for (const index of asyncIndices) {
-      pending.push(values[index])
+    if (asyncPlan === undefined) {
+      return Promise.resolve().then(() => invoke(values))
     }
 
-    return Promise.all(pending).then((resolved) => {
-      for (let i = 0; i < resolved.length; i++) {
-        values[asyncIndices[i]!] = resolved[i]
-      }
+    if (typeof asyncPlan === 'number') {
+      const index = asyncPlan
 
-      return invoke(values)
-    })
+      /* Keep two reactions: combining assignment and invoke changes observable microtask order */
+      return Promise.resolve(values[index])
+        .then((value) => {
+          values[index] = value
+        })
+        .then(() => invoke(values))
+    }
+
+    /* Keep invocation in a separate reaction to preserve Promise.all(...).then(...) ordering */
+    return new Promise<void>((resolve, reject) => {
+      let remaining = asyncPlan.length
+
+      for (let i = 0; i < asyncPlan.length; i++) {
+        const index = asyncPlan[i]!
+
+        void Promise.resolve(values[index]).then(
+          (value) => {
+            values[index] = value
+
+            if (--remaining === 0) {
+              resolve()
+            }
+          },
+          reject
+        )
+      }
+    }).then(() => invoke(values))
   }
 
   /**
@@ -1085,15 +1113,15 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
      */
     const keys = deps as readonly (keyof T)[]
     const len = keys.length
-    const asyncIndices = this.asyncDependencyIndices(keys)
+    const asyncPlan = this.asyncDependencyPlan(keys)
 
-    if (asyncIndices !== undefined) {
+    if (asyncPlan !== undefined) {
       this.regs.set(key as keyof T, {
         kind: lifetime,
         lazy: false,
         fn: ((c: Container<T>) => c.resolveAsyncDependencies(
           keys,
-          asyncIndices,
+          asyncPlan,
           (args) => Reflect.construct(Ctor, args) as V
         )) as unknown as (c: Container<T>) => T[keyof T]['type'],
         owned: true,
@@ -1584,10 +1612,10 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
       const invoke = () => factory()
       fn = () => Promise.resolve().then(invoke)
     } else {
-      const asyncIndices = this.asyncDependencyIndices(keys) ?? []
+      const asyncPlan = this.asyncDependencyPlan(keys)
       fn = (c) => c.resolveAsyncDependencies(
         keys,
-        asyncIndices,
+        asyncPlan,
         (args) => factory(...args)
       )
     }
