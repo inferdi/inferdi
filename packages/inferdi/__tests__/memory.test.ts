@@ -110,7 +110,7 @@ describe.skipIf(!hasGc)('Phase 5 — memory leaks', () => {
       const {scope, inputRef} = await allocateScopeInputAndDispose(mode)
 
       expect(await waitForGC(inputRef)).toBe(true)
-      void scope
+      expect(scope).toBeInstanceOf(Container)
     }
   )
 
@@ -174,13 +174,7 @@ describe.skipIf(!hasGc)('Phase 5 — memory leaks', () => {
      * Keep childRef alive until the GC check so that the test really verifies the
      * absence of the parent reference, not a wholesale GC of the entire subtree
      */
-    void childRef
-
     expect(await waitForGC(rootWeak)).toBe(true)
-    /*
-     * childRef is still in scope — yet root has already been collected because
-     * child.parent was nulled out on dispose
-     */
-    void childRef
+    expect(childRef).toBeInstanceOf(Container)
   })
 })

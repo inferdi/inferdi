@@ -35,10 +35,13 @@ describe('scope-input diagnostics', () => {
         : getSourceFile(fileName, languageVersion, onError, shouldCreateNewSourceFile)
 
     const program = ts.createProgram([fixture], options, host)
-    const messages = ts.getPreEmitDiagnostics(program).map((diagnostic) =>
+    const diagnostics = ts.getPreEmitDiagnostics(program)
+    const messages = diagnostics.map((diagnostic) =>
       ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')
     )
 
+    expect(diagnostics).toHaveLength(3)
+    expect(diagnostics.every((diagnostic) => diagnostic.file?.fileName === fixture)).toBe(true)
     expect(messages.some((message) =>
       message.includes('Invalid scope input declaration')
     )).toBe(true)

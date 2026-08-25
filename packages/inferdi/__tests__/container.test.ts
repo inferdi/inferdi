@@ -255,15 +255,18 @@ describe('Phase 1 — Functional', () => {
       expect(c.get('v')).toBe(value)
     })
 
-    it('explicit undefined value: cache.has fallback returns it (rare path)', () => {
-      /*
-       * Anti-pattern, but supported for correctness: registering `undefined` makes the
-       * first `Map.get` return undefined, falling through to the `Map.has` branch
-       * in get(). The branch is not on the hot path — guarded only for completeness
-       */
+    it('stores explicit undefined behind the one-lookup cache path', () => {
       const c = new Container().registerValue('explicit', undefined as unknown)
+      const cache = (c as unknown as {cache: Map<string, unknown>}).cache
+      expect(cache.get('explicit')).not.toBeUndefined()
+      const cacheGet = vi.spyOn(cache, 'get')
 
-      expect(c.get('explicit')).toBeUndefined()
+      try {
+        expect(c.get('explicit')).toBeUndefined()
+        expect(cacheGet).toHaveBeenCalledTimes(1)
+      } finally {
+        cacheGet.mockRestore()
+      }
     })
   })
 
@@ -1554,13 +1557,21 @@ describe('unknown configuration fail-safe', () => {
  */
 
 describe('Phase 9 — fast fixed contract', () => {
-  it('transient resolution skips the cycle bookkeeping (no try/finally)', () => {
+  it('transient resolution does not touch the cycle stack', () => {
     let calls = 0
     const c = new Container({fast: true})
       .registerFactory('counter', () => ({n: ++calls}), 'transient')
-    expect(c.get('counter').n).toBe(1)
-    expect(c.get('counter').n).toBe(2)
-    expect(calls).toBe(2)
+    const resolving = (c as unknown as {resolving: unknown[]}).resolving
+    const push = vi.spyOn(resolving, 'push')
+
+    try {
+      expect(c.get('counter').n).toBe(1)
+      expect(c.get('counter').n).toBe(2)
+      expect(calls).toBe(2)
+      expect(push).not.toHaveBeenCalled()
+    } finally {
+      push.mockRestore()
+    }
   })
 
   it('singleton resolution caches and returns the same instance', () => {

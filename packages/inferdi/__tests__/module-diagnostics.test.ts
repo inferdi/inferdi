@@ -42,10 +42,13 @@ describe('module diagnostics', () => {
         : getSourceFile(fileName, languageVersion, onError, shouldCreateNewSourceFile)
 
     const program = ts.createProgram([fixture], options, host)
-    const messages = ts.getPreEmitDiagnostics(program).map((diagnostic) =>
+    const diagnostics = ts.getPreEmitDiagnostics(program)
+    const messages = diagnostics.map((diagnostic) =>
       ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')
     ).join('\n---\n')
 
+    expect(diagnostics).toHaveLength(3)
+    expect(diagnostics.every((diagnostic) => diagnostic.file?.fileName === fixture)).toBe(true)
     expect(messages).toContain('Missing module requirements')
     expect(messages).toContain('Incompatible module requirements')
     expect(messages).toContain('Module output keys collide with the container graph')

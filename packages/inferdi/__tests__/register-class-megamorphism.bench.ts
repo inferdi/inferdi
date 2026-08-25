@@ -31,8 +31,9 @@ const ARITIES = [0, 1, 2, 3, 4, 5, 6, 7] as const
 const POOL_SIZES = [1, 2, 4, 8, 16] as const
 const MAX_POOL_SIZE = POOL_SIZES[POOL_SIZES.length - 1]!
 const BENCH_OPTIONS = {time: 300, warmupTime: 150} as const
+const HOT_BATCH_SIZE = 1000
 
-let sink = 0
+export let sink = 0
 
 function createCtor(arity: number, id: number): RuntimeCtor {
   if (arity === 0) {
@@ -103,18 +104,26 @@ for (const arity of [1, 3] as const) {
   describe(`registerClass distinct dependency keys: arity ${arity}`, () => {
     const strictFixture = buildFixture(arity, MAX_POOL_SIZE, 'transient', true, true)
     const fastFixture = buildFixture(arity, MAX_POOL_SIZE, 'transient', false, true)
-    consumeAll(strictFixture)
-    consumeAll(fastFixture)
+    validateFixture(strictFixture)
+    validateFixture(fastFixture)
 
-    bench('hot transient, strict, 16 unique Ctor', hotResolve(strictFixture), BENCH_OPTIONS)
-    bench('hot transient, fast, 16 unique Ctor', hotResolve(fastFixture), BENCH_OPTIONS)
+    bench(
+      `hot transient x${HOT_BATCH_SIZE}, strict, 16 unique Ctor`,
+      hotResolve(strictFixture),
+      BENCH_OPTIONS
+    )
+    bench(
+      `hot transient x${HOT_BATCH_SIZE}, fast, 16 unique Ctor`,
+      hotResolve(fastFixture),
+      BENCH_OPTIONS
+    )
     bench('build + first resolve, transient, 16 unique Ctor', () => {
       consumeAll(buildFixture(arity, MAX_POOL_SIZE, 'transient', true, true))
     }, BENCH_OPTIONS)
   })
 }
 
-function consumeAll(fixture: Fixture, container = fixture.container): void {
+function validateFixture(fixture: Fixture, container = fixture.container): void {
   for (let index = 0; index < fixture.keys.length; index++) {
     const value = container.get(fixture.keys[index]!) as Service
     if (value.checksum !== fixture.expected[index]) {
@@ -124,14 +133,22 @@ function consumeAll(fixture: Fixture, container = fixture.container): void {
   }
 }
 
+function consumeAll(fixture: Fixture, container = fixture.container): void {
+  for (const key of fixture.keys) {
+    sink ^= (container.get(key) as Service).checksum
+  }
+}
+
 function hotResolve(fixture: Fixture): () => void {
   let index = 0
   const mask = fixture.keys.length - 1
 
   return () => {
-    const value = fixture.container.get(fixture.keys[index]!) as Service
-    sink ^= value.checksum
-    index = (index + 1) & mask
+    for (let batchIndex = 0; batchIndex < HOT_BATCH_SIZE; batchIndex++) {
+      const value = fixture.container.get(fixture.keys[index]!) as Service
+      sink ^= value.checksum
+      index = (index + 1) & mask
+    }
   }
 }
 
@@ -140,16 +157,16 @@ for (const arity of ARITIES) {
     for (const poolSize of POOL_SIZES) {
       const strictFixture = buildFixture(arity, poolSize, 'transient', true)
       const fastFixture = buildFixture(arity, poolSize, 'transient', false)
-      consumeAll(strictFixture)
-      consumeAll(fastFixture)
+      validateFixture(strictFixture)
+      validateFixture(fastFixture)
 
       bench(
-        `hot transient, strict, ${poolSize} unique Ctor`,
+        `hot transient x${HOT_BATCH_SIZE}, strict, ${poolSize} unique Ctor`,
         hotResolve(strictFixture),
         BENCH_OPTIONS
       )
       bench(
-        `hot transient, fast, ${poolSize} unique Ctor`,
+        `hot transient x${HOT_BATCH_SIZE}, fast, ${poolSize} unique Ctor`,
         hotResolve(fastFixture),
         BENCH_OPTIONS
       )
@@ -167,7 +184,9 @@ for (const arity of ARITIES) {
       consumeAll(buildFixture(arity, MAX_POOL_SIZE, 'singleton', true))
     }, BENCH_OPTIONS)
 
+    validateFixture(buildFixture(arity, MAX_POOL_SIZE, 'singleton', true))
     const scoped = buildFixture(arity, MAX_POOL_SIZE, 'scoped', true)
+    validateFixture(scoped, scoped.container.createScope())
     bench(`new scope + first resolve, scoped, ${MAX_POOL_SIZE} unique Ctor`, () => {
       consumeAll(scoped, scoped.container.createScope())
     }, BENCH_OPTIONS)

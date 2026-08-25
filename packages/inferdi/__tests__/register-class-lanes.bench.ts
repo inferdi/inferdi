@@ -2,8 +2,9 @@ import {bench, describe} from 'vitest'
 import {Container} from '../src/Container'
 
 const BENCH_OPTIONS = {time: 300, warmupTime: 150} as const
+const HOT_BATCH_SIZE = 100
 
-let sink = 0
+export let sink = 0
 
 class L0 {}
 class L1 { constructor(readonly value: L0) {} }
@@ -81,6 +82,12 @@ function buildFactory(strict: boolean, kind: DynamicLifetime = 'transient') {
     .registerFactory('l9', (c) => new L9(c.get('l8')), kind)
 }
 
+function resolveHot(container: DynamicLifetimeContainer): void {
+  for (let index = 0; index < HOT_BATCH_SIZE; index++) {
+    sink ^= Number(Boolean(container.get('l9')))
+  }
+}
+
 function buildRequestGraph(strict: boolean) {
   return new Container(strict ? {} : {fast: true})
     .registerClass('config', Config, [])
@@ -128,12 +135,12 @@ describe('registerClass deep transient graph', () => {
   const strict = build(true)
   const fast = build(false)
 
-  bench('hot chain x10, strict', () => {
-    sink ^= Number(Boolean(strict.get('l9')))
+  bench(`transient depth-10 resolve x${HOT_BATCH_SIZE}, strict`, () => {
+    resolveHot(strict)
   }, BENCH_OPTIONS)
 
-  bench('hot chain x10, fast', () => {
-    sink ^= Number(Boolean(fast.get('l9')))
+  bench(`transient depth-10 resolve x${HOT_BATCH_SIZE}, fast`, () => {
+    resolveHot(fast)
   }, BENCH_OPTIONS)
 
   bench('build only', () => {
@@ -153,12 +160,12 @@ describe('direct registerFactory control', () => {
   const strict = buildFactory(true)
   const fast = buildFactory(false)
 
-  bench('hot chain x10, strict', () => {
-    sink ^= Number(Boolean(strict.get('l9')))
+  bench(`transient depth-10 resolve x${HOT_BATCH_SIZE}, strict`, () => {
+    resolveHot(strict)
   }, BENCH_OPTIONS)
 
-  bench('hot chain x10, fast', () => {
-    sink ^= Number(Boolean(fast.get('l9')))
+  bench(`transient depth-10 resolve x${HOT_BATCH_SIZE}, fast`, () => {
+    resolveHot(fast)
   }, BENCH_OPTIONS)
 
   bench('build only', () => {

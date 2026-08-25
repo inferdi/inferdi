@@ -1,12 +1,25 @@
 import {bench, describe} from 'vitest'
 import {Container, type SpecMap} from '../src/Container'
 
+export let sink: unknown
+
+const HOT_BATCH_SIZE = 1000
+
+function batched(operation: () => unknown): () => void {
+  return () => {
+    for (let index = 0; index < HOT_BATCH_SIZE; index++) {
+      sink = operation()
+    }
+  }
+}
+
 /*
  * ────────────────────────────────────────────────────────────────────────────
  * Phase 6 — Benchmarks
  *
- * Run via `pnpm run bench` (vitest bench). Not part of the CI run; the goal is
- * to track performance regressions across container changes.
+ * Run via `pnpm run bench` (vitest bench). These source-mode, single-process
+ * probes are directional diagnostics; use isolated multi-round comparisons
+ * before treating a difference as a regression.
  * ────────────────────────────────────────────────────────────────────────────
  */
 
@@ -15,13 +28,15 @@ describe('symbol vs string: singleton cache hit', () => {
   const cStr = new Container().registerValue('foo', {n: 42})
   const cSym = new Container().registerValue(SYM, {n: 42})
 
-  bench('container.get("foo") (string key, cached)', () => {
-    cStr.get('foo')
-  })
+  bench(
+    `container.get("foo") (string key, cached) x${HOT_BATCH_SIZE}`,
+    batched(() => cStr.get('foo'))
+  )
 
-  bench('container.get(SYM) (symbol key, cached)', () => {
-    cSym.get(SYM)
-  })
+  bench(
+    `container.get(SYM) (symbol key, cached) x${HOT_BATCH_SIZE}`,
+    batched(() => cSym.get(SYM))
+  )
 })
 
 /*
@@ -61,18 +76,20 @@ describe('deep graph resolution', () => {
     `deep graph cold resolve (${DEPTH} levels, first get)`,
     () => {
       const {container, topKey} = buildDeepContainer()
-      container.get(topKey)
+      sink = container.get(topKey)
     },
     {iterations: 200}
   )
 
   // Hot: a single container with a warmed-up cache
   const warm = buildDeepContainer()
-  warm.container.get(warm.topKey)
+  const warmValue = warm.container.get(warm.topKey)
+  if (warmValue.level !== DEPTH - 1) throw new Error('Invalid deep graph fixture')
 
-  bench(`deep graph hot resolve (cached singleton, ${DEPTH} levels)`, () => {
-    warm.container.get(warm.topKey)
-  })
+  bench(
+    `deep graph hot resolve (cached singleton, ${DEPTH} levels) x${HOT_BATCH_SIZE}`,
+    batched(() => warm.container.get(warm.topKey))
+  )
 })
 
 /*
@@ -90,19 +107,20 @@ class Top {
 }
 
 describe('DI overhead vs raw new', () => {
-  bench('raw: new Top(new Mid(new Leaf()))', () => {
-    const _t = new Top(new Mid(new Leaf()))
-    void _t
-  })
+  bench(
+    `raw: new Top(new Mid(new Leaf())) x${HOT_BATCH_SIZE}`,
+    batched(() => new Top(new Mid(new Leaf())))
+  )
 
   const transientC = new Container()
     .registerClass('leaf', Leaf, [], 'transient')
     .registerClass('mid', Mid, ['leaf'], 'transient')
     .registerClass('top', Top, ['mid'], 'transient')
 
-  bench('container.get("top") (transient, new Leaf/Mid/Top each time)', () => {
-    transientC.get('top')
-  })
+  bench(
+    `container.get("top") (transient, new Leaf/Mid/Top each time) x${HOT_BATCH_SIZE}`,
+    batched(() => transientC.get('top'))
+  )
 
   const singletonC = new Container()
     .registerClass('leaf', Leaf, [])
@@ -110,9 +128,10 @@ describe('DI overhead vs raw new', () => {
     .registerClass('top', Top, ['mid'])
   singletonC.get('top') // warm-up
 
-  bench('container.get("top") (singleton, cache hit)', () => {
-    singletonC.get('top')
-  })
+  bench(
+    `container.get("top") (singleton, cache hit) x${HOT_BATCH_SIZE}`,
+    batched(() => singletonC.get('top'))
+  )
 })
 
 /*
@@ -132,14 +151,15 @@ describe('scoped lifetime', () => {
   const warmScope = root.createScope()
   warmScope.get('svc')
 
-  bench('scope.get("svc") (scoped cache hit)', () => {
-    warmScope.get('svc')
-  })
+  bench(
+    `scope.get("svc") (scoped cache hit) x${HOT_BATCH_SIZE}`,
+    batched(() => warmScope.get('svc'))
+  )
 
   // Fresh scope + first resolve — cost of scope creation + walking up through parents
   bench('root.createScope() + scope.get("svc") (first resolve in a fresh scope)', () => {
     const s = root.createScope()
-    s.get('svc')
+    sink = s.get('svc')
   })
 
   // Comparison: scope.get vs root.get for a singleton (parent walk vs local cache)
@@ -147,9 +167,10 @@ describe('scoped lifetime', () => {
   const singletonChild = rootSingleton.createScope()
   singletonChild.get('svc') // warm up the owner cache (singleton lives on root, not child)
 
-  bench('scope.get("svc") → root (singleton, parent walk + cache hit on root)', () => {
-    singletonChild.get('svc')
-  })
+  bench(
+    `scope.get("svc") → root (singleton, parent walk + cache hit on root) x${HOT_BATCH_SIZE}`,
+    batched(() => singletonChild.get('svc'))
+  )
 })
 
 describe('scope-input creation and cache paths', () => {
@@ -173,19 +194,19 @@ describe('scope-input creation and cache paths', () => {
   })
 
   bench('createScope() without inputs', () => {
-    noInputRoot.createScope()
+    sink = noInputRoot.createScope()
   })
 
   bench('createScope({}) then createScope()', () => {
-    noInputRoot.createScope({}).createScope()
+    sink = noInputRoot.createScope({}).createScope()
   })
 
   bench('createScope({one})', () => {
-    inputRoot.createScope({one: 1})
+    sink = inputRoot.createScope({one: 1})
   })
 
   bench('createScope({five inputs})', () => {
-    inputRoot.createScope({
+    sink = inputRoot.createScope({
       one: 1,
       two: 2,
       three: 3,
@@ -195,12 +216,13 @@ describe('scope-input creation and cache paths', () => {
   })
 
   bench('nested refinement with five inherited inputs and one new input', () => {
-    inheritedFive.createScope({six: 6})
+    sink = inheritedFive.createScope({six: 6})
   })
 
-  bench('get input cache hit', () => {
-    inputScope.get('one')
-  })
+  bench(
+    `get input cache hit x${HOT_BATCH_SIZE}`,
+    batched(() => inputScope.get('one'))
+  )
 })
 
 /*
@@ -249,6 +271,7 @@ function resolveOwnedScope(root: RuntimeBenchContainer): void {
   }
 
   scope[Symbol.dispose]()
+  sink = scope
 }
 
 describe('scope lookup and ownership hot paths', () => {
@@ -259,17 +282,20 @@ describe('scope lookup and ownership hot paths', () => {
   strictNestedParentTransient.get('service')
   fastParentTransient.get('service')
 
-  bench('parent transient lookup, strict exact walk (depth 1)', () => {
-    strictParentTransient.get('service')
-  })
+  bench(
+    `parent transient lookup, strict exact walk (depth 1) x${HOT_BATCH_SIZE}`,
+    batched(() => strictParentTransient.get('service'))
+  )
 
-  bench('parent transient lookup, strict exact walk (depth 4)', () => {
-    strictNestedParentTransient.get('service')
-  })
+  bench(
+    `parent transient lookup, strict exact walk (depth 4) x${HOT_BATCH_SIZE}`,
+    batched(() => strictNestedParentTransient.get('service'))
+  )
 
-  bench('parent transient lookup, fast direct registry', () => {
-    fastParentTransient.get('service')
-  })
+  bench(
+    `parent transient lookup, fast direct registry x${HOT_BATCH_SIZE}`,
+    batched(() => fastParentTransient.get('service'))
+  )
 
   const strictOwnedRoot = buildOwnedScopeRoot(true)
   const fastOwnedRoot = buildOwnedScopeRoot(false)
@@ -298,21 +324,24 @@ describe('lazy overhead', () => {
   c.get('target') // warm-up
   const wrapper = c.get('targetLazy')
 
-  bench('container.get("target") (direct, cached singleton)', () => {
-    c.get('target')
-  })
+  bench(
+    `container.get("target") (direct, cached singleton) x${HOT_BATCH_SIZE}`,
+    batched(() => c.get('target'))
+  )
 
-  bench('wrapper.get() (lazy wrapper → resolve cached target)', () => {
-    wrapper.get()
-  })
+  bench(
+    `wrapper.get() (lazy wrapper → resolve cached target) x${HOT_BATCH_SIZE}`,
+    batched(() => wrapper.get())
+  )
 
   /*
    * The wrapper is transient: each get returns a NEW {get} object. We measure the
    * cost of creating the wrapper itself (one allocation + closure)
    */
-  bench('container.get("targetLazy") (creation of a new transient wrapper)', () => {
-    c.get('targetLazy')
-  })
+  bench(
+    `container.get("targetLazy") (new transient wrapper) x${HOT_BATCH_SIZE}`,
+    batched(() => c.get('targetLazy'))
+  )
 })
 
 /*
@@ -375,13 +404,15 @@ describe('fan-out (wide graph)', () => {
     .registerClass('top', Wide8, ['d0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7'])
   warm8.get('top')
 
-  bench('fan-out 5 deps, singleton cached', () => {
-    warm5.get('top')
-  })
+  bench(
+    `fan-out 5 deps, singleton cached x${HOT_BATCH_SIZE}`,
+    batched(() => warm5.get('top'))
+  )
 
-  bench('fan-out 8 deps, singleton cached', () => {
-    warm8.get('top')
-  })
+  bench(
+    `fan-out 8 deps, singleton cached x${HOT_BATCH_SIZE}`,
+    batched(() => warm8.get('top'))
+  )
 
   // Cold: top is built for the first time — cost of iterating deps + N recursive gets
   bench(
@@ -394,7 +425,7 @@ describe('fan-out (wide graph)', () => {
         .registerClass('d3', D3, [])
         .registerClass('d4', D4, [])
         .registerClass('top', Wide5, ['d0', 'd1', 'd2', 'd3', 'd4'])
-      c.get('top')
+      sink = c.get('top')
     },
     {iterations: 500}
   )
@@ -412,7 +443,7 @@ describe('fan-out (wide graph)', () => {
         .registerClass('d6', D6, [])
         .registerClass('d7', D7, [])
         .registerClass('top', Wide8, ['d0', 'd1', 'd2', 'd3', 'd4', 'd5', 'd6', 'd7'])
-      c.get('top')
+      sink = c.get('top')
     },
     {iterations: 500}
   )
@@ -431,7 +462,8 @@ describe('error paths', () => {
   bench('get() missing key → throw "Key not found"', () => {
     try {
       emptyC.get('nonExistent')
-    } catch {
+    } catch (error) {
+      sink = error
       // baseline cost measurement: Map miss + walk (owner=undefined) + throw + unwind
     }
   })
@@ -440,7 +472,8 @@ describe('error paths', () => {
   bench('baseline: bare try/throw/catch (no container)', () => {
     try {
       throw new Error('bare')
-    } catch {
+    } catch (error) {
+      sink = error
       // noop
     }
   })
@@ -464,7 +497,8 @@ describe('error paths', () => {
   bench('cycle detection (A → B → A, throw circular)', () => {
     try {
       cycleC.get('a')
-    } catch {
+    } catch (error) {
+      sink = error
       // finally in get()'s try-blocks correctly clears `resolving` between iterations
     }
   })
@@ -476,7 +510,7 @@ describe('error paths', () => {
   const happyC = new Container().registerValue('x', {value: 1})
 
   bench('baseline: successful get (singleton cached)', () => {
-    happyC.get('x')
+    sink = happyC.get('x')
   })
 })
 
@@ -512,17 +546,19 @@ describe('deep graph: symbol keys', () => {
     `deep graph cold resolve (symbol, ${DEPTH} levels)`,
     () => {
       const {container, topKey} = buildDeepSymbolContainer()
-      container.get(topKey as never)
+      sink = container.get(topKey as never)
     },
     {iterations: 200}
   )
 
   const warmSym = buildDeepSymbolContainer()
-  warmSym.container.get(warmSym.topKey as never)
+  const warmSymbolValue = warmSym.container.get(warmSym.topKey as never)
+  if (warmSymbolValue.level !== DEPTH - 1) throw new Error('Invalid symbol graph fixture')
 
-  bench(`deep graph hot resolve (symbol, cached, ${DEPTH} levels)`, () => {
-    warmSym.container.get(warmSym.topKey as never)
-  })
+  bench(
+    `deep graph hot resolve (symbol, cached, ${DEPTH} levels) x${HOT_BATCH_SIZE}`,
+    batched(() => warmSym.container.get(warmSym.topKey as never))
+  )
 })
 
 /*
@@ -555,7 +591,8 @@ describe('fan-out: mixed string + symbol (IC polymorphism check)', () => {
     .registerClass('topMix', WideMix, ['m0', S1, 'm2', S3, 'm4'])
   cMix.get('topMix')
 
-  bench('fan-out 5 mixed string+symbol deps (cached)', () => {
-    cMix.get('topMix')
-  })
+  bench(
+    `fan-out 5 mixed string+symbol deps (cached) x${HOT_BATCH_SIZE}`,
+    batched(() => cMix.get('topMix'))
+  )
 })

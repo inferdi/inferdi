@@ -73,6 +73,96 @@ describe('compact async dependency graph — resolution', () => {
     expect(calls).toBe(1)
   })
 
+  it.each([false, true])(
+    'preserves the zero-async continuation order with fast=%s',
+    async (fast) => {
+      const events: string[] = []
+      const c = new Container({fast})
+        .registerValue('dependency', 1)
+        .registerAsyncFactory('value', (dependency) => {
+          events.push(`factory:${dependency}`)
+          return dependency
+        }, ['dependency'])
+
+      const pending = c.getAsync('value')
+      events.push('returned')
+      queueMicrotask(() => events.push('queued'))
+      void pending.then(() => events.push('settled'))
+
+      await pending
+      await Promise.resolve()
+
+      expect(events).toEqual([
+        'returned',
+        'factory:1',
+        'queued',
+        'settled'
+      ])
+    }
+  )
+
+  it.each([false, true])(
+    'preserves the one-async continuation order with fast=%s',
+    async (fast) => {
+      const events: string[] = []
+      const c = new Container({fast})
+        .registerAsyncFactory('dependency', () => 1, [])
+        .registerAsyncFactory('value', (dependency) => {
+          events.push(`factory:${dependency}`)
+          return dependency
+        }, ['dependency'])
+
+      await c.getAsync('dependency')
+      const pending = c.getAsync('value')
+      events.push('returned')
+      queueMicrotask(() => events.push('queued'))
+      void pending.then(() => events.push('settled'))
+
+      await pending
+      await Promise.resolve()
+
+      expect(events).toEqual([
+        'returned',
+        'queued',
+        'factory:1',
+        'settled'
+      ])
+    }
+  )
+
+  it.each([false, true])(
+    'preserves the multi-async continuation order with fast=%s',
+    async (fast) => {
+      const events: string[] = []
+      const c = new Container({fast})
+        .registerAsyncFactory('first', () => 1, [])
+        .registerAsyncFactory('second', () => 2, [])
+        .registerAsyncFactory('value', (first, second) => {
+          events.push(`factory:${first + second}`)
+          return first + second
+        }, ['first', 'second'])
+
+      await Promise.all([
+        c.getAsync('first'),
+        c.getAsync('second')
+      ])
+      const pending = c.getAsync('value')
+      events.push('returned')
+      queueMicrotask(() => events.push('queued'))
+      void pending.then(() => events.push('settled'))
+
+      await pending
+      await Promise.resolve()
+
+      expect(events).toEqual([
+        'returned',
+        'queued',
+        'factory:3',
+        'settled'
+      ])
+    }
+  )
+
   it('injects sync and async dependencies in positional order', async () => {
     const db = new Database()
     const c = new Container()
@@ -367,6 +457,32 @@ describe('compact async dependency graph — aborted preflight', () => {
     expect(rejections).toEqual([])
     await expect(c.get('legacy')).rejects.toBe(asyncError)
     await expect(c.dispose()).rejects.toBe(asyncError)
+  })
+
+  it('observes every rejected async sibling while preserving the first error', async () => {
+    const firstError = new Error('first dependency failed')
+    const secondError = new Error('second dependency failed')
+    const first = deferred<number>()
+    const second = deferred<number>()
+    const c = new Container()
+      .registerAsyncFactory('first', () => first.promise, [])
+      .registerAsyncFactory('second', () => second.promise, [])
+      .registerAsyncFactory(
+        'parent',
+        (_first: number, _second: number) => 'unreachable',
+        ['first', 'second'],
+        'transient'
+      )
+
+    const pending = c.getAsync('parent')
+    first.reject(firstError)
+    second.reject(secondError)
+
+    await expect(pending).rejects.toBe(firstError)
+    await turn()
+    await turn()
+
+    expect(rejections).toEqual([])
   })
 
   it('does not roll back or take ownership of an earlier async transient', async () => {
@@ -969,6 +1085,32 @@ describe('compact async dependency graph — PromiseLike reentrancy', () => {
       expect(calls).toBe(1)
     }
   )
+
+  it('writes the pending Promise before a one-async result thenable is read', async () => {
+    let calls = 0
+    let reentrant: Promise<{readonly id: number}> | undefined
+    let c!: {getAsync(key: 'value'): Promise<{readonly id: number}>}
+    const root = new Container()
+      .registerAsyncFactory('dependency', () => 1, [])
+      .registerAsyncFactory('value', () => {
+        const value = {id: ++calls}
+
+        return {
+          get then() {
+            reentrant = c.getAsync('value')
+            return (resolve: (result: {readonly id: number}) => void) => resolve(value)
+          }
+        }
+      }, ['dependency'])
+    c = root
+
+    const first = c.getAsync('value')
+    const value = await first
+
+    expect(reentrant).toBe(first)
+    expect(await reentrant!).toBe(value)
+    expect(calls).toBe(1)
+  })
 
   it('starts a second transient initialization on controlled reentry', async () => {
     let calls = 0
