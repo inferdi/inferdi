@@ -1,6 +1,6 @@
 {
   "name": "@inferdi/koa",
-  "version": "6.0.2",
+  "version": "6.0.3",
   "description": "Koa request-scope middleware for InferDI.",
   "keywords": [
     "typescript",
