@@ -11,7 +11,7 @@
 ;(Symbol as { dispose?: symbol }).dispose ??= Symbol.for('Symbol.dispose')
 ;(Symbol as { asyncDispose?: symbol }).asyncDispose ??= Symbol.for('Symbol.asyncDispose')
 
-const UNDEFINED_MARKER = Symbol('UNDEFINED_MARKER')
+const UNDEFINED_MARKER = Symbol()
 
 declare const requiredInputs: unique symbol
 declare const scopeInputMarker: unique symbol
@@ -702,15 +702,14 @@ type AsyncDependencyPlan = number | readonly number[] | undefined
 /*
  * Projects the constructor parameter types onto the allowed DI-map keys.
  * Prevents passing a deps key whose value is not assignable to the corresponding argument.
- * Reads `T[K]['type']` because each entry of the map is a Spec<V, L>
+ * Reads `T[K]['type']` because each entry of the map is a Spec<V, L>.
+ * Check unknown once per argument; intersecting the selected keys avoids a second
+ * distributive pass over the registry on every step of a fluent chain
  */
 type DepsOf<T extends DependenciesMap, A extends readonly unknown[]> = {
-  readonly [I in keyof A]: Extract<
-    keyof T,
-    {
-      [K in keyof T]: unknown extends A[I] ? never : T[K]['type'] extends A[I] ? K : never
-    }[keyof T]
-  >
+  readonly [I in keyof A]: unknown extends A[I] ? never : keyof T & {
+    [K in keyof T]: T[K]['type'] extends A[I] ? K : never
+  }[keyof T]
 }
 
 /*
@@ -780,7 +779,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   /** @internal */
   private readonly cache = new Map<keyof T, unknown>()
   /** @internal */
-  private scopeInputs: Record<string | symbol, unknown> | undefined = undefined
+  private scopeInputs: Record<string | symbol, unknown> | undefined
   /*
    * Teardown queue. Only instances created by THIS container land here
    * (not registerValue — external ownership; not transient — owned by the caller).
@@ -808,7 +807,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   /** @internal */
   private _disposed = false
   /** @internal */
-  private disposePromise: Promise<void> | undefined = undefined
+  private disposePromise: Promise<void> | undefined
   /*
    * Mutable children retain the exact parent chain. Fixed children point directly
    * to the registry owner. dispose nulls the reference so a disposed child
@@ -2327,7 +2326,8 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     for (let read = 0; read < instances.length; read++) {
       const instance = instances[read]
 
-      if (seen.has(instance)) {
+      /* Avoid hashing repeated aliases of the last distinct instance */
+      if ((write !== 0 && instance === instances[write - 1]) || seen.has(instance)) {
         continue
       }
 

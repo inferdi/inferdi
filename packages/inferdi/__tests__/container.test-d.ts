@@ -282,6 +282,53 @@ describe('Phase 4 — unknown-key type safety', () => {
 })
 
 describe('Phase 4 — DepsOf validation', () => {
+  it('preserves optional and variadic dependency tuples', () => {
+    class Optional {
+      constructor(readonly count?: number) {}
+    }
+    class Variadic {
+      constructor(readonly logger: Logger, ..._counts: number[]) {}
+    }
+    const token = Symbol('count')
+    const c = new Container()
+      .registerValue(token, 1)
+      .registerValue('count', 2)
+      .registerValue('text', 'invalid')
+      .registerClass('logger', L, [])
+      .registerClass('empty', Optional, [])
+      .registerClass('optional', Optional, [token])
+      .registerClass('variadic', Variadic, ['logger', token, 'count'])
+
+    expectTypeOf(c.get('empty')).toEqualTypeOf<Optional>()
+    expectTypeOf(c.get('optional')).toEqualTypeOf<Optional>()
+    expectTypeOf(c.get('variadic')).toEqualTypeOf<Variadic>()
+    // @ts-expect-error — an optional parameter still checks its supplied dependency
+    c.registerClass('wrongOptional', Optional, ['text'])
+    // @ts-expect-error — every rest argument must match the element type
+    c.registerClass('wrongRest', Variadic, ['logger', token, 'text'])
+    // @ts-expect-error — a union must satisfy the parameter in every branch
+    c.registerClass('wrongUnion', Optional, ['count' as 'count' | 'text'])
+  })
+
+  it('preserves broad dependency keys and rejects unconstrained parameters', () => {
+    class Numeric {
+      constructor(readonly count: number) {}
+    }
+    class Unconstrained {
+      constructor(_value: unknown) {}
+    }
+    const key = 'runtime' as string
+    const token = Symbol('numeric')
+    const c = new Container().registerValue(key, 1)
+      .registerClass(token, Numeric, [key])
+
+    expectTypeOf(c.get(token)).toEqualTypeOf<Numeric>()
+    // @ts-expect-error — unknown parameters do not declare a dependency shape
+    c.registerClass(Symbol('unknown'), Unconstrained, [key])
+    // @ts-expect-error — async factories use the same positional type check
+    c.registerAsyncFactory(Symbol('wrong'), (_value: string) => 1, [key])
+  })
+
   it('correct order and dep types — compiles', () => {
     const c = new Container()
       .registerClass('logger', L, [])
