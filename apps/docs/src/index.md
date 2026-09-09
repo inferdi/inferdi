@@ -19,6 +19,14 @@ hero:
 
 features:
   - icon:
+      src: /react.png
+      alt: React
+    title: React
+    details: >-
+      The React 19 adapter exposes exact container types through context and Suspense-aware service hooks. Managed child scopes are created after commit and disposed automatically.
+    link: /adapters/react
+    linkText: React adapter
+  - icon:
       src: /fastify.png
       alt: Fastify
     title: Fastify
@@ -58,11 +66,4 @@ features:
       The Elysia v1 adapter connects each request to a typed DI scope and carries route types into the service layer.
     link: /adapters/elysia
     linkText: Elysia adapter
-  - icon:
-      src: /puzzle.png
-      alt: Framework-agnostic core
-    title: Framework-agnostic core
-    details: "InferDI has zero runtime dependencies and runs in Node, Bun, Deno, browsers, and workers. Adapters add optional request-scope lifecycle glue."
-    link: /adapters/
-    linkText: How adapters work
 ---

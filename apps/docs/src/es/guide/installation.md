@@ -59,6 +59,7 @@ Las declaraciones publicadas referencian por sí mismas la biblioteca de tipos d
 Instala el paquete del núcleo, el paquete del adaptador y el peer del framework:
 
 ```bash
+pnpm add @inferdi/inferdi @inferdi/react react
 pnpm add @inferdi/inferdi @inferdi/fastify fastify
 pnpm add @inferdi/inferdi @inferdi/hono hono
 pnpm add @inferdi/inferdi @inferdi/koa koa

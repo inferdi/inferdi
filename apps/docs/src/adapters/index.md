@@ -1,6 +1,6 @@
 # Framework Adapters
 
-Each adapter creates one request scope, exposes it at the framework-native location, and disposes it at the framework's safe completion point. Your application keeps its concrete container type, so `request.di` remains fully typed.
+InferDI adapters connect exact container types to framework lifecycle boundaries. HTTP adapters create one request scope and expose it at the framework-native location. The React adapter provides typed contexts and can own a client-created child scope.
 
 Adapters manage request-scope lifecycle. The core package stays zero-dependency and does not add decorators, controller scanning, handler parameter injection, or route discovery.
 
@@ -13,6 +13,9 @@ Adapters manage request-scope lifecycle. The core package stays zero-dependency 
 | [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa)         | Koa v3     | `ctx.state.di` | no             |
 | [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | Express 5  | `req.di`       | no             |
 | [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)   | Elysia v1  | `context.di`   | yes            |
+| [`@inferdi/react`](https://github.com/inferdi/inferdi/tree/main/packages/react)     | React 19   | React context  | external `Provider` |
+
+React uses a component lifecycle rather than the request lifecycle below. Its external `Provider` never disposes its container; its managed `ScopeProvider` creates after commit and always disposes its child scope. See the [React adapter](./react).
 
 ## Common Lifecycle Contract
 

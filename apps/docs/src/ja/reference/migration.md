@@ -206,6 +206,7 @@ v2 では、すべての登録メソッドに文字列またはシンボルの�
 - [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa)
 - [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express)
 - [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)
+- [`@inferdi/react`](https://github.com/inferdi/inferdi/tree/main/packages/react)
 
 アダプターをアップグレードする際は、アダプターパッケージと [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) を一致するメジャーバージョンに保ってください。
 

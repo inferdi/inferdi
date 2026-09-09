@@ -12,6 +12,7 @@
     "test:watch": "pnpm -r --parallel --filter @inferdi/* test:watch",
     "test:coverage": "pnpm -r --filter @inferdi/* test:coverage",
     "test:types": "pnpm -r --filter @inferdi/* test:types",
+    "test:package": "pnpm -r --filter @inferdi/* test:package",
     "test:bundle-size": "pnpm --filter @inferdi/inferdi run test:bundle-size",
     "docs:dev": "pnpm --filter inferdi-docs run dev",
     "docs:build": "pnpm --filter inferdi-docs run build",

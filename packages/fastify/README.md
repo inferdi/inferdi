@@ -252,5 +252,6 @@ export const inferdiFastify: InferdiFastifyPlugin
 | [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa)         | [JSR](https://jsr.io/@inferdi/koa)     | [npm](https://www.npmjs.com/package/@inferdi/koa)     | Koa v3 request-scope middleware                                     |
 | [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | [JSR](https://jsr.io/@inferdi/express) | [npm](https://www.npmjs.com/package/@inferdi/express) | Express 5 request-scope middleware                                  |
 | [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)   | [JSR](https://jsr.io/@inferdi/elysia)  | [npm](https://www.npmjs.com/package/@inferdi/elysia)  | Elysia request-scope plugin                                         |
+| [`@inferdi/react`](https://github.com/inferdi/inferdi/tree/main/packages/react)     | [JSR](https://jsr.io/@inferdi/react)   | [npm](https://www.npmjs.com/package/@inferdi/react)   | React 19 providers, hooks, Suspense and managed scopes               |
 
 The project repository lives at [inferdi/inferdi](https://github.com/inferdi/inferdi). This adapter targets [Fastify](https://fastify.dev) v5.

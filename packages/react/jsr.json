@@ -1,0 +1,23 @@
+{
+  "name": "@inferdi/react",
+  "version": "6.1.0",
+  "license": "MIT",
+  "exports": "./src/index.ts",
+  "imports": {
+    "@inferdi/inferdi": "jsr:@inferdi/inferdi@^6.0.0",
+    "react": "npm:react@^19.2.8"
+  },
+  "publish": {
+    "include": [
+      "src/**/*.ts",
+      "README.md",
+      "LICENSE",
+      "jsr.json"
+    ],
+    "exclude": [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/*.test-d.ts"
+    ]
+  }
+}

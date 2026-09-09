@@ -45,4 +45,17 @@ const app = new Container()
 
 回调只能看到 `Container<TRequirements>`。要求会按服务类型、精确生命周期、同步/异步模式、managed-lazy 模式和作用域输入就绪状态检查。输出不得与实际图中的任何键冲突；缺少要求、不兼容要求和输出冲突都有具名诊断。
 
+## 动态导入
+
+当可选模块或路由专用模块需要作为独立 JavaScript chunk 加载时，可以使用 `import()`。
+
+```ts
+const { reportsModule } = await import('./reports.module')
+const container = new Container().use(reportsModule)
+```
+
+运行时会先加载并执行 `reports.module`，然后才调用 `.use()`。随后，`.use()` 会同步执行该模块、添加注册项，并返回带有推断类型的容器。动态导入不会让这些服务变成异步服务；如果服务初始化本身是异步的，请使用 `registerAsyncFactory`。
+
+在浏览器中，请在路由或功能边界使用此模式，并确保构建工具生成独立 chunk，且其他代码没有静态导入同一模块。chunk 加载后再创建该功能的容器。在后端的常规启动流程中，应优先使用静态导入。动态导入适合由部署配置选择的可选功能，或对冷启动敏感的 serverless 路径，让未使用的代码和依赖保持未加载状态。无论在哪种运行时，都应在首次解析或调用 `createScope()` 前完成容器组装；不要按请求修改应用容器。
+
 如果键在运行时确定，请在解析前使用 [`.has()` 类型守卫](./type-safety#动态键)。

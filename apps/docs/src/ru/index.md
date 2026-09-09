@@ -19,6 +19,14 @@ hero:
 
 features:
   - icon:
+      src: /react.png
+      alt: React
+    title: React
+    details: >-
+      Адаптер для React 19 передаёт точные типы контейнера через контекст и хуки сервисов с поддержкой Suspense. Управляемые дочерние scope создаются после commit-фазы и освобождаются автоматически.
+    link: /ru/adapters/react
+    linkText: Адаптер React
+  - icon:
       src: /fastify.png
       alt: Fastify
     title: Fastify
@@ -58,11 +66,4 @@ features:
       Elysia v1 уже даёт Bun-приложениям строгие типы маршрутов. Адаптер переносит эту типизацию в сервисный слой: каждый запрос получает DI scope, а автодополнение ведёт от обработчика к бизнес-логике.
     link: /ru/adapters/elysia
     linkText: Адаптер Elysia
-  - icon:
-      src: /puzzle.png
-      alt: Ядро без привязки к фреймворку
-    title: Ядро без привязки к фреймворку
-    details: "У InferDI нет runtime-зависимостей. Ядро работает в Node, Bun, Deno, браузерах и воркерах; адаптеры добавляют lifecycle для request scope."
-    link: /ru/adapters/
-    linkText: Как работают адаптеры
 ---

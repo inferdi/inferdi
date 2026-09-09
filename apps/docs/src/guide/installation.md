@@ -59,6 +59,7 @@ The published declarations reference the explicit-resource-management library th
 Install the core package, the adapter package, and the framework peer:
 
 ```bash
+pnpm add @inferdi/inferdi @inferdi/react react
 pnpm add @inferdi/inferdi @inferdi/fastify fastify
 pnpm add @inferdi/inferdi @inferdi/hono hono
 pnpm add @inferdi/inferdi @inferdi/koa koa

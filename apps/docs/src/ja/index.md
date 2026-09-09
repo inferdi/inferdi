@@ -19,6 +19,14 @@ hero:
 
 features:
   - icon:
+      src: /react.png
+      alt: React
+    title: React
+    details: >-
+      React 19 アダプターは、コンテキストと Suspense 対応のサービスフックを通じて、正確なコンテナー型を公開します。管理対象の子スコープはコミット後に作成され、自動的に破棄されます。
+    link: /ja/adapters/react
+    linkText: React アダプター
+  - icon:
       src: /fastify.png
       alt: Fastify
     title: Fastify
@@ -58,11 +66,4 @@ features:
       Elysia v1 は Bun アプリに鋭いルート型をすでに提供しています。アダプターはその型チェーンをサービスへと運び、各リクエストを DI スコープに結び付けるので、オートコンプリートがハンドラーからビジネスロジックまでの経路を追従します。
     link: /ja/adapters/elysia
     linkText: Elysia アダプター
-  - icon:
-      src: /puzzle.png
-      alt: Framework-agnostic core
-    title: フレームワーク非依存のコア
-    details: "InferDI にはランタイム依存がなく、Node、Bun、Deno、ブラウザ、ワーカーで動作します。アダプターはリクエストスコープ向けの任意のライフサイクル機能を提供します。"
-    link: /ja/adapters/
-    linkText: アダプターの仕組み
 ---

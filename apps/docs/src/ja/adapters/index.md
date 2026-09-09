@@ -1,6 +1,6 @@
 # フレームワークアダプター
 
-各アダプターはリクエストごとに正確に 1 つのリクエストスコープを作成し、それをフレームワークネイティブの場所で公開し、フレームワークの安全な完了ポイントで破棄します。その間、アプリケーションが所有する具体的なコンテナ型を保持するため、`request.di` は `any` やベースコンテナではなく、完全に型付けされます。
+InferDI アダプターは正確なコンテナー型をフレームワーク lifecycle に接続します。HTTP アダプターは request scope を 1 つ作成してフレームワーク固有の場所に公開します。React アダプターは型付き context を提供し、クライアントで作る子 scope も所有できます。
 
 これがアダプターの仕事のすべてです。アダプターは薄いライフサイクルのグルーです。[`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) をゼロ依存に保つのと同じ設計が、デコレーター、コントローラースキャン、ハンドラーパラメータ注入、ルート探索をコアから排除し続けています。あなたが選ぶのはフレームワークのリクエストライフサイクルであって、フレームワーク独自の依存性注入の考え方ではありません。
 
@@ -13,6 +13,9 @@
 | [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa)         | Koa v3     | `ctx.state.di` | なし       |
 | [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | Express 5  | `req.di`       | なし       |
 | [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)   | Elysia v1  | `context.di`   | あり       |
+| [`@inferdi/react`](https://github.com/inferdi/inferdi/tree/main/packages/react)     | React 19   | React context  | 外部 `Provider` |
+
+React は以下の request lifecycle ではなく、コンポーネント lifecycle を使います。外部 `Provider` はコンテナーを dispose せず、managed `ScopeProvider` は commit 後に子 scope を作成して必ず dispose します。詳しくは [React アダプター](./react) を参照してください。
 
 ## 共通のライフサイクル契約
 

@@ -76,7 +76,9 @@ jobs:
             packages/express/package.json \
             packages/express/jsr.json \
             packages/elysia/package.json \
-            packages/elysia/jsr.json
+            packages/elysia/jsr.json \
+            packages/react/package.json \
+            packages/react/jsr.json
           do
             VERSION=$(node -p "require('./$MANIFEST').version")
             echo "tag=$TAG $MANIFEST=$VERSION"
@@ -175,6 +177,17 @@ jobs:
             pnpm dlx jsr publish
           fi
 
+      - name: Publish @inferdi/react ${{ needs.verify.outputs.version }} to JSR
+        working-directory: packages/react
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          if curl -fsSL "https://jsr.io/@inferdi/react/meta.json" | grep -q "\"$VERSION\""; then
+            echo "::notice::@inferdi/react@$VERSION already on JSR, skipping"
+          else
+            pnpm dlx jsr publish
+          fi
+
   publish-npm:
     name: Publish to npm (with provenance)
     needs: [package-changes, verify]
@@ -260,6 +273,17 @@ jobs:
         run: |
           if npm view "@inferdi/elysia@$VERSION" version > /dev/null 2>&1; then
             echo "::notice::@inferdi/elysia@$VERSION already on npm, skipping"
+          else
+            pnpm publish --provenance --access public --no-git-checks
+          fi
+
+      - name: Publish @inferdi/react ${{ needs.verify.outputs.version }} to npm
+        working-directory: packages/react
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          if npm view "@inferdi/react@$VERSION" version > /dev/null 2>&1; then
+            echo "::notice::@inferdi/react@$VERSION already on npm, skipping"
           else
             pnpm publish --provenance --access public --no-git-checks
           fi

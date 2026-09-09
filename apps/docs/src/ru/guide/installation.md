@@ -59,6 +59,7 @@ import { Container } from 'jsr:@inferdi/inferdi'
 Установите основной пакет, пакет адаптера и peer-зависимость фреймворка:
 
 ```bash
+pnpm add @inferdi/inferdi @inferdi/react react
 pnpm add @inferdi/inferdi @inferdi/fastify fastify
 pnpm add @inferdi/inferdi @inferdi/hono hono
 pnpm add @inferdi/inferdi @inferdi/koa koa

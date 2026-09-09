@@ -6,7 +6,7 @@ Compare where each framework creates the scope, how the scope is provided to chi
 
 | Example                                                                                               | Shows                                                        |
 |-------------------------------------------------------------------------------------------------------|--------------------------------------------------------------|
-| [`react.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react.tsx)               | React feature scope created after commit with effect cleanup |
+| [`react.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react.tsx)               | React feature scope managed by `@inferdi/react`               |
 | [`react-native.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react-native.tsx) | React Native screen scope                                    |
 | [`vue.ts`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/vue.ts)                     | Vue 3 provide/inject scope boundary                          |
 | [`svelte.ts`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/svelte.ts)               | Svelte context scope boundary                                |

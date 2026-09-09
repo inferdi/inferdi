@@ -1,6 +1,6 @@
 # 框架适配器
 
-每个适配器都会为每个请求创建恰好一个请求作用域，将其暴露在框架原生的位置，并在框架安全的完成时机释放它 —— 同时保留应用所拥有的具体容器类型，因此 `request.di` 是完全带类型的，而不是 `any` 或某个基类容器。
+InferDI 适配器把精确的容器类型连接到框架 lifecycle。HTTP 适配器创建一个 request scope，并在框架原生位置公开它。React 适配器提供类型化 context，也可以拥有客户端创建的子 scope。
 
 这就是适配器的全部职责。适配器只是轻薄的生命周期胶水代码：让 [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) 保持零依赖的那套设计，同样把装饰器、控制器扫描、处理器参数注入和路由发现挡在内核之外。你选择接入的是框架的请求生命周期，而不是框架对依赖注入的理解。
 
@@ -13,6 +13,9 @@
 | [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) | Koa v3 | `ctx.state.di` | 不支持 |
 | [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | Express 5 | `req.di` | 不支持 |
 | [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) | Elysia v1 | `context.di` | 支持 |
+| [`@inferdi/react`](https://github.com/inferdi/inferdi/tree/main/packages/react) | React 19 | React context | 外部 `Provider` |
+
+React 使用组件 lifecycle，而不是下面的 request lifecycle。外部 `Provider` 永远不会释放容器；managed `ScopeProvider` 在 commit 后创建子 scope，并始终释放它。参见 [React 适配器](./react)。
 
 ## 通用生命周期契约
 

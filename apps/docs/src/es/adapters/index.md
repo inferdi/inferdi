@@ -1,6 +1,6 @@
 # Adaptadores de frameworks
 
-Cada adaptador crea exactamente un scope de petición por petición, lo expone en la ubicación nativa del framework y lo libera en el punto de finalización seguro del framework, conservando al mismo tiempo el tipo concreto de contenedor que tu aplicación posee, de modo que `request.di` queda totalmente tipado, no `any` ni un contenedor base.
+Los adaptadores de InferDI conectan tipos exactos de contenedor con los límites del lifecycle del framework. Los adaptadores HTTP crean un request scope y lo exponen en la ubicación nativa. El adaptador de React proporciona un context tipado y también puede poseer un scope secundario creado en el cliente.
 
 Ese es todo el trabajo. Los adaptadores son una fina capa de pegamento del ciclo de vida: el mismo diseño que mantiene a [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) sin dependencias también mantiene los decoradores, el escaneo de controladores, la inyección de parámetros de handlers y el descubrimiento de rutas fuera del núcleo. Optas por el ciclo de vida de las peticiones de un framework, no por la idea que ese framework tenga de la inyección de dependencias.
 
@@ -13,6 +13,9 @@ Ese es todo el trabajo. Los adaptadores son una fina capa de pegamento del ciclo
 | [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa)         | Koa v3     | `ctx.state.di`      | no             |
 | [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | Express 5  | `req.di`            | no             |
 | [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)   | Elysia v1  | `context.di`        | sí             |
+| [`@inferdi/react`](https://github.com/inferdi/inferdi/tree/main/packages/react)     | React 19   | React context       | `Provider` externo |
+
+React usa el lifecycle del componente en vez del lifecycle de petición descrito abajo. Su `Provider` externo nunca libera el contenedor; su managed `ScopeProvider` crea el scope tras el commit y siempre lo libera. Consulta el [adaptador de React](./react).
 
 ## Contrato común del ciclo de vida
 

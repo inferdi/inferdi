@@ -1,6 +1,6 @@
 # Адаптеры фреймворков
 
-Каждый адаптер создаёт ровно один scope на запрос, кладёт его в нативное для фреймворка место и освобождает в безопасной точке жизненного цикла. При этом сохраняется конкретный тип контейнера, которым владеет приложение: `request.di` остаётся полностью типизированным, а не `any` и не базовым контейнером.
+Адаптеры InferDI связывают точные типы контейнера с lifecycle фреймворка. HTTP-адаптеры создают один scope запроса и публикуют его в нативном месте. React-адаптер предоставляет типизированный context и может владеть дочерним scope на клиенте.
 
 Это вся их работа. Адаптеры - тонкая обвязка жизненного цикла: тот же дизайн, который оставляет [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) без зависимостей, не добавляет в core декораторы, сканирование контроллеров, injection параметров обработчика и поиск маршрутов. Вы подключаетесь к жизненному циклу запроса во фреймворке, а не к его представлению о dependency injection.
 
@@ -13,6 +13,9 @@
 | [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) | Koa v3 | `ctx.state.di` | нет |
 | [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | Express 5 | `req.di` | нет |
 | [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) | Elysia v1 | `context.di` | да |
+| [`@inferdi/react`](https://github.com/inferdi/inferdi/tree/main/packages/react) | React 19 | React context | внешний `Provider` |
+
+React использует lifecycle компонента вместо описанного ниже lifecycle запроса. Внешний `Provider` никогда не освобождает контейнер, а managed `ScopeProvider` создаёт дочерний scope после commit и всегда освобождает его. Подробнее на странице [React-адаптера](./react).
 
 ## Общий контракт жизненного цикла
 

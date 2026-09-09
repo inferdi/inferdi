@@ -206,6 +206,7 @@ v2 также добавил string- и symbol-ключи во все метод
 - [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa)
 - [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express)
 - [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)
+- [`@inferdi/react`](https://github.com/inferdi/inferdi/tree/main/packages/react)
 
 При обновлении адаптеров держите пакет адаптера и [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) на совпадающих major-версиях.
 

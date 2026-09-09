@@ -45,4 +45,17 @@ const app = new Container()
 
 El callback solo ve `Container<TRequirements>`. Los requisitos se comprueban por tipo de servicio, lifetime exacto, modo sync/async, modo managed-lazy y disponibilidad de scope inputs. Los outputs no pueden colisionar con ninguna clave del grafo real; requisitos ausentes, incompatibles y colisiones tienen diagnósticos con nombre.
 
+## Importaciones dinámicas
+
+Usa `import()` cuando un módulo opcional o específico de una ruta deba cargarse como un chunk de JavaScript separado.
+
+```ts
+const { reportsModule } = await import('./reports.module')
+const container = new Container().use(reportsModule)
+```
+
+El runtime carga y evalúa `reports.module` antes de ejecutar `.use()`. Después, `.use()` ejecuta el módulo de forma síncrona, añade sus registros y devuelve el contenedor con el tipo inferido. Una importación dinámica no convierte esos servicios en asíncronos; usa `registerAsyncFactory` cuando la inicialización del propio servicio sea asíncrona.
+
+En el navegador, usa este patrón en el límite de una ruta o funcionalidad, y solo si el bundler genera un chunk separado que ningún otro código importa de forma estática. Construye el contenedor de la funcionalidad después de cargar ese chunk. En un backend, prefiere importaciones estáticas durante un inicio normal. Una importación dinámica resulta útil para funcionalidades opcionales elegidas por la configuración del despliegue o para rutas serverless sensibles al cold start, donde el código y las dependencias sin usar deben permanecer sin cargar. En ambos runtimes, monta el contenedor antes de la primera resolución o de llamar a `createScope()`; no modifiques el contenedor de la aplicación en cada petición.
+
 Si la clave se selecciona en runtime, usa el [type guard `.has()`](./type-safety#claves-dinámicas) antes de resolverla.

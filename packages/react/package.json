@@ -1,0 +1,89 @@
+{
+  "name": "@inferdi/react",
+  "version": "6.1.0",
+  "description": "React 19 provider, hooks, and managed scope adapter for InferDI.",
+  "keywords": [
+    "typescript",
+    "dependency-injection",
+    "di",
+    "ioc",
+    "inferdi",
+    "react",
+    "hooks",
+    "suspense"
+  ],
+  "author": {
+    "name": "Viacheslav Kabanov",
+    "email": "vkabanov@inferdi.com",
+    "url": "https://github.com/maxrendel"
+  },
+  "license": "MIT",
+  "homepage": "https://inferdi.com/adapters/react",
+  "bugs": {
+    "url": "https://github.com/inferdi/inferdi/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/inferdi/inferdi.git",
+    "directory": "packages/react"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "peerDependencies": {
+    "@inferdi/inferdi": "^6.0.0",
+    "react": ">=19.2.8 <20"
+  },
+  "devDependencies": {
+    "@inferdi/inferdi": "workspace:*",
+    "@types/node": "^25.0.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitest/coverage-v8": "^4.1.5",
+    "esbuild": "0.28.1",
+    "jsdom": "26.1.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.5"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup && pnpm run test:consumer-types && pnpm run test:package",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:consumer-types": "tsc --project tsconfig.consumer.json",
+    "test:package": "node ../../scripts/check-package.mjs && node scripts/check-react-package.mjs",
+    "test:types": "vitest --typecheck.enabled --run",
+    "prepublishOnly": "pnpm run clean && pnpm run typecheck && pnpm run build"
+  }
+}

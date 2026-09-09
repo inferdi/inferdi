@@ -19,6 +19,14 @@ hero:
 
 features:
   - icon:
+      src: /react.png
+      alt: React
+    title: React
+    details: >-
+      El adaptador de React 19 expone los tipos exactos del contenedor mediante el contexto y hooks de servicios compatibles con Suspense. Los scopes hijos gestionados se crean después del commit y se liberan automáticamente.
+    link: /es/adapters/react
+    linkText: Adaptador de React
+  - icon:
       src: /fastify.png
       alt: Fastify
     title: Fastify
@@ -58,11 +66,4 @@ features:
       Elysia v1 ya ofrece tipos de ruta precisos a las aplicaciones Bun. El adaptador lleva esa cadena de tipos hasta tus servicios, conectando cada petición a un scope de DI para que el autocompletado siga el camino desde el handler hasta la lógica de negocio.
     link: /es/adapters/elysia
     linkText: Adaptador de Elysia
-  - icon:
-      src: /puzzle.png
-      alt: Framework-agnostic core
-    title: Núcleo agnóstico al framework
-    details: "InferDI no tiene dependencias en runtime y se ejecuta en Node, Bun, Deno, navegadores y workers. Los adaptadores añaden ciclo de vida opcional para el scope de petición."
-    link: /es/adapters/
-    linkText: Cómo funcionan los adaptadores
 ---

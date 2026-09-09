@@ -1,6 +1,6 @@
 {
   "name": "@inferdi/inferdi",
-  "version": "6.0.3",
+  "version": "6.1.0",
   "description": "Zero-dependency, decorator-free, strictly typed DI container for TypeScript. Features scopes, lazy injection, lifetime guards, and explicit async teardown.",
   "keywords": [
     "typescript",
@@ -61,13 +61,14 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup && pnpm run test:consumer-types",
+    "build": "tsup && pnpm run test:consumer-types && pnpm run test:package",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:consumer-types": "tsc --project tsconfig.consumer.json",
+    "test:package": "node ../../scripts/check-package.mjs",
     "test:types": "vitest --typecheck.enabled --run",
     "test:bundle-size": "node scripts/check-bundle-size.mjs",
     "bench": "vitest bench --run",

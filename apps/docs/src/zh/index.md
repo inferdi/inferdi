@@ -19,6 +19,14 @@ hero:
 
 features:
   - icon:
+      src: /react.png
+      alt: React
+    title: React
+    details: >-
+      React 19 适配器通过上下文和支持 Suspense 的服务 Hook 暴露精确的容器类型。托管子作用域会在提交后创建，并自动释放。
+    link: /zh/adapters/react
+    linkText: React 适配器
+  - icon:
       src: /fastify.png
       alt: Fastify
     title: Fastify
@@ -58,11 +66,4 @@ features:
       Elysia v1 已经为 Bun 应用提供了精确的路由类型。该适配器将这条类型链延伸到你的服务中，把每个请求连接到一个 DI 作用域，使自动补全能从处理器一路跟随到业务逻辑。
     link: /zh/adapters/elysia
     linkText: Elysia 适配器
-  - icon:
-      src: /puzzle.png
-      alt: Framework-agnostic core
-    title: 与框架无关的内核
-    details: "InferDI 没有运行时依赖，可运行于 Node、Bun、Deno、浏览器和 workers。适配器为请求作用域提供可选的生命周期胶水代码。"
-    link: /zh/adapters/
-    linkText: 适配器如何工作
 ---

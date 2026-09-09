@@ -1,6 +1,6 @@
 {
   "name": "@inferdi/koa",
-  "version": "6.0.3",
+  "version": "6.1.0",
   "description": "Koa request-scope middleware for InferDI.",
   "keywords": [
     "typescript",
@@ -76,12 +76,13 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && pnpm run test:package",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:package": "node ../../scripts/check-package.mjs",
     "test:types": "vitest --typecheck.enabled --run",
     "prepublishOnly": "pnpm run clean && pnpm run typecheck && pnpm run build"
   }

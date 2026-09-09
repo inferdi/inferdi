@@ -33,6 +33,7 @@ A zero-dependency, **decorator-free**, strongly typed DI container for modern Ty
   - [Install](#install)
   - [Quick Start](#quick-start)
   - [Examples](#examples)
+  - [React Adapter](#react-adapter)
   - [Fastify Adapter](#fastify-adapter)
   - [Hono Adapter](#hono-adapter)
   - [Koa Adapter](#koa-adapter)
@@ -249,6 +250,42 @@ The repository includes framework and runtime examples in [`examples/`](https://
   - [`bullmq.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/bullmq.ts)
   - [`commander.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/commander.ts)
   - [`yargs.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/yargs.ts)
+
+## React Adapter
+
+React 19 applications can use the separate [`@inferdi/react`](https://github.com/inferdi/inferdi/tree/main/packages/react) package for exact typed contexts, Suspense-aware service hooks and managed client child scopes. It is published to npm and JSR with the same version as `@inferdi/inferdi`.
+
+```bash
+pnpm add @inferdi/inferdi @inferdi/react react
+```
+
+```tsx
+import {inferdiReact} from '@inferdi/react'
+import {buildRootContainer} from './container.js'
+
+const root = buildRootContainer()
+const AppDI = inferdiReact<typeof root>()
+const RequestDI = AppDI.createScope({
+  createScope: (parent, input: {requestId: string}) =>
+    parent.createScope({requestId: input.requestId})
+})
+
+function RequestArea({requestId}: {requestId: string}) {
+  return (
+    <AppDI.Provider container={root}>
+      <RequestDI.ScopeProvider
+        input={{requestId}}
+        scopeKey={requestId}
+        fallback={<Loading />}
+      >
+        <RequestScreen />
+      </RequestDI.ScopeProvider>
+    </AppDI.Provider>
+  )
+}
+```
+
+The external `Provider` never disposes its container. The managed `ScopeProvider` creates after commit, serializes replacement behind completed cleanup and always disposes its child. Managed providers render only their fallback during server rendering; full SSR uses an externally owned request scope. See the [React adapter guide](https://inferdi.com/adapters/react).
 
 ## Fastify Adapter
 
@@ -1316,6 +1353,7 @@ This repository is a pnpm monorepo. The published packages:
 | Package | JSR | npm | Description |
 | --- | --- | --- | --- |
 | [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) | [JSR](https://jsr.io/@inferdi/inferdi) | [npm](https://www.npmjs.com/package/@inferdi/inferdi) | Core DI container — zero-dependency, decorator-free, strongly typed |
+| [`@inferdi/react`](https://github.com/inferdi/inferdi/tree/main/packages/react) | [JSR](https://jsr.io/@inferdi/react) | [npm](https://www.npmjs.com/package/@inferdi/react) | React 19 providers, hooks, Suspense and managed scopes |
 | [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | [JSR](https://jsr.io/@inferdi/fastify) | [npm](https://www.npmjs.com/package/@inferdi/fastify) | Fastify v5 request-scope adapter |
 | [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) | [JSR](https://jsr.io/@inferdi/hono) | [npm](https://www.npmjs.com/package/@inferdi/hono) | Hono request-scope middleware |
 | [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) | [JSR](https://jsr.io/@inferdi/koa) | [npm](https://www.npmjs.com/package/@inferdi/koa) | Koa v3 request-scope middleware |

@@ -206,6 +206,7 @@ All published InferDI packages share the same version:
 - [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa)
 - [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express)
 - [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)
+- [`@inferdi/react`](https://github.com/inferdi/inferdi/tree/main/packages/react)
 
 When upgrading adapters, keep the adapter package and [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) on matching major versions.
 

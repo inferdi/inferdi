@@ -115,7 +115,7 @@ const enNav: DefaultTheme.NavItem[] = [
   { text: 'Guide', link: '/guide/quick-start' },
   { text: 'Performance', link: '/guide/performance' },
   { text: 'Adapters', link: '/adapters/' },
-  { text: '6.0.3', items: [
+  { text: '6.1.0', items: [
       { text: 'Migration', link: '/reference/migration' },
     ],
   },
@@ -125,7 +125,7 @@ const ruNav: DefaultTheme.NavItem[] = [
   { text: 'Руководство', link: '/ru/guide/quick-start' },
   { text: 'Производительность', link: '/ru/guide/performance' },
   { text: 'Адаптеры', link: '/ru/adapters/' },
-  { text: '6.0.3', items: [
+  { text: '6.1.0', items: [
       { text: 'Миграция', link: '/ru/reference/migration' },
     ],
   },
@@ -135,7 +135,7 @@ const zhNav: DefaultTheme.NavItem[] = [
   { text: '指南', link: '/zh/guide/quick-start' },
   { text: '性能', link: '/zh/guide/performance' },
   { text: '适配器', link: '/zh/adapters/' },
-  { text: '6.0.3', items: [
+  { text: '6.1.0', items: [
       { text: '迁移', link: '/zh/reference/migration' },
     ],
   },
@@ -145,7 +145,7 @@ const jaNav: DefaultTheme.NavItem[] = [
   { text: 'ガイド', link: '/ja/guide/quick-start' },
   { text: 'パフォーマンス', link: '/ja/guide/performance' },
   { text: 'アダプター', link: '/ja/adapters/' },
-  { text: '6.0.3', items: [
+  { text: '6.1.0', items: [
       { text: '移行', link: '/ja/reference/migration' },
     ],
   },
@@ -155,7 +155,7 @@ const esNav: DefaultTheme.NavItem[] = [
   { text: 'Guía', link: '/es/guide/quick-start' },
   { text: 'Rendimiento', link: '/es/guide/performance' },
   { text: 'Adaptadores', link: '/es/adapters/' },
-  { text: '6.0.3', items: [
+  { text: '6.1.0', items: [
       { text: 'Migración', link: '/es/reference/migration' },
     ],
   },
@@ -203,6 +203,7 @@ const enSidebar: DefaultTheme.Sidebar = [
     text: 'Adapters',
     items: [
       { text: 'Overview', link: '/adapters/' },
+      { text: 'React', link: '/adapters/react' },
       { text: 'Fastify', link: '/adapters/fastify' },
       { text: 'Hono', link: '/adapters/hono' },
       { text: 'Koa', link: '/adapters/koa' },
@@ -269,6 +270,7 @@ const ruSidebar: DefaultTheme.Sidebar = [
     text: 'Адаптеры',
     items: [
       { text: 'Обзор', link: '/ru/adapters/' },
+      { text: 'React', link: '/ru/adapters/react' },
       { text: 'Fastify', link: '/ru/adapters/fastify' },
       { text: 'Hono', link: '/ru/adapters/hono' },
       { text: 'Koa', link: '/ru/adapters/koa' },
@@ -335,6 +337,7 @@ const zhSidebar: DefaultTheme.Sidebar = [
     text: '适配器',
     items: [
       { text: '概览', link: '/zh/adapters/' },
+      { text: 'React', link: '/zh/adapters/react' },
       { text: 'Fastify', link: '/zh/adapters/fastify' },
       { text: 'Hono', link: '/zh/adapters/hono' },
       { text: 'Koa', link: '/zh/adapters/koa' },
@@ -401,6 +404,7 @@ const jaSidebar: DefaultTheme.Sidebar = [
     text: 'アダプター',
     items: [
       { text: '概要', link: '/ja/adapters/' },
+      { text: 'React', link: '/ja/adapters/react' },
       { text: 'Fastify', link: '/ja/adapters/fastify' },
       { text: 'Hono', link: '/ja/adapters/hono' },
       { text: 'Koa', link: '/ja/adapters/koa' },
@@ -467,6 +471,7 @@ const esSidebar: DefaultTheme.Sidebar = [
     text: 'Adaptadores',
     items: [
       { text: 'Visión general', link: '/es/adapters/' },
+      { text: 'React', link: '/es/adapters/react' },
       { text: 'Fastify', link: '/es/adapters/fastify' },
       { text: 'Hono', link: '/es/adapters/hono' },
       { text: 'Koa', link: '/es/adapters/koa' },
@@ -713,7 +718,7 @@ export default defineConfig({
               name: 'InferDI',
               applicationCategory: 'DeveloperApplication',
               operatingSystem: 'Node.js, Bun, Deno, Browser, Edge runtimes',
-              softwareVersion: '6.0.3',
+              softwareVersion: '6.1.0',
               programmingLanguage: 'TypeScript',
               url: `${siteUrl}/`,
               downloadUrl: packageUrl,

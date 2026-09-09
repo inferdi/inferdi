@@ -6,7 +6,9 @@ Declare page, route, or screen context as scope inputs. Register feature view mo
 
 Unmount hooks in React, React Native, Vue, and Svelte are synchronous. If a scope may contain async factories or async disposers, call `scope.dispose().catch(console.error)` from the cleanup hook. The framework will not await that promise, but this avoids using synchronous `[Symbol.dispose]()` on a container that may hold async resources.
 
-In React and React Native, create the scope in an effect after the component commits:
+React uses `@inferdi/react` to create the scope after commit and serialize async
+cleanup before replacement. React Native keeps the equivalent lifecycle wiring
+locally because the adapter does not claim React Native compatibility:
 
 ```tsx
 const [scope, setScope] = useState<PageContainer | null>(null)

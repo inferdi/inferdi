@@ -201,6 +201,7 @@ v2 还为每个注册方法添加了 string 或 symbol 键，并改进了已释�
 - [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa)
 - [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express)
 - [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)
+- [`@inferdi/react`](https://github.com/inferdi/inferdi/tree/main/packages/react)
 
 升级适配器时，请让适配器软件包与 [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) 保持相同的主版本。
 
