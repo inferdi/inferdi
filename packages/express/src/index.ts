@@ -311,7 +311,8 @@ function activate<Scope extends InferdiScope>(
     if (disposed) return
     disposed = true
 
-    const skipped = skippedRequests.delete(req)
+    // Other InferDI middleware instances must still observe request-wide ownership
+    const skipped = skippedRequests.has(req)
     if (!force && skipped) return
 
     const errors: unknown[] = []
@@ -504,6 +505,7 @@ function runExposeScope<Scope extends InferdiScope>(
  * code. Use this when a route intentionally keeps the scope beyond the HTTP
  * response boundary, such as background work that will dispose the scope
  * later.
+ * One call applies to every InferDI middleware instance on the request.
  *
  * @param req - The current Express request.
  */

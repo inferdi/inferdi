@@ -119,7 +119,7 @@ export type ScopedOptions<
   /**
    * Controls whether the plugin disposes the request scope after the response
    * is sent. Returning `false` transfers disposal responsibility to application
-   * code.
+   * code. The scope remains available through `request.di` for manual cleanup.
    */
   readonly autoDispose?:
     | boolean
@@ -638,7 +638,7 @@ async function inferdiFastifyPlugin(
     scope: BaseScope,
     request: FastifyRequest,
     reply: FastifyReply
-  ): Promise<void> {
+  ): Promise<boolean> {
     const errors: unknown[] = []
     let shouldDispose = autoDispose !== false
 
@@ -678,6 +678,7 @@ async function inferdiFastifyPlugin(
     }
 
     logRequestCleanupErrors(errors, request)
+    return shouldDispose
   }
 
   function disposeExposedScope(
@@ -688,7 +689,7 @@ async function inferdiFastifyPlugin(
     /*
      * Clear the double-dispose guard up front, but keep `request.di` pointing at
      * the scope so the cleanup hooks observe the same handle the request did
-     * (Finding 1). It is cleared once cleanup completes
+     * (Finding 1). Clear it after disposal, but preserve it under manual ownership
      */
     clearScopeGuard(state)
 
@@ -707,8 +708,10 @@ async function inferdiFastifyPlugin(
       return
     }
 
-    const finalize = () => {
-      ;(request as DecoratedRequest<BaseScope>).di = null
+    const finalize = (shouldDispose?: boolean | void) => {
+      if (shouldDispose !== false) {
+        ;(request as DecoratedRequest<BaseScope>).di = null
+      }
       requestStates.delete(request)
     }
 

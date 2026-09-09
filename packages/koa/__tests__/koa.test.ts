@@ -1206,6 +1206,31 @@ describe('@inferdi/koa', () => {
     expect(root.scopes[1]?.disposeCalls).toBe(1)
   })
 
+  it('keeps skipInferdiDispose effective for every middleware on the request', async () => {
+    const firstRoot = new TestRoot()
+    const secondRoot = new TestRoot()
+    const app = new Koa()
+      .use(inferdiKoa({ container: firstRoot, key: 'first' }))
+      .use(inferdiKoa({ container: secondRoot, key: 'second' }))
+      .use((ctx) => {
+        if (ctx.path === '/manual') skipInferdiDispose(ctx)
+        ctx.body = { ok: true }
+      })
+
+    try {
+      await requestJson(app, '/manual')
+      await requestJson(app, '/auto')
+
+      for (const root of [firstRoot, secondRoot]) {
+        expect(root.scopes[0]?.disposeCalls).toBe(0)
+        expect(root.scopes[1]?.disposeCalls).toBe(1)
+      }
+    } finally {
+      await firstRoot.scopes[0]?.dispose()
+      await secondRoot.scopes[0]?.dispose()
+    }
+  })
+
   it('skipInferdiDispose does not suppress setup-failure cleanup', async () => {
     const root = new TestRoot()
     const setupError = new Error('setup failed')

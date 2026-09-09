@@ -345,6 +345,7 @@ async function disposeAfterSetupFailure<
  * underlying Node response `finish` / `close` events. Use this only when a
  * route intentionally keeps the scope beyond the HTTP response boundary, such
  * as background work that will dispose the scope later.
+ * One call applies to every InferDI middleware instance on the request.
  *
  * @param context - The current Koa context.
  */
@@ -510,7 +511,8 @@ export function inferdiKoa<
       if (disposed) return
 
       disposed = true
-      const skipped = skippedContexts.delete(context)
+      // Other InferDI middleware instances must still observe request-wide ownership
+      const skipped = skippedContexts.has(context)
       if (!force && !routeFailed && skipped) return
 
       const errors: unknown[] = []

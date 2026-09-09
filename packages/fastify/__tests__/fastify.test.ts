@@ -749,6 +749,34 @@ describe('@inferdi/fastify', () => {
     await app.close()
   })
 
+  it.each([
+    ['autoDispose: false', false],
+    ['a synchronous predicate', () => false],
+    ['an asynchronous predicate', async () => false]
+  ] as const)('keeps request.di available for manual cleanup with %s', async (_label, autoDispose) => {
+    const app = Fastify()
+    const root = new TestRoot()
+    let retainedRequest: RequestWithScope | undefined
+
+    app.register(inferdiFastify, { container: root, autoDispose })
+    app.get('/manual', (request) => {
+      retainedRequest = request as RequestWithScope
+      return 'ok'
+    })
+
+    try {
+      const response = await app.inject('/manual')
+
+      expect(response.statusCode).toBe(200)
+      expect(root.scopes[0]?.disposeCalls).toBe(0)
+      expect(retainedRequest?.di).toBe(root.scopes[0])
+      await retainedRequest?.di?.dispose()
+      expect(root.scopes[0]?.disposeCalls).toBe(1)
+    } finally {
+      await app.close()
+    }
+  })
+
   it('supports a synchronous autoDispose predicate', async () => {
     const app = Fastify()
     const root = new TestRoot()
