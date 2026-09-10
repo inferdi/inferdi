@@ -5,7 +5,10 @@
     "types": ["react"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "rootDir": "src",
+    "paths": {
+      "@inferdi/inferdi": ["../inferdi/src/index.ts"]
+    },
+    "rootDir": "..",
     "outDir": "dist",
     "strict": true,
     "noUncheckedIndexedAccess": true,
