@@ -1,11 +1,15 @@
 # Performance
 
+## Recorded Result
+
+In the public run recorded on **2026-08-17**, the default checked contract resolved a hot singleton in a median **6.233 ns/op**. For that one scenario and the recorded package versions, the participating containers measured **1.76× to 13.05×** its median. These figures measure container overhead, not HTTP throughput or total application performance. The [raw result](https://github.com/inferdi/inferdi/blob/main/benchmarks/results/public-2026-08-17T16-46-00-483Z.json) contains all eight rounds and environment metadata.
+
 A warm resolve reads `Map.get(key)` and calls `new Ctor(...)` directly when construction is required. The benchmark scenarios cover these runtime choices:
 
 | Runtime choice                       | Effect                                                                                                                                                            |
 |--------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Explicit registrations               | Container build is a flat `Map.set` per service. There are no decorator side effects, constructor-name parsers, or metadata tables to prepare.                    |
-| Cached singleton and scoped services | A warm resolve reads from `cache.get(key)` before cycle and lifetime bookkeeping runs. The `cache.has(key)` fallback exists only for explicit `undefined` values. |
+| Cached singleton and scoped services | A warm resolve reads from `cache.get(key)` before cycle and lifetime bookkeeping runs. Explicit `undefined` is stored as an internal `UNDEFINED_MARKER`, so the hit still needs one lookup. |
 | Direct constructor calls             | Classes with 0-7 dependencies use a direct `new Ctor(...)` path. Larger constructors fall back to `Reflect.construct`.                                            |
 | Async factories                      | The factory's `Promise` is cached verbatim, so concurrent callers share one in-flight initialization while `.get()` stays synchronous.                            |
 | Runtime contract                     | Default/`fast: false` keeps runtime checks and an exact mutable parent chain. `fast: true` disables checks and enables fixed-topology scope lookup.               |
@@ -108,6 +112,9 @@ Do not average the relative factors across rows. The scenarios use different bat
 The comparison applies to the recorded package versions, adapters, fixtures, and machine. Each library keeps its public lifecycle model, so `N/A` means the suite found no equivalent operation for that row. The benchmark measures container overhead rather than end-to-end request latency.
 
 ## `fast: true`
+
+See [Container Options](../reference/api#container-options) for the constructor
+reference. This section explains the performance consequences of that choice.
 
 `new Container({ fast: true })` removes runtime cycle bookkeeping, singleton-stack tracking, and the `try`/`finally` around guarded resolution. Fixed scopes read the registry owner directly instead of walking the parent chain, then mirror delegated singletons into the scope cache. Default scopes walk their exact parent chain on every local miss, keeping mutations observable. Fast containers skip defensive registration-time invalidation. Owned-instance identity de-duplication still runs during disposal.
 

@@ -1,11 +1,15 @@
 # Rendimiento
 
+## Resultado registrado
+
+En la ejecución pública del **2026-08-17**, el contrato checked predeterminado resolvió un singleton caliente en una mediana de **6.233 ns/op**. Solo para ese escenario y las versiones registradas, los demás contenedores participantes midieron entre **1.76 y 13.05 veces** esa mediana. Estas cifras miden el coste del contenedor, no el throughput HTTP ni el rendimiento total de la aplicación. El [resultado original](https://github.com/inferdi/inferdi/blob/main/benchmarks/results/public-2026-08-17T16-46-00-483Z.json) contiene las ocho rondas y los metadatos del entorno.
+
 Una resolución en caliente lee `Map.get(key)` y llama a `new Ctor(...)` de forma directa cuando necesita construir el servicio. Los escenarios cubren estas decisiones del runtime:
 
 | Decisión en runtime                    | Efecto                                                                                                                                                                                                 |
 |----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Registros explícitos                   | La construcción del contenedor es un `Map.set` plano por servicio. No hay efectos secundarios de decoradores, parsers de nombres de constructor ni tablas de metadatos que preparar.                   |
-| Servicios singleton y scoped cacheados | Una resolución en caliente lee de `cache.get(key)` antes de que se ejecute la contabilidad de ciclos y tiempos de vida. El recurso a `cache.has(key)` existe solo para valores `undefined` explícitos. |
+| Servicios singleton y scoped cacheados | Una resolución en caliente lee de `cache.get(key)` antes de que se ejecute la contabilidad de ciclos y tiempos de vida. Un `undefined` explícito se guarda como `UNDEFINED_MARKER` interno, así que el cache hit sigue usando una sola consulta. |
 | Llamadas directas al constructor       | Las clases con 0-7 dependencias usan una ruta `new Ctor(...)` directa. Los constructores más grandes recurren a `Reflect.construct`.                                                                   |
 | Factorías asíncronas                   | La `Promise` de la factoría se cachea tal cual, de modo que las llamadas concurrentes comparten una única inicialización en curso mientras `.get()` permanece síncrono.                                |
 | Contrato de runtime                    | Default/`fast: false` mantiene los checks y una cadena de padres exacta y mutable. `fast: true` desactiva los checks y activa la búsqueda de scopes con topología fija.                                |
@@ -108,6 +112,10 @@ No promedies los factores relativos entre filas. Los escenarios usan tamaños de
 La comparación se aplica a las versiones de paquetes, adaptadores, fixtures y máquina registrados. Cada biblioteca conserva su modelo público de lifecycle, por lo que `N/A` indica que no existe una operación equivalente para esa fila. El benchmark mide el overhead del contenedor, no la latencia completa de una petición.
 
 ## `fast: true`
+
+Consulta [Opciones del contenedor](../reference/api#opciones-del-contenedor) para
+la referencia del argumento del constructor. Esta sección explica cómo afecta
+esa elección al rendimiento.
 
 `new Container({ fast: true })` elimina la contabilidad de ciclos en runtime, el seguimiento de la pila de singletons y el `try`/`finally` alrededor de la ruta de resolución protegida. Los scopes fijos leen directamente el registry owner, sin recorrer la cadena de padres, y reflejan los singletons delegados en la caché del scope. Los scopes predeterminados recorren su cadena exacta de padres en cada fallo local, por lo que las mutaciones siguen visibles. Los contenedores fast omiten la invalidación defensiva durante el registro. La deduplicación por identidad de instancias owned se mantiene durante el disposal.
 

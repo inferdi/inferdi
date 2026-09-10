@@ -11,13 +11,30 @@ pnpm add -D @types/koa
 
 ```ts
 import Koa from 'koa'
+import { Container } from '@inferdi/inferdi'
 import { inferdiKoa, type InferdiKoaState } from '@inferdi/koa'
 ```
 
 ## リクエストスコープ
 
 ```ts
-const root = buildRootContainer()
+type RequestContext = {
+  requestId: string
+  userId?: string
+  ip: string
+}
+
+class Users {
+  constructor(readonly request: RequestContext) {}
+
+  profile(id: string) {
+    return { id, userId: this.request.userId }
+  }
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('users', Users, ['request'], 'scoped')
 const openRequestScope = (request: RequestContext) =>
   root.createScope({ request })
 type RequestScope = ReturnType<typeof openRequestScope>
@@ -110,3 +127,5 @@ app.use(async (ctx) => {
 ```
 
 ダウンストリームのエラーは常にスコープを破棄します。成功したスキップ済みリクエストはアプリケーション所有になります。
+
+`skipInferdiDispose(ctx)` を一度呼ぶと、異なる state キーを使うものも含め、そのリクエストのすべての InferDI ミドルウェアインスタンスに適用されます。保持した各スコープはアプリケーション側で破棄する必要があります。

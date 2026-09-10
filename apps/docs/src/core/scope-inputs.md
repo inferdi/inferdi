@@ -167,3 +167,28 @@ function resolveAny<
 - `{fast: true}` supports input refinement but keeps its fixed-graph rule: finish registration before the first `.get()` or `.createScope()`.
 
 See [Scopes and Disposal](./scopes) for ownership rules and [Async Dependencies](./async-dependencies) for async services that depend on scope inputs.
+
+## Compiler Check
+
+The same graph changes its ready keys after the input is supplied:
+
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
+type RequestContext = { requestId: string }
+
+class Handler {
+  constructor(readonly request: RequestContext) {}
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('handler', Handler, ['request'], 'scoped')
+
+root.get('handler') // [!code error]
+
+const scope = root.createScope({ request: { requestId: 'req-1' } })
+const handler = scope.get('handler')
+//    ^?
+```

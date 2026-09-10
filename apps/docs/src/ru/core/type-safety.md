@@ -1,51 +1,92 @@
 # Типобезопасность
 
-Главное правило InferDI: граф зависимостей живёт в системе типов. Неверный граф - перепутанный порядок аргументов, незарегистрированный ключ, singleton, который тянется к scoped-состоянию - это ошибка типа прямо в редакторе, а не stack trace, который вы найдёте под нагрузкой. Всё, что компилятор может доказать статически, проверяется статически; runtime-защита нужна только для того, что проскользнуло через `as`-касты и динамические ключи.
+InferDI хранит объявленный граф зависимостей в типе контейнера. Каждая регистрация добавляет ключ, тип сервиса, время жизни, синхронный или асинхронный режим и требования к входным данным скоупа. Следующие вызовы проверяются по уже накопленному состоянию графа.
 
 ## Сигнатуры конструкторов
 
-`registerClass` проверяет кортеж зависимостей по параметрам конструктора.
+`registerClass` сопоставляет ключи зависимостей с параметрами конструктора по позиции и структурной совместимости.
 
-```ts
-class Logger {}
-class Db {}
+```ts twoslash
+import { Container } from '@inferdi/inferdi'
+
+class Logger {
+  info(message: string) {}
+}
+
+class Database {
+  findUser(id: string) {
+    return { id }
+  }
+}
 
 class UserRepo {
-  constructor(logger: Logger, db: Db) {}
+  constructor(
+    private readonly logger: Logger,
+    private readonly database: Database
+  ) {}
+}
+
+const container = new Container()
+  .registerClass('logger', Logger, [])
+  .registerClass('database', Database, [])
+  .registerClass('users', UserRepo, ['logger', 'database'])
+
+const users = container.get('users')
+//    ^?
+```
+
+Публичные структуры у зависимостей разные, поэтому перестановка действительно даёт заявленную ошибку:
+
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
+class Logger {
+  info(message: string) {}
+}
+
+class Database {
+  findUser(id: string) {
+    return { id }
+  }
+}
+
+class UserRepo {
+  constructor(logger: Logger, database: Database) {}
 }
 
 new Container()
   .registerClass('logger', Logger, [])
-  .registerClass('db', Db, [])
-  .registerClass('users', UserRepo, ['logger', 'db'])
+  .registerClass('database', Database, [])
+  .registerClass('users', UserRepo, ['database', 'logger']) // [!code error]
 ```
 
-Если конструктор изменится, регистрация должна измениться вместе с ним. Кортеж `['db', 'logger']` будет отклонён, потому что первый параметр ожидает `Logger`.
+TypeScript использует структурную типизацию. Два пустых класса или два класса с одинаковыми публичными членами совместимы, поэтому компилятор не видит смысловую перестановку. Делайте контракты различимыми. Если значения обязаны отличаться при одинаковой структуре, используйте брендированные типы из раздела [Символьные ключи](./symbol-keys#same-value-shape).
 
 ## Уникальность ключей
 
-Каждая регистрация возвращает расширенный тип контейнера. Повторная регистрация того же ключа через fluent API отклоняется:
+Каждая регистрация в цепочке вызовов возвращает контейнер с расширенным типом графа. Повторная регистрация ключа приводит к ошибке:
 
-```ts
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
 new Container()
   .registerValue('dsn', 'postgres://localhost/app')
-  // TypeScript rejects this duplicate key.
-  .registerValue('dsn', 'sqlite://memory')
+  .registerValue('dsn', 'sqlite://memory') // [!code error]
 ```
 
-В тестах для намеренной замены используется `.override()`.
+В тестах намеренную замену делает `.override()`. После каждой регистрации сохраняйте возвращённый контейнер: старая ссылка не знает о новых узлах. Подробный пример есть в [Плохих практиках](./bad-practices#stale-builder-references).
 
-После каждой регистрации продолжайте работу с возвращённым расширенным контейнером. Старая ссылка не содержит тип текущего графа; подробнее: [Плохие практики](./bad-practices).
-
-Проверка уникальности учитывает весь набор значений, представленный типом ключа. Если после регистрации `'dsn'` новый ключ имеет тип `'dsn' | 'replica'`, TypeScript отклонит вызов: в runtime значение может перезаписать `'dsn'`. То же правило действует для широких `string` и `symbol`, а также для `lazyKey`, который не должен пересекаться с основным или существующим ключом.
-
-Broad- и union-ключи разрешены, пока их возможные значения не пересекаются с графом. Широкий `string` можно зарегистрировать в пустом контейнере или после ключей, состоящих только из symbol. Перед регистрацией сузьте runtime-ключ до заведомо нового значения; для намеренной замены используйте `.override()`.
+Проверка учитывает все возможные значения типа ключа. После регистрации `'dsn'` кандидат типа `'dsn' | 'replica'` отклоняется, ведь при выполнении он может перезаписать `'dsn'`. Широкие `string` и `symbol` разрешены, пока не пересекаются с известным графом, но расширение ключа снижает точность всего графа.
 
 ## Динамические ключи
 
-Статические ключи проверяются непосредственно в `.get()`. Если ключ приходит во время выполнения, сначала уточните его через `.has()`:
+Литеральные ключи `.get()` проверяет напрямую. Ключ из данных времени выполнения сначала уточните через `.has()`:
 
-```ts
+```ts twoslash
+import { Container } from '@inferdi/inferdi'
+
 const container = new Container()
   .registerValue('answer', 42)
   .registerAsyncFactory('name', async () => 'InferDI', [])
@@ -57,37 +98,61 @@ if (container.has(key)) {
 }
 ```
 
-В графе выше нет незаполненных scope inputs, а `.getAsync()` принимает оба зарегистрированных ключа независимо от sync- или async-режима. `.has()` доказывает только факт регистрации. Для очищенного контейнера метод возвращает `false`, но не доказывает готовность scope inputs и не делает ключ доступным через `.get()`.
+`.has()` доказывает регистрацию. Метод не подтверждает готовность недостающих входных данных скоупа и не превращает асинхронный ключ в допустимый аргумент синхронного `.get()`.
 
 ## Время жизни в типе
 
-Каждая запись хранит тип значения и вид времени жизни. Система типов фильтрует зависимости так, чтобы singleton не мог напрямую зависеть от scoped- или transient-сервисов.
+Каждая запись содержит время жизни. Singleton не может захватить scoped- или transient-зависимость:
 
-```ts
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
+class RequestContext {
+  readonly requestId = 'req-1'
+}
+
+class UserService {
+  constructor(readonly request: RequestContext) {}
+}
+
 new Container()
   .registerClass('request', RequestContext, [], 'scoped')
-  // Rejected: singleton cannot capture scoped request state.
-  .registerClass('users', UserService, ['request'], 'singleton')
+  .registerClass('users', UserService, ['request'], 'singleton') // [!code error]
 ```
 
-Default runtime-проверки остаются вторым рубежом защиты для `as`-кастов, динамических ключей, захваченных внешних контейнеров и циклов зависимостей.
+Контракт по умолчанию повторяет проверки циклов и времени жизни во время выполнения. Так он ловит приведения типов, динамические ключи и захваченные контейнеры, которых TypeScript не видит. `{ fast: true }` задаёт отдельный контракт фиксированного графа с меньшим числом проверок во время выполнения.
 
-## Готовность и async status
+## Готовность и асинхронность {#готовность-и-async-status}
 
-Тип графа также хранит требования scope inputs и декларативные async-регистрации. Ключ недоступен через `.get()`, пока его inputs не предоставлены. Ключ `AsyncSpec` и зависимые от него классы разрешаются через `.getAsync()`.
+Входные данные скоупа и декларативные асинхронные зависимости меняют доступность ключей и выбор между `.get()` и `.getAsync()`:
 
-```ts
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
+type RequestContext = { requestId: string }
+
+class Database {
+  query() {}
+}
+
+class Handler {
+  constructor(request: RequestContext, database: Database) {}
+}
+
 const root = new Container()
-  .declareScopeInputs<{request: Request}>()
-  .registerAsyncFactory('db', openDatabase, [])
-  .registerClass('handler', Handler, ['request', 'db'], 'scoped')
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerAsyncFactory('database', async () => new Database(), [])
+  .registerClass('handler', Handler, ['request', 'database'], 'scoped')
 
-const scope = root.createScope({request})
+root.getAsync('handler') // [!code error]
 
-// @ts-expect-error: handler is async
-scope.get('handler')
+const scope = root.createScope({ request: { requestId: 'req-1' } })
+scope.get('handler') // [!code error]
 
-await scope.getAsync('handler')
+const handler = await scope.getAsync('handler')
+//    ^?
 ```
 
-Готовность моделируется через [входные данные скоупа](./scope-inputs), а выбор Promise-контракта описан в разделе [Асинхронные зависимости](./async-dependencies).
+В корневом контейнере нет `request`, а готовый `handler` остаётся асинхронным из-за зависимости от `database`. Дальше разберите [Входные данные скоупа](./scope-inputs) и [Асинхронные зависимости](./async-dependencies).

@@ -1,0 +1,100 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="880" viewBox="0 0 1200 880" role="group" aria-labelledby="title desc" lang="en">
+<title id="title">DI containers — interactive comparison</title>
+<desc id="desc">Select a scenario. Values are nanoseconds per operation (ns/op); lower is better. All seven containers are sorted in ascending order, with N/A at the bottom. The linear scale updates for each scenario.</desc>
+<style>
+text {font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;fill:#e6edf5}
+.muted {fill:#91a0b7} .tab {cursor:pointer;outline:none} .tab rect {fill:#182336;stroke:#2c3a50;stroke-width:1}
+.tab text {font-size:13px;fill:#b7c4d7;pointer-events:none}
+.tab:hover rect {fill:#24364b}.tab[aria-selected="true"] rect {fill:#65dfb2;stroke:#65dfb2}
+.tab[aria-selected="true"] text {fill:#0b241c;font-weight:650}.tab:focus-visible rect {stroke:#fff;stroke-width:3}
+.value {font-size:15px;font-variant-numeric:tabular-nums;font-weight:600}
+</style>
+<rect width="1200" height="880" rx="24" fill="#0c1422"/>
+<text x="40" y="48" class="muted" font-size="11" letter-spacing="2.3">DEPENDENCY INJECTION / BENCHMARK</text>
+
+<text id="scenario" x="40" y="120" font-size="22" font-weight="600">Hot singleton resolve</text>
+<text x="40" y="168" class="muted" font-size="13">Nanoseconds per operation (ns/op) · Linear scale, adjusted per scenario</text>
+<g transform="translate(0 -170)"><g id="chart" role="tabpanel" aria-labelledby="tab-0">
+<text x="215" y="371" text-anchor="end" class="muted" font-size="11" letter-spacing="1.4">CONTAINER</text>
+<text x="240" y="371" class="muted" font-size="11" letter-spacing="1.4">TIME (ns/op)</text>
+<path d="M240 390V799" stroke="#202d40"/><text id="tick-0" x="240" y="820" text-anchor="middle" class="muted" font-size="11">0.00</text>
+<path d="M445 390V799" stroke="#202d40"/><text id="tick-1" x="445" y="820" text-anchor="middle" class="muted" font-size="11">20.34</text>
+<path d="M650 390V799" stroke="#202d40"/><text id="tick-2" x="650" y="820" text-anchor="middle" class="muted" font-size="11">40.68</text>
+<path d="M855 390V799" stroke="#202d40"/><text id="tick-3" x="855" y="820" text-anchor="middle" class="muted" font-size="11">61.02</text>
+<path d="M1060 390V799" stroke="#202d40"/><text id="tick-4" x="1060" y="820" text-anchor="middle" class="muted" font-size="11">81.35</text>
+<g id="row-0" transform="translate(0 405)"><title>InferDI: 6.233 ns/op</title><text x="215" y="20" text-anchor="end" font-size="16" font-weight="550">InferDI</text><rect class="bar" x="240" y="0" width="62.82493792560906" height="32" rx="5" fill="#65dfb2"/><text class="value" x="314.82493792560905" y="21">6.233</text></g>
+<g id="row-1" transform="translate(0 462)"><title>InversifyJS: 10.954 ns/op</title><text x="215" y="20" text-anchor="end" font-size="16" font-weight="550">InversifyJS</text><rect class="bar" x="240" y="0" width="110.40981389974678" height="32" rx="5" fill="#80a9ff"/><text class="value" x="362.4098138997468" y="21">10.954</text></g>
+<g id="row-2" transform="translate(0 519)"><title>Awilix PROXY: 40.425 ns/op</title><text x="215" y="20" text-anchor="end" font-size="16" font-weight="550">Awilix PROXY</text><rect class="bar" x="240" y="0" width="407.45998967475475" height="32" rx="5" fill="#b39aff"/><text class="value" x="659.4599896747548" y="21">40.425</text></g>
+<g id="row-3" transform="translate(0 576)"><title>Awilix CLASSIC: 41.525 ns/op</title><text x="215" y="20" text-anchor="end" font-size="16" font-weight="550">Awilix CLASSIC</text><rect class="bar" x="240" y="0" width="418.54733633257126" height="32" rx="5" fill="#db9bea"/><text class="value" x="670.5473363325713" y="21">41.525</text></g>
+<g id="row-4" transform="translate(0 747)"><title>TSyringe: 81.354 ns/op</title><text x="215" y="20" text-anchor="end" font-size="16" font-weight="550">TSyringe</text><rect class="bar" x="240" y="0" width="820.0" height="32" rx="5" fill="#f3ba72"/><text class="value" x="1072.0" y="21">81.354</text></g>
+<g id="row-5" transform="translate(0 690)"><title>TypeDI: 71.729 ns/op</title><text x="215" y="20" text-anchor="end" font-size="16" font-weight="550">TypeDI</text><rect class="bar" x="240" y="0" width="722.985716744106" height="32" rx="5" fill="#e88d9b"/><text class="value" x="974.985716744106" y="21">71.729</text></g>
+<g id="row-6" transform="translate(0 633)"><title>Typed Inject: 48.354 ns/op</title><text x="215" y="20" text-anchor="end" font-size="16" font-weight="550">Typed Inject</text><rect class="bar" x="240" y="0" width="487.3796002655063" height="32" rx="5" fill="#71cddd"/><text class="value" x="739.3796002655063" y="21">48.354</text></g>
+</g></g>
+<text x="40" y="689" class="muted" font-size="12">N/A — no data</text>
+<text x="1160" y="689" text-anchor="end" font-size="14" style="fill:#65dfb2">Lower is better ↑</text>
+<path d="M40 714H1160" stroke="#273449"/>
+<text x="40" y="740" class="muted" font-size="11" letter-spacing="1.4">SELECT SCENARIO</text>
+<g role="tablist" aria-label="Scenario">
+<g class="tab" id="tab-0" role="tab" tabindex="0" aria-selected="true" aria-controls="chart" data-index="0" transform="translate(40 755)"><rect width="177" height="34" rx="9"/><text x="88.5" y="22" text-anchor="middle">Hot singleton resolve</text></g>
+<g class="tab" id="tab-1" role="tab" tabindex="-1" aria-selected="false" aria-controls="chart" data-index="1" transform="translate(225 755)"><rect width="149" height="34" rx="9"/><text x="74.5" y="22" text-anchor="middle">Transient resolve</text></g>
+<g class="tab" id="tab-2" role="tab" tabindex="-1" aria-selected="false" aria-controls="chart" data-index="2" transform="translate(382 755)"><rect width="184" height="34" rx="9"/><text x="92.0" y="22" text-anchor="middle">Deep graph (10 levels)</text></g>
+<g class="tab" id="tab-3" role="tab" tabindex="-1" aria-selected="false" aria-controls="chart" data-index="3" transform="translate(574 755)"><rect width="220" height="34" rx="9"/><text x="110.0" y="22" text-anchor="middle">Wide graph (4 dependencies)</text></g>
+<g class="tab" id="tab-4" role="tab" tabindex="-1" aria-selected="false" aria-controls="chart" data-index="4" transform="translate(802 755)"><rect width="227" height="34" rx="9"/><text x="113.5" y="22" text-anchor="middle">Wide graph (10 dependencies)</text></g>
+<g class="tab" id="tab-5" role="tab" tabindex="-1" aria-selected="false" aria-controls="chart" data-index="5" transform="translate(1037 755)"><rect width="113" height="34" rx="9"/><text x="56.5" y="22" text-anchor="middle">Registration</text></g>
+<g class="tab" id="tab-6" role="tab" tabindex="-1" aria-selected="false" aria-controls="chart" data-index="6" transform="translate(40 798)"><rect width="120" height="34" rx="9"/><text x="60.0" y="22" text-anchor="middle">First resolve</text></g>
+<g class="tab" id="tab-7" role="tab" tabindex="-1" aria-selected="false" aria-controls="chart" data-index="7" transform="translate(168 798)"><rect width="127" height="34" rx="9"/><text x="63.5" y="22" text-anchor="middle">Scope creation</text></g>
+<g class="tab" id="tab-8" role="tab" tabindex="-1" aria-selected="false" aria-controls="chart" data-index="8" transform="translate(303 798)"><rect width="170" height="34" rx="9"/><text x="85.0" y="22" text-anchor="middle">First scoped resolve</text></g>
+<g class="tab" id="tab-9" role="tab" tabindex="-1" aria-selected="false" aria-controls="chart" data-index="9" transform="translate(481 798)"><rect width="163" height="34" rx="9"/><text x="81.5" y="22" text-anchor="middle">Warm scoped resolve</text></g>
+<g class="tab" id="tab-10" role="tab" tabindex="-1" aria-selected="false" aria-controls="chart" data-index="10" transform="translate(652 798)"><rect width="120" height="34" rx="9"/><text x="60.0" y="22" text-anchor="middle">Sync teardown</text></g>
+<g class="tab" id="tab-11" role="tab" tabindex="-1" aria-selected="false" aria-controls="chart" data-index="11" transform="translate(780 798)"><rect width="127" height="34" rx="9"/><text x="63.5" y="22" text-anchor="middle">Async teardown</text></g>
+<g class="tab" id="tab-12" role="tab" tabindex="-1" aria-selected="false" aria-controls="chart" data-index="12" transform="translate(915 798)"><rect width="113" height="34" rx="9"/><text x="56.5" y="22" text-anchor="middle">Lazy resolve</text></g>
+</g>
+<script><![CDATA[
+(()=>{
+const data=[{"name": "Hot singleton resolve", "values": ["6.233", "10.954", "40.425", "41.525", "81.354", "71.729", "48.354"]}, {"name": "Transient resolve", "values": ["41.798", "79.566", "219.82", "227.15", "301.40", "519.75", "138.05"]}, {"name": "Deep graph (10 levels)", "values": ["344.21", "397.37", "1306.3", "1190.8", "1463.0", "4478.8", "717.75"]}, {"name": "Wide graph (4 dependencies)", "values": ["59.584", "103.22", "331.10", "302.69", "457.97", "863.32", "197.63"]}, {"name": "Wide graph (10 dependencies)", "values": ["188.37", "394.63", "681.08", "571.54", "979.46", "2234.1", "321.29"]}, {"name": "Registration", "values": ["2007.5", "61274.6", "74763.4", "95225.6", "3762.9", null, "3593.3"]}, {"name": "First resolve", "values": ["653.13", "9967.4", "2434.9", "3044.2", "1236.8", "3322.9", "1275.3"]}, {"name": "Scope creation", "values": ["79.750", "6194.4", "1054.4", "1031.2", "503.26", "419.38", "164.08"]}, {"name": "First scoped resolve", "values": ["115.05", "3048.6", "352.92", "362.54", "373.54", "296.08", "203.05"]}, {"name": "Warm scoped resolve", "values": ["8.387", "30.204", "90.841", "95.242", "78.375", "92.630", "7.975"]}, {"name": "Sync teardown", "values": ["99.455", null, null, null, null, "124.21", null]}, {"name": "Async teardown", "values": ["242.91", null, "860.52", "886.87", "1311.8", null, "721.42"]}, {"name": "Lazy resolve", "values": ["18.837", "64.212", "115.68", "124.09", "155.01", "271.06", "76.496"]}];
+const names=["InferDI", "InversifyJS", "Awilix PROXY", "Awilix CLASSIC", "TSyringe", "TypeDI", "Typed Inject"];
+const tabs=Array.from(document.querySelectorAll('.tab'));
+const rows=names.map((_,i)=>{const el=document.getElementById('row-'+i);return {el,bar:el.querySelector('.bar'),label:el.querySelector('.value'),title:el.querySelector('title'),y:+el.getAttribute('transform').match(/[\d.]+/g)[1],w:+el.querySelector('.bar').getAttribute('width'),v:+data[0].values[i]};});
+let active=0,frame=0;
+const reduced=matchMedia('(prefers-reduced-motion: reduce)');
+function select(index,animate=true){
+ cancelAnimationFrame(frame);active=index;
+ const scene=data[index], max=Math.max(...scene.values.map(v=>+(v||0)));
+ const order=names.map((_,i)=>i).sort((a,b)=>(scene.values[a]===null?Infinity:+scene.values[a])-(scene.values[b]===null?Infinity:+scene.values[b])||a-b);
+ document.getElementById('scenario').textContent=scene.name;
+ document.getElementById('chart').setAttribute('aria-labelledby','tab-'+index);
+ tabs.forEach((t,i)=>{t.setAttribute('aria-selected',String(i===index));t.setAttribute('tabindex',i===index?'0':'-1');});
+ for(let i=0;i<5;i++)document.getElementById('tick-'+i).textContent=(max*i/4).toLocaleString('en-US',{maximumFractionDigits:2,useGrouping:false});
+ const start=rows.map(r=>({y:r.y,w:r.w,v:r.v}));
+ const end=rows.map((r,i)=>({y:405+order.indexOf(i)*57,w:scene.values[i]===null?0:+scene.values[i]/max*820,v:scene.values[i]===null?0:+scene.values[i]}));
+ const duration=animate&&!reduced.matches?850:0;let began=null;
+ rows.forEach((r,i)=>{r.title.textContent=names[i]+': '+(scene.values[i]===null?'N/A':scene.values[i]+' ns/op');r.el.setAttribute('aria-label',r.title.textContent);});
+ function draw(now){
+ if(began===null)began=now;
+ const t=duration?Math.min((now-began)/duration,1):1, p=1-Math.pow(1-t,3);
+ rows.forEach((r,i)=>{
+ const a=start[i],b=end[i];r.y=a.y+(b.y-a.y)*p;r.w=a.w+(b.w-a.w)*p;r.v=a.v+(b.v-a.v)*p;
+ r.el.setAttribute('transform','translate(0 '+r.y+')');r.bar.setAttribute('width',r.w);
+ r.label.setAttribute('x',252+r.w);
+ r.label.textContent=scene.values[i]===null?'N/A':t===1?scene.values[i]:r.v.toFixed(scene.values[i].split('.')[1].length);
+ r.label.setAttribute('fill',scene.values[i]===null?'#91a0b7':'#e6edf5');
+ });
+ if(t<1)frame=requestAnimationFrame(draw);
+ }
+ frame=requestAnimationFrame(draw);
+}
+tabs.forEach((tab,i)=>{
+ tab.addEventListener('click',()=>select(i));
+ tab.addEventListener('keydown',e=>{
+ let next=i;
+ if(e.key==='ArrowRight'||e.key==='ArrowDown')next=(i+1)%tabs.length;
+ else if(e.key==='ArrowLeft'||e.key==='ArrowUp')next=(i+tabs.length-1)%tabs.length;
+ else if(e.key==='Home')next=0;
+ else if(e.key==='End')next=tabs.length-1;
+ else if(e.key!=='Enter'&&e.key!==' ')return;
+ e.preventDefault();tabs[next].focus();select(next);
+ });
+});
+select(0,false);
+})();
+]]></script></svg>

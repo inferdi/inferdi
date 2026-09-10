@@ -50,12 +50,37 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 }
 ```
 
-`fast` のデフォルトは `false` です。ランタイムの循環・ライフタイムチェックを
-維持し、scope は正確で可変な親チェーンを保持します。`{fast: true}` はその
-追跡を無効にしてグラフを固定として扱い、親 lookup のフラット化と継承
-singleton のミラーリングを有効にします。子 scope は root の設定を継承します。
-fast ツリーでは、最初の解決または `createScope()` より前にすべての
-`register*`、`.use()`、`.override()` を完了し、祖先より先に子を破棄してください。
+## コンテナオプション
+
+コンストラクターは 1 つの省略可能な設定を受け取ります。
+
+| オプション | 型 | デフォルト | 用途 |
+| --- | --- | --- | --- |
+| `fast` | `boolean` | `false` | チェック付きの可変契約と、ランタイムチェックを省く固定グラフ契約を選択する |
+
+```ts
+const checked = new Container()
+const explicitChecked = new Container({ fast: false })
+const fast = new Container({ fast: true })
+```
+
+デフォルト形式と明示的な `false` は、ランタイムの循環・ライフタイムチェックを
+維持し、ルートからの scoped サービスの解決を拒否し、正確で可変な親チェーンを
+使用します。開発、テスト、ホットリロード、および起動後に変更される可能性がある
+グラフではこの契約を使用してください。
+
+リテラルの `{fast: true}` はすべての TypeScript チェックを維持しますが、ルートの
+scoped ガードを含むランタイムの循環・ライフタイム追跡を無効にします。コンテナ
+ツリーを固定として扱い、scope から registry owner を直接参照し、委譲された
+singleton をローカル scope のキャッシュへ反映します。子 scope は root の設定を
+継承します。
+
+fast ツリーでは、最初の解決または `createScope()` より前にすべての `register*`、
+`.use()`、`.override()` を完了し、起動後のツリーを不変に保ち、祖先より先に子を
+破棄してください。この契約を有効にするのはリテラル値 `true` だけです。それ以外の
+ランタイム値ではチェック付き契約へフォールバックします。この選択が影響する処理と
+トレードオフが有効な場合については[パフォーマンス](../guide/performance#fast-true)を
+参照してください。
 
 ## 登録メソッド
 
@@ -173,7 +198,9 @@ discriminant に runtime field はなく、export もされません。
 
 ## アダプター API の形
 
-すべてのアダプターは以下をエクスポートします。
+### HTTP アダプター
+
+Fastify、Hono、Koa、Express、Elysia は以下をエクスポートします。
 
 - `inferdiFastify` のような統合関数
 - `skipInferdiDispose`
@@ -181,4 +208,8 @@ discriminant に runtime field はなく、export もされません。
 - 構造的な `InferdiScope`、`InferdiRoot`、`InferdiScopeOf` ヘルパー
 - フレームワーク固有のオプションおよびコンテキストのヘルパー型
 
-フレームワーク固有のジェネリック名やライフサイクルの詳細については、アダプターのページを参照してください。
+### React アダプター
+
+React は `inferdiReact` と、binding、外部 `Provider`、管理対象 `ScopeProvider`、service hooks、グラフ抽出、安定した sync/async キー、スコープのライフサイクルオプション用の型をエクスポートします。コンポーネントスコープは HTTP リクエストではなく React の commit と effect cleanup に従うため、`skipInferdiDispose` はありません。
+
+正確な名前とライフサイクルの詳細は、各アダプターのページを参照してください。

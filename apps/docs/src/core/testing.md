@@ -1,5 +1,36 @@
 # Testing and Overrides
 
+## Test the Service Directly
+
+Business services receive ordinary values, so their unit tests do not need a container:
+
+```ts
+type Logger = { info(message: string): void }
+type Database = { findUser(id: string): { id: string } | undefined }
+
+class UserRepo {
+  constructor(readonly logger: Logger, readonly db: Database) {}
+
+  find(id: string) {
+    this.logger.info(`find ${id}`)
+    return this.db.findUser(id)
+  }
+}
+
+const messages: string[] = []
+const repo = new UserRepo(
+  { info: (message) => messages.push(message) },
+  { findUser: (id) => ({ id }) }
+)
+
+expect(repo.find('42')).toEqual({ id: '42' })
+expect(messages).toEqual(['find 42'])
+```
+
+Use a container in an integration test when the subject is the application graph itself.
+
+## Test the Assembled Graph
+
 Use `.override()` when tests need to replace an existing registration with a mock.
 
 ```ts

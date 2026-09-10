@@ -1,6 +1,6 @@
 # Адаптер Koa
 
-[`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) - это middleware для Koa v3. Оно создаёт один scope запроса, выставляет его как `ctx.state.di` и очищает после события Node response `finish` или `close`.
+[`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa) добавляет middleware для Koa v3. Оно создаёт один скоуп на запрос, сохраняет его в `ctx.state.di` и освобождает после события `finish` или `close` у объекта ответа Node.js.
 
 ## Установка
 
@@ -11,13 +11,30 @@ pnpm add -D @types/koa
 
 ```ts
 import Koa from 'koa'
+import { Container } from '@inferdi/inferdi'
 import { inferdiKoa, type InferdiKoaState } from '@inferdi/koa'
 ```
 
-## Scope запроса
+## Скоуп запроса {#scope-запроса}
 
 ```ts
-const root = buildRootContainer()
+type RequestContext = {
+  requestId: string
+  userId?: string
+  ip: string
+}
+
+class Users {
+  constructor(readonly request: RequestContext) {}
+
+  profile(id: string) {
+    return { id, userId: this.request.userId }
+  }
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('users', Users, ['request'], 'scoped')
 const openRequestScope = (request: RequestContext) =>
   root.createScope({ request })
 type RequestScope = ReturnType<typeof openRequestScope>
@@ -45,7 +62,7 @@ app.use(async (ctx) => {
 })
 ```
 
-## Собственный ключ state
+## Собственный ключ состояния {#собственныи-ключ-state}
 
 ```ts
 import type { DefaultState, ParameterizedContext } from 'koa'
@@ -77,18 +94,18 @@ app.use(async (ctx: AppContext) => {
 | Опция | По умолчанию | Назначение |
 | --- | --- | --- |
 | `container` | обязательна | Корневой контейнер. Middleware его не очищает. |
-| `key` | `'di'` | Ключ в Koa state. |
-| `createScope` | `root.createScope()` | Пользовательское создание scope запроса. |
-| `setupScope` | нет | Выполняет дополнительную инициализацию после создания scope. |
-| `disposeScope` | `scope.dispose()` | Пользовательская очистка. |
-| `autoDispose` | `true` | `false` или предикат `false` передаёт владение. |
-| `onDisposeError` | `ctx.app.emit('error')` | Приёмник ошибок очистки. |
+| `key` | `'di'` | Ключ в объекте состояния Koa. |
+| `createScope` | `root.createScope()` | Позволяет задать создание скоупа запроса. |
+| `setupScope` | нет | Выполняет дополнительную инициализацию после создания скоупа. |
+| `disposeScope` | `scope.dispose()` | Позволяет задать освобождение ресурсов. |
+| `autoDispose` | `true` | `false` или предикат, вернувший `false`, передаёт владение приложению. |
+| `onDisposeError` | `ctx.app.emit('error')` | Обработчик ошибок очистки. |
 
 ## Стриминг
 
-Обычные тела потоковых ответов в Koa не требуют skip. Адаптер ждёт `finish` или `close`.
+Обычные тела потоковых ответов в Koa не требуют отключения автоочистки. Адаптер ждёт `finish` или `close`.
 
-Используйте `skipInferdiDispose(ctx)` только когда код приложения намеренно держит scope дольше границы HTTP-ответа:
+Используйте `skipInferdiDispose(ctx)` только когда код приложения продолжает использовать скоуп после завершения HTTP-ответа:
 
 ```ts
 import { skipInferdiDispose } from '@inferdi/koa'
@@ -109,4 +126,6 @@ app.use(async (ctx) => {
 })
 ```
 
-Downstream-ошибка всегда очищает scope; успешные запросы с пропущенной автоочисткой переходят во владение приложения.
+Ошибка последующего обработчика всегда освобождает скоуп; успешные запросы с пропущенной автоочисткой переходят во владение приложения.
+
+Один вызов `skipInferdiDispose(ctx)` действует на все экземпляры middleware InferDI в этом запросе, включая экземпляры с разными ключами состояния. Приложение должно самостоятельно освободить каждый сохранённый скоуп.

@@ -44,3 +44,16 @@ c.get(DB_LAZY).get()
 主キーとコンパニオンキーは、同じ種類である必要はありません。
 
 衝突検査では string と symbol の領域を分けて扱います。広い `string` キーは symbol キーだけを含むグラフへ追加できますが、string キーが一つでも存在すると TypeScript が拒否します。ランタイム値が既存登録を指す可能性があるためです。union キーでは、すべての候補が新しいキーでなければなりません。`lazyKey` はグラフと主キーの両方に対して検査されます。
+
+## 同じ値の形 {#same-value-shape}
+
+`unique symbol` はキーに名目的な識別性を与えますが、コンストラクターの構造が同じ 2 つの値までは区別しません。意味上の順序を名目的に扱う必要がある場合は、値の契約をブランド化します。
+
+```ts
+type PrimaryDsn = string & { readonly __brand: 'primary' }
+type ReplicaDsn = string & { readonly __brand: 'replica' }
+
+class Queries {
+  constructor(readonly primary: PrimaryDsn, readonly replica: ReplicaDsn) {}
+}
+```

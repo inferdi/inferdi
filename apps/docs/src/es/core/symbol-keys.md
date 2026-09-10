@@ -44,3 +44,16 @@ c.get(DB_LAZY).get()
 La clave principal y la clave del acompañante no necesitan ser de la misma clase.
 
 La comprobación de colisiones mantiene separados los dominios de string y symbol. Una clave `string` amplia puede seguir a registros compuestos solo por symbols, pero TypeScript la rechaza después de cualquier clave string porque su valor de runtime podría nombrar ese registro. En una clave union, cada miembro posible debe ser nuevo. `lazyKey` se comprueba contra el grafo y contra su clave principal.
+
+## La misma forma de valor {#same-value-shape}
+
+Un `unique symbol` da identidad nominal a una clave, pero no distingue dos valores estructuralmente idénticos en un constructor. Usa marcas en los contratos cuando el orden semántico deba ser nominal:
+
+```ts
+type PrimaryDsn = string & { readonly __brand: 'primary' }
+type ReplicaDsn = string & { readonly __brand: 'replica' }
+
+class Queries {
+  constructor(readonly primary: PrimaryDsn, readonly replica: ReplicaDsn) {}
+}
+```

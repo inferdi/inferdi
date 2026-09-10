@@ -11,13 +11,30 @@ pnpm add -D @types/express
 
 ```ts
 import express from 'express'
+import { Container } from '@inferdi/inferdi'
 import { inferdiExpress } from '@inferdi/express'
 ```
 
 ## Request Scope
 
 ```ts
-const root = buildRootContainer()
+type RequestContext = {
+  requestId: string
+  userId?: string
+  ip?: string
+}
+
+class Users {
+  constructor(readonly request: RequestContext) {}
+
+  profile(id: string) {
+    return { id, userId: this.request.userId }
+  }
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('users', Users, ['request'], 'scoped')
 const openRequestScope = (request: RequestContext) =>
   root.createScope({ request })
 type RequestScope = ReturnType<typeof openRequestScope>
@@ -91,3 +108,5 @@ app.get('/background', (req, res) => {
 ## Failed Request Caveat
 
 Unlike the other adapters, Express cannot reliably force-dispose a skipped scope on a handled route error. Express middleware is callback-style; after `next()` returns, the adapter cannot observe a downstream exception that was later handled by an error handler. If a route calls `skipInferdiDispose(req)` and then fails, the scope remains application-owned. Dispose it from your own error path or avoid combining skips with routes that may throw.
+
+A single `skipInferdiDispose(req)` call applies to every InferDI middleware instance on that request. Application code must retain and dispose every scope; `req.di` exposes the scope assigned by the last middleware.

@@ -23,5 +23,5 @@ Use `examples/_shared/container.ts` as the application graph for server-side exa
 For server-side and worker examples, compare the framework/platform lifecycle hooks. For frontend examples, compare the mount and unmount boundaries.
 
 ::: info Reference snippets
-The root workspace does not install every framework dependency or typecheck `examples/`. Copy the relevant pattern into your application, install its dependencies, and adapt the shared graph to your types.
+`pnpm run examples:typecheck` checks `examples/_shared/container.ts` and `examples/_shared/testing.ts`. It does not typecheck every framework snippet because the root workspace does not install every framework dependency. Copy the relevant pattern into your application, install its dependencies, and adapt the shared graph to your types.
 :::

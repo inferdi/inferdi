@@ -167,3 +167,28 @@ function resolveAny<
 - `{fast: true}` 支持逐步提供输入，但仍要求依赖图固定：在第一次 `.get()` 或 `.createScope()` 前完成注册。
 
 所有权规则见[作用域与资源释放](./scopes)，依赖作用域输入的异步服务见[异步依赖](./async-dependencies)。
+
+## 编译器检查
+
+提供输入后，同一个依赖图会获得不同的就绪键集合：
+
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
+type RequestContext = { requestId: string }
+
+class Handler {
+  constructor(readonly request: RequestContext) {}
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('handler', Handler, ['request'], 'scoped')
+
+root.get('handler') // [!code error]
+
+const scope = root.createScope({ request: { requestId: 'req-1' } })
+const handler = scope.get('handler')
+//    ^?
+```

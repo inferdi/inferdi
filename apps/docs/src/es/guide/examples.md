@@ -23,5 +23,5 @@ Usa `examples/_shared/container.ts` como el grafo de la aplicación para los eje
 Para los ejemplos del lado del servidor y de workers, compara los hooks del ciclo de vida del framework/plataforma. Para los ejemplos de frontend, compara los límites de montaje y desmontaje.
 
 ::: info Fragmentos de referencia
-El workspace raíz no instala todas las dependencias de frameworks ni comprueba los tipos de `examples/`. Copia el patrón que necesites, instala sus dependencias y adapta el grafo compartido a tus tipos.
+`pnpm run examples:typecheck` comprueba `examples/_shared/container.ts` y `examples/_shared/testing.ts`. No comprueba todos los fragmentos de frameworks porque el workspace raíz no instala todas sus dependencias. Copia el patrón que necesites, instala sus dependencias y adapta el grafo compartido a tus tipos.
 :::

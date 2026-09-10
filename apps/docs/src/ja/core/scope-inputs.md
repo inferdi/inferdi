@@ -167,3 +167,28 @@ function resolveAny<
 - `{fast: true}` でも入力を段階的に追加できますが、グラフは固定に保ちます。最初の `.get()` または `.createScope()` より前に登録を終えてください。
 
 所有権の規則は[スコープとリソース破棄](./scopes)、スコープ入力へ依存する async サービスは[非同期依存関係](./async-dependencies)を参照してください。
+
+## コンパイラーによる検証
+
+入力を渡すと、同じグラフの準備済みキーが変わります。
+
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
+type RequestContext = { requestId: string }
+
+class Handler {
+  constructor(readonly request: RequestContext) {}
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('handler', Handler, ['request'], 'scoped')
+
+root.get('handler') // [!code error]
+
+const scope = root.createScope({ request: { requestId: 'req-1' } })
+const handler = scope.get('handler')
+//    ^?
+```

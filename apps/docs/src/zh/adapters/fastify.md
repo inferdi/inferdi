@@ -10,6 +10,7 @@ pnpm add @inferdi/inferdi @inferdi/fastify fastify
 
 ```ts
 import Fastify, { type FastifyRequest } from 'fastify'
+import { Container } from '@inferdi/inferdi'
 import { inferdiFastify } from '@inferdi/fastify'
 ```
 
@@ -18,7 +19,22 @@ import { inferdiFastify } from '@inferdi/fastify'
 通过模块增强发布你的具体容器类型：
 
 ```ts
-const root = buildRootContainer()
+type RequestContext = {
+  requestId: string
+  ip: string
+}
+
+class Users {
+  constructor(readonly request: RequestContext) {}
+
+  profile(id: string) {
+    return { id, requestId: this.request.requestId }
+  }
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('users', Users, ['request'], 'scoped')
 const app = Fastify()
 
 type RootContainer = typeof root
@@ -92,3 +108,5 @@ app.get('/health', async function () {
 - 失败的请求会忽略 `skipInferdiDispose` 并仍然释放，但仍受 `autoDispose` 约束。
 - 客户端中止的清理在作用域已暴露之后于 `onRequestAbort` 中运行。
 - 只有在启用 `disposeRootOnClose` 时，根容器释放错误才会通过 `fastify.close()` 传播。
+
+当 `autoDispose: false` 或谓词返回 `false` 时，响应或中止清理完成后 `request.di` 仍然可用，应用代码可以自行释放保留的作用域。

@@ -44,3 +44,16 @@ c.get(DB_LAZY).get()
 主键和伴随项键不需要是相同的种类。
 
 冲突检查会区分 string 与 symbol 两个键域。宽泛的 `string` 键可以跟在仅含 symbol 键的注册之后；如果依赖图中已有任何 string 键，TypeScript 会拒绝它，因为运行时值可能指向已有注册。联合键的每个候选成员都必须是新键。`lazyKey` 会同时与依赖图和主键比较。
+
+## 相同的值形状 {#same-value-shape}
+
+`unique symbol` 会让键具有名义身份，但不会区分构造函数中两个结构相同的值。如果参数顺序必须具有名义差异，请为值契约添加品牌：
+
+```ts
+type PrimaryDsn = string & { readonly __brand: 'primary' }
+type ReplicaDsn = string & { readonly __brand: 'replica' }
+
+class Queries {
+  constructor(readonly primary: PrimaryDsn, readonly replica: ReplicaDsn) {}
+}
+```

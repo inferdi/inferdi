@@ -11,13 +11,30 @@ pnpm add -D @types/koa
 
 ```ts
 import Koa from 'koa'
+import { Container } from '@inferdi/inferdi'
 import { inferdiKoa, type InferdiKoaState } from '@inferdi/koa'
 ```
 
 ## Scope de petición
 
 ```ts
-const root = buildRootContainer()
+type RequestContext = {
+  requestId: string
+  userId?: string
+  ip: string
+}
+
+class Users {
+  constructor(readonly request: RequestContext) {}
+
+  profile(id: string) {
+    return { id, userId: this.request.userId }
+  }
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('users', Users, ['request'], 'scoped')
 const openRequestScope = (request: RequestContext) =>
   root.createScope({ request })
 type RequestScope = ReturnType<typeof openRequestScope>
@@ -110,3 +127,5 @@ app.use(async (ctx) => {
 ```
 
 Un error aguas abajo siempre libera el scope; las peticiones omitidas que tienen éxito pasan a ser propiedad de la aplicación.
+
+Una llamada a `skipInferdiDispose(ctx)` se aplica a todas las instancias del middleware InferDI de esa petición, incluidas las que usan distintas claves de estado. La aplicación debe liberar cada scope retenido.

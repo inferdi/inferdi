@@ -1,6 +1,6 @@
 # 快速开始
 
-本节将构建一个完整的依赖图，解析根容器中的服务，再创建请求作用域。无需装饰器或元数据配置。
+先用两个普通类和一条显式组合链搭出最小图。理解基础图之后，再加入请求作用域。
 
 ## 安装
 
@@ -22,99 +22,51 @@ yarn add @inferdi/inferdi
 
 ## 构建依赖图
 
-```ts
+<<< ../../../snippets/quick-start-sync.ts
+
+`UserService` 不导入 InferDI。组合代码选择 `Logger`，为两个注册命名，并写明构造函数参数顺序。返回的 `root` 类型已经包含这两个服务。
+
+如果修改构造函数却没有更新依赖图，错误会出现在应用组装处：
+
+```ts twoslash
+// @errors: 2345
 import { Container } from '@inferdi/inferdi'
 
-type RequestContext = {
-  requestId: string
-}
-
 class Logger {
-  info(message: string) {
-    console.info(message)
-  }
-}
-
-class Database {
-  constructor(readonly dsn: string) {}
+  info(message: string) {}
 }
 
 class UserService {
-  constructor(
-    private readonly request: RequestContext,
-    private readonly database: Database,
-    private readonly logger: Logger
-  ) {}
-
-  find(id: string) {
-    this.logger.info(`request=${this.request.requestId} user=${id}`)
-    return { id, database: this.database.dsn }
-  }
+  constructor(readonly logger: Logger, readonly region: string) {}
 }
 
-const root = new Container()
-  .declareScopeInputs<{ request: RequestContext }>()
-  .registerValue('dsn', 'postgres://localhost/app')
+new Container()
   .registerClass('logger', Logger, [])
-  .registerClass('database', Database, ['dsn'])
-  .registerClass(
-    'users',
-    UserService,
-    ['request', 'database', 'logger'],
-    'scoped'
-  )
+  .registerClass('users', UserService, ['logger']) // [!code error]
 ```
 
-每个依赖元组都会与构造函数参数进行检查。交换 `database` 和 `logger`、漏掉 `request` 或使用未知键都会触发 TypeScript 错误。
-
-上面的依赖图包含一个外部输入和四项注册：
-
-```text
-dsn ───────────────▶ database (singleton) ─┐
-logger (singleton) ────────────────────────┼─▶ users (scoped)
-request (scope input) ─────────────────────┘
-```
+这就是图类型状态的实际作用：注册逐步细化容器类型，后续操作必须符合已经声明的图。
 
 ## 解析服务
 
-根容器中的 singleton 可以用 `.get()` 同步解析：
+`root.get('users')` 同步返回 `UserService`。默认生命周期是 `singleton`，因此重复调用会取得缓存实例。
 
-```ts
-const database = root.get('database')
-```
+请求数据需要更短的边界。先声明作用域输入，再在创建子作用域时传入：
 
-`users` 需要 `request` 输入，因此要先创建作用域：
+<<< ../../../snippets/quick-start-scope.ts
 
-```ts
-const request = { requestId: crypto.randomUUID() }
-
-await using scope = root.createScope({ request })
-const users = scope.get('users')
-
-users.find('42')
-```
-
-返回的作用域类型记录了 `request` 已就绪。根容器没有请求输入，因此 `root.get('users')` 无法通过类型检查。
+即使请求处理抛错，`finally` 也会关闭子作用域。`scope.dispose()` 释放作用域拥有的 `RequestLog`；传入的 `request` 仍由应用管理。如果 TypeScript 工具链支持 Explicit Resource Management，也可以改用 `await using` 完成同样的清理。
 
 ## 选择生命周期
 
-注册默认使用 `singleton`。如果值属于某个作用域或调用方，请显式指定生命周期。
+| 生命周期 | 实例策略 | 缓存所有者 | 释放责任 |
+|---|---|---|---|
+| `singleton` | 每个注册所有者创建一次 | 根容器或注册所有者 | 该容器 |
+| `scoped` | 每个解析作用域创建一次 | 子作用域 | 该作用域 |
+| `transient` | 每次解析都创建 | 无 | 调用方 |
 
-| 生命周期 | 创建时机 | 缓存位置 | 释放方 |
-| --- | --- | --- | --- |
-| `singleton` | 一次 | 创建它的容器 | 该容器 |
-| `scoped` | 每个子作用域一次 | 子作用域 | 该作用域 |
-| `transient` | 每次解析 | 不缓存 | 调用方 |
-
-singleton 不能直接依赖 scoped 或 transient 服务。InferDI 会在类型层面执行此规则，默认也会在运行时再次检查。
+通过 `registerValue`、`.override()` 或作用域输入提供的值也由应用持有。单例不能直接依赖作用域级或瞬态服务；InferDI 会在类型中拒绝这条声明关系，并在默认运行时契约中再次检查。
 
 ## 下一步
 
-| 需求 | 继续阅读 |
-| --- | --- |
-| 了解编译期依赖图检查 | [类型安全](../core/type-safety) |
-| 建模请求、租户或任务数据 | [作用域输入](../core/scope-inputs) |
-| 异步初始化依赖 | [异步依赖](../core/async-dependencies) |
-| 安全关闭数据库和其他资源 | [作用域与资源释放](../core/scopes) |
-| 将作用域接入 Web 框架 | [框架适配器](../adapters/) |
-| 查看完整的框架与运行时示例 | [示例](./examples) |
+[为什么选择 InferDI](./why-inferdi)解释设计取舍，[类型安全](../core/type-safety)列出完整的图检查。[作用域与资源释放](../core/scopes)讲清所有权，[框架适配器](../adapters/)则把作用域接入应用生命周期。

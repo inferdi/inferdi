@@ -1,5 +1,36 @@
 # Pruebas y overrides
 
+## Prueba el servicio directamente
+
+Los servicios de negocio reciben valores normales, así que sus pruebas unitarias no necesitan un contenedor:
+
+```ts
+type Logger = { info(message: string): void }
+type Database = { findUser(id: string): { id: string } | undefined }
+
+class UserRepo {
+  constructor(readonly logger: Logger, readonly db: Database) {}
+
+  find(id: string) {
+    this.logger.info(`find ${id}`)
+    return this.db.findUser(id)
+  }
+}
+
+const messages: string[] = []
+const repo = new UserRepo(
+  { info: (message) => messages.push(message) },
+  { findUser: (id) => ({ id }) }
+)
+
+expect(repo.find('42')).toEqual({ id: '42' })
+expect(messages).toEqual(['find 42'])
+```
+
+Usa el contenedor en una prueba de integración cuando quieras comprobar el grafo de la aplicación.
+
+## Prueba el grafo ensamblado
+
 Usa `.override()` cuando las pruebas necesitan reemplazar un registro existente por un mock.
 
 ```ts

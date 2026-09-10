@@ -10,6 +10,7 @@ pnpm add @inferdi/inferdi @inferdi/fastify fastify
 
 ```ts
 import Fastify, { type FastifyRequest } from 'fastify'
+import { Container } from '@inferdi/inferdi'
 import { inferdiFastify } from '@inferdi/fastify'
 ```
 
@@ -18,7 +19,22 @@ import { inferdiFastify } from '@inferdi/fastify'
 Publica los tipos concretos de tu contenedor mediante module augmentation:
 
 ```ts
-const root = buildRootContainer()
+type RequestContext = {
+  requestId: string
+  ip: string
+}
+
+class Users {
+  constructor(readonly request: RequestContext) {}
+
+  profile(id: string) {
+    return { id, requestId: this.request.requestId }
+  }
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('users', Users, ['request'], 'scoped')
 const app = Fastify()
 
 type RootContainer = typeof root
@@ -92,3 +108,5 @@ El modo solo raíz no instala ninguna decoración de petición ni ningún hook d
 - Una petición fallida ignora `skipInferdiDispose` y igualmente libera, sujeto a `autoDispose`.
 - La limpieza por aborto del cliente se ejecuta en `onRequestAbort` después de que se haya expuesto un scope.
 - Los errores de liberación de la raíz se propagan a través de `fastify.close()` solo cuando `disposeRootOnClose` está activado.
+
+Con `autoDispose: false` o un predicado que devuelve `false`, `request.di` sigue disponible tras procesar la respuesta o el cierre de la conexión para que la aplicación pueda liberar el scope retenido.

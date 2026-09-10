@@ -1,6 +1,6 @@
 # Адаптер Fastify
 
-[`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) - это плагин для Fastify v5. В режиме со scope он выставляет root как `app.di`, создаёт scope запроса в `onRequest`, выставляет его как `request.di` и очищает в `onResponse`.
+[`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) интегрирует InferDI с Fastify v5. Плагин предоставляет корневой контейнер через `app.di`. В режиме с отдельным скоупом на запрос он создаёт скоуп в `onRequest`, сохраняет его в `request.di` и освобождает в `onResponse`.
 
 ## Установка
 
@@ -10,15 +10,31 @@ pnpm add @inferdi/inferdi @inferdi/fastify fastify
 
 ```ts
 import Fastify, { type FastifyRequest } from 'fastify'
+import { Container } from '@inferdi/inferdi'
 import { inferdiFastify } from '@inferdi/fastify'
 ```
 
-## Scope запроса
+## Скоуп запроса {#scope-запроса}
 
 Опубликуйте конкретные типы контейнеров через расширение модуля:
 
 ```ts
-const root = buildRootContainer()
+type RequestContext = {
+  requestId: string
+  ip: string
+}
+
+class Users {
+  constructor(readonly request: RequestContext) {}
+
+  profile(id: string) {
+    return { id, requestId: this.request.requestId }
+  }
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('users', Users, ['request'], 'scoped')
 const app = Fastify()
 
 type RootContainer = typeof root
@@ -52,22 +68,22 @@ app.get('/users/:id', async (request) => {
 })
 ```
 
-Fastify `app.register` не может глубоко вывести generics плагина для inline hooks, поэтому параметры hook лучше аннотировать явно.
+В `app.register` Fastify не может полностью вывести параметры типов плагина для хуков, переданных прямо в опциях. Явно указывайте типы параметров таких хуков.
 
 ## Опции
 
 | Опция | По умолчанию | Назначение |
 | --- | --- | --- |
 | `container` | обязательна | Корневой контейнер, выставленный как `app.di`. |
-| `scopePerRequest` | `true` | `false` для режима без scope запроса. |
-| `createScope` | `root.createScope()` | Пользовательское создание scope запроса. |
-| `setupScope` | нет | Выполняет дополнительную инициализацию после создания scope. |
-| `disposeScope` | `scope.dispose()` | Пользовательская очистка. |
-| `autoDispose` | `true` | `false` или предикат `false` передаёт владение. |
-| `disposeRootOnClose` | `false` | Очищает root во время `fastify.close()`. |
-| `onDisposeError` | `request.log.error` | Приёмник ошибок очистки scope запроса. |
+| `scopePerRequest` | `true` | `false` для режима без скоупа запроса. |
+| `createScope` | `root.createScope()` | Позволяет задать создание скоупа запроса. |
+| `setupScope` | нет | Выполняет дополнительную инициализацию после создания скоупа. |
+| `disposeScope` | `scope.dispose()` | Позволяет задать освобождение ресурсов. |
+| `autoDispose` | `true` | `false` или предикат, вернувший `false`, передаёт владение приложению. |
+| `disposeRootOnClose` | `false` | Освобождает корневой контейнер во время `fastify.close()`. |
+| `onDisposeError` | `request.log.error` | Обработчик ошибок очистки скоупа запроса. |
 
-## Режим без scope запроса
+## Режим без скоупа запроса {#режим-без-scope-запроса}
 
 ```ts
 await app.register(inferdiFastify, {
@@ -80,13 +96,15 @@ app.get('/health', async function () {
 })
 ```
 
-В этом режиме адаптер не устанавливает request decoration и hooks жизненного цикла запроса.
+В этом режиме адаптер не добавляет `di` в объект запроса и не устанавливает хуки его жизненного цикла.
 
 ## Заметки о жизненном цикле
 
-- `request.di` выставляется только после успешного setup.
-- Ошибка setup очищает полусобранный scope и поднимает только исходную ошибку setup.
-- Cleanup hooks видят `request.di`, пока выполняются.
-- Упавший запрос игнорирует `skipInferdiDispose` и всё равно очищает scope, с учётом `autoDispose`.
-- Очистка при client abort выполняется в `onRequestAbort` после выставления scope.
-- Ошибки очистки root проходят через `fastify.close()` только с `disposeRootOnClose`.
+- `request.di` становится доступным после успешной настройки скоупа.
+- При ошибке настройки адаптер освобождает частично подготовленный скоуп и передаёт дальше только исходную ошибку.
+- Хуки очистки могут обращаться к `request.di` во время выполнения.
+- Если запрос завершился ошибкой, маркер `skipInferdiDispose` игнорируется; решение об очистке по-прежнему зависит от `autoDispose`.
+- Если клиент оборвал соединение после того, как скоуп стал доступен, очистка выполняется в `onRequestAbort`.
+- Ошибки освобождения корневого контейнера передаются через `fastify.close()` только при включённом `disposeRootOnClose`.
+
+При `autoDispose: false` или предикате, возвращающем `false`, `request.di` остаётся доступным после обработки ответа или обрыва соединения: приложение может освободить сохранённый скоуп самостоятельно.

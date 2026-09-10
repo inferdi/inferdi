@@ -35,14 +35,16 @@ El tipo del contenedor registra los inputs proporcionados y oculta los servicios
 
 ## Propiedad
 
-Cada contenedor libera solo las instancias que creó.
+La propiedad depende del tipo de registro, no solo del código que llamó al constructor.
 
-| Instancia                                                         | Propietario         |
-|-------------------------------------------------------------------|---------------------|
-| Singleton registrado en la raíz, aunque se resuelva desde un hijo | Contenedor raíz     |
-| Singleton registrado en un contenedor hijo                        | Ese contenedor hijo |
-| Servicio con scope                                                | Scope de petición   |
-| Transitorio                                                       | Llamante            |
+| Valor | Propietario y limpieza |
+| --- | --- |
+| Resultado de una factoría o clase singleton | El contenedor propietario del registro |
+| Resultado de una factoría o clase scoped | El scope que lo resuelve y lo cachea |
+| Resultado de una factoría o clase transient | El llamante; InferDI no lo conserva para liberarlo |
+| Valor de `registerValue` | La aplicación |
+| Valor de `.override()` | La aplicación o el fixture de prueba |
+| Entrada de scope | El código que abre el scope |
 
 `root.dispose()` no cascadea hacia los scopes hijos ya creados. Libera los scopes en su propio límite de ciclo de vida.
 

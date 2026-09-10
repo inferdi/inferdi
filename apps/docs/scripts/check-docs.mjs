@@ -4,7 +4,7 @@ import path from 'node:path'
 
 const sourceRoot = fileURLToPath(new URL('../src/', import.meta.url))
 const configPath = fileURLToPath(new URL('../.vitepress/config.mts', import.meta.url))
-const locales = ['ru', 'zh', 'ja', 'es']
+const locales = ['ru', 'zh', 'ja', 'es', 'de', 'fr']
 const retiredAsyncSlug = ['async', 'dependency', 'graph'].join('-')
 const errors = []
 

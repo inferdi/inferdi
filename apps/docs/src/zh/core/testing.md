@@ -1,5 +1,36 @@
 # 测试与覆盖
 
+## 直接测试服务
+
+业务服务接收普通值，所以单元测试不需要容器：
+
+```ts
+type Logger = { info(message: string): void }
+type Database = { findUser(id: string): { id: string } | undefined }
+
+class UserRepo {
+  constructor(readonly logger: Logger, readonly db: Database) {}
+
+  find(id: string) {
+    this.logger.info(`find ${id}`)
+    return this.db.findUser(id)
+  }
+}
+
+const messages: string[] = []
+const repo = new UserRepo(
+  { info: (message) => messages.push(message) },
+  { findUser: (id) => ({ id }) }
+)
+
+expect(repo.find('42')).toEqual({ id: '42' })
+expect(messages).toEqual(['find 42'])
+```
+
+当测试对象是应用依赖图本身时，再在集成测试中使用容器。
+
+## 测试组装后的依赖图
+
 当测试需要用 mock 替换现有注册时，请使用 `.override()`。
 
 ```ts

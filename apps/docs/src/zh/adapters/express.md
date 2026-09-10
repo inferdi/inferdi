@@ -11,13 +11,30 @@ pnpm add -D @types/express
 
 ```ts
 import express from 'express'
+import { Container } from '@inferdi/inferdi'
 import { inferdiExpress } from '@inferdi/express'
 ```
 
 ## 请求作用域
 
 ```ts
-const root = buildRootContainer()
+type RequestContext = {
+  requestId: string
+  userId?: string
+  ip?: string
+}
+
+class Users {
+  constructor(readonly request: RequestContext) {}
+
+  profile(id: string) {
+    return { id, userId: this.request.userId }
+  }
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('users', Users, ['request'], 'scoped')
 const openRequestScope = (request: RequestContext) =>
   root.createScope({ request })
 type RequestScope = ReturnType<typeof openRequestScope>
@@ -91,3 +108,5 @@ app.get('/background', (req, res) => {
 ## 失败请求的注意事项
 
 与其他适配器不同，Express 无法在一个已被处理的路由错误上可靠地强制释放被跳过的作用域。Express 中间件是回调式的；在 `next()` 返回之后，适配器无法观察到一个之后被错误处理器处理掉的下游异常。如果某个路由调用了 `skipInferdiDispose(req)` 然后失败，该作用域仍归应用所有。请在你自己的错误路径中释放它，或者避免将跳过与可能抛出的路由组合使用。
+
+一次 `skipInferdiDispose(req)` 调用适用于该请求中的所有 InferDI 中间件实例。应用代码必须保留并自行释放每个作用域；`req.di` 暴露最后一个中间件赋值的作用域。

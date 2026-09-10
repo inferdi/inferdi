@@ -1,6 +1,6 @@
 # クイックスタート
 
-この手順では、依存グラフ全体を構築し、ルートサービスを解決したあと、リクエストスコープを開きます。デコレーターやメタデータの設定は不要です。
+まずは通常のクラス 2 つと、明示的な構成チェーンで小さなグラフを作ります。リクエストスコープは基本を確認してから追加します。
 
 ## インストール
 
@@ -22,99 +22,51 @@ yarn add @inferdi/inferdi
 
 ## グラフを構築する
 
-```ts
+<<< ../../../snippets/quick-start-sync.ts
+
+`UserService` は InferDI をインポートしません。構成コードが `Logger` を選び、登録に名前を付け、コンストラクター引数の順序を記述します。返された `root` の型には両方のサービスが含まれます。
+
+コンストラクターを変更してグラフを更新し忘れると、アプリケーションを組み立てる場所でエラーになります。
+
+```ts twoslash
+// @errors: 2345
 import { Container } from '@inferdi/inferdi'
 
-type RequestContext = {
-  requestId: string
-}
-
 class Logger {
-  info(message: string) {
-    console.info(message)
-  }
-}
-
-class Database {
-  constructor(readonly dsn: string) {}
+  info(message: string) {}
 }
 
 class UserService {
-  constructor(
-    private readonly request: RequestContext,
-    private readonly database: Database,
-    private readonly logger: Logger
-  ) {}
-
-  find(id: string) {
-    this.logger.info(`request=${this.request.requestId} user=${id}`)
-    return { id, database: this.database.dsn }
-  }
+  constructor(readonly logger: Logger, readonly region: string) {}
 }
 
-const root = new Container()
-  .declareScopeInputs<{ request: RequestContext }>()
-  .registerValue('dsn', 'postgres://localhost/app')
+new Container()
   .registerClass('logger', Logger, [])
-  .registerClass('database', Database, ['dsn'])
-  .registerClass(
-    'users',
-    UserService,
-    ['request', 'database', 'logger'],
-    'scoped'
-  )
+  .registerClass('users', UserService, ['logger']) // [!code error]
 ```
 
-各依存タプルはコンストラクターと照合されます。`database` と `logger` の順序を入れ替える、`request` を省く、未登録キーを指定すると、TypeScript エラーになります。
-
-このグラフには 1 つの外部入力と 4 つの登録があります。
-
-```text
-dsn ───────────────▶ database (singleton) ─┐
-logger (singleton) ────────────────────────┼─▶ users (scoped)
-request (scope input) ─────────────────────┘
-```
+これがグラフ型状態の実際の働きです。登録がコンテナー型を絞り込み、後続の操作は宣言済みグラフに適合しなければなりません。
 
 ## サービスを解決する
 
-ルートの singleton は `.get()` で同期的に解決できます。
+`root.get('users')` は `UserService` を同期的に返します。デフォルトのライフタイムは `singleton` なので、2 回目以降はキャッシュ済みインスタンスを返します。
 
-```ts
-const database = root.get('database')
-```
+リクエストデータには短い境界が必要です。スコープ入力として宣言し、子スコープを開くときに渡します。
 
-`users` には `request` 入力が必要なので、先にスコープを開きます。
+<<< ../../../snippets/quick-start-scope.ts
 
-```ts
-const request = { requestId: crypto.randomUUID() }
-
-await using scope = root.createScope({ request })
-const users = scope.get('users')
-
-users.find('42')
-```
-
-返されたスコープの型には、`request` が準備済みであることが記録されます。ルートにはリクエスト入力がないため、`root.get('users')` は型エラーになります。
+リクエスト処理が失敗しても、`finally` が子スコープを閉じます。`scope.dispose()` はスコープ所有の `RequestLog` を破棄し、渡された `request` はアプリケーション所有のままです。TypeScript ツールチェーンが Explicit Resource Management を扱える場合は、同じ処理を `await using` でも書けます。
 
 ## ライフタイムを選ぶ
 
-登録の既定値は `singleton` です。値がスコープまたは呼び出し側に属する場合は、ライフタイムを明示します。
+| ライフタイム | インスタンス生成 | キャッシュ所有者 | 破棄する側 |
+|---|---|---|---|
+| `singleton` | 登録所有者ごとに 1 回 | ルートまたは登録所有者 | そのコンテナー |
+| `scoped` | 解決するスコープごとに 1 回 | 子スコープ | そのスコープ |
+| `transient` | 解決のたび | なし | 呼び出し側 |
 
-| ライフタイム      | 作成           | キャッシュ     | 破棄する側   |
-|-------------|--------------|-----------|---------|
-| `singleton` | 1 回          | 作成したコンテナー | そのコンテナー |
-| `scoped`    | 子スコープごとに 1 回 | 子スコープ     | そのスコープ  |
-| `transient` | 解決するたび       | なし        | 呼び出し側   |
-
-singleton は scoped または transient サービスへ直接依存できません。InferDI はこの規則を型で検証し、既定では実行時にも確認します。
+`registerValue`、`.override()`、スコープ入力で渡した値もアプリケーション所有です。シングルトンはスコープドまたはトランジェントなサービスへ直接依存できません。InferDI は型で拒否し、デフォルトの実行時契約でも再検査します。
 
 ## 次に読むページ
 
-| 目的 | ページ |
-| --- | --- |
-| コンパイル時のグラフ検証を理解する | [型安全性](../core/type-safety) |
-| リクエスト、テナント、ジョブデータをモデル化する | [スコープ入力](../core/scope-inputs) |
-| 依存関係を非同期に初期化する | [非同期依存関係](../core/async-dependencies) |
-| データベースなどのリソースを安全に閉じる | [スコープとリソース破棄](../core/scopes) |
-| スコープを Web フレームワークへ接続する | [フレームワークアダプター](../adapters/) |
-| フレームワークとランタイムの完全な例を見る | [例](./examples) |
+[InferDI を選ぶ理由](./why-inferdi)で設計上の判断を確認し、[型安全性](../core/type-safety)でグラフ検査を詳しく見てください。[スコープとリソース破棄](../core/scopes)は所有権を、[フレームワークアダプター](../adapters/)はアプリケーションのライフサイクルとの接続を説明します。

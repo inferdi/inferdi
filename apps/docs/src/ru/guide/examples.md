@@ -1,6 +1,6 @@
 # Примеры
 
-Выберите границу, которой владеет приложение, и сравните, как в этой экосистеме создаётся, публикуется и освобождается скоуп. Каждая группа соответствует директории в [`examples/`](https://github.com/inferdi/inferdi/tree/main/examples).
+Выберите подходящий сценарий и сравните, как приложение создаёт скоуп, передаёт его обработчикам и освобождает ресурсы. Каждая группа соответствует каталогу в [`examples/`](https://github.com/inferdi/inferdi/tree/main/examples).
 
 ## Начните отсюда
 
@@ -9,19 +9,19 @@
 | Группа | Что сравнить |
 | --- | --- |
 | [JavaScript](/ru/guide/examples/javascript) | Node ESM, Node CommonJS и браузерная сборка |
-| [Бэкенд-фреймворки](/ru/guide/examples/backend) | адаптеры scope запроса для Fastify, Hono, Koa, Express и Elysia |
-| [API-слои](/ru/guide/examples/api-layers) | границы scope запроса в tRPC, Apollo Server и GraphQL Yoga |
-| [Фулстек-фреймворки](/ru/guide/examples/fullstack) | scope для Next.js App Router, Server Actions, loader и action в Remix |
+| [Бэкенд-фреймворки](/ru/guide/examples/backend) | адаптеры скоупа запроса для Fastify, Hono, Koa, Express и Elysia |
+| [API-слои](/ru/guide/examples/api-layers) | границы скоупа запроса в tRPC, Apollo Server и GraphQL Yoga |
+| [Фулстек-фреймворки](/ru/guide/examples/fullstack) | скоупы для Next.js App Router, Server Actions, loader и action в Remix |
 | [Рантаймы и edge-платформы](/ru/guide/examples/runtimes-edge) | Node HTTP, Bun, Deno, Cloudflare Workers, Vercel Edge, Deno Deploy и Supabase Edge |
-| [Фронтенд-фреймворки](/ru/guide/examples/frontend) | feature scope в React, React Native, Vue и Svelte |
-| [Боты, очереди и CLI](/ru/guide/examples/workers-cli) | scope на операцию в Telegraf, Grammy, BullMQ, Commander и Yargs |
+| [Фронтенд-фреймворки](/ru/guide/examples/frontend) | скоуп отдельной части приложения в React, React Native, Vue и Svelte |
+| [Боты, очереди и CLI](/ru/guide/examples/workers-cli) | скоуп на операцию в Telegraf, Grammy, BullMQ, Commander и Yargs |
 
 ## Как читать группы
 
-Используйте `examples/_shared/container.ts` как граф приложения для серверных примеров. Остальные страницы групп показывают владение жизненным циклом: где scope создаётся, где становится доступен и где очищается.
+Используйте `examples/_shared/container.ts` как граф приложения для серверных примеров. Страницы отдельных групп показывают, кто управляет скоупом: где создаётся скоуп, где становится доступен и где очищается.
 
-В серверных и worker-примерах сравнивайте hooks жизненного цикла фреймворка или платформы. Во фронтенд-примерах сравнивайте границы mount и unmount.
+В серверных примерах и обработчиках заданий обратите внимание на хуки жизненного цикла фреймворка или платформы. Во фронтенд-примерах смотрите, как скоуп связан с монтированием и размонтированием компонентов.
 
 ::: info Справочные фрагменты
-Корневой workspace не устанавливает все зависимости фреймворков и не проверяет типы в `examples/`. Скопируйте нужный шаблон в приложение, установите его зависимости и адаптируйте общий граф к своим типам.
+`pnpm run examples:typecheck` проверяет `examples/_shared/container.ts` и `examples/_shared/testing.ts`. Остальные примеры для фреймворков он не проверяет, потому что корневое рабочее пространство не устанавливает все зависимости фреймворков. Скопируйте нужный шаблон в приложение, установите его зависимости и адаптируйте общий граф к своим типам.
 :::

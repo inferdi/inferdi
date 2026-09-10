@@ -174,3 +174,24 @@ At the top-level, `getAsync('dbPromise')` follows JavaScript await semantics and
 - A dynamic cycle through `AsyncLazy.get()` after a Promise boundary can wait on its own cached pending Promise. The synchronous cycle detector cannot report that deadlock.
 
 See [Factories](./factories) for synchronous construction and [Scopes and Disposal](./scopes) for the ownership model.
+
+## Compiler Check
+
+A declarative async registration is excluded from synchronous `.get()` and remains available through `.getAsync()`:
+
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
+class Database {
+  query() {}
+}
+
+const container = new Container()
+  .registerAsyncFactory('database', async () => new Database(), [])
+
+container.get('database') // [!code error]
+
+const database = await container.getAsync('database')
+//    ^?
+```

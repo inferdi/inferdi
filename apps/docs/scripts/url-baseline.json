@@ -1,0 +1,1411 @@
+{
+  "format": 1,
+  "source": "VitePress 1.6.4 build before the docs positioning redesign",
+  "routes": {
+    "/adapters/elysia": [
+      "elysia-adapter",
+      "install",
+      "request-scope",
+      "options",
+      "root-only-mode",
+      "lifecycle-notes",
+      "streaming"
+    ],
+    "/adapters/express": [
+      "express-adapter",
+      "install",
+      "request-scope",
+      "options",
+      "streaming-and-background-work",
+      "failed-request-caveat"
+    ],
+    "/adapters/fastify": [
+      "fastify-adapter",
+      "install",
+      "request-scope",
+      "options",
+      "root-only-mode",
+      "lifecycle-notes"
+    ],
+    "/adapters/hono": [
+      "hono-adapter",
+      "install",
+      "request-scope",
+      "custom-key",
+      "options",
+      "streaming"
+    ],
+    "/adapters/": [
+      "framework-adapters",
+      "packages",
+      "common-lifecycle-contract",
+      "shared-options",
+      "error-and-ownership-rules",
+      "important-differences"
+    ],
+    "/adapters/koa": [
+      "koa-adapter",
+      "install",
+      "request-scope",
+      "custom-state-key",
+      "options",
+      "streaming"
+    ],
+    "/adapters/react": [
+      "react",
+      "install",
+      "bind-an-exact-container-type",
+      "external-providers",
+      "managed-child-scopes",
+      "service-hooks-and-suspense",
+      "identity-and-teardown",
+      "strict-mode-and-activity",
+      "server-rendering",
+      "errors"
+    ],
+    "/core/async-dependencies": [
+      "async-dependencies",
+      "choose-the-promise-model",
+      "register-async-factories",
+      "resolve-and-propagate",
+      "scheduling-and-caching",
+      "asynclazy-companions",
+      "teardown-and-failures",
+      "legacy-promise-values",
+      "dynamic-boundaries"
+    ],
+    "/core/bad-practices": [
+      "bad-practices",
+      "reusing-an-old-builder-reference",
+      "why-the-compiler-permits-it",
+      "keep-the-latest-returned-reference",
+      "do-not-use-register-as-a-replacement-api"
+    ],
+    "/core/factories": [
+      "factories",
+      "container-aware-factories",
+      "declared-factory-dependencies",
+      "factory-lifetimes",
+      "bind-interfaces",
+      "choose-the-promise-contract"
+    ],
+    "/core/lazy-injection": [
+      "lazy-injection",
+      "lifetime-is-preserved",
+      "captured-scope-and-disposal",
+      "circular-dependencies"
+    ],
+    "/core/lifetime-guards": [
+      "lifetimes",
+      "the-lifetime-rule",
+      "default-runtime-checks",
+      "fast-true"
+    ],
+    "/core/modules": [
+      "modules",
+      "named-modules",
+      "dynamic-imports"
+    ],
+    "/core/scope-inputs": [
+      "scope-inputs",
+      "declare-the-inputs",
+      "open-typed-profiles",
+      "requirements-follow-the-graph",
+      "nested-scope-ownership",
+      "reusable-type-contracts",
+      "input-contract"
+    ],
+    "/core/scopes": [
+      "scopes-and-disposal",
+      "scope-inputs",
+      "ownership",
+      "native-resource-management",
+      "disposal-protocol"
+    ],
+    "/core/symbol-keys": [
+      "symbol-keys",
+      "when-to-use-symbols",
+      "lazy-companions"
+    ],
+    "/core/testing": [
+      "testing-and-overrides",
+      "typed-providers",
+      "override-timing",
+      "ownership",
+      "scope-locality"
+    ],
+    "/core/type-safety": [
+      "type-safety",
+      "constructor-signatures",
+      "key-uniqueness",
+      "dynamic-keys",
+      "lifetime-in-the-type",
+      "readiness-and-async-status"
+    ],
+    "/es/adapters/elysia": [
+      "adaptador-de-elysia",
+      "instalacion",
+      "scope-de-peticion",
+      "opciones",
+      "modo-solo-raiz",
+      "notas-del-ciclo-de-vida",
+      "streaming"
+    ],
+    "/es/adapters/express": [
+      "adaptador-de-express",
+      "instalacion",
+      "scope-de-peticion",
+      "opciones",
+      "streaming-y-trabajo-en-segundo-plano",
+      "salvedad-sobre-las-peticiones-fallidas"
+    ],
+    "/es/adapters/fastify": [
+      "adaptador-de-fastify",
+      "instalacion",
+      "scope-de-peticion",
+      "opciones",
+      "modo-solo-raiz",
+      "notas-del-ciclo-de-vida"
+    ],
+    "/es/adapters/hono": [
+      "adaptador-de-hono",
+      "instalacion",
+      "scope-de-peticion",
+      "clave-personalizada",
+      "opciones",
+      "streaming"
+    ],
+    "/es/adapters/": [
+      "adaptadores-de-frameworks",
+      "paquetes",
+      "contrato-comun-del-ciclo-de-vida",
+      "opciones-compartidas",
+      "reglas-de-errores-y-de-propiedad",
+      "diferencias-importantes"
+    ],
+    "/es/adapters/koa": [
+      "adaptador-de-koa",
+      "instalacion",
+      "scope-de-peticion",
+      "clave-de-state-personalizada",
+      "opciones",
+      "streaming"
+    ],
+    "/es/adapters/react": [
+      "adaptador-de-react",
+      "instalacion",
+      "vincular-un-tipo-exacto-de-contenedor",
+      "providers-externos",
+      "scopes-secundarios-administrados",
+      "hooks-de-servicios-y-suspense",
+      "identidad-y-teardown",
+      "strict-mode-y-activity",
+      "renderizado-del-servidor",
+      "errores"
+    ],
+    "/es/core/async-dependencies": [
+      "dependencias-asincronas",
+      "elegir-el-modelo-de-promise",
+      "registrar-factorias-asincronas",
+      "resolucion-y-propagacion",
+      "planificacion-y-cache",
+      "companions-asynclazy",
+      "liberacion-de-recursos-y-errores",
+      "valores-promise-heredados",
+      "limites-dinamicos"
+    ],
+    "/es/core/bad-practices": [
+      "malas-practicas",
+      "reutilizar-una-referencia-anterior",
+      "por-que-el-compilador-permite-este-codigo",
+      "conserva-la-ultima-referencia-devuelta",
+      "no-uses-register-como-api-de-reemplazo"
+    ],
+    "/es/core/factories": [
+      "factorias",
+      "factorias-con-acceso-al-contenedor",
+      "dependencias-declaradas-de-una-factoria",
+      "tiempos-de-vida-de-las-factorias",
+      "vincular-interfaces",
+      "elegir-el-contrato-de-promise"
+    ],
+    "/es/core/lazy-injection": [
+      "inyeccion-perezosa",
+      "el-tiempo-de-vida-se-preserva",
+      "scope-capturado-y-liberacion-de-recursos",
+      "dependencias-circulares"
+    ],
+    "/es/core/lifetime-guards": [
+      "tiempos-de-vida",
+      "la-regla-del-tiempo-de-vida",
+      "comprobaciones-en-runtime-predeterminadas",
+      "fast-true"
+    ],
+    "/es/core/modules": [
+      "modulos",
+      "modulos-con-nombre",
+      "importaciones-dinamicas"
+    ],
+    "/es/core/scope-inputs": [
+      "entradas-de-scope",
+      "declarar-las-entradas",
+      "abrir-perfiles-tipados",
+      "los-requisitos-se-propagan-por-el-grafo",
+      "propiedad-de-scopes-anidados",
+      "contratos-de-tipos-reutilizables",
+      "contrato-de-entrada"
+    ],
+    "/es/core/scopes": [
+      "scopes-y-liberacion-de-recursos",
+      "entradas-de-scope",
+      "propiedad",
+      "gestion-nativa-de-recursos",
+      "protocolo-de-liberacion"
+    ],
+    "/es/core/symbol-keys": [
+      "claves-symbol",
+      "cuando-usar-symbols",
+      "acompanantes-perezosos"
+    ],
+    "/es/core/testing": [
+      "pruebas-y-overrides",
+      "providers-tipados",
+      "momento-del-override",
+      "propiedad",
+      "localidad-del-scope"
+    ],
+    "/es/core/type-safety": [
+      "seguridad-de-tipos",
+      "firmas-de-constructor",
+      "unicidad-de-claves",
+      "claves-dinamicas",
+      "el-tiempo-de-vida-en-el-tipo",
+      "preparacion-y-estado-async"
+    ],
+    "/es/guide/examples": [
+      "ejemplos",
+      "empieza-aqui",
+      "como-leer-los-grupos"
+    ],
+    "/es/guide/examples/api-layers": [
+      "capas-de-api",
+      "trpc",
+      "apollo-server",
+      "graphql-yoga"
+    ],
+    "/es/guide/examples/backend": [
+      "frameworks-de-backend",
+      "fastify",
+      "hono",
+      "koa",
+      "express",
+      "elysia"
+    ],
+    "/es/guide/examples/frontend": [
+      "frameworks-de-frontend",
+      "react",
+      "react-native",
+      "vue",
+      "svelte"
+    ],
+    "/es/guide/examples/fullstack": [
+      "frameworks-full-stack",
+      "next-js-app-router",
+      "remix"
+    ],
+    "/es/guide/examples/javascript": [
+      "uso-con-javascript",
+      "node-esm",
+      "node-commonjs",
+      "navegador-con-vite"
+    ],
+    "/es/guide/examples/runtimes-edge": [
+      "runtimes-y-plataformas-edge",
+      "node-http",
+      "bun-serve",
+      "deno-http",
+      "cloudflare-workers",
+      "vercel-edge",
+      "deno-deploy",
+      "supabase-edge-functions"
+    ],
+    "/es/guide/examples/workers-cli": [
+      "bots-colas-y-cli",
+      "telegraf",
+      "grammy",
+      "bullmq",
+      "commander",
+      "yargs"
+    ],
+    "/es/guide/installation": [
+      "instalacion",
+      "node-js",
+      "bun",
+      "deno",
+      "requisitos",
+      "instalacion-de-adaptadores"
+    ],
+    "/es/guide/performance": [
+      "rendimiento",
+      "conjunto-de-benchmarks",
+      "fast-true",
+      "pequenos-detalles-de-la-ruta-caliente",
+      "construccion-de-servicios-transient",
+      "representacion-de-las-claves",
+      "reproducir-localmente"
+    ],
+    "/es/guide/quick-start": [
+      "inicio-rapido",
+      "instalacion",
+      "construir-el-grafo",
+      "resolver-servicios",
+      "elegir-tiempos-de-vida",
+      "siguiente-paso"
+    ],
+    "/es/": [],
+    "/es/reference/api": [
+      "resumen-de-la-api",
+      "container",
+      "metodos-de-registro",
+      "entradas-de-scope-y-resolucion",
+      "tipos-del-namespace",
+      "tipos-publicos",
+      "formas-de-la-api-de-los-adaptadores"
+    ],
+    "/es/reference/contributors": [
+      "colaboradores"
+    ],
+    "/es/reference/errors": [
+      "errores",
+      "ciclos-entre-factorias-asincronas",
+      "errores-de-limpieza-en-los-adaptadores"
+    ],
+    "/es/reference/manifesto": [
+      "manifiesto-arquitectonico-del-core-de-inferdi",
+      "_1-filosofia-y-promesa",
+      "mision",
+      "propuesta-de-valor",
+      "_2-pilares-innegociables",
+      "_2-1-seguridad-de-tipos-de-extremo-a-extremo",
+      "_2-2-cero-decoradores-cero-reflexion-de-metadatos",
+      "_2-3-el-tiempo-de-vida-es-un-tipo",
+      "_2-3-1-el-modo-async-es-estado-de-tipo",
+      "_2-3-2-la-disponibilidad-del-scope-es-estado-de-tipo",
+      "_2-3-3-los-modulos-son-contratos-de-requisitos",
+      "_2-4-la-ruta-caliente-de-resolucion-se-mantiene-pequena",
+      "_2-5-cero-dependencias-en-runtime",
+      "_2-6-la-liberacion-hace-cumplir-la-propiedad",
+      "_3-filtro-de-pr",
+      "_4-checklist-de-control-estricto",
+      "ruta-caliente-y-forma-en-runtime",
+      "sistema-de-tipos",
+      "dependencias-y-build",
+      "ciclo-de-vida-y-liberacion",
+      "vias-de-escape-y-uso-dinamico",
+      "_5-compromisos-conscientes",
+      "_6-no-objetivos"
+    ],
+    "/es/reference/migration": [
+      "migracion",
+      "migracion-a-6-0",
+      "los-resolvers-genericos-usan-claves-listas",
+      "specs-con-nombre-para-acompanantes-lazy",
+      "migracion-a-5-0",
+      "la-resolucion-scoped-requiere-un-scope-hijo",
+      "contrato-de-grafo-fijo-de-fast-true",
+      "notas-de-los-adaptadores",
+      "migracion-a-4-0",
+      "migracion-a-3-0",
+      "migracion-a-2-0",
+      "se-elimino-container-cradle",
+      "registerclass-lazy-true-paso-a-ser-lazykey",
+      "lockstep-de-versiones",
+      "lista-de-verificacion-de-actualizacion",
+      "fronteras-estables"
+    ],
+    "/guide/examples": [
+      "examples",
+      "start-here",
+      "how-to-read-the-groups"
+    ],
+    "/guide/examples/api-layers": [
+      "api-layers",
+      "trpc",
+      "apollo-server",
+      "graphql-yoga"
+    ],
+    "/guide/examples/backend": [
+      "backend-frameworks",
+      "fastify",
+      "hono",
+      "koa",
+      "express",
+      "elysia"
+    ],
+    "/guide/examples/frontend": [
+      "frontend-frameworks",
+      "react",
+      "react-native",
+      "vue",
+      "svelte"
+    ],
+    "/guide/examples/fullstack": [
+      "full-stack-frameworks",
+      "next-js-app-router",
+      "remix"
+    ],
+    "/guide/examples/javascript": [
+      "javascript-usage",
+      "node-esm",
+      "node-commonjs",
+      "browser-with-vite"
+    ],
+    "/guide/examples/runtimes-edge": [
+      "runtimes-and-edge-platforms",
+      "node-http",
+      "bun-serve",
+      "deno-http",
+      "cloudflare-workers",
+      "vercel-edge",
+      "deno-deploy",
+      "supabase-edge-functions"
+    ],
+    "/guide/examples/workers-cli": [
+      "bots-queues-and-cli",
+      "telegraf",
+      "grammy",
+      "bullmq",
+      "commander",
+      "yargs"
+    ],
+    "/guide/installation": [
+      "installation",
+      "node-js",
+      "bun",
+      "deno",
+      "requirements",
+      "adapter-installs"
+    ],
+    "/guide/performance": [
+      "performance",
+      "benchmark-suite",
+      "fast-true",
+      "small-hot-path-details",
+      "transient-construction",
+      "key-representation",
+      "reproduce-locally"
+    ],
+    "/guide/quick-start": [
+      "quick-start",
+      "install",
+      "build-the-graph",
+      "resolve-services",
+      "choose-lifetimes",
+      "choose-the-next-page"
+    ],
+    "/": [],
+    "/ja/adapters/elysia": [
+      "elysia-アダプター",
+      "インストール",
+      "リクエストスコープ",
+      "オプション",
+      "ルート専用モード",
+      "ライフサイクルに関する注意",
+      "ストリーミング"
+    ],
+    "/ja/adapters/express": [
+      "express-アダプター",
+      "インストール",
+      "リクエストスコープ",
+      "オプション",
+      "ストリーミングとバックグラウンド作業",
+      "失敗したリクエストに関する注意点"
+    ],
+    "/ja/adapters/fastify": [
+      "fastify-アダプター",
+      "インストール",
+      "リクエストスコープ",
+      "オプション",
+      "ルート専用モード",
+      "ライフサイクルに関する注意"
+    ],
+    "/ja/adapters/hono": [
+      "hono-アダプター",
+      "インストール",
+      "リクエストスコープ",
+      "カスタムキー",
+      "オプション",
+      "ストリーミング"
+    ],
+    "/ja/adapters/": [
+      "フレームワークアダプター",
+      "パッケージ",
+      "共通のライフサイクル契約",
+      "共通オプション",
+      "エラーと所有権のルール",
+      "重要な違い"
+    ],
+    "/ja/adapters/koa": [
+      "koa-アダプター",
+      "インストール",
+      "リクエストスコープ",
+      "カスタム-state-キー",
+      "オプション",
+      "ストリーミング"
+    ],
+    "/ja/adapters/react": [
+      "react-アダプター",
+      "インストール",
+      "正確なコンテナー型を-binding-する",
+      "外部-providers",
+      "管理される子-scope",
+      "service-hooks-と-suspense",
+      "identity-と-teardown",
+      "strict-mode-と-activity",
+      "サーバーレンダリング",
+      "エラー"
+    ],
+    "/ja/core/async-dependencies": [
+      "非同期依存関係",
+      "promise-モデルを選ぶ",
+      "非同期ファクトリーを登録する",
+      "解決と非同期状態の伝播",
+      "スケジューリングとキャッシュ",
+      "asynclazy-companion",
+      "リソース破棄と失敗",
+      "従来の-promise-値",
+      "動的な境界"
+    ],
+    "/ja/core/bad-practices": [
+      "バッドプラクティス",
+      "古い参照を再利用する",
+      "コンパイラが許可する理由",
+      "最新の戻り値を使う",
+      "register-を置き換え-api-として使わない"
+    ],
+    "/ja/core/factories": [
+      "ファクトリー",
+      "コンテナーを受け取るファクトリー",
+      "ファクトリー依存関係の宣言",
+      "ファクトリーのライフタイム",
+      "インターフェースをバインドする",
+      "promise-契約を選ぶ"
+    ],
+    "/ja/core/lazy-injection": [
+      "遅延注入",
+      "ライフタイムは保持される",
+      "キャプチャしたスコープとリソース破棄",
+      "循環依存"
+    ],
+    "/ja/core/lifetime-guards": [
+      "ライフタイム",
+      "ライフタイムのルール",
+      "既定の実行時チェック",
+      "fast-true"
+    ],
+    "/ja/core/modules": [
+      "モジュール",
+      "名前付きモジュール",
+      "動的インポート"
+    ],
+    "/ja/core/scope-inputs": [
+      "スコープ入力",
+      "入力の宣言",
+      "型付きプロファイルを開く",
+      "要件の伝播",
+      "ネストしたスコープの所有権",
+      "再利用できる型契約",
+      "入力の契約"
+    ],
+    "/ja/core/scopes": [
+      "スコープとリソース破棄",
+      "スコープ入力",
+      "所有権",
+      "ネイティブのリソース管理",
+      "破棄のプロトコル"
+    ],
+    "/ja/core/symbol-keys": [
+      "symbol-キー",
+      "symbol-を使うべきとき",
+      "lazy-コンパニオン"
+    ],
+    "/ja/core/testing": [
+      "テストとオーバーライド",
+      "型付き-provider",
+      "オーバーライドのタイミング",
+      "所有権",
+      "スコープの局所性"
+    ],
+    "/ja/core/type-safety": [
+      "型安全性",
+      "コンストラクターのシグネチャ",
+      "キーの一意性",
+      "動的キー",
+      "型に含まれるライフタイム",
+      "準備状態と-async-状態"
+    ],
+    "/ja/guide/examples": [
+      "例",
+      "ここから始める",
+      "グループの読み方"
+    ],
+    "/ja/guide/examples/api-layers": [
+      "api-レイヤー",
+      "trpc",
+      "apollo-server",
+      "graphql-yoga"
+    ],
+    "/ja/guide/examples/backend": [
+      "バックエンドフレームワーク",
+      "fastify",
+      "hono",
+      "koa",
+      "express",
+      "elysia"
+    ],
+    "/ja/guide/examples/frontend": [
+      "フロントエンドフレームワーク",
+      "react",
+      "react-native",
+      "vue",
+      "svelte"
+    ],
+    "/ja/guide/examples/fullstack": [
+      "フルスタックフレームワーク",
+      "next-js-app-router",
+      "remix"
+    ],
+    "/ja/guide/examples/javascript": [
+      "javascript-での利用",
+      "node-esm",
+      "node-commonjs",
+      "ブラウザでの-vite-利用"
+    ],
+    "/ja/guide/examples/runtimes-edge": [
+      "ランタイムとエッジプラットフォーム",
+      "node-http",
+      "bun-serve",
+      "deno-http",
+      "cloudflare-workers",
+      "vercel-edge",
+      "deno-deploy",
+      "supabase-edge-functions"
+    ],
+    "/ja/guide/examples/workers-cli": [
+      "ボット、キュー、cli",
+      "telegraf",
+      "grammy",
+      "bullmq",
+      "commander",
+      "yargs"
+    ],
+    "/ja/guide/installation": [
+      "インストール",
+      "node-js",
+      "bun",
+      "deno",
+      "要件",
+      "アダプターのインストール"
+    ],
+    "/ja/guide/performance": [
+      "パフォーマンス",
+      "ベンチマークスイート",
+      "fast-true",
+      "ホットパスの細かな詳細",
+      "transient-サービスの生成",
+      "キーの表現",
+      "ローカルで再現する"
+    ],
+    "/ja/guide/quick-start": [
+      "クイックスタート",
+      "インストール",
+      "グラフを構築する",
+      "サービスを解決する",
+      "ライフタイムを選ぶ",
+      "次に読むページ"
+    ],
+    "/ja/": [],
+    "/ja/reference/api": [
+      "api-サマリー",
+      "container",
+      "登録メソッド",
+      "スコープ入力と解決",
+      "名前空間の型",
+      "公開型",
+      "アダプター-api-の形"
+    ],
+    "/ja/reference/contributors": [
+      "コントリビューター"
+    ],
+    "/ja/reference/errors": [
+      "エラー",
+      "非同期ファクトリーの循環",
+      "アダプターのクリーンアップエラー"
+    ],
+    "/ja/reference/manifesto": [
+      "inferdi-コアアーキテクチャ宣言",
+      "_1-哲学と約束",
+      "ミッション",
+      "価値提案",
+      "_2-妥協できない柱",
+      "_2-1-エンドツーエンドの型安全性",
+      "_2-2-ゼロデコレーター、ゼロ-reflect-metadata",
+      "_2-3-ライフタイムは型である",
+      "_2-3-1-async-モードは型状態である",
+      "_2-3-2-スコープの準備状態は型状態である",
+      "_2-3-3-モジュールは要件契約である",
+      "_2-4-解決のホットパスは小さく保つ",
+      "_2-5-ゼロランタイム依存",
+      "_2-6-破棄は所有権を強制する",
+      "_3-pr-フィルター",
+      "_4-厳格な管理チェックリスト",
+      "ホットパスとランタイム形状",
+      "型システム",
+      "依存とビルド",
+      "ライフサイクルと破棄",
+      "脱出口と動的利用",
+      "_5-意識的なトレードオフ",
+      "_6-非目標"
+    ],
+    "/ja/reference/migration": [
+      "マイグレーション",
+      "_6-0-へのマイグレーション",
+      "ジェネリック-resolver-では準備済みキーを使う",
+      "lazy-コンパニオンでは-named-spec-を使う",
+      "_5-0-へのマイグレーション",
+      "scoped-の解決には子スコープが必要",
+      "fast-true-の固定グラフ契約",
+      "アダプターに関する注意",
+      "_4-0-へのマイグレーション",
+      "_3-0-へのマイグレーション",
+      "_2-0-へのマイグレーション",
+      "container-cradle-が削除されました",
+      "registerclass-lazy-true-が-lazykey-になりました",
+      "バージョンのロックステップ",
+      "アップグレードのチェックリスト",
+      "安定した境界"
+    ],
+    "/reference/api": [
+      "api-summary",
+      "container",
+      "registration-methods",
+      "scope-inputs-and-resolution",
+      "namespace-types",
+      "public-types",
+      "adapter-api-shapes"
+    ],
+    "/reference/contributors": [
+      "contributors"
+    ],
+    "/reference/errors": [
+      "errors",
+      "async-factory-cycles",
+      "adapter-cleanup-errors"
+    ],
+    "/reference/manifesto": [
+      "inferdi-core-architectural-manifesto",
+      "_1-philosophy-and-promise",
+      "mission",
+      "value-proposition",
+      "_2-non-negotiable-pillars",
+      "_2-1-type-safety-end-to-end",
+      "_2-2-zero-decorators-zero-reflect-metadata",
+      "_2-3-lifetime-is-a-type",
+      "_2-3-1-async-mode-is-type-state",
+      "_2-3-2-scope-readiness-is-type-state",
+      "_2-3-3-modules-are-requirement-contracts",
+      "_2-4-the-resolve-hot-path-stays-small",
+      "_2-5-zero-runtime-dependencies",
+      "_2-6-disposal-is-ownership-enforcement",
+      "_3-pr-filter",
+      "_4-strict-control-checklist",
+      "hot-path-and-runtime-shape",
+      "type-system",
+      "dependencies-and-build",
+      "lifecycle-and-disposal",
+      "escape-hatches-and-dynamic-use",
+      "_5-conscious-trade-offs",
+      "_6-non-goals"
+    ],
+    "/reference/migration": [
+      "migration",
+      "migration-to-6-0",
+      "generic-resolver-helpers-use-ready-keys",
+      "named-specs-for-lazy-companions",
+      "migration-to-5-0",
+      "scoped-resolution-requires-a-child-scope",
+      "fast-true-fixed-graph-contract",
+      "adapter-notes",
+      "migration-to-4-0",
+      "migration-to-3-0",
+      "migration-to-2-0",
+      "container-cradle-was-removed",
+      "registerclass-lazy-true-became-lazykey",
+      "version-lockstep",
+      "upgrade-checklist",
+      "stable-boundaries"
+    ],
+    "/ru/adapters/elysia": [
+      "адаптер-elysia",
+      "установка",
+      "scope-запроса",
+      "опции",
+      "режим-без-scope-запроса",
+      "заметки-о-жизненном-цикле",
+      "стриминг"
+    ],
+    "/ru/adapters/express": [
+      "адаптер-express",
+      "установка",
+      "scope-запроса",
+      "опции",
+      "стриминг-и-фоновая-работа",
+      "ограничение-для-упавших-запросов"
+    ],
+    "/ru/adapters/fastify": [
+      "адаптер-fastify",
+      "установка",
+      "scope-запроса",
+      "опции",
+      "режим-без-scope-запроса",
+      "заметки-о-жизненном-цикле"
+    ],
+    "/ru/adapters/hono": [
+      "адаптер-hono",
+      "установка",
+      "scope-запроса",
+      "собственныи-ключ",
+      "опции",
+      "стриминг"
+    ],
+    "/ru/adapters/": [
+      "адаптеры-фреимворков",
+      "пакеты",
+      "общии-контракт-жизненного-цикла",
+      "общие-опции",
+      "правила-ошибок-и-владения",
+      "важные-различия"
+    ],
+    "/ru/adapters/koa": [
+      "адаптер-koa",
+      "установка",
+      "scope-запроса",
+      "собственныи-ключ-state",
+      "опции",
+      "стриминг"
+    ],
+    "/ru/adapters/react": [
+      "react-адаптер",
+      "установка",
+      "привязка-точного-типа-контеинера",
+      "внешние-providers",
+      "управляемые-дочерние-scope",
+      "хуки-сервисов-и-suspense",
+      "идентичность-и-teardown",
+      "strict-mode-и-activity",
+      "серверныи-рендеринг",
+      "ошибки"
+    ],
+    "/ru/core/async-dependencies": [
+      "асинхронные-зависимости",
+      "выбор-promise-модели",
+      "регистрация-async-фабрик",
+      "resolve-и-распространение-async-статуса",
+      "запуск-и-кеширование",
+      "asynclazy-companions",
+      "освобождение-ресурсов-и-ошибки",
+      "legacy-promise-значения",
+      "динамические-границы"
+    ],
+    "/ru/core/bad-practices": [
+      "плохие-практики",
+      "повторное-использование-старои-ссылки",
+      "почему-компилятор-разрешает-такои-код",
+      "используите-последнюю-возвращенную-ссылку",
+      "не-используите-register-для-замены-регистрации"
+    ],
+    "/ru/core/factories": [
+      "фабрики",
+      "фабрики-с-доступом-к-контеинеру",
+      "объявленные-зависимости-фабрики",
+      "время-жизни-фабрик",
+      "привязка-интерфеисов",
+      "выбор-promise-контракта"
+    ],
+    "/ru/core/lazy-injection": [
+      "ленивое-внедрение",
+      "время-жизни-сохраняется",
+      "захваченныи-скоуп-и-освобождение-ресурсов",
+      "циклические-зависимости"
+    ],
+    "/ru/core/lifetime-guards": [
+      "время-жизни",
+      "правило-жизненного-цикла",
+      "runtime-проверки-по-умолчанию",
+      "fast-true"
+    ],
+    "/ru/core/modules": [
+      "модули",
+      "именованные-модули",
+      "динамические-импорты"
+    ],
+    "/ru/core/scope-inputs": [
+      "входные-данные-скоупа",
+      "объявление-данных",
+      "типизированные-профили",
+      "распространение-требовании",
+      "владение-вложенными-скоупами",
+      "переиспользуемые-контракты-типов",
+      "контракт-входных-данных"
+    ],
+    "/ru/core/scopes": [
+      "скоупы-и-освобождение-ресурсов",
+      "входные-данные-скоупа",
+      "владение",
+      "нативное-управление-ресурсами",
+      "порядок-очистки"
+    ],
+    "/ru/core/symbol-keys": [
+      "символьные-ключи",
+      "когда-использовать-symbol-ключи",
+      "lazy-companion-ключи"
+    ],
+    "/ru/core/testing": [
+      "тестирование",
+      "типизированные-providers",
+      "когда-делать-override",
+      "владение",
+      "локальность-scope"
+    ],
+    "/ru/core/type-safety": [
+      "типобезопасность",
+      "сигнатуры-конструкторов",
+      "уникальность-ключеи",
+      "динамические-ключи",
+      "время-жизни-в-типе",
+      "готовность-и-async-status"
+    ],
+    "/ru/guide/examples": [
+      "примеры",
+      "начните-отсюда",
+      "как-читать-группы"
+    ],
+    "/ru/guide/examples/api-layers": [
+      "api-слои",
+      "trpc",
+      "apollo-server",
+      "graphql-yoga"
+    ],
+    "/ru/guide/examples/backend": [
+      "бэкенд-фреимворки",
+      "fastify",
+      "hono",
+      "koa",
+      "express",
+      "elysia"
+    ],
+    "/ru/guide/examples/frontend": [
+      "фронтенд-фреимворки",
+      "react",
+      "react-native",
+      "vue",
+      "svelte"
+    ],
+    "/ru/guide/examples/fullstack": [
+      "фулстек-фреимворки",
+      "next-js-app-router",
+      "remix"
+    ],
+    "/ru/guide/examples/javascript": [
+      "javascript",
+      "node-esm",
+      "node-commonjs",
+      "браузер-с-vite"
+    ],
+    "/ru/guide/examples/runtimes-edge": [
+      "рантаимы-и-edge-платформы",
+      "node-http",
+      "bun-serve",
+      "deno-http",
+      "cloudflare-workers",
+      "vercel-edge",
+      "deno-deploy",
+      "supabase-edge-functions"
+    ],
+    "/ru/guide/examples/workers-cli": [
+      "боты-очереди-и-cli",
+      "telegraf",
+      "grammy",
+      "bullmq",
+      "commander",
+      "yargs"
+    ],
+    "/ru/guide/installation": [
+      "установка",
+      "node-js",
+      "bun",
+      "deno",
+      "требования",
+      "установка-адаптеров"
+    ],
+    "/ru/guide/performance": [
+      "производительность",
+      "набор-бенчмарков",
+      "fast-true",
+      "детали-горячего-пути",
+      "создание-transient-сервисов",
+      "представление-ключеи",
+      "запуск-локально"
+    ],
+    "/ru/guide/quick-start": [
+      "быстрыи-старт",
+      "установка",
+      "сборка-графа",
+      "получение-сервисов",
+      "выбор-времени-жизни",
+      "куда-дальше"
+    ],
+    "/ru/": [],
+    "/ru/reference/api": [
+      "справочник-api",
+      "container",
+      "методы-регистрации",
+      "scope-inputs-и-разрешение",
+      "типы-namespace",
+      "публичные-типы",
+      "форма-api-адаптеров"
+    ],
+    "/ru/reference/contributors": [
+      "контрибьюторы"
+    ],
+    "/ru/reference/errors": [
+      "ошибки",
+      "циклы-async-фабрик",
+      "ошибки-очистки-в-адаптерах"
+    ],
+    "/ru/reference/manifesto": [
+      "архитектурныи-манифест-ядра-inferdi",
+      "_1-философия-и-обещание",
+      "миссия",
+      "ценность",
+      "_2-необсуждаемые-опоры",
+      "_2-1-сквозная-типобезопасность",
+      "_2-2-никаких-декораторов-и-reflect-metadata",
+      "_2-3-lifetime-является-типом",
+      "_2-3-1-async-режим-является-состоянием-типа",
+      "_2-3-2-готовность-scope-является-состоянием-типа",
+      "_2-3-3-модули-являются-контрактами-требовании",
+      "_2-4-горячии-путь-разрешения-остается-маленьким",
+      "_2-5-нулевые-runtime-зависимости",
+      "_2-6-disposal-обеспечивает-соблюдение-владения",
+      "_3-фильтр-pr",
+      "_4-чек-лист-строгого-контроля",
+      "горячии-путь-и-runtime-форма",
+      "система-типов",
+      "зависимости-и-сборка",
+      "жизненныи-цикл-и-disposal",
+      "лазеики-и-динамическое-использование",
+      "_5-осознанные-компромиссы",
+      "_6-не-цели"
+    ],
+    "/ru/reference/migration": [
+      "миграция",
+      "переход-на-6-0",
+      "generic-resolver-использует-готовые-ключи",
+      "именованные-specs-для-lazy-companion",
+      "переход-на-5-0",
+      "scoped-разрешение-требует-дочернии-scope",
+      "контракт-фиксированного-графа-fast-true",
+      "заметки-по-адаптерам",
+      "переход-на-4-0",
+      "переход-на-3-0",
+      "переход-на-2-0",
+      "container-cradle-удален",
+      "registerclass-lazy-true-стал-lazykey",
+      "версии-в-lockstep",
+      "чеклист-обновления",
+      "стабильные-границы"
+    ],
+    "/zh/adapters/elysia": [
+      "elysia-适配器",
+      "安装",
+      "请求作用域",
+      "选项",
+      "仅根模式",
+      "生命周期说明",
+      "流式"
+    ],
+    "/zh/adapters/express": [
+      "express-适配器",
+      "安装",
+      "请求作用域",
+      "选项",
+      "流式与后台工作",
+      "失败请求的注意事项"
+    ],
+    "/zh/adapters/fastify": [
+      "fastify-适配器",
+      "安装",
+      "请求作用域",
+      "选项",
+      "仅根模式",
+      "生命周期说明"
+    ],
+    "/zh/adapters/hono": [
+      "hono-适配器",
+      "安装",
+      "请求作用域",
+      "自定义键",
+      "选项",
+      "流式"
+    ],
+    "/zh/adapters/": [
+      "框架适配器",
+      "软件包",
+      "通用生命周期契约",
+      "共享选项",
+      "错误与所有权规则",
+      "重要差异"
+    ],
+    "/zh/adapters/koa": [
+      "koa-适配器",
+      "安装",
+      "请求作用域",
+      "自定义状态键",
+      "选项",
+      "流式"
+    ],
+    "/zh/adapters/react": [
+      "react-适配器",
+      "安装",
+      "绑定精确的容器类型",
+      "外部-providers",
+      "托管子-scope",
+      "服务-hooks-与-suspense",
+      "身份与-teardown",
+      "strict-mode-与-activity",
+      "服务端渲染",
+      "错误"
+    ],
+    "/zh/core/async-dependencies": [
+      "异步依赖",
+      "选择-promise-模型",
+      "注册异步工厂",
+      "解析与异步状态传播",
+      "调度与缓存",
+      "asynclazy-伴生键",
+      "资源释放与失败",
+      "旧式-promise-值",
+      "动态边界"
+    ],
+    "/zh/core/bad-practices": [
+      "不良实践",
+      "复用旧引用",
+      "编译器为何允许这段代码",
+      "使用最新返回的引用",
+      "不要把-register-当作替换-api"
+    ],
+    "/zh/core/factories": [
+      "工厂",
+      "可访问容器的工厂",
+      "声明工厂依赖",
+      "工厂生命周期",
+      "绑定接口",
+      "选择-promise-契约"
+    ],
+    "/zh/core/lazy-injection": [
+      "惰性注入",
+      "生命周期得以保留",
+      "捕获的作用域与资源释放",
+      "循环依赖"
+    ],
+    "/zh/core/lifetime-guards": [
+      "生命周期",
+      "生命周期规则",
+      "默认运行时检查",
+      "fast-true"
+    ],
+    "/zh/core/modules": [
+      "模块",
+      "具名模块",
+      "动态导入"
+    ],
+    "/zh/core/scope-inputs": [
+      "作用域输入",
+      "声明输入",
+      "打开类型安全的配置",
+      "要求会沿依赖图传播",
+      "嵌套作用域的所有权",
+      "可复用的类型契约",
+      "输入契约"
+    ],
+    "/zh/core/scopes": [
+      "作用域与资源释放",
+      "作用域输入",
+      "所有权",
+      "原生资源管理",
+      "释放协议"
+    ],
+    "/zh/core/symbol-keys": [
+      "symbol-键",
+      "何时使用-symbol",
+      "惰性伴随项"
+    ],
+    "/zh/core/testing": [
+      "测试与覆盖",
+      "类型化-provider",
+      "覆盖时机",
+      "所有权",
+      "作用域局部性"
+    ],
+    "/zh/core/type-safety": [
+      "类型安全",
+      "构造函数签名",
+      "键的唯一性",
+      "动态键",
+      "类型中的生命周期",
+      "就绪状态与异步状态"
+    ],
+    "/zh/guide/examples": [
+      "示例",
+      "从这里开始",
+      "如何阅读这些分组"
+    ],
+    "/zh/guide/examples/api-layers": [
+      "api-层",
+      "trpc",
+      "apollo-server",
+      "graphql-yoga"
+    ],
+    "/zh/guide/examples/backend": [
+      "后端框架",
+      "fastify",
+      "hono",
+      "koa",
+      "express",
+      "elysia"
+    ],
+    "/zh/guide/examples/frontend": [
+      "前端框架",
+      "react",
+      "react-native",
+      "vue",
+      "svelte"
+    ],
+    "/zh/guide/examples/fullstack": [
+      "全栈框架",
+      "next-js-app-router",
+      "remix"
+    ],
+    "/zh/guide/examples/javascript": [
+      "javascript-用法",
+      "node-esm",
+      "node-commonjs",
+      "在浏览器中使用-vite"
+    ],
+    "/zh/guide/examples/runtimes-edge": [
+      "运行时与边缘平台",
+      "node-http",
+      "bun-serve",
+      "deno-http",
+      "cloudflare-workers",
+      "vercel-edge",
+      "deno-deploy",
+      "supabase-edge-functions"
+    ],
+    "/zh/guide/examples/workers-cli": [
+      "机器人、队列与-cli",
+      "telegraf",
+      "grammy",
+      "bullmq",
+      "commander",
+      "yargs"
+    ],
+    "/zh/guide/installation": [
+      "安装",
+      "node-js",
+      "bun",
+      "deno",
+      "环境要求",
+      "适配器安装"
+    ],
+    "/zh/guide/performance": [
+      "性能",
+      "基准测试套件",
+      "fast-true",
+      "热路径的小细节",
+      "transient-服务的构造",
+      "键的表示方式",
+      "在本地复现"
+    ],
+    "/zh/guide/quick-start": [
+      "快速开始",
+      "安装",
+      "构建依赖图",
+      "解析服务",
+      "选择生命周期",
+      "下一步"
+    ],
+    "/zh/": [],
+    "/zh/reference/api": [
+      "api-概览",
+      "container",
+      "注册方法",
+      "作用域输入与解析",
+      "命名空间类型",
+      "公开类型",
+      "适配器-api-形态"
+    ],
+    "/zh/reference/contributors": [
+      "贡献者"
+    ],
+    "/zh/reference/errors": [
+      "错误",
+      "异步工厂之间的循环",
+      "适配器清理错误"
+    ],
+    "/zh/reference/manifesto": [
+      "inferdi-核心架构宣言",
+      "_1-哲学与承诺",
+      "使命",
+      "价值主张",
+      "_2-不可妥协的支柱",
+      "_2-1-端到端的类型安全",
+      "_2-2-零装饰器-零反射元数据",
+      "_2-3-生命周期即类型",
+      "_2-3-1-异步模式是类型状态",
+      "_2-3-2-作用域就绪性是类型状态",
+      "_2-3-3-模块是需求契约",
+      "_2-4-解析热路径保持精简",
+      "_2-5-零运行时依赖",
+      "_2-6-释放用于落实所有权",
+      "_3-pr-过滤器",
+      "_4-严格控制清单",
+      "热路径与运行时形态",
+      "类型系统",
+      "依赖与构建",
+      "生命周期与释放",
+      "逃逸口与动态使用",
+      "_5-有意识的取舍",
+      "_6-非目标"
+    ],
+    "/zh/reference/migration": [
+      "迁移",
+      "迁移到-6-0",
+      "泛型-resolver-使用就绪键",
+      "lazy-伴随项使用具名-spec",
+      "迁移到-5-0",
+      "scoped-解析需要子作用域",
+      "fast-true-的固定依赖图契约",
+      "适配器说明",
+      "迁移到-4-0",
+      "迁移到-3-0",
+      "迁移到-2-0",
+      "移除了-container-cradle",
+      "registerclass-lazy-true-变为-lazykey",
+      "版本一致-lockstep",
+      "升级清单",
+      "稳定边界"
+    ]
+  }
+}

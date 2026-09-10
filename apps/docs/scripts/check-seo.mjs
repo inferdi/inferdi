@@ -12,7 +12,9 @@ const languages = {
   ru: 'ru',
   zh: 'zh-Hans',
   ja: 'ja',
-  es: 'es'
+  es: 'es',
+  de: 'de',
+  fr: 'fr'
 }
 const retiredAsyncSlug = ['async', 'dependency', 'graph'].join('-')
 const errors = []
@@ -52,7 +54,7 @@ const canonicalFor = (relative) => {
 }
 
 const localeFor = (relative) =>
-  relative.match(/^(ru|zh|ja|es)\//)?.[1] ?? 'en'
+  relative.match(/^(ru|zh|ja|es|de|fr)\//)?.[1] ?? 'en'
 
 const htmlFiles = (await walk(outputRoot))
   .filter((file) => file.endsWith('.html'))
@@ -109,7 +111,7 @@ for (const file of htmlFiles) {
 
   for (const [alternateLocale, language] of Object.entries(languages)) {
     const alternate = alternates.find((tag) => attribute(tag, 'hreflang') === language)
-    const route = relative.replace(/^(ru|zh|ja|es)\//, '')
+    const route = relative.replace(/^(ru|zh|ja|es|de|fr)\//, '')
     const localizedRoute = alternateLocale === 'en' ? route : `${alternateLocale}/${route}`
     const expected = canonicalFor(localizedRoute)
     if (attribute(alternate ?? '', 'href') !== expected) {
@@ -118,12 +120,12 @@ for (const file of htmlFiles) {
   }
 
   const defaultAlternate = alternates.find((tag) => attribute(tag, 'hreflang') === 'x-default')
-  const englishRoute = relative.replace(/^(ru|zh|ja|es)\//, '')
+  const englishRoute = relative.replace(/^(ru|zh|ja|es|de|fr)\//, '')
   if (attribute(defaultAlternate ?? '', 'href') !== canonicalFor(englishRoute)) {
     errors.push(`${relative}: x-default alternate does not point to English`)
   }
   if (alternates.length !== Object.keys(languages).length + 1) {
-    errors.push(`${relative}: expected six language alternates, found ${alternates.length}`)
+    errors.push(`${relative}: expected ${Object.keys(languages).length + 1} language alternates, found ${alternates.length}`)
   }
 
   if (metaContent('og:url') !== expectedCanonical) errors.push(`${relative}: og:url does not match canonical`)
@@ -148,7 +150,7 @@ for (const file of htmlFiles) {
       const organization = graph.find((item) => item['@type'] === 'Organization')
       const software = graph.find((item) => item['@type'] === 'SoftwareApplication')
       const isRootHome = relative === 'index.html'
-      const isHome = isRootHome || /^(ru|zh|ja|es)\/index\.html$/.test(relative)
+      const isHome = isRootHome || /^(ru|zh|ja|es|de|fr)\/index\.html$/.test(relative)
 
       if (webPage === undefined) errors.push(`${relative}: missing WebPage schema`)
       if (webPage?.isPartOf?.['@id'] !== websiteId) {
@@ -245,5 +247,5 @@ if (errors.length > 0) {
   for (const error of errors) console.error(`- ${error}`)
   process.exitCode = 1
 } else {
-  console.log(`SEO check passed: ${indexablePages.length} indexable pages with unique metadata and six language alternates`)
+  console.log(`SEO check passed: ${indexablePages.length} indexable pages with unique metadata and ${Object.keys(languages).length + 1} language alternates`)
 }

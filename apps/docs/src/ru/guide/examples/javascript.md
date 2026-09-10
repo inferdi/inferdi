@@ -1,11 +1,11 @@
 # JavaScript
 
-InferDI написан на TypeScript, но JavaScript-проекты используют собранный npm-пакет через карту package exports.
+InferDI написан на TypeScript, но JavaScript-проекты используют собранный npm-пакет через поле `exports` пакета.
 
 | Пример | Что показывает |
 | --- | --- |
 | [`node-esm.mjs`](https://github.com/inferdi/inferdi/blob/main/examples/javascript/node-esm.mjs) | ESM-импорт в Node с `// @ts-check` и типами конструкторов через JSDoc |
-| [`node-commonjs.cjs`](https://github.com/inferdi/inferdi/blob/main/examples/javascript/node-commonjs.cjs) | CommonJS `require()` в Node через package exports |
+| [`node-commonjs.cjs`](https://github.com/inferdi/inferdi/blob/main/examples/javascript/node-commonjs.cjs) | CommonJS `require()` в Node через `exports` пакета |
 | [`browser-vite.js`](https://github.com/inferdi/inferdi/blob/main/examples/javascript/browser-vite.js) | ESM для браузера через Vite или другой сборщик |
 
 ## Node ESM

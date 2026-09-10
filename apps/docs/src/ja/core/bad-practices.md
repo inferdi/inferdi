@@ -50,3 +50,70 @@ container.get('consumer')
 本番用グラフを構築するときは、各キーの実装を一度だけ選びます。設定に応じて実装を選ぶ場合は、通常の条件分岐か `.use()` を使ってください。
 
 テストでは、置き換え後も元のライフタイム、遅延モード、非同期モードを保てる場合に限り、解決前に `.override()` を使用できます。`.override()` で同期登録を宣言的な非同期登録へ変換することはできません。[テストとオーバーライド](./testing)も参照してください。
+
+## ビジネスロジックでの Service Locator
+
+ドメインサービスへコンテナーを渡すと本当の依存関係が隠れ、キー不足の失敗が呼び出し箇所まで遅れます。サービス自体を渡してください。
+
+```ts
+class UserController {
+  constructor(
+    private readonly container: AppContainer // [!code --]
+    private readonly users: UserRepo // [!code ++]
+  ) {}
+
+  show(id: string) {
+    return this.container.get('users').find(id) // [!code --]
+    return this.users.find(id) // [!code ++]
+  }
+}
+```
+
+組み立てコードで必要な resolver-aware factory は構成ルートに置きます。
+
+## グローバルなリクエストスコープ
+
+変更可能なグローバルスコープは、並行する別のリクエストへ値を漏らす可能性があります。リクエスト境界の中で作成して閉じてください。
+
+```ts
+let currentScope = root.createScope({ request }) // [!code warning]
+
+async function handle(request: Request) {
+  const scope = root.createScope({ request }) // [!code focus]
+  try {
+    return await scope.getAsync('handler')
+  } finally {
+    await scope.dispose()
+  }
+}
+```
+
+フレームワークアダプターは同じ所有権規則を保ったまま、この境界を自動化します。
+
+## 具体的なコンテナー型を失う
+
+`Container` という注釈は蓄積したグラフ状態を消します。builder の戻り値を推論させ、そこから alias を作ります。
+
+```ts
+const buildContainer = (): Container => new Container() // [!code --]
+const buildContainer = () => new Container() // [!code ++]
+  .registerClass('users', UserRepo, [])
+
+type AppContainer = ReturnType<typeof buildContainer>
+```
+
+アプリケーションが所有するコンテナーとスコープの alias には `ReturnType` を使い、generic arguments を手作業で再現しないでください。
+
+## 所有権を失う
+
+対応する cleanup なしでスコープを作ると、所有する scoped インスタンスが解放されません。作成と同じライフサイクル境界で cleanup します。
+
+```ts
+const scope = root.createScope({ request }) // [!code warning]
+return scope.get('handler').run()
+
+await using ownedScope = root.createScope({ request }) // [!code focus]
+return ownedScope.get('handler').run()
+```
+
+toolchain が `await using` を使えない場合は、`try/finally` と `await scope.dispose()` を使います。values、overrides、scope inputs、transient の結果は呼び出し元が所有し、それぞれの cleanup 方針が必要です。

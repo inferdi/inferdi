@@ -50,11 +50,32 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 }
 ```
 
-`fast` 默认为 `false`：运行时循环与生命周期检查保持启用，作用域保留精确的可变父链。
-`{fast: true}` 会关闭这些记录，并把依赖图视为固定图，从而启用扁平化父级
-查找和继承 singleton 镜像。子作用域会继承根容器的配置。在 fast 容器树中，
-必须在第一次解析或调用 `createScope()` 前完成所有 `register*`、`.use()` 和
-`.override()` 调用，并先释放子容器，再释放祖先容器。
+## 容器选项
+
+构造函数接受一个可选设置：
+
+| 选项 | 类型 | 默认值 | 用途 |
+| --- | --- | --- | --- |
+| `fast` | `boolean` | `false` | 在经过检查的可变契约与未经运行时检查的固定图契约之间选择 |
+
+```ts
+const checked = new Container()
+const explicitChecked = new Container({ fast: false })
+const fast = new Container({ fast: true })
+```
+
+默认形式和显式 `false` 会保留运行时循环与生命周期检查，禁止从根容器解析
+scoped 服务，并使用精确的可变父链。开发、测试、热重载以及启动后仍可能变更的
+依赖图都应使用此契约。
+
+字面量 `{fast: true}` 保留所有 TypeScript 检查，但关闭运行时循环与生命周期记录，
+包括根容器的 scoped 检查。它把容器树视为固定结构，让作用域直接访问注册表所有者，
+并将委托解析的 singleton 镜像到本地作用域缓存中。子作用域继承根容器的配置。
+
+在 fast 容器树中，必须在第一次解析或调用 `createScope()` 前完成所有 `register*`、
+`.use()` 和 `.override()` 调用；激活后保持容器树不变，并先释放子容器，再释放祖先
+容器。只有字面量 `true` 会启用此契约；其他运行时值会回退到经过检查的契约。
+[性能](../guide/performance#fast-true)说明了此选择影响的操作，以及何时值得采用这一取舍。
 
 ## 注册方法
 
@@ -171,7 +192,9 @@ type Module<TRequirements extends DependenciesMap, TProvides extends Dependencie
 
 ## 适配器 API 形态
 
-每个适配器都会导出：
+### HTTP 适配器
+
+Fastify、Hono、Koa、Express 和 Elysia 导出：
 
 - 集成函数，例如 `inferdiFastify`
 - `skipInferdiDispose`
@@ -179,4 +202,8 @@ type Module<TRequirements extends DependenciesMap, TProvides extends Dependencie
 - 结构化的 `InferdiScope`、`InferdiRoot` 和 `InferdiScopeOf` 辅助类型
 - 框架专属的选项与上下文辅助类型
 
-框架专属的泛型名称和生命周期细节请参阅各适配器页面。
+### React 适配器
+
+React 导出 `inferdiReact`，以及 binding、外部 `Provider`、托管 `ScopeProvider`、服务 Hook、依赖图提取、稳定同步/异步键和作用域生命周期选项的类型。它不导出 `skipInferdiDispose`，因为组件作用域跟随 React 的提交与 effect 清理，而不是 HTTP 请求生命周期。
+
+准确名称和生命周期细节请参阅各适配器页面。

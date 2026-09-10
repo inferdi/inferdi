@@ -10,6 +10,7 @@ pnpm add @inferdi/inferdi @inferdi/fastify fastify
 
 ```ts
 import Fastify, { type FastifyRequest } from 'fastify'
+import { Container } from '@inferdi/inferdi'
 import { inferdiFastify } from '@inferdi/fastify'
 ```
 
@@ -18,7 +19,22 @@ import { inferdiFastify } from '@inferdi/fastify'
 Publish your concrete container types with module augmentation:
 
 ```ts
-const root = buildRootContainer()
+type RequestContext = {
+  requestId: string
+  ip: string
+}
+
+class Users {
+  constructor(readonly request: RequestContext) {}
+
+  profile(id: string) {
+    return { id, requestId: this.request.requestId }
+  }
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('users', Users, ['request'], 'scoped')
 const app = Fastify()
 
 type RootContainer = typeof root
@@ -92,3 +108,5 @@ Root-only mode installs no request decoration and no request lifecycle hooks.
 - A failed request ignores `skipInferdiDispose` and still disposes, subject to `autoDispose`.
 - Client abort cleanup runs in `onRequestAbort` after a scope has been exposed.
 - Root disposal errors propagate through `fastify.close()` only when `disposeRootOnClose` is enabled.
+
+With `autoDispose: false` or a predicate returning `false`, `request.di` remains available after response or abort cleanup so application code can dispose the retained scope.

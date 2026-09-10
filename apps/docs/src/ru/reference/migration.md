@@ -1,6 +1,6 @@
 # Миграция
 
-InferDI документирует breaking changes по major versions. Источник истины остаётся в [`packages/inferdi/MIGRATION.md`](https://github.com/inferdi/inferdi/blob/main/packages/inferdi/MIGRATION.md), а текущий путь миграции собран здесь.
+Несовместимые изменения InferDI описаны отдельно для каждой основной версии. Полный список находится в [`packages/inferdi/MIGRATION.md`](https://github.com/inferdi/inferdi/blob/main/packages/inferdi/MIGRATION.md); здесь собраны инструкции по переходу.
 
 ## Переход на 6.0
 
@@ -8,18 +8,18 @@ InferDI документирует breaking changes по major versions. Ист�
 пакеты `@inferdi/*` до `6.0.0`: адаптеры требуют
 `@inferdi/inferdi@^6.0.0`.
 
-- Замените `RegistrationKind` на `Lifetime`, а `Spec.kind` на `Spec.lifetime`; deprecated alias не оставлен.
-- В стабильной v5 не было deps-aware overload для `registerFactory`. V6 добавляет `registerFactory(key, factory, deps, ...)`; менять порядок аргументов нужно только пользователям prerelease-формы `registerFactory(key, deps, factory, ...)`. Companion sync-фабрики требует явный lifetime, включая `'singleton'`.
-- Замените v5 `{strict: false}` на `{fast: true}`, а `{strict: true}` — на значение по умолчанию или `{fast: false}`. Смысл boolean инвертирован. Prerelease-опция `mode` удалена.
-- Именованный `Module<TRequirements, TProvides>` принимает actual graph с дополнительными регистрациями, сохраняет их, точно проверяет requirements и запрещает collisions outputs. `new Container(parent)` больше не public; используйте `createScope()`.
-- Регистрация теперь отклоняет любой тип ключа, который может пересечься с существующим основным или lazy-ключом. Сузьте broad- или union-ключ до нового значения либо используйте `.override()` для намеренной замены.
-- V6 добавляет type-only scope inputs через `declareScopeInputs<Inputs>()` и `createScope(inputs)`. Существующие scope без аргументов сохраняют поведение v5.
-- V6 добавляет `registerAsyncFactory`, `AsyncSpec` и `getAsync()` для декларативных async-зависимостей. Promise-valued `registerFactory` остаётся синхронным сервисом графа и по-прежнему разрешается через `get()`.
-- Async teardown сообщает общий объект rejection один раз, если ошибка зависимости прошла через несколько закешированных Promise. Sync teardown наблюдает rejection нативного Promise до выброса ошибки об async-использовании.
+- Замените `RegistrationKind` на `Lifetime`, а `Spec.kind` на `Spec.lifetime`. Псевдонимы старых имён не сохранены.
+- В стабильной v5 у `registerFactory` не было перегрузки с объявленными зависимостями. V6 добавляет `registerFactory(key, factory, deps, ...)`. Порядок аргументов нужно менять только тем, кто использовал предварительную версию с формой `registerFactory(key, deps, factory, ...)`. Для ленивой обёртки синхронной фабрики время жизни указывается явно, включая `singleton`.
+- Замените `{strict: false}` из v5 на `{fast: true}`, а `{strict: true}` на значение по умолчанию или `{fast: false}`. Смысл логического флага обратный. Опция `mode` из предварительных версий удалена.
+- Именованный `Module<TRequirements, TProvides>` принимает граф с дополнительными регистрациями и сохраняет их. Требования проверяются точно, добавляемые ключи не должны пересекаться с существующими. Конструктор `new Container(parent)` больше не входит в публичный API; используйте `createScope()`.
+- Регистрация отклоняет любой тип ключа, который может пересечься с существующим основным ключом или ключом ленивой обёртки. Сузьте широкий тип или объединение до заведомо нового значения. Для намеренной подмены используйте `.override()`.
+- В V6 входные данные скоупа объявляются только в типах через `declareScopeInputs<Inputs>()`, а передаются через `createScope(inputs)`. Вызов без аргументов сохраняет поведение v5.
+- V6 добавляет `registerAsyncFactory`, `AsyncSpec` и `getAsync()` для декларативных асинхронных зависимостей. Фабрика `registerFactory`, возвращающая Promise, остаётся синхронной записью графа и доступна через `get()`.
+- При асинхронном освобождении ресурсов один и тот же объект ошибки сообщается один раз, даже если он прошёл через несколько закэшированных Promise. Синхронное освобождение подписывается на отклонение нативного Promise до того, как сообщить об ошибочном использовании асинхронного ресурса.
 
-### Generic resolver использует готовые ключи
+### Обобщённые функции используют готовые ключи {#generic-resolver-использует-готовые-ключи}
 
-`.get()` теперь принимает готовые синхронные ключи, для которых предоставлены scope inputs. У конкретных контейнеров без scope inputs набор синхронных ключей не меняется. Generic helpers с `K extends keyof T` должны учитывать готовность и async status.
+`.get()` теперь принимает готовые синхронные ключи, для которых предоставлены входные данные скоупа. У конкретных контейнеров без входных данных скоупа набор синхронных ключей не меняется. Обобщённые вспомогательные функции с `K extends keyof T` должны учитывать готовность и асинхронность.
 
 ```ts
 // Before
@@ -39,73 +39,57 @@ function resolve<
 }
 ```
 
-Для generic helper с `getAsync()` используйте `Container.ReadyKeys<Container<T>>`. Generic `T extends DependenciesMap` может содержать декларативные async-записи или сервисы, заблокированные недостающими scope inputs.
+Для обобщённой функции, вызывающей `getAsync()`, используйте `Container.ReadyKeys<Container<T>>`. Параметр типа `T extends DependenciesMap` может включать декларативные асинхронные записи или сервисы, которым ещё не переданы входные данные скоупа.
 
-### Именованные specs для lazy companion
+### Именованные типы ленивых обёрток {#именованные-specs-для-lazy-companion}
 
-`LazySpec` теперь содержит private type-only mode brand; v6 также добавляет
-`AsyncLazySpec`. В явных `Container` и `Module` shapes используйте эти
-именованные exports вместо структурного `{type, lifetime, lazyOf}`. Runtime-поля у
-brand нет.
+В `LazySpec` появился закрытый маркер режима, существующий только в системе типов; v6 также добавляет `AsyncLazySpec`. В явных описаниях `Container` и `Module` используйте эти экспортируемые типы вместо структуры `{type, lifetime, lazyOf}`. Маркер не создаёт поля во время выполнения.
 
-Пятый `lazyKey` у `registerAsyncFactory` создаёт `AsyncLazy<T>`. Async-класс
-использует тот же wrapper, mixed sync/async класс возвращает
-`Lazy<T> | AsyncLazy<T>`. Promise-valued `registerFactory` сохраняет
-`Lazy<Promise<T>>`. `Container.ResolveUnwrapped` distributive-разворачивает все
-управляемые варианты.
+Пятый аргумент `lazyKey` у `registerAsyncFactory` создаёт `AsyncLazy<T>`. Асинхронный класс использует такую же обёртку. Если ключ зависимости допускает синхронный или асинхронный сервис, класс получает `Lazy<T> | AsyncLazy<T>`. Фабрика `registerFactory`, возвращающая Promise, сохраняет `Lazy<Promise<T>>`. Тип `Container.ResolveUnwrapped` разворачивает все управляемые варианты, в том числе каждый вариант объединения.
 
 Новые наборы ключей описаны в [Справочнике API](./api), [Входных данных скоупа](../core/scope-inputs) и [Асинхронных зависимостях](../core/async-dependencies).
 
 ## Переход на 5.0
 
-Первый релиз v5 затрагивал только адаптеры. Повышение версии нужно, чтобы все опубликованные пакеты остались в синхронных версиях, а адаптеры фреймворков использовали общий контракт очистки. Более поздние сборки v5 также закрепляют владение через дочерний scope и ужесточают описанный ниже контракт `{fast: true}`.
+Первый релиз v5 затрагивал только адаптеры. Повышение версии нужно, чтобы все опубликованные пакеты остались на одной версии, а адаптеры фреймворков использовали общий контракт очистки. Более поздние сборки v5 также закрепляют владение через дочерний скоуп и ужесточают описанный ниже контракт `{fast: true}`.
 
 Общие контракты адаптеров:
 
 - `createScope`, `setupScope`, `disposeScope`, `autoDispose` и `onDisposeError` используют одинаковые термины.
 - `MaybePromise`, `InferdiScope`, `InferdiRoot` и `InferdiScopeOf` экспортируются во всех адаптерах.
-- Если `setupScope` падает, адаптер поднимает только исходную ошибку setup.
-- Ошибки очистки во время setup teardown идут в `onDisposeError` или приёмник адаптера.
-- Упавший запрос очищает scope даже после `skipInferdiDispose`, кроме документированного ограничения Express.
-- Cleanup hooks видят публичный слот scope, пока выполняются.
+- Если `setupScope` падает, адаптер передаёт дальше только исходную ошибку настройки.
+- Ошибки очистки при освобождении скоупа после ошибки настройки идут в `onDisposeError` или стандартный обработчик адаптера.
+- Упавший запрос освобождает скоуп даже после `skipInferdiDispose`, кроме документированного ограничения Express.
+- Хуки очистки видят публичное поле скоупа, пока выполняются.
 
-### Scoped-разрешение требует дочерний scope
+### Получайте scoped-сервисы из дочернего скоупа {#scoped-разрешение-требует-дочернии-scope}
 
-При `{fast: false}` (по умолчанию) resolve scoped-ключа из root теперь выбрасывает `Scoped "key" cannot be resolved from the root container. Use createScope().` Создайте дочерний контейнер через `const scope = root.createScope()`, вызовите `scope.get(scopedKey)` и освободите scope на его границе жизненного цикла. `{fast: true}` отключает эту runtime-проверку, но scoped-сервисы всё равно следует получать из дочерних scope.
+При `{fast: false}` (по умолчанию) получение scoped-сервиса из корневого контейнера теперь выбрасывает `Scoped "key" cannot be resolved from the root container. Use createScope().` Создайте дочерний контейнер через `const scope = root.createScope()`, вызовите `scope.get(scopedKey)` и освободите скоуп на его границе жизненного цикла. `{fast: true}` отключает эту проверку во время выполнения, но scoped-сервисы всё равно следует получать из дочерних скоупов.
 
 ### Контракт фиксированного графа `fast: true`
 
-`new Container({fast: true})` читает неизменяемый root registry
-напрямую из scope, избегает прохода по родителям, а delegated singleton
-зеркалирует в cache scope. Strict scope при каждом локальном промахе проходит
-точную цепочку родителей вместо хранения снимков lookup, поэтому мутации видны
-без инвалидации и метаданных на каждом scope. Дедупликация owned-инстансов
-выполняется во время disposal в обоих режимах. Регистрируйте каждый runtime-ключ
-один раз в одной линейной fluent-цепочке, завершите регистрацию до первого
-resolve или создания scope, не меняйте активированное дерево и закрывайте
-дочерние scope раньше предков. Для hot reload и любого дерева, которое меняется
-после активации, используйте `{fast: false}`.
+При `new Container({fast: true})` скоуп обращается напрямую к неизменяемому корневому реестру, пропуская цепочку родителей. Singleton-значения, полученные у предка, также сохраняются в кэше скоупа. В проверяемом режиме локальный промах каждый раз запускает поиск по точной цепочке родителей. Снимки результатов поиска не хранятся, поэтому изменения видны без инвалидации и дополнительных метаданных в скоупах. В обоих режимах повторяющиеся ссылки на принадлежащие контейнеру экземпляры удаляются при освобождении ресурсов. Регистрируйте каждый ключ один раз в одной последовательной цепочке вызовов. Завершите регистрацию до первого получения сервиса или создания скоупа, не меняйте активированное дерево и освобождайте дочерние скоупы раньше предков. Для горячей перезагрузки и деревьев, меняющихся после активации, используйте `{fast: false}`.
 
 ### Заметки по адаптерам
 
 | Пакет                     | Что изменилось                                                                                                                                                                                         |
 |---------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | `logDisposeError` переименован в `onDisposeError`; `InferdiScope.dispose()` может вернуть `void` или `Promise<void>`; добавлены `disposeScope`, `autoDispose`, `skipInferdiDispose`, `InferdiScopeOf`. |
-| [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono)    | Ошибки очистки после `next()` логируются или идут в `onDisposeError`; они больше не заменяют успешный ответ. Setup teardown больше не бросает `AggregateError`.                                        |
-| [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | `onDisposeError` теперь per-error-приёмник для setup teardown и завершения response. Express не может принудительно очистить scope с пропущенной автоочисткой при обработанной ошибке маршрута.        |
-| [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa)     | Setup teardown поднимает только ошибку setup. Downstream-ошибка очищает scope даже после `skipInferdiDispose(ctx)`.                                                                                    |
-| [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)  | Setup teardown поднимает только ошибку setup. Ошибка очистки идёт в `onDisposeError` или `console.error`.                                                                                              |
+| [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono)    | Ошибки очистки после `next()` логируются или идут в `onDisposeError`; они больше не заменяют успешный ответ. Освобождение скоупа после ошибки настройки больше не выбрасывает `AggregateError`.                                        |
+| [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | `onDisposeError` теперь обработчик каждой ошибки очистки после сбоя настройки или завершения ответа. Express не может принудительно очистить скоупы с пропущенной автоочисткой при обработанной ошибке маршрута.        |
+| [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa)     | При сбое настройки передаётся только исходная ошибка. При ошибке последующего обработчика адаптер освобождает скоуп даже после `skipInferdiDispose(ctx)`.                                                                                    |
+| [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)  | При сбое настройки передаётся только исходная ошибка. Ошибка очистки идёт в `onDisposeError` или `console.error`.                                                                                              |
 
 ## Переход на 4.0
 
-v4 ужесточает семантику времени жизни `Lazy<T>`. Managed lazy companion теперь сохраняет время жизни цели. Singleton может инжектить только `Lazy<singleton>`.
+v4 ужесточает семантику времени жизни `Lazy<T>`. Управляемая ленивая обёртка теперь сохраняет время жизни цели. Singleton может получать только `Lazy<singleton>`.
 
 Главные изменения:
 
 - `AllowedDeps<T, 'singleton'>` больше не принимает произвольный `Lazy<V>`.
 - `LazySpec<V, TargetKind>` стал публичным типом для явных форм контейнера и модуля.
-- Runtime-исключение для lazy применяется только когда target kind равен `singleton`.
-- Singleton, который инжектил `Lazy<scoped>` или `Lazy<transient>`, должен изменить время жизни цели или потребителя.
+- Исключение из проверки времени жизни для ленивой обёртки действует только при времени жизни цели `singleton`.
+- Singleton, который получал `Lazy<scoped>` или `Lazy<transient>`, должен изменить время жизни цели или потребителя.
 
 Типовые исправления:
 
@@ -133,7 +117,7 @@ type Deps = SpecMap<{ clock: Clock }> & {
 
 ## Переход на 3.0
 
-v3 переносит безопасность времени жизни в систему типов. Runtime behavior остаётся совместимым, а default runtime-защита остаётся вторым рубежом.
+v3 переносит проверки времени жизни в систему типов. Поведение во время выполнения остаётся совместимым, а проверки режима по умолчанию продолжают служить дополнительной защитой.
 
 Главные изменения:
 
@@ -142,7 +126,7 @@ v3 переносит безопасность времени жизни в си
 - `registerFactory` сужает параметр `c` для singleton-фабрик.
 - `registerClass` фильтрует `deps` для singleton-регистраций.
 - `override(key, value)` сохраняет исходный вид времени жизни.
-- `new Container({fast: true})` может отключить runtime-проверки циклов и времени жизни после аудита графа.
+- `new Container({fast: true})` может отключить проверки циклов и времени жизни во время выполнения после аудита графа.
 
 Типовые исправления:
 
@@ -167,7 +151,7 @@ const mod: Module<
 
 ## Переход на 2.0
 
-В v2 есть два механических breaking changes.
+В v2 два несовместимых изменения, которые требуют простых замен в коде.
 
 ### `container.cradle` удалён
 
@@ -184,7 +168,7 @@ const logger = container.get('logger')
 
 ### `registerClass(..., lazy: true)` стал `lazyKey`
 
-Передавайте companion-ключ:
+Передавайте ключ ленивой обёртки:
 
 ```ts
 // 1.x
@@ -194,9 +178,9 @@ const logger = container.get('logger')
 .registerClass('clock', Clock, [], 'transient', 'clockLazy')
 ```
 
-v2 также добавил string- и symbol-ключи во все методы регистрации и уточнил диагностику очищенного предка.
+v2 также добавил строковые и символьные ключи во все методы регистрации и уточнил диагностику очищенного предка.
 
-## Версии в lockstep
+## Единая версия пакетов {#версии-в-lockstep}
 
 Все опубликованные пакеты InferDI имеют одну версию:
 
@@ -208,16 +192,16 @@ v2 также добавил string- и symbol-ключи во все метод
 - [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)
 - [`@inferdi/react`](https://github.com/inferdi/inferdi/tree/main/packages/react)
 
-При обновлении адаптеров держите пакет адаптера и [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) на совпадающих major-версиях.
+При обновлении адаптеров держите пакет адаптера и [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) на совпадающих основных версиях.
 
 ## Чеклист обновления
 
-1. Прочитать заметки о миграции для всех major-версий, через которые проходите.
+1. Прочитать заметки о миграции для всех основных версий, через которые проходите.
 2. Обновить [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) и все установленные адаптеры вместе.
-3. Запустить type tests или `tsc --noEmit`, чтобы поймать изменения формы графа.
-4. Запустить runtime tests с default checked contract.
-5. Проверить владение scope запроса, если используются `skipInferdiDispose`, `autoDispose: false` или пользовательский `disposeScope`.
+3. Запустить тесты типов или `tsc --noEmit`, чтобы поймать изменения формы графа.
+4. Запустить тесты поведения во время выполнения с проверяемым контрактом по умолчанию.
+5. Проверить владение скоупом запроса, если используются `skipInferdiDispose`, `autoDispose: false` или пользовательский `disposeScope`.
 
 ## Стабильные границы
 
-Основной пакет остаётся без декораторов и runtime-зависимостей. Поведение жизненного цикла фреймворков живёт в пакетах адаптеров, а не в [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi).
+Основной пакет остаётся без декораторов и зависимостей времени выполнения. Поведение жизненного цикла фреймворков живёт в пакетах адаптеров, а не в [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi).

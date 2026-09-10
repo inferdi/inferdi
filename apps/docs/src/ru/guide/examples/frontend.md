@@ -1,15 +1,15 @@
 # Фронтенд-фреймворки
 
-Фронтенд-примеры создают scope на границе страницы, маршрута, экрана или фичи. Они используют свои небольшие сборщики, а не общий серверный модуль.
+Фронтенд-примеры создают скоуп на границе страницы, маршрута, экрана или фичи. Они используют свои небольшие сборщики, а не общий серверный модуль.
 
-Сравнивайте, где фреймворк создаёт scope, как scope передаётся детям и как очистка запускается при unmount.
+Сравните, где создаётся скоуп, как его получают дочерние компоненты и когда освобождаются ресурсы при размонтировании.
 
 | Пример | Что показывает |
 | --- | --- |
-| [`react.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react.tsx) | feature scope в React под управлением `@inferdi/react` |
-| [`react-native.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react-native.tsx) | scope экрана в React Native |
-| [`vue.ts`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/vue.ts) | граница scope через provide/inject во Vue 3 |
-| [`svelte.ts`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/svelte.ts) | граница scope через context в Svelte |
+| [`react.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react.tsx) | скоуп отдельной части приложения в React под управлением `@inferdi/react` |
+| [`react-native.tsx`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/react-native.tsx) | скоуп экрана в React Native |
+| [`vue.ts`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/vue.ts) | граница скоупа через provide/inject во Vue 3 |
+| [`svelte.ts`](https://github.com/inferdi/inferdi/blob/main/examples/frontend/svelte.ts) | граница скоупа через контекст в Svelte |
 
 ## React
 

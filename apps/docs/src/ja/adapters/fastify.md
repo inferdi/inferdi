@@ -10,6 +10,7 @@ pnpm add @inferdi/inferdi @inferdi/fastify fastify
 
 ```ts
 import Fastify, { type FastifyRequest } from 'fastify'
+import { Container } from '@inferdi/inferdi'
 import { inferdiFastify } from '@inferdi/fastify'
 ```
 
@@ -18,7 +19,22 @@ import { inferdiFastify } from '@inferdi/fastify'
 モジュール拡張（module augmentation）で具体的なコンテナ型を公開します。
 
 ```ts
-const root = buildRootContainer()
+type RequestContext = {
+  requestId: string
+  ip: string
+}
+
+class Users {
+  constructor(readonly request: RequestContext) {}
+
+  profile(id: string) {
+    return { id, requestId: this.request.requestId }
+  }
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('users', Users, ['request'], 'scoped')
 const app = Fastify()
 
 type RootContainer = typeof root
@@ -92,3 +108,5 @@ app.get('/health', async function () {
 - 失敗したリクエストは `skipInferdiDispose` を無視し、`autoDispose` に従いつつ、それでもスコープを破棄します。
 - クライアント中断のクリーンアップは、スコープが公開された後に `onRequestAbort` で実行されます。
 - ルートの破棄エラーは、`disposeRootOnClose` が有効な場合にのみ `fastify.close()` を通じて伝播します。
+
+`autoDispose: false` または述語が `false` を返す場合、レスポンス完了や接続中断の処理後も `request.di` は利用でき、アプリケーション側で保持したスコープを破棄できます。

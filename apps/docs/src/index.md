@@ -1,69 +1,68 @@
 ---
 layout: home
 description: "A zero-dependency, decorator-free DI container with compiler-checked graphs, explicit lifetimes, and predictable disposal."
-
-hero:
-  name: InferDI
-  text: Typed dependency injection for modern TypeScript
-  tagline: Register services explicitly, let TypeScript check the graph, and keep runtime resolution small.
-  image:
-    src: /logo.png
-    alt: InferDI
-  actions:
-    - theme: brand
-      text: Get Started
-      link: /guide/quick-start
-    - theme: alt
-      text: View on GitHub
-      link: https://github.com/inferdi/inferdi
-
-features:
-  - icon:
-      src: /react.png
-      alt: React
-    title: React
-    details: >-
-      The React 19 adapter exposes exact container types through context and Suspense-aware service hooks. Managed child scopes are created after commit and disposed automatically.
-    link: /adapters/react
-    linkText: React adapter
-  - icon:
-      src: /fastify.png
-      alt: Fastify
-    title: Fastify
-    details: >-
-      The Fastify v5 adapter creates a typed request scope in `onRequest` and disposes it in `onResponse`. It works with Fastify plugins and lifecycle hooks.
-    link: /adapters/fastify
-    linkText: Fastify adapter
-  - icon:
-      src: /hono.png
-      alt: Hono
-    title: Hono
-    details: >-
-      The Hono v4 adapter stores the request scope in context variables. Use it with Workers and Bun while keeping the scope type at the handler boundary.
-    link: /adapters/hono
-    linkText: Hono adapter
-  - icon:
-      src: /koa.png
-      alt: Koa
-    title: Koa
-    details: >-
-      The Koa v3 adapter binds request context to services through a typed scope and preserves Koa's async middleware flow.
-    link: /adapters/koa
-    linkText: Koa adapter
-  - icon:
-      src: /express.png
-      alt: Express
-    title: Express
-    details: >-
-      The Express 5 adapter adds a typed request scope to middleware and routes. Keep service wiring out of globals and ad hoc request factories.
-    link: /adapters/express
-    linkText: Express adapter
-  - icon:
-      src: /elysia.png
-      alt: Elysia
-    title: Elysia
-    details: >-
-      The Elysia v1 adapter connects each request to a typed DI scope and carries route types into the service layer.
-    link: /adapters/elysia
-    linkText: Elysia adapter
 ---
+
+<script setup>
+import HomeShowcase from '../.vitepress/theme/HomeShowcase.vue'
+</script>
+
+<HomeShowcase locale="en" />
+
+## TypeScript sees the whole graph
+
+Each registration returns a new container type that records its key, value, lifetime, async edge, and scope requirements.
+
+```ts twoslash
+import { Container } from '@inferdi/inferdi'
+
+class Logger {
+  info(message: string) {}
+}
+
+class Database {
+  findUser(id: string) {
+    return { id }
+  }
+}
+
+class UserRepo {
+  constructor(readonly logger: Logger, readonly database: Database) {}
+}
+
+const container = new Container()
+  .registerClass('logger', Logger, [])
+  .registerClass('database', Database, [])
+  .registerClass('users', UserRepo, ['logger', 'database'])
+
+const users = container.get('users')
+//    ^?
+```
+
+<div class="value-grid">
+  <a href="/core/type-safety"><strong>Constructor shapes</strong><span>Keys must match parameter types and order.</span></a>
+  <a href="/core/lifetime-guards"><strong>Lifetimes</strong><span>Singletons cannot capture scoped or transient values.</span></a>
+  <a href="/core/scope-inputs"><strong>Scope readiness</strong><span>Request values must exist before dependent services resolve.</span></a>
+  <a href="/core/async-dependencies"><strong>Async edges</strong><span>Async dependencies propagate through the graph type.</span></a>
+</div>
+
+## Framework adapters
+
+<div class="adapter-grid">
+  <a href="/adapters/react"><img src="/react.png" alt=""><strong>React 19</strong><span>Typed context, Suspense hooks, and managed scopes.</span></a>
+  <a href="/adapters/fastify"><img src="/fastify.png" alt=""><strong>Fastify 5</strong><span>One typed scope per request with lifecycle cleanup.</span></a>
+  <a href="/adapters/hono"><img src="/hono.png" alt=""><strong>Hono 4</strong><span>Typed context variables for Workers, Bun, and Node.</span></a>
+  <a href="/adapters/koa"><img src="/koa.png" alt=""><strong>Koa 3</strong><span>Request scopes that follow the middleware lifecycle.</span></a>
+  <a href="/adapters/express"><img src="/express.png" alt=""><strong>Express 5</strong><span>Typed request scopes for middleware and routes.</span></a>
+  <a href="/adapters/elysia"><img src="/elysia.png" alt=""><strong>Elysia 1</strong><span>Route-aware types carried into request services.</span></a>
+</div>
+
+<section class="home-next" aria-labelledby="home-next-title">
+  <p class="home-next-kicker">Next step</p>
+  <h2 id="home-next-title">Start at the composition root</h2>
+  <p>Keep the graph in one place, where its choices are easy to read and change.</p>
+  <div class="home-next-links">
+    <a class="primary" href="/guide/quick-start">Build your first graph <span aria-hidden="true">↗</span></a>
+    <a href="/guide/composition-root">Composition root <span aria-hidden="true">→</span></a>
+  </div>
+</section>

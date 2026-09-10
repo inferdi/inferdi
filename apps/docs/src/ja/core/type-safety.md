@@ -1,51 +1,92 @@
 # 型安全性
 
-InferDI の中心的なルール: 依存関係グラフは型システムの中に存在します。不正なグラフ — 引数の順序の誤り、登録されていないキー、スコープドな状態に手を伸ばすシングルトン — は、負荷がかかってはじめて発見されるスタックトレースではなく、エディター上で確認できる型エラーです。コンパイラが静的に証明できるものはすべて静的に検証されます。ランタイムガードは、`as` キャストや動的キーがすり抜けてしまうものを捕捉するためにのみ存在します。
+InferDI は宣言された依存グラフをコンテナーの型に保持します。登録するたびに、キー、サービス型、ライフタイム、同期・非同期状態、スコープ入力の要件が追加されます。以降の呼び出しは、蓄積されたグラフの型状態に対して検査されます。
 
 ## コンストラクターのシグネチャ
 
-`registerClass` は、依存関係のタプルをコンストラクターのパラメーターリストと照合します。
+`registerClass` は、依存キーとコンストラクター引数を位置と構造的代入可能性の両方で照合します。
 
-```ts
-class Logger {}
-class Db {}
+```ts twoslash
+import { Container } from '@inferdi/inferdi'
+
+class Logger {
+  info(message: string) {}
+}
+
+class Database {
+  findUser(id: string) {
+    return { id }
+  }
+}
 
 class UserRepo {
-  constructor(logger: Logger, db: Db) {}
+  constructor(
+    private readonly logger: Logger,
+    private readonly database: Database
+  ) {}
+}
+
+const container = new Container()
+  .registerClass('logger', Logger, [])
+  .registerClass('database', Database, [])
+  .registerClass('users', UserRepo, ['logger', 'database'])
+
+const users = container.get('users')
+//    ^?
+```
+
+2 つの依存は公開構造が異なるため、順序を入れ替えると実際にエラーになります。
+
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
+class Logger {
+  info(message: string) {}
+}
+
+class Database {
+  findUser(id: string) {
+    return { id }
+  }
+}
+
+class UserRepo {
+  constructor(logger: Logger, database: Database) {}
 }
 
 new Container()
   .registerClass('logger', Logger, [])
-  .registerClass('db', Db, [])
-  .registerClass('users', UserRepo, ['logger', 'db'])
+  .registerClass('database', Database, [])
+  .registerClass('users', UserRepo, ['database', 'logger']) // [!code error]
 ```
 
-コンストラクターが変われば、登録もそれに伴って変わります。`['db', 'logger']` への入れ替えは、最初のコンストラクターパラメーターが `Logger` を期待しているため拒否されます。
+TypeScript は構造的型付けを採用しています。空のクラス同士や公開メンバーが同じクラス同士は代入可能なので、意味上の順序までは判別できません。契約ごとに異なる構造を持たせてください。同じ構造の値を区別する必要がある場合は、[Symbol キー](./symbol-keys#same-value-shape)で説明するブランド型を使います。
 
 ## キーの一意性
 
-すべての登録は、拡張されたコンテナ型を返します。フルーエント API を通じて同じキーを再登録することは拒否されます:
+チェーン上の各登録は、グラフ型が広がったコンテナーを返します。登録済みキーを再登録するとエラーになります。
 
-```ts
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
 new Container()
   .registerValue('dsn', 'postgres://localhost/app')
-  // TypeScript rejects this duplicate key.
-  .registerValue('dsn', 'sqlite://memory')
+  .registerValue('dsn', 'sqlite://memory') // [!code error]
 ```
 
-置き換えが意図的である場合、テストでは `.override()` を使用します。
+テストで意図的にサービスを差し替える場合は `.override()` を使います。登録のたびに返されたコンテナーを使ってください。古い参照には後続ノードのグラフ状態がありません。[バッドプラクティス](./bad-practices#stale-builder-references)に具体例があります。
 
-各登録が返す拡張済みのコンテナを使い続けてください。古い参照には現在のチェーンのグラフ型が含まれません。詳しくは[バッドプラクティス](./bad-practices)を参照してください。
-
-一意性ガードは、キー型が表す候補値の集合全体を検査します。`'dsn'` の登録後に候補キーが `'dsn' | 'replica'` 型なら、ランタイム値が `'dsn'` を上書きする可能性があるため TypeScript は呼び出しを拒否します。広い `string` / `symbol` 型にも同じ規則が適用されます。`lazyKey` は主キーおよび既存キーのどちらとも重複できません。
-
-候補値がグラフと重複しない broad キーや union キーは使用できます。広い `string` 型は、空のコンテナか symbol キーだけを含むコンテナに登録できます。ランタイムキーを新しい候補へ絞り込んでから登録し、置き換える場合は `.override()` を使用してください。
+一意性チェックはキー型が表すすべての候補を調べます。`'dsn'` の登録後、`'dsn' | 'replica'` 型の候補は実行時に `'dsn'` を上書きし得るため拒否されます。既知のグラフと重ならない広い `string` や `symbol` も使えますが、キーを広げるほどグラフ型の精度は下がります。
 
 ## 動的キー
 
-静的キーは `.get()` で直接検証されます。実行時に得たキーは、先に `.has()` で型を絞り込みます。
+リテラルキーは `.get()` が直接検査します。実行時に得たキーは `.has()` で絞り込みます。
 
-```ts
+```ts twoslash
+import { Container } from '@inferdi/inferdi'
+
 const container = new Container()
   .registerValue('answer', 42)
   .registerAsyncFactory('name', async () => 'InferDI', [])
@@ -57,37 +98,61 @@ if (container.has(key)) {
 }
 ```
 
-上の具体的なグラフには不足しているスコープ入力がなく、`.getAsync()` は同期・非同期モードにかかわらず、どちらの登録済みキーも受け付けます。`.has()` が証明するのは登録だけです。破棄済みのコンテナーでは `false` を返しますが、スコープ入力の準備状態やキーを `.get()` に渡せるかどうかは保証しません。
+`.has()` が証明するのは登録だけです。不足しているスコープ入力の準備状態や、非同期キーを同期 `.get()` に渡せることまでは証明しません。
 
 ## 型に含まれるライフタイム
 
-各エントリーは、値の型とそのライフタイムの種類の両方を保持します。型システムは依存関係をフィルタリングし、シングルトンがスコープドまたはトランジェントなサービスに直接依存できないようにします。
+各エントリーはライフタイムを記録します。シングルトンはスコープドまたはトランジェントな依存を保持できません。
 
-```ts
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
+class RequestContext {
+  readonly requestId = 'req-1'
+}
+
+class UserService {
+  constructor(readonly request: RequestContext) {}
+}
+
 new Container()
   .registerClass('request', RequestContext, [], 'scoped')
-  // Rejected: singleton cannot capture scoped request state.
-  .registerClass('users', UserService, ['request'], 'singleton')
+  .registerClass('users', UserService, ['request'], 'singleton') // [!code error]
 ```
 
-ランタイムの strict モードは、`as` キャスト、動的キー、キャプチャされた外側のコンテナ、依存関係の循環に対する多層防御として残ります。
+デフォルトの実行時契約も循環とライフタイムを検査し、キャスト、動的キー、外側のコンテナー参照を捕捉します。`{ fast: true }` は実行時検査を減らした固定グラフ向けの別契約です。
 
 ## 準備状態と async 状態
 
-グラフ型はスコープ入力の要件と宣言的 async 登録も記録します。入力が提供されるまでキーは `.get()` から除外され、`AsyncSpec` キーとそれに依存するクラスは `.getAsync()` で解決します。
+スコープ入力と宣言的な非同期依存は、キーの準備状態と `.get()` / `.getAsync()` の選択にも反映されます。
 
-```ts
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
+type RequestContext = { requestId: string }
+
+class Database {
+  query() {}
+}
+
+class Handler {
+  constructor(request: RequestContext, database: Database) {}
+}
+
 const root = new Container()
-  .declareScopeInputs<{request: Request}>()
-  .registerAsyncFactory('db', openDatabase, [])
-  .registerClass('handler', Handler, ['request', 'db'], 'scoped')
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerAsyncFactory('database', async () => new Database(), [])
+  .registerClass('handler', Handler, ['request', 'database'], 'scoped')
 
-const scope = root.createScope({request})
+root.getAsync('handler') // [!code error]
 
-// @ts-expect-error: handler is async
-scope.get('handler')
+const scope = root.createScope({ request: { requestId: 'req-1' } })
+scope.get('handler') // [!code error]
 
-await scope.getAsync('handler')
+const handler = await scope.getAsync('handler')
+//    ^?
 ```
 
-準備状態は[スコープ入力](./scope-inputs)、Promise 契約の選択は[非同期依存関係](./async-dependencies)を参照してください。
+ルートには `request` がありません。スコープ内の `handler` は準備済みでも、`database` に依存するため非同期のままです。続けて[スコープ入力](./scope-inputs)と[非同期依存関係](./async-dependencies)を読んでください。

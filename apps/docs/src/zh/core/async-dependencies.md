@@ -168,3 +168,24 @@ const monitor = await legacy.getAsync('monitor')
 - Promise 边界之后通过 `AsyncLazy.get()` 形成的动态循环可能等待自己的缓存 pending Promise，运行时不会报告循环错误。
 
 同步构造见[工厂](./factories)，所有权模型见[作用域与资源释放](./scopes)。
+
+## 编译器检查
+
+声明式异步注册不能通过同步 `.get()` 获取，但可以通过 `.getAsync()` 获取：
+
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
+class Database {
+  query() {}
+}
+
+const container = new Container()
+  .registerAsyncFactory('database', async () => new Database(), [])
+
+container.get('database') // [!code error]
+
+const database = await container.getAsync('database')
+//    ^?
+```

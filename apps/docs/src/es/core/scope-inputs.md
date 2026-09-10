@@ -167,3 +167,28 @@ function resolveAny<
 - `{fast: true}` admite el refinamiento de entradas, pero conserva su regla de grafo fijo: termina los registros antes del primer `.get()` o `.createScope()`.
 
 Consulta [Scopes y liberación de recursos](./scopes) para las reglas de propiedad y [Dependencias asíncronas](./async-dependencies) para servicios async que dependen de entradas de scope.
+
+## Comprobación del compilador
+
+El mismo grafo cambia sus claves disponibles después de proporcionar la entrada:
+
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
+type RequestContext = { requestId: string }
+
+class Handler {
+  constructor(readonly request: RequestContext) {}
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('handler', Handler, ['request'], 'scoped')
+
+root.get('handler') // [!code error]
+
+const scope = root.createScope({ request: { requestId: 'req-1' } })
+const handler = scope.get('handler')
+//    ^?
+```

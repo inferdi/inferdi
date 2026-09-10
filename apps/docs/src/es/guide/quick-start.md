@@ -1,6 +1,6 @@
 # Inicio rápido
 
-En este recorrido construiremos un grafo completo, resolveremos un servicio del contenedor raíz y abriremos un scope de petición. No hacen falta decoradores ni configuración de metadatos.
+Empieza con dos clases normales y una cadena de composición explícita. Los scopes de petición llegan después, cuando el grafo básico ya está claro.
 
 ## Instalación
 
@@ -22,99 +22,51 @@ yarn add @inferdi/inferdi
 
 ## Construir el grafo
 
-```ts
+<<< ../../../snippets/quick-start-sync.ts
+
+`UserService` no importa InferDI. El código de composición elige `Logger`, da nombre a ambos registros y fija el orden del constructor. El tipo devuelto para `root` ya contiene los dos servicios.
+
+Si cambias el constructor y olvidas actualizar el grafo, el error aparece donde ensamblas la aplicación:
+
+```ts twoslash
+// @errors: 2345
 import { Container } from '@inferdi/inferdi'
 
-type RequestContext = {
-  requestId: string
-}
-
 class Logger {
-  info(message: string) {
-    console.info(message)
-  }
-}
-
-class Database {
-  constructor(readonly dsn: string) {}
+  info(message: string) {}
 }
 
 class UserService {
-  constructor(
-    private readonly request: RequestContext,
-    private readonly database: Database,
-    private readonly logger: Logger
-  ) {}
-
-  find(id: string) {
-    this.logger.info(`request=${this.request.requestId} user=${id}`)
-    return { id, database: this.database.dsn }
-  }
+  constructor(readonly logger: Logger, readonly region: string) {}
 }
 
-const root = new Container()
-  .declareScopeInputs<{ request: RequestContext }>()
-  .registerValue('dsn', 'postgres://localhost/app')
+new Container()
   .registerClass('logger', Logger, [])
-  .registerClass('database', Database, ['dsn'])
-  .registerClass(
-    'users',
-    UserService,
-    ['request', 'database', 'logger'],
-    'scoped'
-  )
+  .registerClass('users', UserService, ['logger']) // [!code error]
 ```
 
-Cada tupla de dependencias se comprueba contra el constructor. Intercambiar `database` y `logger`, omitir `request` o usar una clave desconocida produce un error de TypeScript.
-
-El grafo anterior contiene una entrada externa y cuatro registros:
-
-```text
-dsn ───────────────▶ database (singleton) ─┐
-logger (singleton) ────────────────────────┼─▶ users (scoped)
-request (scope input) ─────────────────────┘
-```
+Así funciona el estado de tipo del grafo: cada registro refina el tipo del contenedor y las operaciones posteriores deben encajar con lo ya declarado.
 
 ## Resolver servicios
 
-Los singleton del contenedor raíz se resuelven de forma síncrona con `.get()`:
+`root.get('users')` devuelve `UserService` de forma síncrona. El tiempo de vida predeterminado es `singleton`, así que las llamadas posteriores reciben la instancia en caché.
 
-```ts
-const database = root.get('database')
-```
+Los datos de petición necesitan un límite más corto. Decláralos como entrada de scope y entrégalos al abrir un scope hijo:
 
-`users` necesita la entrada `request`, así que primero hay que abrir un scope:
+<<< ../../../snippets/quick-start-scope.ts
 
-```ts
-const request = { requestId: crypto.randomUUID() }
-
-await using scope = root.createScope({ request })
-const users = scope.get('users')
-
-users.find('42')
-```
-
-El tipo del scope devuelto registra que `request` está disponible. `root.get('users')` no compila porque el contenedor raíz no tiene una petición.
+El bloque `finally` cierra el hijo aunque falle el trabajo de la petición. `scope.dispose()` libera el `RequestLog` propiedad del scope; el valor `request` sigue siendo propiedad de la aplicación. Si tu toolchain de TypeScript admite Explicit Resource Management, puedes expresar el mismo cleanup con `await using`.
 
 ## Elegir tiempos de vida
 
-Los registros usan `singleton` por defecto. Indica otro tiempo de vida cuando el valor pertenezca al scope o al código que lo solicita.
+| Tiempo de vida | Política de instancia | Dueño de la caché | Dueño del cleanup |
+|---|---|---|---|
+| `singleton` | una por dueño del registro | root o dueño del registro | ese contenedor |
+| `scoped` | una por scope que resuelve | scope hijo | ese scope |
+| `transient` | una por resolución | ninguno | llamador |
 
-| Tiempo de vida | Creación               | Caché                     | Responsable de liberar |
-|----------------|------------------------|---------------------------|------------------------|
-| `singleton`    | una vez                | el contenedor que lo crea | ese contenedor         |
-| `scoped`       | una vez por scope hijo | el scope hijo             | ese scope              |
-| `transient`    | en cada resolución     | ninguna                   | el llamador            |
+Los valores entregados mediante `registerValue`, `.override()` o entradas de scope también pertenecen a la aplicación. Un singleton no puede depender directamente de un servicio con scope o transitorio; InferDI rechaza la relación en los tipos y la comprueba otra vez en el contrato de runtime predeterminado.
 
-Un singleton no puede depender directamente de un servicio scoped o transient. InferDI aplica esta regla en los tipos y, por defecto, vuelve a comprobarla en runtime.
+## El siguiente paso {#siguiente-paso}
 
-## Siguiente paso
-
-| Si necesitas…                                            | Continúa con                                          |
-|----------------------------------------------------------|-------------------------------------------------------|
-| entender las comprobaciones del grafo en compilación     | [Seguridad de tipos](../core/type-safety)             |
-| modelar una petición, un tenant o los datos de una tarea | [Entradas de scope](../core/scope-inputs)             |
-| inicializar una dependencia de forma asíncrona           | [Dependencias asíncronas](../core/async-dependencies) |
-| cerrar bases de datos y otros recursos con seguridad     | [Scopes y liberación de recursos](../core/scopes)     |
-| conectar scopes con un framework web                     | [Adaptadores](../adapters/)                           |
-| ver ejemplos completos de frameworks y runtimes          | [Ejemplos](./examples)                                |
+[Por qué InferDI](./why-inferdi) explica las decisiones de diseño y [Seguridad de tipos](../core/type-safety) cubre todas las comprobaciones del grafo. [Scopes y liberación](../core/scopes) detalla la propiedad; [Adaptadores](../adapters/) conecta los scopes con el ciclo de vida de la aplicación.

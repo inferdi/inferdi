@@ -31,6 +31,231 @@
   border-radius: 8px;
 }
 
+.VPHome .vp-doc {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1152px;
+  margin: 0 auto;
+  padding: 0 24px 0;
+}
+
+.VPHome .vp-doc > h2 {
+  margin: 0;
+  border-top: 1px solid var(--vp-c-divider);
+  padding: 80px 0 0;
+  font-size: clamp(30px, 3.2vw, 40px);
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}
+
+.VPHome .vp-doc > h2 + p {
+  max-width: 700px;
+  margin: 18px 0 30px;
+  color: var(--vp-c-text-2);
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.VPHome .vp-doc > div[class*="language-"] {
+  margin: 0 0 24px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgb(15 23 42 / 7%);
+}
+
+.value-grid,
+.adapter-grid {
+  display: grid;
+  gap: 14px;
+  margin: 24px 0 80px;
+}
+
+.value-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.value-grid a,
+.adapter-grid a {
+  position: relative;
+  display: grid;
+  gap: 9px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 14px;
+  padding: 20px;
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-1);
+  text-decoration: none;
+  transition: border-color 160ms, background-color 160ms, transform 160ms;
+}
+
+.value-grid a:hover,
+.adapter-grid a:hover {
+  border-color: var(--vp-c-brand-1);
+  background: var(--vp-c-brand-soft);
+  transform: translateY(-2px);
+}
+
+.value-grid a:focus-visible,
+.adapter-grid a:focus-visible {
+  outline: 2px solid var(--vp-c-brand-1);
+  outline-offset: 2px;
+}
+
+.value-grid span,
+.adapter-grid span {
+  color: var(--vp-c-text-2);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.value-grid strong,
+.adapter-grid strong {
+  letter-spacing: -0.01em;
+}
+
+.adapter-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 96px;
+}
+
+.adapter-grid a {
+  grid-template-columns: 32px 1fr;
+  align-items: center;
+  min-height: 112px;
+}
+
+.adapter-grid img {
+  grid-row: 1 / 3;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.home-next {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 24px 48px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 20px;
+  padding: clamp(28px, 5vw, 52px);
+  background:
+    radial-gradient(circle at 90% 10%, var(--vp-c-brand-soft), transparent 40%),
+    var(--vp-c-bg-soft);
+}
+
+.VPHome .vp-doc .home-next :is(h2, p) {
+  margin: 0;
+}
+
+.VPHome .vp-doc .home-next h2 {
+  grid-column: 1;
+  border: 0;
+  padding: 0;
+  font-size: clamp(30px, 3.2vw, 40px);
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}
+
+.VPHome .vp-doc .home-next .home-next-kicker {
+  grid-column: 1 / -1;
+  color: var(--vp-c-brand-1);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.VPHome .vp-doc .home-next h2 + p {
+  grid-column: 1;
+  max-width: 580px;
+  color: var(--vp-c-text-2);
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.home-next-links {
+  grid-column: 2;
+  grid-row: 2 / 4;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.VPHome .vp-doc .home-next-links a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 46px;
+  border: 1px solid var(--vp-c-divider);
+  border-radius: 10px;
+  padding: 10px 16px;
+  color: var(--vp-c-text-1);
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+  transition: border-color 160ms, background-color 160ms;
+}
+
+.VPHome .vp-doc .home-next-links a:hover {
+  border-color: var(--vp-c-brand-1);
+  background: var(--vp-c-brand-soft);
+}
+
+.VPHome .vp-doc .home-next-links a.primary {
+  border-color: #4f46e5;
+  background: #4f46e5;
+  color: #fff;
+}
+
+.VPHome .vp-doc .home-next-links a.primary:hover {
+  background: #4338ca;
+}
+
+@media (max-width: 959px) {
+  .value-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .home-next {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .home-next-links {
+    grid-column: 1;
+    grid-row: auto;
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 767px) {
+  .VPHome .vp-doc {
+    padding: 0 24px 80px;
+  }
+
+  .VPHome .vp-doc > h2 {
+    padding-top: 60px;
+  }
+
+  .value-grid,
+  .adapter-grid {
+    grid-template-columns: 1fr;
+    margin-bottom: 64px;
+  }
+
+  .value-grid a,
+  .adapter-grid a {
+    padding: 18px;
+  }
+
+  .adapter-grid a {
+    min-height: 0;
+  }
+}
+
 .vp-doc table {
   display: table;
   width: 100%;

@@ -50,12 +50,37 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 }
 ```
 
-`fast` defaults to `false`: runtime cycle and lifetime checks stay enabled and
-scopes keep the exact mutable parent chain. `{fast: true}` disables that
-bookkeeping and treats the graph as fixed, enabling flattened parent lookup and
-inherited singleton mirroring. Child scopes inherit the root configuration.
-Finish every `register*`, `.use()`, and `.override()` call before the first
-resolve or `createScope()` in a fast tree, and dispose children before ancestors.
+## Container Options
+
+The constructor accepts one optional setting:
+
+| Option | Type | Default | Purpose |
+| --- | --- | --- | --- |
+| `fast` | `boolean` | `false` | Selects the checked mutable contract or the unchecked fixed-graph contract |
+
+```ts
+const checked = new Container()
+const explicitChecked = new Container({ fast: false })
+const fast = new Container({ fast: true })
+```
+
+The default and explicit `false` forms keep runtime cycle and lifetime checks,
+reject scoped resolution from the root, and preserve the exact mutable parent
+chain. Use this contract for development, tests, hot reload, and graphs that can
+change after startup.
+
+The literal `{fast: true}` keeps all compile-time checks but disables runtime
+cycle and lifetime bookkeeping, including the root-scoped guard. It treats the
+container tree as fixed, flattens scope lookup to the registry owner, and mirrors
+delegated singletons into local scope caches. Child scopes inherit the root
+configuration.
+
+In a fast tree, finish every `register*`, `.use()`, and `.override()` call before
+the first resolve or `createScope()`, keep the tree immutable after activation,
+and dispose children before ancestors. Only the literal value `true` enables this
+contract; other runtime values fall back to the checked contract. See
+[Performance](../guide/performance#fast-true) for the costs affected by this
+choice and guidance on when the trade-off is useful.
 
 ## Registration Methods
 
@@ -174,7 +199,9 @@ and is not exported.
 
 ## Adapter API Shapes
 
-Every adapter exports:
+### HTTP Adapters
+
+Fastify, Hono, Koa, Express, and Elysia export:
 
 - the integration function, such as `inferdiFastify`
 - `skipInferdiDispose`
@@ -182,4 +209,8 @@ Every adapter exports:
 - structural `InferdiScope`, `InferdiRoot`, and `InferdiScopeOf` helpers
 - framework-specific option and context helper types
 
-Use the adapter pages for framework-specific generic names and lifecycle details.
+### React Adapter
+
+React exports `inferdiReact` and types for its binding, external `Provider`, managed `ScopeProvider`, service hooks, graph extraction, stable sync/async keys, and scope lifecycle options. It does not export `skipInferdiDispose` because component scopes follow React commit and effect cleanup rather than an HTTP request lifecycle.
+
+Use the adapter pages for exact names and lifecycle details.

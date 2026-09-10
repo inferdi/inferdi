@@ -11,13 +11,30 @@ pnpm add -D @types/express
 
 ```ts
 import express from 'express'
+import { Container } from '@inferdi/inferdi'
 import { inferdiExpress } from '@inferdi/express'
 ```
 
 ## Scope de petición
 
 ```ts
-const root = buildRootContainer()
+type RequestContext = {
+  requestId: string
+  userId?: string
+  ip?: string
+}
+
+class Users {
+  constructor(readonly request: RequestContext) {}
+
+  profile(id: string) {
+    return { id, userId: this.request.userId }
+  }
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('users', Users, ['request'], 'scoped')
 const openRequestScope = (request: RequestContext) =>
   root.createScope({ request })
 type RequestScope = ReturnType<typeof openRequestScope>
@@ -91,3 +108,5 @@ app.get('/background', (req, res) => {
 ## Salvedad sobre las peticiones fallidas
 
 A diferencia de los demás adaptadores, Express no puede forzar de forma fiable la liberación de un scope omitido ante un error de ruta gestionado. El middleware de Express se basa en callbacks; después de que `next()` retorna, el adaptador no puede observar una excepción aguas abajo que más tarde fue gestionada por un manejador de errores. Si una ruta llama a `skipInferdiDispose(req)` y luego falla, el scope permanece como propiedad de la aplicación. Libéralo desde tu propia ruta de error o evita combinar skips con rutas que puedan lanzar excepciones.
+
+Una llamada a `skipInferdiDispose(req)` se aplica a todas las instancias del middleware InferDI de esa petición. La aplicación debe conservar y liberar todos los scopes; `req.di` expone el scope asignado por el último middleware.

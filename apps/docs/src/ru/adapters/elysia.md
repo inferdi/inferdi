@@ -1,6 +1,6 @@
 # Адаптер Elysia
 
-[`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) - это плагин для Elysia v1. В режиме со scope он создаёт один scope запроса, выставляет его в контекст Elysia, оставляет доступным для пользовательских обработчиков ошибок и очищает из `onAfterResponse`.
+[`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia) интегрирует InferDI с Elysia v1. В режиме с отдельным скоупом на запрос плагин создаёт скоуп, добавляет его в контекст Elysia и освобождает в `onAfterResponse`. Пользовательские обработчики ошибок также могут обращаться к этому скоупу.
 
 ## Установка
 
@@ -10,13 +10,29 @@ pnpm add @inferdi/inferdi @inferdi/elysia elysia
 
 ```ts
 import { Elysia } from 'elysia'
+import { Container } from '@inferdi/inferdi'
 import { inferdiElysia } from '@inferdi/elysia'
 ```
 
-## Scope запроса
+## Скоуп запроса {#scope-запроса}
 
 ```ts
-const root = buildRootContainer()
+type RequestContext = {
+  requestId: string
+  userId?: string
+}
+
+class Users {
+  constructor(readonly request: RequestContext) {}
+
+  profile(id: string) {
+    return { id, userId: this.request.userId }
+  }
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('users', Users, ['request'], 'scoped')
 
 const app = new Elysia()
   .use(inferdiElysia({
@@ -52,7 +68,7 @@ const app = new Elysia()
   )
 ```
 
-Routes должны регистрироваться после `.use(inferdiElysia(...))` в типизированной цепочке Elysia.
+Маршруты нужно регистрировать после `.use(inferdiElysia(...))` в типизированной цепочке Elysia.
 
 ## Опции
 
@@ -60,15 +76,15 @@ Routes должны регистрироваться после `.use(inferdiEly
 | --- | --- | --- |
 | `container` | обязательна | Корневой контейнер. |
 | `key` | `'di'` | Ключ контекста Elysia. |
-| `scopePerRequest` | `true` | `false` для режима без scope запроса. |
-| `createScope` | `root.createScope()` | Пользовательское создание scope запроса. |
-| `setupScope` | нет | Выполняет дополнительную инициализацию после создания scope. |
-| `setupValidatedScope` | нет | Выполняет дополнительную инициализацию после validation Elysia. |
-| `disposeScope` | `scope.dispose()` | Пользовательская очистка. |
-| `autoDispose` | `true` | `false` или предикат `false` передаёт владение. |
-| `onDisposeError` | `console.error` | Приёмник ошибок очистки. |
+| `scopePerRequest` | `true` | `false` для режима без скоупа запроса. |
+| `createScope` | `root.createScope()` | Позволяет задать создание скоупа запроса. |
+| `setupScope` | нет | Выполняет дополнительную инициализацию после создания скоупа. |
+| `setupValidatedScope` | нет | Выполняет дополнительную инициализацию после валидации Elysia. |
+| `disposeScope` | `scope.dispose()` | Позволяет задать освобождение ресурсов. |
+| `autoDispose` | `true` | `false` или предикат, вернувший `false`, передаёт владение приложению. |
+| `onDisposeError` | `console.error` | Обработчик ошибок очистки. |
 
-## Режим без scope запроса
+## Режим без скоупа запроса {#режим-без-scope-запроса}
 
 ```ts
 const app = new Elysia()
@@ -79,17 +95,17 @@ const app = new Elysia()
   .get('/health', ({ di }) => di.get('health').check())
 ```
 
-В этом режиме адаптер выставляет корневой контейнер и не устанавливает hooks жизненного цикла scope запроса. Опции, допустимые только для scoped mode, отклоняются статически.
+В этом режиме адаптер предоставляет корневой контейнер и не устанавливает хуки жизненного цикла скоупа запроса. TypeScript отклоняет опции, предназначенные только для режима со скоупами.
 
 ## Заметки о жизненном цикле
 
-Очистка привязана к `onAfterResponse`. Если Elysia не доходит до этого hook, адаптер не может освободить ресурсы, удерживаемые scope запроса. Учёт на каждый запрос хранится через weak-ссылки, но для dispose ресурсов всё равно нужен hook жизненного цикла.
+Очистка привязана к `onAfterResponse`. Если Elysia не вызывает этот хук, адаптер не может освободить ресурсы скоупа запроса. Служебное состояние запроса хранится через слабые ссылки, но они не заменяют освобождение ресурсов: для него всё равно нужен хук жизненного цикла.
 
-`setupScope` подходит для значений до validation. `setupValidatedScope` подходит для данных из проверенных body, query, params, headers или cookies.
+Используйте `setupScope` для настройки до валидации. В `setupValidatedScope` доступны уже проверенные тело запроса, параметры запроса и маршрута, заголовки и cookies.
 
 ## Стриминг
 
-Elysia может вернуть streaming `Response` до завершения stream. Если scoped-сервисы используются после возврата route, вызывайте `skipInferdiDispose(context)` и очищайте scope самостоятельно.
+Elysia может вернуть потоковый `Response` до завершения потока. Если scoped-сервисы нужны и после возврата из обработчика маршрута, вызовите `skipInferdiDispose(context)` и освободите скоуп самостоятельно.
 
 ```ts
 import { skipInferdiDispose } from '@inferdi/elysia'
@@ -116,4 +132,4 @@ app.get('/events', (context) => {
 })
 ```
 
-`skipInferdiDispose` подавляет только очистку успешного ответа. Пути с ошибкой всё равно очищают scope.
+`skipInferdiDispose` пропускает очистку только при успешном ответе. При ошибке скоуп всё равно освобождается, если это допускает `autoDispose`.

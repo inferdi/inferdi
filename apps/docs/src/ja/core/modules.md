@@ -59,3 +59,27 @@ const container = new Container().use(reportsModule)
 ブラウザーでは、ルートまたは機能の境界でこのパターンを使います。バンドラーが別チャンクを生成し、同じモジュールが他の場所から静的にインポートされていないことを確認してください。チャンクの読み込み後に、その機能用のコンテナを構築します。通常のバックエンド起動では静的インポートを優先してください。動的インポートは、デプロイ設定で選ぶオプション機能や、未使用のコードと依存関係を読み込まずに済ませたい cold start 重視の serverless パスに適しています。どちらのランタイムでも、最初の解決または `createScope()` の前にコンテナを組み立て、リクエストごとにアプリケーションコンテナを変更しないでください。
 
 実行時に選択したキーは、解決前に [`.has()` 型ガード](./type-safety#動的キー)で絞り込みます。
+
+## コンパイラーによる検証
+
+宣言した要件がグラフに存在するまで、名前付きモジュールは追加できません。
+
+```ts twoslash
+// @errors: 2345
+import { Container, type Module, type SpecMap } from '@inferdi/inferdi'
+
+type Requirements = SpecMap<{ config: { env: string } }>
+type Provides = SpecMap<{ feature: string }>
+
+const addFeature: Module<Requirements, Provides> = (container) =>
+  container.registerFactory('feature', (c) => c.get('config').env, ['config'])
+
+new Container().use(addFeature) // [!code error]
+
+const app = new Container()
+  .registerValue('config', { env: 'test' })
+  .use(addFeature)
+
+const feature = app.get('feature')
+//    ^?
+```

@@ -1,51 +1,92 @@
 # 类型安全
 
-InferDI 的核心原则：依赖图存在于类型系统之中。一个无效的依赖图——错误的参数顺序、从未注册的键、单例去引用作用域级状态——都是你在编辑器里就能看到的类型错误，而不是在高负载下才发现的堆栈跟踪。凡是编译器能够静态证明的，都会被静态校验；运行时守卫只是用来捕捉那些被 `as` 类型转换和动态键绕过的问题。
+InferDI 把已声明的依赖图保存在容器类型中。每次注册都会加入键、服务类型、生命周期、同步或异步状态，以及作用域输入要求。后续调用都按这份不断累积的图类型状态检查。
 
 ## 构造函数签名
 
-`registerClass` 会根据构造函数的参数列表来校验依赖元组。
+`registerClass` 按位置和结构兼容性，将依赖键与构造函数参数逐一核对。
 
-```ts
-class Logger {}
-class Db {}
+```ts twoslash
+import { Container } from '@inferdi/inferdi'
+
+class Logger {
+  info(message: string) {}
+}
+
+class Database {
+  findUser(id: string) {
+    return { id }
+  }
+}
 
 class UserRepo {
-  constructor(logger: Logger, db: Db) {}
+  constructor(
+    private readonly logger: Logger,
+    private readonly database: Database
+  ) {}
+}
+
+const container = new Container()
+  .registerClass('logger', Logger, [])
+  .registerClass('database', Database, [])
+  .registerClass('users', UserRepo, ['logger', 'database'])
+
+const users = container.get('users')
+//    ^?
+```
+
+这两个依赖有不同的公开结构，因此交换顺序会产生示例所说的错误：
+
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
+class Logger {
+  info(message: string) {}
+}
+
+class Database {
+  findUser(id: string) {
+    return { id }
+  }
+}
+
+class UserRepo {
+  constructor(logger: Logger, database: Database) {}
 }
 
 new Container()
   .registerClass('logger', Logger, [])
-  .registerClass('db', Db, [])
-  .registerClass('users', UserRepo, ['logger', 'db'])
+  .registerClass('database', Database, [])
+  .registerClass('users', UserRepo, ['database', 'logger']) // [!code error]
 ```
 
-如果构造函数发生变化，注册也会随之改变。把参数交换成 `['db', 'logger']` 会被拒绝，因为第一个构造函数参数期望的是 `Logger`。
+TypeScript 采用结构类型。两个空类或公开成员相同的类可以互相赋值，编译器无法识别它们的业务含义。请让契约具有不同结构。若两个值结构相同但语义上必须区分，请使用 [Symbol 键](./symbol-keys#same-value-shape)一节介绍的品牌类型。
 
 ## 键的唯一性
 
-每次注册都会返回一个被扩宽的容器类型。通过流式 API 重复注册同一个键会被拒绝：
+每次链式注册都会返回图类型更宽的容器。再次注册已有键会报错：
 
-```ts
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
 new Container()
   .registerValue('dsn', 'postgres://localhost/app')
-  // TypeScript rejects this duplicate key.
-  .registerValue('dsn', 'sqlite://memory')
+  .registerValue('dsn', 'sqlite://memory') // [!code error]
 ```
 
-当替换是有意为之时，测试应使用 `.override()`。
+测试需要有意替换服务时使用 `.override()`。每次注册后都要保留返回的新容器；旧引用没有后续节点的图状态。[不良实践](./bad-practices#stale-builder-references)展示了这种错误。
 
-每次注册后，请继续使用返回的扩展容器。旧引用不包含当前调用链的依赖图类型；参见[不良实践](./bad-practices)。
-
-唯一性守卫会检查键类型所表示的全部候选值。注册 `'dsn'` 后，如果候选键的类型是 `'dsn' | 'replica'`，TypeScript 会拒绝这次调用，因为运行时值可能覆盖 `'dsn'`。宽泛的 `string` 或 `symbol` 也遵循这项规则；`lazyKey` 不能与主键或已有键重叠。
-
-只要候选值不与依赖图重叠，宽泛键和联合键仍可使用。宽泛的 `string` 可以注册到空容器，也可以跟在仅含 symbol 键的注册之后。注册前请把运行时键收窄到确定的新成员；需要替换时请使用 `.override()`。
+唯一性检查会覆盖键类型的全部候选值。注册 `'dsn'` 后，类型为 `'dsn' | 'replica'` 的候选键会被拒绝，因为运行时值可能覆盖 `'dsn'`。宽泛的 `string` 和 `symbol` 在不与已知图重叠时仍然可用，但宽泛键也会降低整张图的类型精度。
 
 ## 动态键
 
-静态键由 `.get()` 直接检查。键来自运行时输入时，应先用 `.has()` 缩小类型：
+`.get()` 直接检查字面量键。运行时获得的键应先用 `.has()` 收窄：
 
-```ts
+```ts twoslash
+import { Container } from '@inferdi/inferdi'
+
 const container = new Container()
   .registerValue('answer', 42)
   .registerAsyncFactory('name', async () => 'InferDI', [])
@@ -57,37 +98,61 @@ if (container.has(key)) {
 }
 ```
 
-上面的具体依赖图没有缺失的作用域输入，`.getAsync()` 可以接受任一已注册键，无论其为同步还是异步模式。`.has()` 只证明键已注册。容器已释放时它返回 `false`，但它不能证明作用域输入已就绪，也不能证明键可传给 `.get()`。
+`.has()` 只证明键已注册。它不能证明缺少的作用域输入已经就绪，也不能让同步 `.get()` 接受异步键。
 
 ## 类型中的生命周期
 
-每个条目都同时携带值类型及其生命周期种类。类型系统会对依赖进行过滤，使单例无法直接依赖作用域级或瞬态服务。
+每个条目都记录生命周期。单例不能捕获作用域级或瞬态依赖：
 
-```ts
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
+class RequestContext {
+  readonly requestId = 'req-1'
+}
+
+class UserService {
+  constructor(readonly request: RequestContext) {}
+}
+
 new Container()
   .registerClass('request', RequestContext, [], 'scoped')
-  // Rejected: singleton cannot capture scoped request state.
-  .registerClass('users', UserService, ['request'], 'singleton')
+  .registerClass('users', UserService, ['request'], 'singleton') // [!code error]
 ```
 
-默认 `{fast: false}` 的运行时检查仍作为针对 `as` 类型转换、动态键、捕获的外层容器以及依赖循环的纵深防御手段。
+默认运行时契约会再次检查循环和生命周期，用来捕捉类型转换、动态键和 TypeScript 无法分析的外部容器引用。`{ fast: true }` 是另一套固定图契约，运行时检查更少。
 
 ## 就绪状态与异步状态
 
-依赖图类型还会记录作用域输入要求和声明式异步注册。输入尚未提供时，对应键不会出现在 `.get()` 中。`AsyncSpec` 键及依赖它的类需要通过 `.getAsync()` 解析。
+作用域输入和声明式异步依赖还会改变键是否就绪，以及应使用 `.get()` 还是 `.getAsync()`：
 
-```ts
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
+type RequestContext = { requestId: string }
+
+class Database {
+  query() {}
+}
+
+class Handler {
+  constructor(request: RequestContext, database: Database) {}
+}
+
 const root = new Container()
-  .declareScopeInputs<{request: Request}>()
-  .registerAsyncFactory('db', openDatabase, [])
-  .registerClass('handler', Handler, ['request', 'db'], 'scoped')
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerAsyncFactory('database', async () => new Database(), [])
+  .registerClass('handler', Handler, ['request', 'database'], 'scoped')
 
-const scope = root.createScope({request})
+root.getAsync('handler') // [!code error]
 
-// @ts-expect-error: handler is async
-scope.get('handler')
+const scope = root.createScope({ request: { requestId: 'req-1' } })
+scope.get('handler') // [!code error]
 
-await scope.getAsync('handler')
+const handler = await scope.getAsync('handler')
+//    ^?
 ```
 
-使用[作用域输入](./scope-inputs)建模就绪状态，使用[异步依赖](./async-dependencies)选择 Promise 契约。
+根容器缺少 `request`；作用域中的 `handler` 虽已就绪，却仍因依赖 `database` 而保持异步。接着阅读[作用域输入](./scope-inputs)和[异步依赖](./async-dependencies)。

@@ -45,3 +45,16 @@ Either key may be a string or symbol; the primary and companion do not need to
 use the same key type.
 
 Key collision checks keep the string and symbol domains separate. A broad `string` key can follow symbol-only registrations, but TypeScript rejects it after any string key because its runtime value may name that existing registration. Union keys follow the same rule: every possible member must be fresh. A `lazyKey` is checked against both the graph and its primary key.
+
+## Same Value Shape {#same-value-shape}
+
+A `unique symbol` makes a key nominal, but it does not make two structurally identical service values different constructor arguments. Brand the value contracts when their semantic order must be nominal:
+
+```ts
+type PrimaryDsn = string & { readonly __brand: 'primary' }
+type ReplicaDsn = string & { readonly __brand: 'replica' }
+
+class Queries {
+  constructor(readonly primary: PrimaryDsn, readonly replica: ReplicaDsn) {}
+}
+```

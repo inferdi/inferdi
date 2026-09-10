@@ -59,3 +59,27 @@ const container = new Container().use(reportsModule)
 在浏览器中，请在路由或功能边界使用此模式，并确保构建工具生成独立 chunk，且其他代码没有静态导入同一模块。chunk 加载后再创建该功能的容器。在后端的常规启动流程中，应优先使用静态导入。动态导入适合由部署配置选择的可选功能，或对冷启动敏感的 serverless 路径，让未使用的代码和依赖保持未加载状态。无论在哪种运行时，都应在首次解析或调用 `createScope()` 前完成容器组装；不要按请求修改应用容器。
 
 如果键在运行时确定，请在解析前使用 [`.has()` 类型守卫](./type-safety#动态键)。
+
+## 编译器检查
+
+在依赖图满足声明的要求之前，不能安装具名模块：
+
+```ts twoslash
+// @errors: 2345
+import { Container, type Module, type SpecMap } from '@inferdi/inferdi'
+
+type Requirements = SpecMap<{ config: { env: string } }>
+type Provides = SpecMap<{ feature: string }>
+
+const addFeature: Module<Requirements, Provides> = (container) =>
+  container.registerFactory('feature', (c) => c.get('config').env, ['config'])
+
+new Container().use(addFeature) // [!code error]
+
+const app = new Container()
+  .registerValue('config', { env: 'test' })
+  .use(addFeature)
+
+const feature = app.get('feature')
+//    ^?
+```

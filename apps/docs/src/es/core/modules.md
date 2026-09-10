@@ -59,3 +59,27 @@ El runtime carga y evalúa `reports.module` antes de ejecutar `.use()`. Después
 En el navegador, usa este patrón en el límite de una ruta o funcionalidad, y solo si el bundler genera un chunk separado que ningún otro código importa de forma estática. Construye el contenedor de la funcionalidad después de cargar ese chunk. En un backend, prefiere importaciones estáticas durante un inicio normal. Una importación dinámica resulta útil para funcionalidades opcionales elegidas por la configuración del despliegue o para rutas serverless sensibles al cold start, donde el código y las dependencias sin usar deben permanecer sin cargar. En ambos runtimes, monta el contenedor antes de la primera resolución o de llamar a `createScope()`; no modifiques el contenedor de la aplicación en cada petición.
 
 Si la clave se selecciona en runtime, usa el [type guard `.has()`](./type-safety#claves-dinámicas) antes de resolverla.
+
+## Comprobación del compilador
+
+Un módulo con nombre no se puede instalar hasta que el grafo contenga sus requisitos declarados:
+
+```ts twoslash
+// @errors: 2345
+import { Container, type Module, type SpecMap } from '@inferdi/inferdi'
+
+type Requirements = SpecMap<{ config: { env: string } }>
+type Provides = SpecMap<{ feature: string }>
+
+const addFeature: Module<Requirements, Provides> = (container) =>
+  container.registerFactory('feature', (c) => c.get('config').env, ['config'])
+
+new Container().use(addFeature) // [!code error]
+
+const app = new Container()
+  .registerValue('config', { env: 'test' })
+  .use(addFeature)
+
+const feature = app.get('feature')
+//    ^?
+```

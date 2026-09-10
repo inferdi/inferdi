@@ -1,13 +1,13 @@
 # Фулстек-фреймворки
 
-Фулстек-примеры используют scope для loaders, actions, обработчиков маршрутов и server actions. В dev-сборках корневой контейнер кешируется на `globalThis`, чтобы HMR не создавал дубликаты клиентов.
+Фулстек-примеры используют скоупы в загрузчиках данных (loaders), действиях (actions), обработчиках маршрутов и серверных действиях (Server Actions). В режиме разработки корневой контейнер кэшируется на `globalThis`, чтобы HMR не создавал повторные экземпляры клиентов.
 
-Оба примера используют общий [`examples/_shared/container.ts`](https://github.com/inferdi/inferdi/blob/main/examples/_shared/container.ts). Сравнивайте границу операции, которую фреймворк дожидается через `await`.
+Оба примера используют общий [`examples/_shared/container.ts`](https://github.com/inferdi/inferdi/blob/main/examples/_shared/container.ts). Обратите внимание, какой операции фреймворк дожидается через `await` и когда после неё можно освободить скоуп.
 
 | Пример | Что показывает |
 | --- | --- |
-| [`next-app-router.ts`](https://github.com/inferdi/inferdi/blob/main/examples/fullstack/next-app-router.ts) | границы scope для запроса и Server Action в Next.js App Router |
-| [`remix.ts`](https://github.com/inferdi/inferdi/blob/main/examples/fullstack/remix.ts) | границы scope для loader и action в Remix |
+| [`next-app-router.ts`](https://github.com/inferdi/inferdi/blob/main/examples/fullstack/next-app-router.ts) | границы скоупа для запроса и Server Action в Next.js App Router |
+| [`remix.ts`](https://github.com/inferdi/inferdi/blob/main/examples/fullstack/remix.ts) | границы скоупа для loader и action в Remix |
 
 ## Next.js App Router
 

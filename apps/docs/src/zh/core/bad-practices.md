@@ -50,3 +50,70 @@ container.get('consumer')
 构建生产依赖图时，每个键只选择一次实现。配置需要选择不同实现时，请使用普通条件分支或 `.use()`。
 
 测试可以在解析依赖图之前调用 `.override()`，前提是替换值保留原有的生命周期、惰性模式和异步模式。`.override()` 不能把同步注册转换为声明式异步注册。参见[测试与覆盖](./testing)。
+
+## 在业务逻辑中使用 Service Locator
+
+把容器传给领域服务会隐藏真实依赖，并把缺少键的问题推迟到调用位置。请直接传入服务：
+
+```ts
+class UserController {
+  constructor(
+    private readonly container: AppContainer // [!code --]
+    private readonly users: UserRepo // [!code ++]
+  ) {}
+
+  show(id: string) {
+    return this.container.get('users').find(id) // [!code --]
+    return this.users.find(id) // [!code ++]
+  }
+}
+```
+
+如果组装代码确实需要 resolver-aware factory，请把它留在组合根。
+
+## 全局请求作用域
+
+可变的全局作用域可能把一个并发请求的值泄漏给另一个请求。请在请求边界内创建并关闭作用域：
+
+```ts
+let currentScope = root.createScope({ request }) // [!code warning]
+
+async function handle(request: Request) {
+  const scope = root.createScope({ request }) // [!code focus]
+  try {
+    return await scope.getAsync('handler')
+  } finally {
+    await scope.dispose()
+  }
+}
+```
+
+框架适配器会自动管理这条边界，并保留相同的所有权规则。
+
+## 擦除具体容器类型
+
+使用 `Container` 注解会丢失累积的依赖图状态。让 builder 的返回类型自动推断，再从中生成别名：
+
+```ts
+const buildContainer = (): Container => new Container() // [!code --]
+const buildContainer = () => new Container() // [!code ++]
+  .registerClass('users', UserRepo, [])
+
+type AppContainer = ReturnType<typeof buildContainer>
+```
+
+使用 `ReturnType` 定义应用自己的容器和作用域别名，不要手写它们的泛型参数。
+
+## 丢失所有权
+
+创建作用域却没有对应的清理路径，会泄漏由作用域拥有的实例。请在创建作用域的生命周期边界清理它：
+
+```ts
+const scope = root.createScope({ request }) // [!code warning]
+return scope.get('handler').run()
+
+await using ownedScope = root.createScope({ request }) // [!code focus]
+return ownedScope.get('handler').run()
+```
+
+如果工具链不支持 `await using`，请使用 `try/finally` 和 `await scope.dispose()`。values、overrides、scope inputs 和 transient 结果仍由调用方拥有，需要各自的清理策略。

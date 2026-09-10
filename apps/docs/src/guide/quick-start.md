@@ -1,6 +1,6 @@
 # Quick Start
 
-This walkthrough builds one complete graph, resolves a root service, then opens a request scope. No decorators or metadata setup are required.
+Start with two ordinary classes and one explicit composition chain. Request scopes come later, after the basic graph is clear.
 
 ## Install
 
@@ -22,99 +22,51 @@ yarn add @inferdi/inferdi
 
 ## Build the Graph
 
-```ts
+<<< ../../snippets/quick-start-sync.ts
+
+`UserService` has no InferDI import. The composition code chooses `Logger`, names both registrations, and states the constructor order. The returned `root` type now contains both services.
+
+Change the constructor without updating the graph and the registration fails where you assemble the application:
+
+```ts twoslash
+// @errors: 2345
 import { Container } from '@inferdi/inferdi'
 
-type RequestContext = {
-  requestId: string
-}
-
 class Logger {
-  info(message: string) {
-    console.info(message)
-  }
-}
-
-class Database {
-  constructor(readonly dsn: string) {}
+  info(message: string) {}
 }
 
 class UserService {
-  constructor(
-    private readonly request: RequestContext,
-    private readonly database: Database,
-    private readonly logger: Logger
-  ) {}
-
-  find(id: string) {
-    this.logger.info(`request=${this.request.requestId} user=${id}`)
-    return { id, database: this.database.dsn }
-  }
+  constructor(readonly logger: Logger, readonly region: string) {}
 }
 
-const root = new Container()
-  .declareScopeInputs<{ request: RequestContext }>()
-  .registerValue('dsn', 'postgres://localhost/app')
+new Container()
   .registerClass('logger', Logger, [])
-  .registerClass('database', Database, ['dsn'])
-  .registerClass(
-    'users',
-    UserService,
-    ['request', 'database', 'logger'],
-    'scoped'
-  )
+  .registerClass('users', UserService, ['logger']) // [!code error]
 ```
 
-Each dependency tuple is checked against its constructor. Swapping `database` and `logger`, omitting `request`, or using an unknown key is a TypeScript error.
-
-The graph above has one external input and four registrations:
-
-```text
-dsn ───────────────▶ database (singleton) ─┐
-logger (singleton) ────────────────────────┼─▶ users (scoped)
-request (scope input) ─────────────────────┘
-```
+That feedback is the practical meaning of graph type state: registrations refine the container type, and later operations must fit the graph already declared.
 
 ## Resolve Services
 
-Root singletons resolve synchronously with `.get()`:
+`root.get('users')` returns `UserService` synchronously. Singleton is the default lifetime, so repeated calls return the cached instance.
 
-```ts
-const database = root.get('database')
-```
+Request data needs a shorter boundary. Declare it as a scope input, then provide it when opening a child scope:
 
-`users` needs the `request` input, so open a scope before resolving it:
+<<< ../../snippets/quick-start-scope.ts
 
-```ts
-const request = { requestId: crypto.randomUUID() }
-
-await using scope = root.createScope({ request })
-const users = scope.get('users')
-
-users.find('42')
-```
-
-The returned scope type records that `request` is ready. Calling `root.get('users')` is rejected because the root has no request input.
+The `finally` block closes the child even when request work throws. `scope.dispose()` releases the scoped `RequestLog`; the supplied `request` value remains owned by the application. You can use `await using` instead when your TypeScript toolchain supports Explicit Resource Management.
 
 ## Choose Lifetimes
 
-Registrations default to `singleton`. Pass a lifetime when a value belongs to a scope or to the caller.
+| Lifetime | Instance policy | Cache owner | Disposal owner |
+|---|---|---|---|
+| `singleton` | one per registry owner | root or registration owner | that container |
+| `scoped` | one per resolving scope | child scope | that scope |
+| `transient` | one per resolution | none | caller |
 
-| Lifetime    | Created              | Cached by                     | Disposal owner |
-|-------------|----------------------|-------------------------------|----------------|
-| `singleton` | once                 | the container that creates it | that container |
-| `scoped`    | once per child scope | the child scope               | that scope     |
-| `transient` | on every resolve     | nobody                        | the caller     |
-
-A singleton cannot directly depend on a scoped or transient service. InferDI enforces this in types and, by default, checks it again at runtime.
+Values passed through `registerValue`, `.override()`, or scope inputs also remain application-owned. A singleton cannot depend directly on a scoped or transient service; InferDI rejects the declared relationship in types and checks it again in the default runtime contract.
 
 ## Choose the Next Page
 
-| If you need to…                             | Continue with                                    |
-|---------------------------------------------|--------------------------------------------------|
-| understand compile-time graph checks        | [Type Safety](../core/type-safety)               |
-| model request, tenant, or job data          | [Scope Inputs](../core/scope-inputs)             |
-| initialize a dependency asynchronously      | [Async Dependencies](../core/async-dependencies) |
-| close databases and other resources safely  | [Scopes and Disposal](../core/scopes)            |
-| connect scopes to a web framework           | [Framework Adapters](../adapters/)               |
-| see complete framework and runtime examples | [Examples](./examples)                           |
+Read [Why InferDI](./why-inferdi) for the design trade-offs, then [Type Safety](../core/type-safety) for the full set of graph checks. [Scopes and Disposal](../core/scopes) covers ownership, and [Framework Adapters](../adapters/) connects scopes to application lifecycles.

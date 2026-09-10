@@ -11,13 +11,30 @@ pnpm add -D @types/express
 
 ```ts
 import express from 'express'
+import { Container } from '@inferdi/inferdi'
 import { inferdiExpress } from '@inferdi/express'
 ```
 
 ## リクエストスコープ
 
 ```ts
-const root = buildRootContainer()
+type RequestContext = {
+  requestId: string
+  userId?: string
+  ip?: string
+}
+
+class Users {
+  constructor(readonly request: RequestContext) {}
+
+  profile(id: string) {
+    return { id, userId: this.request.userId }
+  }
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('users', Users, ['request'], 'scoped')
 const openRequestScope = (request: RequestContext) =>
   root.createScope({ request })
 type RequestScope = ReturnType<typeof openRequestScope>
@@ -91,3 +108,5 @@ app.get('/background', (req, res) => {
 ## 失敗したリクエストに関する注意点
 
 他のアダプターとは異なり、Express は処理済みのルートエラーに対して、スキップされたスコープを確実に強制破棄することができません。Express のミドルウェアはコールバックスタイルです。`next()` が戻った後、アダプターは後でエラーハンドラーによって処理されたダウンストリームの例外を観測できません。ルートが `skipInferdiDispose(req)` を呼び出してから失敗した場合、スコープはアプリケーション所有のままになります。自身のエラーパスからそれを破棄するか、スキップとスローし得るルートを組み合わせるのを避けてください。
+
+`skipInferdiDispose(req)` を一度呼ぶと、そのリクエストのすべての InferDI ミドルウェアインスタンスに適用されます。すべてのスコープをアプリケーション側で保持して破棄してください。`req.di` は最後のミドルウェアが設定したスコープを公開します。

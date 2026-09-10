@@ -3,217 +3,58 @@
 <div align="center">
 <img src="https://raw.githubusercontent.com/inferdi/inferdi/main/assets/logo.png" alt="InferDI" width="150" height="150" />
 
-[![JSR](https://jsr.io/badges/@inferdi/hono)](https://jsr.io/@inferdi/hono)
-[![npm version](https://img.shields.io/npm/v/@inferdi/hono)](https://www.npmjs.com/package/@inferdi/hono)
-![License](https://img.shields.io/npm/l/@inferdi/hono.svg)
-[![Docs](https://img.shields.io/badge/docs-inferdi.com-5b5ff5)](https://inferdi.com/adapters/hono)
+**Your graph. Every request. The Hono way.**
 
-Hono request-scope middleware for [InferDI](https://github.com/inferdi/inferdi).
+Compiler-checked services meet Hono context, with typed scopes and explicit cleanup.
+
+[![npm version](https://img.shields.io/npm/v/@inferdi/hono)](https://www.npmjs.com/package/@inferdi/hono)
+[![JSR](https://jsr.io/badges/@inferdi/hono)](https://jsr.io/@inferdi/hono)
+[![License](https://img.shields.io/npm/l/@inferdi/hono.svg)](https://github.com/inferdi/inferdi/blob/main/LICENSE)
+
+[Get started](https://inferdi.com/adapters/hono) · [InferDI](https://inferdi.com) · [All integrations](https://inferdi.com/adapters/)
+
+**Read the docs in your language**
+
+[English](https://inferdi.com/adapters/hono) · [中文](https://inferdi.com/zh/adapters/hono) · [日本語](https://inferdi.com/ja/adapters/hono) · [Español](https://inferdi.com/es/adapters/hono) · [Русский](https://inferdi.com/ru/adapters/hono) · [Deutsch](https://inferdi.com/de/adapters/hono) · [Français](https://inferdi.com/fr/adapters/hono)
+
 </div>
 
-> **Part of the [InferDI](https://github.com/inferdi/inferdi) project** — a
-> zero-dependency, decorator-free, strongly typed DI container for TypeScript.
-> Core package: [`@inferdi/inferdi`](https://www.npmjs.com/package/@inferdi/inferdi)
-> ([JSR](https://jsr.io/@inferdi/inferdi)).
+InferDI is a TypeScript dependency injection container that checks how your services fit together at compile time. `@inferdi/hono` brings that graph to Hono 4 through one middleware. Each request gets a scope on `c.var.di`, ready before your handler runs and released when the route pipeline completes.
 
-This middleware wires InferDI into Hono's request pipeline **without** adding
-decorators, reflection, controller scanning, or handler parameter injection.
-Your application still builds an explicit InferDI graph and resolves services
-with `.get(key)` — the adapter only manages the per-request scope.
+## The graph is the type. Built for speed.
 
-## Table of Contents
+**Catch broken wiring while you code.** Each registration records service types, dependencies and lifetimes in the container’s type. TypeScript rejects missing keys, duplicate registrations, incompatible constructor arguments and declared singleton dependencies on scoped services. Async dependencies and required scope inputs also determine which services are ready to resolve. Refactor a constructor and your editor points to affected registrations.
 
-- [Install](#install)
-- [Request Scope](#request-scope)
-- [Options](#options)
-- [Streaming](#streaming)
-- [API](#api)
-- [Related](#related)
+**Keep your business logic yours.** Choose implementations explicitly where you assemble the application. Services receive ordinary constructor or function arguments, with no InferDI imports, decorators or metadata. You can test them directly and keep business policy independent of the framework and container. Reusable modules, lazy resolution and typed overrides support composition as the application grows.
 
-## Install
+**Fast resolution, compact core.** InferDI core has zero runtime dependencies, an enforced budget under 3 KiB gzip and a single `Map.get()` fast path for cached services. In the [recorded core cached-singleton benchmark](https://github.com/inferdi/inferdi/blob/main/benchmarks/results/public-2026-08-17T16-46-00-483Z.json), default InferDI is **1.76× to 13.05× faster** than the compared containers, with runtime checks enabled. These are core operation measurements; adapter overhead and application performance depend on the workload. [Explore the benchmarks](https://inferdi.com/guide/performance).
 
-For the full multilingual guide, adapter docs, API reference, and migration notes, see [inferdi.com](https://inferdi.com).
+Static checks cover the declared graph within TypeScript’s limits; casts can bypass them and structurally identical dependency types remain interchangeable.
 
-```bash
-pnpm add @inferdi/inferdi @inferdi/hono hono
-# or
-deno add jsr:@inferdi/inferdi jsr:@inferdi/hono npm:hono
-```
+## Why use it with Hono
 
-```ts
-import { Hono } from 'hono'
-import { inferdiHono } from '@inferdi/hono'
-```
+- **Typed context access:** environment helpers preserve your exact scope type through `c.var.di` and `c.get('di')`.
+- **Choose your context key:** use `di` or a custom name without global context augmentation.
+- **Prepare request services:** sync or async creation and setup hooks connect request data to your graph before handlers run.
+- **Keep cleanup under control:** customize disposal and error reporting, or take ownership when work outlives the route pipeline.
+- **Keep Hono’s error flow:** setup failures preserve the original error; cleanup failures never replace a produced response.
 
-## Request Scope
+## Lifecycle essentials
 
-The middleware creates one InferDI scope per request, exposes it as `c.var.di`,
-and disposes it after Hono's bounded route pipeline completes.
+Automatic disposal runs after the bounded `await next()` pipeline. Hono streaming helpers can return a response before stream work finishes. If that work uses scoped services, call `skipInferdiDispose(c)` and dispose the scope when the work ends.
 
-```ts
-import { Hono } from 'hono'
-import { inferdiHono, type InferdiHonoEnv } from '@inferdi/hono'
-import { buildRootContainer } from './container.js'
+The skip applies to successful requests; a request failure overrides it. Setting `autoDispose` to `false`, or returning `false` from its predicate, transfers disposal to your application. The root container always remains application-owned.
 
-const root = buildRootContainer()
-type AppEnv = InferdiHonoEnv<typeof root>
+If setup fails after scope creation, the middleware releases that scope and surfaces only the original setup error. Cleanup failures go to `onDisposeError` or `console.error`.
 
-const app = new Hono<AppEnv>()
+## Get started
 
-app.use('*', inferdiHono({
-  container: root,
-  setupScope: (scope, c) => {
-    const ctx = scope.get('request')
-    ctx.requestId = crypto.randomUUID()
-    ctx.userId = c.req.header('x-user-id')
-  },
-}))
+Hono 4 · Node.js 16+ when using Node · TypeScript 5.2+ · InferDI 6
 
-app.get('/users/:id', async (c) => {
-  return c.json(await c.var.di.get('users').profile(c.req.param('id')))
-})
-```
+Available on [npm](https://www.npmjs.com/package/@inferdi/hono) and [JSR](https://jsr.io/@inferdi/hono), alongside [`@inferdi/inferdi`](https://www.npmjs.com/package/@inferdi/inferdi).
 
-`c.get('di')` is equivalent to `c.var.di` and remains fully typed. For a custom
-context variable key, pass `key` and include it in the app Env:
+**[Read the Hono guide →](https://inferdi.com/adapters/hono)**
 
-```ts
-type AppEnv = InferdiHonoEnv<typeof root, 'container'>
+Installation, typed context, custom keys, lifecycle options and streaming are covered in the guide.
 
-const app = new Hono<AppEnv>()
-app.use('*', inferdiHono({ container: root, key: 'container' }))
-
-app.get('/users/:id', async (c) => {
-  return c.json(await c.var.container.get('users').profile(c.req.param('id')))
-})
-```
-
-The package does not globally augment Hono's `ContextVariableMap`; this keeps
-missing middleware visible to TypeScript.
-
-## Options
-
-```ts
-app.use('*', inferdiHono({
-  container: root,
-  createScope: (root, c) => root.createScope(),
-  setupScope: (scope, c) => {},
-  disposeScope: (scope, c) => scope.dispose(),
-  autoDispose: true,
-  onDisposeError: (error, c) => {
-    console.error('Failed to dispose request scope', error)
-  },
-}))
-```
-
-| Option           | Default              | Description                                                                                                                 |
-|------------------|----------------------|-----------------------------------------------------------------------------------------------------------------------------|
-| `container`      | —                    | **Required.** The root container. Must structurally provide `createScope()`. The root is never disposed by this middleware. |
-| `key`            | `'di'`               | Hono context variable key used with `c.var[key]` / `c.get(key)`.                                                            |
-| `createScope`    | `root.createScope()` | Overrides how a request scope is created. May be async.                                                                     |
-| `setupScope`     | —                    | Hydrates the scope before it is exposed to route handlers. May be async.                                                    |
-| `disposeScope`   | `scope.dispose()`    | Overrides request-scope disposal. May be async.                                                                             |
-| `autoDispose`    | `true`               | Set to `false`, or return `false`, when application code owns disposal.                                                     |
-| `onDisposeError` | `console.error(...)` | Optional sink for post-response disposal failures. Returning normally marks the error handled; omitted failures are logged. |
-
-If `setupScope` fails after a scope has been created, the middleware disposes
-that scope and rethrows **only** the original setup error (the response has not
-been produced yet, so Hono routes it to `onError`). A disposal failure during
-that teardown is routed to `onDisposeError`, or logged via `console.error` when
-no handler is set — it is never aggregated into the rethrown error.
-
-After `next()`, the response has already been produced. A `disposeScope` or
-`autoDispose` failure at that point is logged via `console.error` (or routed to
-`onDisposeError`) and **never replaces the response** — it cannot turn a
-successful response into an error one. A route error from the handler still flows
-through Hono's normal `onError` handling, and it always disposes the scope:
-`skipInferdiDispose` only suppresses cleanup for a **successful** response.
-
-## Streaming
-
-Hono `stream(...)`, `streamText(...)`, and `streamSSE(...)` can return a
-`Response` before the stream callback finishes. In those routes, call
-`skipInferdiDispose(c)` and dispose the scope when stream work ends.
-
-```ts
-import { stream } from 'hono/streaming'
-import { skipInferdiDispose } from '@inferdi/hono'
-
-app.get('/events', (c) => {
-  skipInferdiDispose(c)
-
-  const scope = c.var.di
-  const events = scope.get('events')
-
-  return stream(c, async (s) => {
-    try {
-      for await (const event of events.subscribe()) {
-        await s.write(`data: ${JSON.stringify(event)}\n\n`)
-      }
-    } finally {
-      await scope.dispose()
-    }
-  })
-})
-```
-
-On Cloudflare Workers, cleanup can be scheduled through the execution context:
-
-```ts
-app.get('/events', (c) => {
-  skipInferdiDispose(c)
-
-  const scope = c.var.di
-
-  return stream(c, async (s) => {
-    try {
-      await s.write('data: ready\n\n')
-    } finally {
-      c.executionCtx.waitUntil(Promise.resolve(scope.dispose()))
-    }
-  })
-})
-```
-
-## API
-
-```ts
-export type MaybePromise<T> = T | Promise<T>
-
-export interface InferdiScope {
-  dispose(): MaybePromise<void>
-}
-
-export interface InferdiRoot<Scope extends InferdiScope = InferdiScope> {
-  createScope(): Scope
-}
-
-export type InferdiScopeOf<Root extends InferdiRoot> =
-  ReturnType<Root['createScope']>
-
-export type InferdiHonoScopeEnv<Scope, Key extends string = 'di'> = {
-  Variables: { [P in Key]: Scope }
-}
-
-export type InferdiHonoEnv<Root, Key extends string = 'di'> =
-  InferdiHonoScopeEnv<InferdiScopeOf<Root>, Key>
-
-export interface InferdiHonoOptions<Root, E, Key, Scope> { /* ... */ }
-
-export function inferdiHono(options: InferdiHonoOptions): MiddlewareHandler
-export function skipInferdiDispose(context: Context): void
-```
-
-## Related
-
-| Package                                                                             | JSR                                    | npm                                                   | Description                                                         |
-|-------------------------------------------------------------------------------------|----------------------------------------|-------------------------------------------------------|---------------------------------------------------------------------|
-| [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) | [JSR](https://jsr.io/@inferdi/inferdi) | [npm](https://www.npmjs.com/package/@inferdi/inferdi) | Core DI container — zero-dependency, decorator-free, strongly typed |
-| [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | [JSR](https://jsr.io/@inferdi/fastify) | [npm](https://www.npmjs.com/package/@inferdi/fastify) | Fastify v5 request-scope adapter                                    |
-| [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono)       | [JSR](https://jsr.io/@inferdi/hono)    | [npm](https://www.npmjs.com/package/@inferdi/hono)    | Hono request-scope middleware                                       |
-| [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa)         | [JSR](https://jsr.io/@inferdi/koa)     | [npm](https://www.npmjs.com/package/@inferdi/koa)     | Koa v3 request-scope middleware                                     |
-| [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | [JSR](https://jsr.io/@inferdi/express) | [npm](https://www.npmjs.com/package/@inferdi/express) | Express 5 request-scope middleware                                  |
-| [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)   | [JSR](https://jsr.io/@inferdi/elysia)  | [npm](https://www.npmjs.com/package/@inferdi/elysia)  | Elysia request-scope plugin                                         |
-| [`@inferdi/react`](https://github.com/inferdi/inferdi/tree/main/packages/react)     | [JSR](https://jsr.io/@inferdi/react)   | [npm](https://www.npmjs.com/package/@inferdi/react)   | React 19 providers, hooks, Suspense and managed scopes               |
-
-The project repository lives at [inferdi/inferdi](https://github.com/inferdi/inferdi). This adapter targets [Hono](https://hono.dev).
+[GitHub](https://github.com/inferdi/inferdi) · [Report an issue](https://github.com/inferdi/inferdi/issues) · [MIT license](https://github.com/inferdi/inferdi/blob/main/LICENSE)

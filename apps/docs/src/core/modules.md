@@ -64,3 +64,27 @@ The runtime loads and evaluates `reports.module` before `.use()` runs. `.use()` 
 In a browser, use this pattern at a route or feature boundary, and only when your bundler emits a separate chunk that nothing else imports statically. Build the feature container after that chunk loads. On a backend, prefer static imports during normal startup. A dynamic import is useful for deployment-selected optional features or cold-start-sensitive serverless paths whose unused code and dependencies should remain unloaded. In either runtime, assemble the container before its first resolution or `createScope()`; do not mutate the application container per request.
 
 For keys selected at runtime, use the [`.has()` type guard](./type-safety#dynamic-keys) before resolution.
+
+## Compiler Check
+
+A named module cannot be installed until its declared requirements are present:
+
+```ts twoslash
+// @errors: 2345
+import { Container, type Module, type SpecMap } from '@inferdi/inferdi'
+
+type Requirements = SpecMap<{ config: { env: string } }>
+type Provides = SpecMap<{ feature: string }>
+
+const addFeature: Module<Requirements, Provides> = (container) =>
+  container.registerFactory('feature', (c) => c.get('config').env, ['config'])
+
+new Container().use(addFeature) // [!code error]
+
+const app = new Container()
+  .registerValue('config', { env: 'test' })
+  .use(addFeature)
+
+const feature = app.get('feature')
+//    ^?
+```

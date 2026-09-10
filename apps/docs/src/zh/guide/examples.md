@@ -23,5 +23,5 @@
 对于服务端和 worker 示例，对比框架/平台的生命周期钩子。对于前端示例，对比挂载和卸载的边界。
 
 ::: info 参考片段
-根 workspace 不会安装所有框架依赖，也不会对 `examples/` 执行类型检查。请把所需模式复制到应用中，安装对应依赖，并按自己的类型调整共享依赖图。
+`pnpm run examples:typecheck` 会检查 `examples/_shared/container.ts` 和 `examples/_shared/testing.ts`。它不会检查所有框架片段，因为根 workspace 没有安装全部框架依赖。请把所需模式复制到应用中，安装对应依赖，并按自己的类型调整共享依赖图。
 :::

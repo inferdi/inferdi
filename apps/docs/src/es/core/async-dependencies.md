@@ -168,3 +168,24 @@ En el nivel superior, `getAsync('dbPromise')` sigue la semántica await de JavaS
 - Un ciclo dinámico mediante `AsyncLazy.get()` tras un límite Promise puede esperar su propia Promise pendiente en caché sin error de runtime.
 
 Consulta [Factorías](./factories) para la construcción síncrona y [Scopes y liberación de recursos](./scopes) para el modelo de propiedad.
+
+## Comprobación del compilador
+
+Un registro async declarativo queda fuera de `.get()` síncrono y sigue disponible mediante `.getAsync()`:
+
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
+class Database {
+  query() {}
+}
+
+const container = new Container()
+  .registerAsyncFactory('database', async () => new Database(), [])
+
+container.get('database') // [!code error]
+
+const database = await container.getAsync('database')
+//    ^?
+```

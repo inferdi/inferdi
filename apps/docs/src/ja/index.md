@@ -1,69 +1,68 @@
 ---
 layout: home
 description: "実行時依存とデコレーターを使わず、依存グラフ、ライフタイム、スコープ境界をコンパイル時に検証する DI コンテナーです。"
-
-hero:
-  name: InferDI
-  text: モダンな TypeScript のための強力な型付き DI
-  tagline: サービスを明示的に登録し、TypeScript で依存グラフを検証し、小さな実行時解決パスを維持します。
-  image:
-    src: /logo.png
-    alt: InferDI
-  actions:
-    - theme: brand
-      text: はじめる
-      link: /ja/guide/quick-start
-    - theme: alt
-      text: GitHub で見る
-      link: https://github.com/inferdi/inferdi
-
-features:
-  - icon:
-      src: /react.png
-      alt: React
-    title: React
-    details: >-
-      React 19 アダプターは、コンテキストと Suspense 対応のサービスフックを通じて、正確なコンテナー型を公開します。管理対象の子スコープはコミット後に作成され、自動的に破棄されます。
-    link: /ja/adapters/react
-    linkText: React アダプター
-  - icon:
-      src: /fastify.png
-      alt: Fastify
-    title: Fastify
-    details: >-
-      Fastify は速度のために作られており、DI 層はその邪魔をすべきではありません。Fastify v5 アダプターはプラグインとフックに組み込まれ、onRequest で型付きのリクエストスコープを作成し、onResponse でそれをクリーンアップします。
-    link: /ja/adapters/fastify
-    linkText: Fastify アダプター
-  - icon:
-      src: /hono.png
-      alt: Hono
-    title: Hono
-    details: >-
-      エッジアプリには薄いグルーと素早い起動が必要です。Hono v4 アダプターはリクエストスコープをコンテキスト変数に保存し、Workers や Bun のデプロイに適合し、ネットワーク境界で厳格な型を維持します。
-    link: /ja/adapters/hono
-    linkText: Hono アダプター
-  - icon:
-      src: /koa.png
-      alt: Koa
-    title: Koa
-    details: >-
-      Koa はミドルウェアチェーンが小さく明示的なときに最も力を発揮します。Koa v3 アダプターは非同期の制御フローを隠すことなく、型付きスコープを通じてリクエストコンテキストをサービスに結び付けます。
-    link: /ja/adapters/koa
-    linkText: Koa アダプター
-  - icon:
-      src: /express.png
-      alt: Express
-    title: Express
-    details: >-
-      Express 5 は今でも多くの Node アプリにとって馴染みのあるデフォルトです。このアダプターはそうしたミドルウェアチェーンに型付きのリクエストスコープを与え、サービスがグローバル変数や手作りのファクトリー、散らばったインポートを通じて漏れ出すのを防ぎます。
-    link: /ja/adapters/express
-    linkText: Express アダプター
-  - icon:
-      src: /elysia.png
-      alt: Elysia
-    title: Elysia
-    details: >-
-      Elysia v1 は Bun アプリに鋭いルート型をすでに提供しています。アダプターはその型チェーンをサービスへと運び、各リクエストを DI スコープに結び付けるので、オートコンプリートがハンドラーからビジネスロジックまでの経路を追従します。
-    link: /ja/adapters/elysia
-    linkText: Elysia アダプター
 ---
+
+<script setup>
+import HomeShowcase from '../../.vitepress/theme/HomeShowcase.vue'
+</script>
+
+<HomeShowcase locale="ja" />
+
+## TypeScript がグラフ全体を把握
+
+登録するたびに新しいコンテナー型が返され、キー、値、ライフタイム、非同期エッジ、スコープ要件が記録されます。
+
+```ts twoslash
+import { Container } from '@inferdi/inferdi'
+
+class Logger {
+  info(message: string) {}
+}
+
+class Database {
+  findUser(id: string) {
+    return { id }
+  }
+}
+
+class UserRepo {
+  constructor(readonly logger: Logger, readonly database: Database) {}
+}
+
+const container = new Container()
+  .registerClass('logger', Logger, [])
+  .registerClass('database', Database, [])
+  .registerClass('users', UserRepo, ['logger', 'database'])
+
+const users = container.get('users')
+//    ^?
+```
+
+<div class="value-grid">
+  <a href="/ja/core/type-safety"><strong>コンストラクターの形</strong><span>キーは引数の型と順序に一致する必要があります。</span></a>
+  <a href="/ja/core/lifetime-guards"><strong>ライフタイム</strong><span>singleton は scoped や transient の値を取り込めません。</span></a>
+  <a href="/ja/core/scope-inputs"><strong>スコープの準備状態</strong><span>依存サービスを解決する前にリクエスト値が必要です。</span></a>
+  <a href="/ja/core/async-dependencies"><strong>非同期エッジ</strong><span>非同期状態は依存グラフ型を通じて伝播します。</span></a>
+</div>
+
+## フレームワークアダプター
+
+<div class="adapter-grid">
+  <a href="/ja/adapters/react"><img src="/react.png" alt=""><strong>React 19</strong><span>型付きコンテキスト、Suspense フック、管理対象スコープ。</span></a>
+  <a href="/ja/adapters/fastify"><img src="/fastify.png" alt=""><strong>Fastify 5</strong><span>リクエストごとの型付きスコープとライフサイクルでの破棄。</span></a>
+  <a href="/ja/adapters/hono"><img src="/hono.png" alt=""><strong>Hono 4</strong><span>Workers、Bun、Node 向けの型付きコンテキスト変数。</span></a>
+  <a href="/ja/adapters/koa"><img src="/koa.png" alt=""><strong>Koa 3</strong><span>ミドルウェアのライフサイクルに沿うリクエストスコープ。</span></a>
+  <a href="/ja/adapters/express"><img src="/express.png" alt=""><strong>Express 5</strong><span>ミドルウェアとルート向けの型付きリクエストスコープ。</span></a>
+  <a href="/ja/adapters/elysia"><img src="/elysia.png" alt=""><strong>Elysia 1</strong><span>ルート型をリクエストサービスまで運びます。</span></a>
+</div>
+
+<section class="home-next" aria-labelledby="home-next-title">
+  <p class="home-next-kicker">次のステップ</p>
+  <h2 id="home-next-title">構成ルートから始める</h2>
+  <p>依存グラフを一か所にまとめると、選択した内容を確認し、変更しやすくなります。</p>
+  <div class="home-next-links">
+    <a class="primary" href="/ja/guide/quick-start">最初のグラフを作る <span aria-hidden="true">↗</span></a>
+    <a href="/ja/guide/composition-root">構成ルート <span aria-hidden="true">→</span></a>
+  </div>
+</section>

@@ -1,16 +1,16 @@
 # Боты, очереди и CLI
 
-Обновления ботов, задания в очередях и CLI-команды являются ограниченными асинхронными операциями. Примеры создают один scope на обновление, задание или команду и используют `await using`, когда функция владеет всей операцией.
+Обработка входящего события бота, задания из очереди или CLI-команды имеет определённое начало и конец. Примеры создают отдельный скоуп на каждую такую операцию и используют `await using`, когда функция отвечает за всю работу от начала до завершения.
 
 Они используют общий [`examples/_shared/container.ts`](https://github.com/inferdi/inferdi/blob/main/examples/_shared/container.ts). Сравнивайте единицу работы, которую библиотека передаёт коду приложения.
 
 | Пример | Что показывает |
 | --- | --- |
-| [`telegraf.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/telegraf.ts) | scope на обновление в Telegraf |
-| [`grammy.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/grammy.ts) | scope на обновление в Grammy |
-| [`bullmq.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/bullmq.ts) | scope на задание в BullMQ |
-| [`commander.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/commander.ts) | scope на команду в Commander |
-| [`yargs.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/yargs.ts) | scope на команду в Yargs |
+| [`telegraf.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/telegraf.ts) | скоуп на обновление в Telegraf |
+| [`grammy.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/grammy.ts) | скоуп на обновление в Grammy |
+| [`bullmq.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/bullmq.ts) | скоуп на задание в BullMQ |
+| [`commander.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/commander.ts) | скоуп на команду в Commander |
+| [`yargs.ts`](https://github.com/inferdi/inferdi/blob/main/examples/workers-cli/yargs.ts) | скоуп на команду в Yargs |
 
 ## Telegraf
 

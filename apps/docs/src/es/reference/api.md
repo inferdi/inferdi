@@ -50,13 +50,39 @@ class Container<T extends DependenciesMap = Record<never, never>> {
 }
 ```
 
-`fast` vale `false` por defecto: mantiene los checks de ciclos y lifetimes en
-runtime y la cadena de padres exacta y mutable. `{fast: true}` desactiva ese
-seguimiento y trata el grafo como fijo, con búsqueda de padres aplanada y
-mirroring de singletons heredados. Los scopes hijos heredan la configuración de
-la raíz. En un árbol fast, completa todas las llamadas a `register*`, `.use()` y
-`.override()` antes de la primera resolución o `createScope()`, y libera los
-hijos antes que sus ancestros.
+## Opciones del contenedor
+
+El constructor acepta una opción de configuración:
+
+| Opción | Tipo | Predeterminado | Función |
+| --- | --- | --- | --- |
+| `fast` | `boolean` | `false` | Elige entre el contrato mutable con comprobaciones y el contrato de grafo fijo sin comprobaciones de runtime |
+
+```ts
+const checked = new Container()
+const explicitChecked = new Container({ fast: false })
+const fast = new Container({ fast: true })
+```
+
+La forma predeterminada y la forma con `false` explícito mantienen las
+comprobaciones de ciclos y lifetimes en runtime, rechazan la resolución de
+servicios scoped desde la raíz y conservan la cadena de padres exacta y mutable.
+Usa este contrato para desarrollo, pruebas, recarga en caliente y grafos que
+puedan cambiar después del arranque.
+
+El literal `{fast: true}` conserva todas las comprobaciones de TypeScript, pero
+desactiva el seguimiento de ciclos y lifetimes en runtime, incluida la protección
+de servicios scoped en la raíz. Trata el árbol de contenedores como fijo, dirige
+la búsqueda del scope al propietario del registro y refleja los singletons
+delegados en las cachés locales. Los scopes hijos heredan la configuración de la
+raíz.
+
+En un árbol fast, completa todas las llamadas a `register*`, `.use()` y
+`.override()` antes de la primera resolución o `createScope()`, mantén el árbol
+inmutable después de activarlo y libera los hijos antes que sus ancestros. Solo
+el valor literal `true` habilita este contrato; cualquier otro valor de runtime
+conserva el contrato con comprobaciones. [Rendimiento](../guide/performance#fast-true)
+explica qué costes se ven afectados y cuándo puede resultar útil esta decisión.
 
 ## Métodos de registro
 
@@ -174,7 +200,9 @@ El discriminante no crea un campo de runtime y no se exporta.
 
 ## Formas de la API de los adaptadores
 
-Todos los adaptadores exportan:
+### Adaptadores HTTP
+
+Fastify, Hono, Koa, Express y Elysia exportan:
 
 - la función de integración, como `inferdiFastify`
 - `skipInferdiDispose`
@@ -182,4 +210,8 @@ Todos los adaptadores exportan:
 - los helpers estructurales `InferdiScope`, `InferdiRoot` e `InferdiScopeOf`
 - tipos de opciones y helpers de contexto específicos del framework
 
-Usa las páginas de los adaptadores para conocer los nombres genéricos y los detalles del ciclo de vida específicos de cada framework.
+### Adaptador de React
+
+React exporta `inferdiReact` y tipos para su binding, `Provider` externo, `ScopeProvider` gestionado, hooks de servicios, extracción del grafo, claves sync/async estables y opciones de ciclo de vida del scope. No exporta `skipInferdiDispose`: los scopes de componentes siguen el commit y la limpieza de efectos de React, no un ciclo de petición HTTP.
+
+Consulta las páginas de los adaptadores para ver los nombres exactos y los detalles del ciclo de vida.

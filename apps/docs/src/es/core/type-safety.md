@@ -1,51 +1,92 @@
 # Seguridad de tipos
 
-La regla central de InferDI: el grafo de dependencias vive en el sistema de tipos. Un grafo inválido — un orden de argumentos incorrecto, una clave que nunca se registró, un singleton que alcanza estado con scope — es un error de tipos que ves en tu editor, no un stack trace que descubres bajo carga. Todo lo que el compilador puede demostrar estáticamente se comprueba estáticamente; los guards de runtime existen solo para atrapar lo que los casts `as` y las claves dinámicas dejan pasar.
+InferDI guarda el grafo declarado en el tipo del contenedor. Cada registro añade una clave, el tipo del servicio, su tiempo de vida, su estado síncrono o asíncrono y los requisitos de entradas de scope. Las llamadas posteriores se comprueban contra ese estado acumulado.
 
 ## Firmas de constructor
 
-`registerClass` comprueba la tupla de dependencias contra la lista de parámetros del constructor.
+`registerClass` compara las claves de dependencias con los parámetros del constructor por posición y compatibilidad estructural.
 
-```ts
-class Logger {}
-class Db {}
+```ts twoslash
+import { Container } from '@inferdi/inferdi'
+
+class Logger {
+  info(message: string) {}
+}
+
+class Database {
+  findUser(id: string) {
+    return { id }
+  }
+}
 
 class UserRepo {
-  constructor(logger: Logger, db: Db) {}
+  constructor(
+    private readonly logger: Logger,
+    private readonly database: Database
+  ) {}
+}
+
+const container = new Container()
+  .registerClass('logger', Logger, [])
+  .registerClass('database', Database, [])
+  .registerClass('users', UserRepo, ['logger', 'database'])
+
+const users = container.get('users')
+//    ^?
+```
+
+Las dos dependencias tienen estructuras públicas distintas, así que intercambiarlas sí produce el error descrito:
+
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
+class Logger {
+  info(message: string) {}
+}
+
+class Database {
+  findUser(id: string) {
+    return { id }
+  }
+}
+
+class UserRepo {
+  constructor(logger: Logger, database: Database) {}
 }
 
 new Container()
   .registerClass('logger', Logger, [])
-  .registerClass('db', Db, [])
-  .registerClass('users', UserRepo, ['logger', 'db'])
+  .registerClass('database', Database, [])
+  .registerClass('users', UserRepo, ['database', 'logger']) // [!code error]
 ```
 
-Si el constructor cambia, el registro cambia con él. Intercambiar `['db', 'logger']` se rechaza porque el primer parámetro del constructor espera un `Logger`.
+TypeScript usa tipado estructural. Dos clases vacías, o dos clases con los mismos miembros públicos, son asignables entre sí y no permiten demostrar el orden semántico. Da formas distintas a los contratos. Si dos valores deben diferenciarse pese a compartir estructura, usa tipos con marca como explica [Claves Symbol](./symbol-keys#same-value-shape).
 
 ## Unicidad de claves
 
-Cada registro devuelve un tipo de contenedor ampliado. Volver a registrar la misma clave a través de la API fluida se rechaza:
+Cada registro encadenado devuelve un contenedor con un tipo de grafo más amplio. Volver a registrar una clave existente es un error:
 
-```ts
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
 new Container()
   .registerValue('dsn', 'postgres://localhost/app')
-  // TypeScript rejects this duplicate key.
-  .registerValue('dsn', 'sqlite://memory')
+  .registerValue('dsn', 'sqlite://memory') // [!code error]
 ```
 
-Las pruebas usan `.override()` cuando el reemplazo es intencional.
+Usa `.override()` cuando una prueba sustituya un servicio de forma intencionada. Conserva el contenedor devuelto por cada registro; una referencia anterior no contiene el estado de los nodos posteriores. [Malas prácticas](./bad-practices#stale-builder-references) muestra el problema.
 
-Sigue usando el contenedor ampliado que devuelve cada registro. Una referencia anterior no contiene el tipo de grafo de la cadena actual; consulta [Malas prácticas](./bad-practices).
-
-El guard de unicidad comprueba todo el conjunto de valores representado por el tipo de la clave. Si una clave tiene el tipo `'dsn' | 'replica'` después de registrar `'dsn'`, TypeScript rechaza la llamada porque el valor de runtime podría sobrescribir `'dsn'`. La misma regla se aplica a un `string` o `symbol` amplio y a `lazyKey`, que no puede solaparse con la clave principal ni con una clave existente.
-
-Las claves amplias y union siguen disponibles cuando sus valores posibles no se solapan con el grafo. Un `string` amplio es válido en un contenedor vacío o después de registros compuestos solo por symbols. Acota una clave de runtime a un miembro nuevo antes de registrarla; usa `.override()` cuando quieras reemplazar un registro.
+La comprobación de unicidad cubre todos los valores posibles del tipo de la clave. Después de registrar `'dsn'`, una clave de tipo `'dsn' | 'replica'` se rechaza porque podría sobrescribir `'dsn'` en runtime. Los tipos amplios `string` y `symbol` siguen disponibles si no se solapan con el grafo conocido, aunque también reducen la precisión del tipo del grafo.
 
 ## Claves dinámicas
 
-`.get()` comprueba directamente las claves estáticas. Si una clave llega en runtime, acota primero su tipo con `.has()`:
+`.get()` comprueba directamente las claves literales. Acota con `.has()` una clave obtenida en runtime:
 
-```ts
+```ts twoslash
+import { Container } from '@inferdi/inferdi'
+
 const container = new Container()
   .registerValue('answer', 42)
   .registerAsyncFactory('name', async () => 'InferDI', [])
@@ -57,37 +98,61 @@ if (container.has(key)) {
 }
 ```
 
-El grafo concreto anterior no tiene inputs de scope pendientes, y `.getAsync()` acepta cualquiera de las claves registradas sin importar su modo sync o async. `.has()` solo demuestra que la clave está registrada. Devuelve `false` si el contenedor está liberado, pero no demuestra que los inputs de scope estén listos ni que la clave pueda pasarse a `.get()`.
+`.has()` demuestra que la clave está registrada. No demuestra que las entradas de scope pendientes estén listas ni que `.get()` pueda aceptar una clave asíncrona.
 
 ## El tiempo de vida en el tipo
 
-Cada entrada lleva tanto el tipo del valor como su clase de tiempo de vida. El sistema de tipos filtra las dependencias para que un singleton no pueda depender directamente de servicios con scope o transitorios.
+Cada entrada registra su tiempo de vida. Un singleton no puede capturar una dependencia con scope o transitoria:
 
-```ts
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
+class RequestContext {
+  readonly requestId = 'req-1'
+}
+
+class UserService {
+  constructor(readonly request: RequestContext) {}
+}
+
 new Container()
   .registerClass('request', RequestContext, [], 'scoped')
-  // Rejected: singleton cannot capture scoped request state.
-  .registerClass('users', UserService, ['request'], 'singleton')
+  .registerClass('users', UserService, ['request'], 'singleton') // [!code error]
 ```
 
-El modo estricto en runtime sigue siendo defensa en profundidad frente a casts `as`, claves dinámicas, contenedores externos capturados y ciclos de dependencias.
+El contrato de runtime predeterminado repite las comprobaciones de ciclos y tiempos de vida para capturar casts, claves dinámicas y contenedores externos que TypeScript no puede analizar. `{ fast: true }` es otro contrato para grafos fijos, con menos comprobaciones en runtime.
 
 ## Preparación y estado async
 
-El tipo del grafo también registra requisitos de entradas de scope y registros async declarativos. Una clave desaparece de `.get()` hasta que se proporcionan sus entradas, y una clave `AsyncSpec` pasa a `.getAsync()` junto con las clases que dependen de ella.
+Las entradas de scope y las dependencias async declarativas también determinan qué claves están listas y si se resuelven con `.get()` o `.getAsync()`:
 
-```ts
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
+type RequestContext = { requestId: string }
+
+class Database {
+  query() {}
+}
+
+class Handler {
+  constructor(request: RequestContext, database: Database) {}
+}
+
 const root = new Container()
-  .declareScopeInputs<{request: Request}>()
-  .registerAsyncFactory('db', openDatabase, [])
-  .registerClass('handler', Handler, ['request', 'db'], 'scoped')
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerAsyncFactory('database', async () => new Database(), [])
+  .registerClass('handler', Handler, ['request', 'database'], 'scoped')
 
-const scope = root.createScope({request})
+root.getAsync('handler') // [!code error]
 
-// @ts-expect-error: handler is async
-scope.get('handler')
+const scope = root.createScope({ request: { requestId: 'req-1' } })
+scope.get('handler') // [!code error]
 
-await scope.getAsync('handler')
+const handler = await scope.getAsync('handler')
+//    ^?
 ```
 
-Usa [Entradas de scope](./scope-inputs) para modelar la preparación y [Dependencias asíncronas](./async-dependencies) para elegir el contrato Promise.
+Al root le falta `request`; el `handler` del scope ya está listo, pero sigue siendo asíncrono porque depende de `database`. Continúa con [Entradas de scope](./scope-inputs) y [Dependencias asíncronas](./async-dependencies).

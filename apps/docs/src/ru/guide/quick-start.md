@@ -1,6 +1,6 @@
 # Быстрый старт
 
-В этом примере мы соберём полный граф, получим сервис из root-контейнера, а затем создадим скоуп запроса. Декораторы и настройка метаданных не нужны.
+Начнём с двух обычных классов и явной цепочки сборки. До скоупов запроса дойдём после того, как разберём базовый граф.
 
 ## Установка
 
@@ -22,99 +22,51 @@ yarn add @inferdi/inferdi
 
 ## Сборка графа
 
-```ts
+<<< ../../../snippets/quick-start-sync.ts
+
+В `UserService` нет импорта InferDI. Код сборки выбирает `Logger`, задаёт имена регистраций и фиксирует порядок аргументов конструктора. Возвращённый тип `root` уже содержит оба сервиса.
+
+Если изменить конструктор и забыть обновить граф, TypeScript покажет ошибку в коде сборки:
+
+```ts twoslash
+// @errors: 2345
 import { Container } from '@inferdi/inferdi'
 
-type RequestContext = {
-  requestId: string
-}
-
 class Logger {
-  info(message: string) {
-    console.info(message)
-  }
-}
-
-class Database {
-  constructor(readonly dsn: string) {}
+  info(message: string) {}
 }
 
 class UserService {
-  constructor(
-    private readonly request: RequestContext,
-    private readonly database: Database,
-    private readonly logger: Logger
-  ) {}
-
-  find(id: string) {
-    this.logger.info(`request=${this.request.requestId} user=${id}`)
-    return { id, database: this.database.dsn }
-  }
+  constructor(readonly logger: Logger, readonly region: string) {}
 }
 
-const root = new Container()
-  .declareScopeInputs<{ request: RequestContext }>()
-  .registerValue('dsn', 'postgres://localhost/app')
+new Container()
   .registerClass('logger', Logger, [])
-  .registerClass('database', Database, ['dsn'])
-  .registerClass(
-    'users',
-    UserService,
-    ['request', 'database', 'logger'],
-    'scoped'
-  )
+  .registerClass('users', UserService, ['logger']) // [!code error]
 ```
 
-Каждый кортеж зависимостей проверяется по конструктору. Если поменять местами `database` и `logger`, пропустить `request` или указать неизвестный ключ, TypeScript сообщит об ошибке.
+Так граф отражается в системе типов: каждая регистрация уточняет тип контейнера, и следующие вызовы проверяются с учётом уже объявленных зависимостей.
 
-В этом графе один внешний вход и четыре регистрации:
+## Получение сервисов {#получение-сервисов}
 
-```text
-dsn ───────────────▶ database (singleton) ─┐
-logger (singleton) ────────────────────────┼─▶ users (scoped)
-request (scope input) ─────────────────────┘
-```
+`root.get('users')` синхронно возвращает `UserService`. По умолчанию сервисы имеют время жизни `singleton`, поэтому повторный вызов получает экземпляр из кэша.
 
-## Получение сервисов
+Данные запроса нужны только на время его обработки. Объявите их как входные данные скоупа и передайте при создании дочернего контейнера:
 
-Singleton из root-контейнера можно получить синхронно через `.get()`:
+<<< ../../../snippets/quick-start-scope.ts
 
-```ts
-const database = root.get('database')
-```
-
-Сервису `users` нужен вход `request`, поэтому сначала откройте скоуп:
-
-```ts
-const request = { requestId: crypto.randomUUID() }
-
-await using scope = root.createScope({ request })
-const users = scope.get('users')
-
-users.find('42')
-```
-
-Тип созданного скоупа хранит информацию о готовности `request`. Вызов `root.get('users')` не компилируется, потому что у root-контейнера нет данных запроса.
+Блок `finally` освобождает дочерний скоуп даже при ошибке. `scope.dispose()` освобождает scoped-экземпляр `RequestLog`, а переданный `request` остаётся во владении приложения. Если ваша сборка TypeScript поддерживает явное управление ресурсами (Explicit Resource Management), вместо `try/finally` можно использовать `await using`.
 
 ## Выбор времени жизни
 
-По умолчанию регистрация имеет время жизни `singleton`. Явно укажите другое значение, если объект принадлежит скоупу или вызывающему коду.
+| Время жизни | Когда создаётся | Кто кэширует | Кто освобождает |
+|---|---|---|---|
+| `singleton` | один раз у владельца регистрации | корневой контейнер или владелец регистрации | этот контейнер |
+| `scoped` | один раз в скоупе, из которого получают сервис | дочерний скоуп | этот скоуп |
+| `transient` | при каждом получении сервиса | никто | вызывающий код |
 
-| Время жизни | Создание | Где кешируется | Кто освобождает |
-| --- | --- | --- | --- |
-| `singleton` | один раз | создавший контейнер | этот контейнер |
-| `scoped` | один раз на дочерний скоуп | дочерний скоуп | этот скоуп |
-| `transient` | при каждом resolve | нигде | вызывающий код |
+Значения, переданные через `registerValue`, `.override()` или входные данные скоупа, тоже остаются во владении приложения. Singleton не может напрямую зависеть от scoped- или transient-сервиса: InferDI отклоняет объявленную связь в типах и повторяет проверку в режиме по умолчанию во время выполнения.
 
-Singleton не может напрямую зависеть от scoped- или transient-сервиса. InferDI проверяет это в типах и, по умолчанию, повторяет проверку во время выполнения.
+## Куда двигаться дальше {#куда-дальше}
 
-## Куда дальше
-
-| Задача | Раздел |
-| --- | --- |
-| разобраться в compile-time проверках графа | [Типобезопасность](../core/type-safety) |
-| описать запрос, tenant или данные задачи | [Входные данные скоупа](../core/scope-inputs) |
-| асинхронно инициализировать зависимость | [Асинхронные зависимости](../core/async-dependencies) |
-| безопасно закрывать базы данных и другие ресурсы | [Скоупы и освобождение ресурсов](../core/scopes) |
-| связать скоупы с веб-фреймворком | [Адаптеры](../adapters/) |
-| посмотреть полные примеры для фреймворков и runtime | [Примеры](./examples) |
+На странице [Зачем InferDI](./why-inferdi) разобраны инженерные компромиссы, а [Типобезопасность](../core/type-safety) показывает полный набор проверок графа. [Скоупы и освобождение ресурсов](../core/scopes) объясняют владение, [Адаптеры](../adapters/) связывают скоупы с жизненным циклом приложения.

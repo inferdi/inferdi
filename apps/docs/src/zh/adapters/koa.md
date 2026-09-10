@@ -11,13 +11,30 @@ pnpm add -D @types/koa
 
 ```ts
 import Koa from 'koa'
+import { Container } from '@inferdi/inferdi'
 import { inferdiKoa, type InferdiKoaState } from '@inferdi/koa'
 ```
 
 ## 请求作用域
 
 ```ts
-const root = buildRootContainer()
+type RequestContext = {
+  requestId: string
+  userId?: string
+  ip: string
+}
+
+class Users {
+  constructor(readonly request: RequestContext) {}
+
+  profile(id: string) {
+    return { id, userId: this.request.userId }
+  }
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('users', Users, ['request'], 'scoped')
 const openRequestScope = (request: RequestContext) =>
   root.createScope({ request })
 type RequestScope = ReturnType<typeof openRequestScope>
@@ -110,3 +127,5 @@ app.use(async (ctx) => {
 ```
 
 下游错误总是会释放作用域；成功且被跳过的请求则归应用所有。
+
+一次 `skipInferdiDispose(ctx)` 调用适用于该请求中的所有 InferDI 中间件实例，包括使用不同 state 键的实例。应用代码必须自行释放每个保留的作用域。

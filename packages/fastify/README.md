@@ -3,255 +3,60 @@
 <div align="center">
 <img src="https://raw.githubusercontent.com/inferdi/inferdi/main/assets/logo.png" alt="InferDI" width="150" height="150" />
 
-[![JSR](https://jsr.io/badges/@inferdi/fastify)](https://jsr.io/@inferdi/fastify)
-[![npm version](https://img.shields.io/npm/v/@inferdi/fastify)](https://www.npmjs.com/package/@inferdi/fastify)
-![License](https://img.shields.io/npm/l/@inferdi/fastify.svg)
-[![Docs](https://img.shields.io/badge/docs-inferdi.com-5b5ff5)](https://inferdi.com/adapters/fastify)
+**Typed services. Request scopes. Fastify speed.**
 
-Fastify v5 request-scope adapter for [InferDI](https://github.com/inferdi/inferdi).
+Bring InferDI’s compiler-checked graph to Fastify 5 with scopes that follow the request lifecycle.
+
+[![npm version](https://img.shields.io/npm/v/@inferdi/fastify)](https://www.npmjs.com/package/@inferdi/fastify)
+[![JSR](https://jsr.io/badges/@inferdi/fastify)](https://jsr.io/@inferdi/fastify)
+[![License](https://img.shields.io/npm/l/@inferdi/fastify.svg)](https://github.com/inferdi/inferdi/blob/main/LICENSE)
+
+[Get started](https://inferdi.com/adapters/fastify) · [InferDI](https://inferdi.com) · [All integrations](https://inferdi.com/adapters/)
+
+**Read the docs in your language**
+
+[English](https://inferdi.com/adapters/fastify) · [中文](https://inferdi.com/zh/adapters/fastify) · [日本語](https://inferdi.com/ja/adapters/fastify) · [Español](https://inferdi.com/es/adapters/fastify) · [Русский](https://inferdi.com/ru/adapters/fastify) · [Deutsch](https://inferdi.com/de/adapters/fastify) · [Français](https://inferdi.com/fr/adapters/fastify)
+
 </div>
 
-> **Part of the [InferDI](https://github.com/inferdi/inferdi) project** — a
-> zero-dependency, decorator-free, strongly typed DI container for TypeScript.
-> Core package: [`@inferdi/inferdi`](https://www.npmjs.com/package/@inferdi/inferdi)
-> ([JSR](https://jsr.io/@inferdi/inferdi)).
+InferDI is a TypeScript dependency injection container that checks how your services fit together at compile time. `@inferdi/fastify` brings that graph to Fastify 5: each request gets its own scope on `request.di`, with the root on `app.di`. Keep request data isolated and let the plugin handle cleanup after the response.
 
-This plugin wires InferDI into Fastify's lifecycle **without** adding decorators,
-reflection, controller scanning, or handler parameter injection. Your
-application still builds an explicit InferDI graph and resolves services with
-`.get(key)` — the adapter only manages the per-request scope.
+## The graph is the type. Built for speed.
 
-## Table of Contents
+**Catch broken wiring while you code.** Each registration records service types, dependencies and lifetimes in the container’s type. TypeScript rejects missing keys, duplicate registrations, incompatible constructor arguments and declared singleton dependencies on scoped services. Async dependencies and required scope inputs also determine which services are ready to resolve. Refactor a constructor and your editor points to affected registrations.
 
-- [Install](#install)
-- [Request Scope](#request-scope)
-- [Options](#options)
-- [Root-Only Mode](#root-only-mode)
-- [Lifecycle](#lifecycle)
-- [API](#api)
-- [Related](#related)
+**Keep your business logic yours.** Choose implementations explicitly where you assemble the application. Services receive ordinary constructor or function arguments, with no InferDI imports, decorators or metadata. You can test them directly and keep business policy independent of the framework and container. Reusable modules, lazy resolution and typed overrides support composition as the application grows.
 
-## Install
+**Fast resolution, compact core.** InferDI core has zero runtime dependencies, an enforced budget under 3 KiB gzip and a single `Map.get()` fast path for cached services. In the [recorded core cached-singleton benchmark](https://github.com/inferdi/inferdi/blob/main/benchmarks/results/public-2026-08-17T16-46-00-483Z.json), default InferDI is **1.76× to 13.05× faster** than the compared containers, with runtime checks enabled. These are core operation measurements; adapter overhead and application performance depend on the workload. [Explore the benchmarks](https://inferdi.com/guide/performance).
 
-For the full multilingual guide, adapter docs, API reference, and migration notes, see [inferdi.com](https://inferdi.com).
+Static checks cover the declared graph within TypeScript’s limits; casts can bypass them and structurally identical dependency types remain interchangeable.
 
-```bash
-pnpm add @inferdi/inferdi @inferdi/fastify fastify
-# or
-deno add jsr:@inferdi/inferdi jsr:@inferdi/fastify npm:fastify
-```
+## Why use it with Fastify
 
-```ts
-import Fastify from 'fastify'
-import { inferdiFastify } from '@inferdi/fastify'
-```
+- **Your service types reach the handler:** declaration merging preserves your concrete root and request container types.
+- **One scope per request:** create and initialize services before handlers run, with sync or async setup hooks.
+- **Cleanup follows Fastify:** scopes stay available to error handlers and dispose after the response; client aborts have a dedicated cleanup path.
+- **Root-only mode stays lean:** expose `app.di` without request decoration or request lifecycle hooks when you do not need scopes.
+- **Control ownership:** customize disposal, hand a scope to longer-lived work, or opt into root disposal when Fastify closes.
 
-## Request Scope
+## Lifecycle essentials
 
-By default the plugin creates one InferDI scope per request, exposes it as
-`request.di`, and disposes it in Fastify's `onResponse` hook after the response
-has been sent. The root container is always exposed as `app.di`.
+Setup runs in `onRequest`, before body parsing. Inline setup hooks passed through `app.register` need explicit scope annotations; handler types come from your declaration merging. The guide covers both patterns.
 
-Publish your own concrete container types via module augmentation — the plugin
-keeps its published types structural and never declares `di` globally as `any`.
+Request scopes dispose in `onResponse`, or `onRequestAbort` after a client disconnects. Setup failure releases the unfinished scope and surfaces the original error. Cleanup failures go to `onDisposeError` or Fastify’s logger.
 
-```ts
-import Fastify from 'fastify'
-import { inferdiFastify } from '@inferdi/fastify'
-import { buildRootContainer } from './container.js'
+`skipInferdiDispose(request)` transfers cleanup to your application on successful requests; request errors override the skip. After scope exposure, client aborts honor manual ownership. Setting `autoDispose` to `false`, or returning `false` from its predicate, also transfers ownership. Root disposal is opt-in through `disposeRootOnClose`.
 
-const root = buildRootContainer()
-const app = Fastify()
+## Get started
 
-type RootContainer = typeof root
-type RequestContainer = ReturnType<RootContainer['createScope']>
+Fastify 5 · Node.js 20+ · TypeScript 5.2+ · InferDI 6
 
-declare module 'fastify' {
-  interface FastifyInstance {
-    di: RootContainer
-  }
+Available on [npm](https://www.npmjs.com/package/@inferdi/fastify) and [JSR](https://jsr.io/@inferdi/fastify), alongside [`@inferdi/inferdi`](https://www.npmjs.com/package/@inferdi/inferdi).
 
-  interface FastifyRequest {
-    di: RequestContainer
-  }
-}
+**[Read the Fastify guide →](https://inferdi.com/adapters/fastify)**
 
-await app.register(inferdiFastify, {
-  container: root,
-  // Annotate hook params explicitly — see the note below.
-  setupScope: (scope: RequestContainer, request) => {
-    const ctx = scope.get('request')
-    ctx.requestId = request.id
-    ctx.ip = request.ip
-  },
-})
+Installation, concrete request types, hook annotations, root-only mode and lifecycle options are covered in the guide.
 
-app.get('/users/:id', async (request) => {
-  const { id } = request.params as { id: string }
-  return request.di.get('users').profile(id)
-})
-```
+[GitHub](https://github.com/inferdi/inferdi) · [Report an issue](https://github.com/inferdi/inferdi/issues) · [MIT license](https://github.com/inferdi/inferdi/blob/main/LICENSE)
 
-> **Type inference through `app.register`.** Fastify consumes the plugin through
-> `app.register`, whose own generics collapse the plugin's type parameters before
-> the options object is checked. As a result the scope parameter of an inline
-> hook (`setupScope`, `disposeScope`, `createScope`, …) is **not** inferred — annotate
-> it explicitly (`(scope: InferdiScopeOf<typeof root>) => …`, or `RequestContainer`
-> as above). Route handlers reading `request.di` are unaffected: their type comes
-> from the `FastifyRequest` augmentation, not from inference.
-
-`setupScope` runs in `onRequest`, before Fastify parses the request body. Use it
-for headers, request ids, IP addresses, raw request metadata, and auth data from
-earlier plugins. If a route needs parsed body data in the scope, add a later
-application hook and write to `request.di` there.
-
-## Options
-
-```ts
-await app.register(inferdiFastify, {
-  container: root,
-  createScope: (root, request, reply) => root.createScope(),
-  setupScope: (scope, request, reply) => {},
-  disposeScope: (scope, request, reply) => scope.dispose(),
-  autoDispose: true,
-  disposeRootOnClose: true,
-  onDisposeError: (error, request, reply) => {
-    request.log.error({ err: error }, 'Failed to dispose request scope')
-  },
-})
-```
-
-| Option               | Default                  | Description                                                                                                                                                                                                                                 |
-|----------------------|--------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `container`          | —                        | **Required.** The root container. Must structurally provide `createScope()`; a `dispose()` is required only when `disposeRootOnClose: true`. Exposed as `app.di`.                                                                           |
-| `scopePerRequest`    | `true`                   | Set to `false` for [root-only mode](#root-only-mode).                                                                                                                                                                                       |
-| `createScope`        | `root.createScope()`     | Overrides how a per-request scope is created. May be async.                                                                                                                                                                                 |
-| `setupScope`         | —                        | Hydrates the scope before it is assigned to `request.di`. Runs in `onRequest`. May be async.                                                                                                                                                |
-| `disposeScope`       | `scope.dispose()`        | Overrides request-scope disposal. May be sync or async.                                                                                                                                                                                     |
-| `autoDispose`        | `true`                   | Set to `false`, or return `false` from a predicate, when application code owns disposal.                                                                                                                                                    |
-| `disposeRootOnClose` | `false`                  | Dispose the root container on `fastify.close()`. Set it when the Fastify instance owns the root container's lifetime. Requires a disposable root: the type narrows to `false` when `container` has no `dispose()`.                          |
-| `onDisposeError`     | `request.log.error(...)` | Optional sink for **request-scope** disposal failures. Returning normally marks the error handled; otherwise it is logged. Disposal runs in `onResponse` (the response is already sent), so a failure here is never surfaced to the client. |
-
-`InferdiScope.dispose()` may be synchronous or asynchronous — a sync `dispose()`
-resolves the response in the same tick without scheduling a microtask.
-
-The cleanup hooks (`disposeScope`, `autoDispose`, `onDisposeError`) observe the
-scope on `request.di`, the same handle route handlers read — it stays assigned
-while they run and is cleared only once cleanup finishes. This holds on the
-setup-failure path too: setup-failure cleanup hooks see `request.di`, but it is
-cleared before Fastify's error handler runs, so error handlers never observe a
-half-built or disposed scope.
-
-If `setupScope` fails after a scope has been created, the plugin disposes that
-scope and rethrows the **original** setup error through Fastify's normal hook
-error path; a disposal failure during that teardown is sent to `onDisposeError` /
-`request.log.error`, never aggregated into the thrown error.
-
-A route that keeps using the scope past the response (background work, a handed-off
-stream) can call `skipInferdiDispose(request)` to take over disposal; the plugin
-then leaves that one request's scope alone. The skip suppresses cleanup only for
-a **successful** response: if the request fails through Fastify's error path, the
-scope is disposed regardless of the marker.
-
-If the client aborts before the response is sent, Fastify never runs `onResponse`,
-so the scope is released in `onRequestAbort` instead. Once the scope has been
-exposed on `request.di`, abort cleanup uses the same `autoDispose`,
-`disposeScope`, and `onDisposeError` contract as `onResponse`; the adapter keeps
-the Fastify `reply` object from setup time for those hooks. `skipInferdiDispose`
-and an explicit `autoDispose: false` keep their manual-ownership meaning after
-the scope has been exposed. If abort happens while async `createScope` /
-`setupScope` is still in flight, the scope is never exposed to application code,
-so the adapter disposes it itself through `disposeScope` / `onDisposeError`.
-
-## Root-Only Mode
-
-Use `scopePerRequest: false` when the application does not use request-scoped
-services. In this mode the plugin only decorates the Fastify instance as
-`app.di` — it does **not** decorate requests or install request lifecycle hooks,
-so the per-request options (`createScope`, `setupScope`, `disposeScope`,
-`autoDispose`, `onDisposeError`) are statically rejected.
-
-```ts
-await app.register(inferdiFastify, {
-  container: root,
-  scopePerRequest: false,
-})
-
-app.get('/health', async function () {
-  return this.di.get('health').check()
-})
-
-app.get('/ready', async (request) => {
-  return request.server.di.get('health').check()
-})
-```
-
-In root-only mode, do not augment `FastifyRequest.di`; handlers should use
-`this.di` in non-arrow handlers or `request.server.di`.
-
-## Lifecycle
-
-Scoped mode installs:
-
-1. `decorate('di', root)`.
-2. `decorateRequest('di', null)`.
-3. `onRequest` — creates and initializes the request scope.
-4. `onResponse` — disposes the request scope after the response is sent.
-5. `onRequestAbort` — disposes the request scope when the client aborts before
-   the response is sent (`onResponse` does not run then).
-
-Root-only mode installs only `decorate('di', root)` and, when
-`disposeRootOnClose` is set, root disposal on `onClose`.
-
-## API
-
-```ts
-// A value or a promise of it — used by the scope hooks.
-export type MaybePromise<T> = T | Promise<T>
-
-// Minimal structural contract for a disposable scope (any Container satisfies it).
-export interface InferdiScope {
-  dispose(): MaybePromise<void>
-}
-
-// Root container: only `createScope()` is required. A `dispose()` is needed just
-// for `disposeRootOnClose: true`, enforced at the option level.
-export interface InferdiRoot<Scope extends InferdiScope = InferdiScope> {
-  createScope(): Scope
-}
-
-// Extracts the request-scope type produced by a root container.
-export type InferdiScopeOf<Root extends InferdiRoot> = ReturnType<Root['createScope']>
-
-// Per-request (scoped) and root-only option shapes; the union discriminates on
-// `scopePerRequest`. `Scope` defaults to `InferdiScopeOf<Root>`.
-export type ScopedOptions<Root, Scope = InferdiScopeOf<Root>> = { /* ... */ }
-export type RootOnlyOptions<Root, Scope = InferdiScopeOf<Root>> = { /* ... */ }
-export type InferdiFastifyOptions<Root, Scope = InferdiScopeOf<Root>> =
-  | ScopedOptions<Root, Scope>
-  | RootOnlyOptions<Root, Scope>
-
-// Public call signature of the plugin. `Root` is inferred from `container`;
-// `Scope` defaults to `InferdiScopeOf<Root>`.
-export type InferdiFastifyPlugin = <Root extends InferdiRoot, Scope extends InferdiScope = InferdiScopeOf<Root>>(
-  fastify: FastifyInstance,
-  options: InferdiFastifyOptions<Root, Scope>,
-) => Promise<void>
-
-// The plugin. Register it with `app.register(inferdiFastify, options)`.
-export const inferdiFastify: InferdiFastifyPlugin
-```
-
-## Related
-
-| Package                                                                             | JSR                                    | npm                                                   | Description                                                         |
-|-------------------------------------------------------------------------------------|----------------------------------------|-------------------------------------------------------|---------------------------------------------------------------------|
-| [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) | [JSR](https://jsr.io/@inferdi/inferdi) | [npm](https://www.npmjs.com/package/@inferdi/inferdi) | Core DI container — zero-dependency, decorator-free, strongly typed |
-| [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | [JSR](https://jsr.io/@inferdi/fastify) | [npm](https://www.npmjs.com/package/@inferdi/fastify) | Fastify v5 request-scope adapter                                    |
-| [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono)       | [JSR](https://jsr.io/@inferdi/hono)    | [npm](https://www.npmjs.com/package/@inferdi/hono)    | Hono request-scope middleware                                       |
-| [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa)         | [JSR](https://jsr.io/@inferdi/koa)     | [npm](https://www.npmjs.com/package/@inferdi/koa)     | Koa v3 request-scope middleware                                     |
-| [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | [JSR](https://jsr.io/@inferdi/express) | [npm](https://www.npmjs.com/package/@inferdi/express) | Express 5 request-scope middleware                                  |
-| [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)   | [JSR](https://jsr.io/@inferdi/elysia)  | [npm](https://www.npmjs.com/package/@inferdi/elysia)  | Elysia request-scope plugin                                         |
-| [`@inferdi/react`](https://github.com/inferdi/inferdi/tree/main/packages/react)     | [JSR](https://jsr.io/@inferdi/react)   | [npm](https://www.npmjs.com/package/@inferdi/react)   | React 19 providers, hooks, Suspense and managed scopes               |
-
-The project repository lives at [inferdi/inferdi](https://github.com/inferdi/inferdi). This adapter targets [Fastify](https://fastify.dev) v5.
+With `autoDispose: false` or a predicate returning `false`, `request.di` remains available after response or abort cleanup so application code can dispose the retained scope.

@@ -11,13 +11,30 @@ pnpm add -D @types/koa
 
 ```ts
 import Koa from 'koa'
+import { Container } from '@inferdi/inferdi'
 import { inferdiKoa, type InferdiKoaState } from '@inferdi/koa'
 ```
 
 ## Request Scope
 
 ```ts
-const root = buildRootContainer()
+type RequestContext = {
+  requestId: string
+  userId?: string
+  ip: string
+}
+
+class Users {
+  constructor(readonly request: RequestContext) {}
+
+  profile(id: string) {
+    return { id, userId: this.request.userId }
+  }
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('users', Users, ['request'], 'scoped')
 const openRequestScope = (request: RequestContext) =>
   root.createScope({ request })
 type RequestScope = ReturnType<typeof openRequestScope>
@@ -110,3 +127,5 @@ app.use(async (ctx) => {
 ```
 
 A downstream error always disposes the scope; successful skipped requests become application-owned.
+
+A single `skipInferdiDispose(ctx)` call applies to every InferDI middleware instance on that request, including instances with different state keys. Application code must dispose every retained scope.

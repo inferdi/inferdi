@@ -3,221 +3,60 @@
 <div align="center">
 <img src="https://raw.githubusercontent.com/inferdi/inferdi/main/assets/logo.png" alt="InferDI" width="150" height="150" />
 
-[![JSR](https://jsr.io/badges/@inferdi/express)](https://jsr.io/@inferdi/express)
-[![npm version](https://img.shields.io/npm/v/@inferdi/express)](https://www.npmjs.com/package/@inferdi/express)
-![License](https://img.shields.io/npm/l/@inferdi/express.svg)
-[![Docs](https://img.shields.io/badge/docs-inferdi.com-5b5ff5)](https://inferdi.com/adapters/express)
+**Your Express app. A compiler-checked service graph.**
 
-Express request-scope middleware for [InferDI](https://github.com/inferdi/inferdi).
+Typed request scopes and response-aware cleanup, delivered as Express middleware.
+
+[![npm version](https://img.shields.io/npm/v/@inferdi/express)](https://www.npmjs.com/package/@inferdi/express)
+[![JSR](https://jsr.io/badges/@inferdi/express)](https://jsr.io/@inferdi/express)
+[![License](https://img.shields.io/npm/l/@inferdi/express.svg)](https://github.com/inferdi/inferdi/blob/main/LICENSE)
+
+[Get started](https://inferdi.com/adapters/express) · [InferDI](https://inferdi.com) · [All integrations](https://inferdi.com/adapters/)
+
+**Read the docs in your language**
+
+[English](https://inferdi.com/adapters/express) · [中文](https://inferdi.com/zh/adapters/express) · [日本語](https://inferdi.com/ja/adapters/express) · [Español](https://inferdi.com/es/adapters/express) · [Русский](https://inferdi.com/ru/adapters/express) · [Deutsch](https://inferdi.com/de/adapters/express) · [Français](https://inferdi.com/fr/adapters/express)
+
 </div>
 
-> **Part of the [InferDI](https://github.com/inferdi/inferdi) project** — a
-> zero-dependency, decorator-free, strongly typed DI container for TypeScript.
-> Core package: [`@inferdi/inferdi`](https://www.npmjs.com/package/@inferdi/inferdi)
-> ([JSR](https://jsr.io/@inferdi/inferdi)).
+InferDI is a TypeScript dependency injection container that checks how your services fit together at compile time. `@inferdi/express` brings that graph to Express 5 with one scope per request on `req.di`. Keep service wiring explicit and let middleware manage request lifetimes, including responses that stream beyond the handler.
 
-This middleware wires InferDI into Express 5 without decorators, reflection,
-controller scanning, router patching, `AsyncLocalStorage`, or handler parameter
-injection. Your application still builds an explicit InferDI graph and resolves
-services with `.get(key)` — the adapter only manages the per-request scope.
+## The graph is the type. Built for speed.
 
-## Table of Contents
+**Catch broken wiring while you code.** Each registration records service types, dependencies and lifetimes in the container’s type. TypeScript rejects missing keys, duplicate registrations, incompatible constructor arguments and declared singleton dependencies on scoped services. Async dependencies and required scope inputs also determine which services are ready to resolve. Refactor a constructor and your editor points to affected registrations.
 
-- [Install](#install)
-- [Request Scope](#request-scope)
-- [Options](#options)
-- [Streaming](#streaming)
-- [API](#api)
-- [Related](#related)
+**Keep your business logic yours.** Choose implementations explicitly where you assemble the application. Services receive ordinary constructor or function arguments, with no InferDI imports, decorators or metadata. You can test them directly and keep business policy independent of the framework and container. Reusable modules, lazy resolution and typed overrides support composition as the application grows.
 
-## Install
+**Fast resolution, compact core.** InferDI core has zero runtime dependencies, an enforced budget under 3 KiB gzip and a single `Map.get()` fast path for cached services. In the [recorded core cached-singleton benchmark](https://github.com/inferdi/inferdi/blob/main/benchmarks/results/public-2026-08-17T16-46-00-483Z.json), default InferDI is **1.76× to 13.05× faster** than the compared containers, with runtime checks enabled. These are core operation measurements; adapter overhead and application performance depend on the workload. [Explore the benchmarks](https://inferdi.com/guide/performance).
 
-For the full multilingual guide, adapter docs, API reference, and migration notes, see [inferdi.com](https://inferdi.com).
+Static checks cover the declared graph within TypeScript’s limits; casts can bypass them and structurally identical dependency types remain interchangeable.
 
-```bash
-pnpm add @inferdi/inferdi @inferdi/express express
-pnpm add -D @types/express
-# or
-deno add jsr:@inferdi/inferdi jsr:@inferdi/express npm:express
-```
+## Why use it with Express
 
-```ts
-import express from 'express'
-import { inferdiExpress } from '@inferdi/express'
-```
+- **Your types in every handler:** declaration merging gives `Express.Request` your concrete scope type and preserves typed service resolution.
+- **Scopes ready before routing:** sync or async hooks create and initialize request services before handing control to Express.
+- **Streaming-aware cleanup:** scopes dispose when the Node response finishes or closes; normal stream responses need no special skip.
+- **Ownership you control:** customize disposal and error reporting, or retain a scope for work beyond the HTTP response.
+- **Fits existing Express code:** integrate through middleware while keeping domain services independent of Express and InferDI.
 
-Express publishes JavaScript and keeps TypeScript declarations in
-`@types/express`. `@inferdi/express` lists that package as an optional peer so
-TypeScript consumers can keep Express request and response types in their
-application dependency graph.
+## Lifecycle essentials
 
-## Request Scope
+Automatic cleanup follows the response’s `finish` or `close` event. Setup failure releases the unfinished scope and passes only the original error to `next`. Cleanup failures go to `onDisposeError` or `console.error`.
 
-The middleware creates one InferDI scope per request, exposes it as `req.di`,
-and disposes it after the underlying Node response finishes or the connection
-closes.
+`skipInferdiDispose(req)` transfers disposal to application code. **That ownership remains yours if a route later fails:** Express callback middleware cannot observe a handled downstream exception at cleanup time. Dispose retained scopes from your own completion and error paths.
 
-```ts
-import express from 'express'
-import { inferdiExpress, type InferdiScopeOf } from '@inferdi/express'
-import { buildRootContainer } from './container.js'
+Setting `autoDispose` to `false`, or returning `false` from its predicate, also transfers ownership. The middleware never disposes the root container. The guide covers streaming, background work and the handled-error limitation.
 
-const root = buildRootContainer()
+## Get started
 
-declare global {
-  namespace Express {
-    interface Request {
-      di: InferdiScopeOf<typeof root>
-    }
-  }
-}
+Express 5 · Node.js 18+ · TypeScript 5.2+ · InferDI 6. TypeScript applications also need `@types/express`.
 
-const app = express()
+Available on [npm](https://www.npmjs.com/package/@inferdi/express) and [JSR](https://jsr.io/@inferdi/express), alongside [`@inferdi/inferdi`](https://www.npmjs.com/package/@inferdi/inferdi).
 
-app.use(inferdiExpress({
-  container: root,
-  setupScope: (scope, req) => {
-    const request = scope.get('request')
-    request.requestId = crypto.randomUUID()
-    request.userId = req.get('x-user-id') || undefined
-    request.ip = req.ip
-  },
-}))
+**[Read the Express guide →](https://inferdi.com/adapters/express)**
 
-app.get('/users/:id', async (req, res, next) => {
-  try {
-    res.json(await req.di.get('users').profile(req.params.id))
-  } catch (error) {
-    next(error)
-  }
-})
-```
+Installation, request declaration merging, lifecycle options, streaming and error ownership are covered in the guide.
 
-The package does not globally augment `Express.Request` with `any`, `unknown`,
-or a base container. You own the concrete request type through declaration
-merging.
+[GitHub](https://github.com/inferdi/inferdi) · [Report an issue](https://github.com/inferdi/inferdi/issues) · [MIT license](https://github.com/inferdi/inferdi/blob/main/LICENSE)
 
-Install body parsers, cookie/session middleware, auth, Helmet, CORS, and
-validation before or after `inferdiExpress(...)` according to what your
-`setupScope` hook needs. The adapter passes `req` and `res` to your hooks but
-does not read or trust request data itself.
-
-## Options
-
-```ts
-app.use(inferdiExpress({
-  container: root,
-  createScope: (root, req, res) => root.createScope(),
-  setupScope: (scope, req, res) => {},
-  disposeScope: (scope, req, res) => scope.dispose(),
-  autoDispose: true,
-  onDisposeError: (error, req, res) => {
-    logger.error({ err: error, path: req.path }, 'DI cleanup failed')
-  },
-}))
-```
-
-| Option           | Default              | Description                                                                                                                                           |
-|------------------|----------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `container`      | —                    | **Required.** The root container. Must structurally provide `createScope()`. The root is never disposed by this middleware.                           |
-| `createScope`    | `root.createScope()` | Overrides how a request scope is created. May be async.                                                                                               |
-| `setupScope`     | —                    | Hydrates the scope before it is exposed to route handlers. May be async.                                                                              |
-| `disposeScope`   | `scope.dispose()`    | Overrides request-scope disposal. May be async.                                                                                                       |
-| `autoDispose`    | `true`               | Set to `false`, or return `false`, when application code owns disposal.                                                                               |
-| `onDisposeError` | —                    | Optional per-error sink for cleanup failures — during setup teardown and after response completion alike. Returning normally marks the error handled. |
-
-If `setupScope` fails after a scope has been created, the middleware disposes
-that half-built scope before calling `next(error)`. **Only** the original setup
-error is passed to `next`; a disposal failure during that teardown is routed to
-`onDisposeError`, or logged with `console.error` when no handler is set — it is
-never aggregated into the error passed to `next`.
-
-Response-completion cleanup failures happen after Express has already sent or
-closed the response. By default they are logged with `console.error` and
-swallowed. If `onDisposeError` throws or rejects, the adapter logs an
-`AggregateError` containing both the original cleanup error and the handler
-error.
-
-### `skipInferdiDispose` and failed requests
-
-The other InferDI adapters force-dispose a scope when the request fails, so
-`skipInferdiDispose` suppresses cleanup only for a successful response. Express
-**cannot** match that on a handled route error. Its middleware is callback-style:
-`next()` returns no downstream-completion promise, so the middleware never
-observes a route exception, and cleanup runs from the Node response
-`finish`/`close` event, where a handled error (the error handler produced a
-response) is indistinguishable from a normal one. As a result, if a route calls
-`skipInferdiDispose(req)` and then fails, the scope is **not** auto-disposed —
-application code owns it. Only an already-destroyed connection at activation time
-bypasses the skip. Dispose such scopes from your own error path, or avoid
-combining `skipInferdiDispose` with routes that may throw.
-
-## Streaming
-
-Normal Express stream responses do not need a special skip. The middleware waits
-for the underlying Node response `finish` or `close` event before disposing the
-scope.
-
-Use `skipInferdiDispose(req)` when application code intentionally keeps the
-scope beyond the HTTP response boundary:
-
-```ts
-import { skipInferdiDispose } from '@inferdi/express'
-
-app.get('/background', (req, res) => {
-  skipInferdiDispose(req)
-  const scope = req.di
-
-  queue.add(async () => {
-    try {
-      await scope.get('jobs').run()
-    } finally {
-      await scope.dispose()
-    }
-  })
-
-  res.status(202).json({ status: 'queued' })
-})
-```
-
-For Server-Sent Events, WebSocket handoff, or background work, call
-`skipInferdiDispose(req)` before returning control to Express, then dispose the
-scope from the application-owned terminal path.
-
-## API
-
-```ts
-export type MaybePromise<T> = T | Promise<T>
-
-export interface InferdiScope {
-  dispose(): MaybePromise<void>
-}
-
-export interface InferdiRoot<Scope extends InferdiScope = InferdiScope> {
-  createScope(): Scope
-}
-
-export type InferdiScopeOf<Root extends InferdiRoot> =
-  ReturnType<Root['createScope']>
-
-export interface InferdiExpressOptions<Root, Scope> {
-  /* ... */
-}
-
-export function inferdiExpress(options: InferdiExpressOptions): RequestHandler
-export function skipInferdiDispose(req: Request): void
-```
-
-## Related
-
-| Package                                                                             | JSR                                    | npm                                                   | Description                                                         |
-|-------------------------------------------------------------------------------------|----------------------------------------|-------------------------------------------------------|---------------------------------------------------------------------|
-| [`@inferdi/inferdi`](https://github.com/inferdi/inferdi/tree/main/packages/inferdi) | [JSR](https://jsr.io/@inferdi/inferdi) | [npm](https://www.npmjs.com/package/@inferdi/inferdi) | Core DI container — zero-dependency, decorator-free, strongly typed |
-| [`@inferdi/fastify`](https://github.com/inferdi/inferdi/tree/main/packages/fastify) | [JSR](https://jsr.io/@inferdi/fastify) | [npm](https://www.npmjs.com/package/@inferdi/fastify) | Fastify v5 request-scope adapter                                    |
-| [`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono)       | [JSR](https://jsr.io/@inferdi/hono)    | [npm](https://www.npmjs.com/package/@inferdi/hono)    | Hono request-scope middleware                                       |
-| [`@inferdi/koa`](https://github.com/inferdi/inferdi/tree/main/packages/koa)         | [JSR](https://jsr.io/@inferdi/koa)     | [npm](https://www.npmjs.com/package/@inferdi/koa)     | Koa v3 request-scope middleware                                     |
-| [`@inferdi/express`](https://github.com/inferdi/inferdi/tree/main/packages/express) | [JSR](https://jsr.io/@inferdi/express) | [npm](https://www.npmjs.com/package/@inferdi/express) | Express 5 request-scope middleware                                  |
-| [`@inferdi/elysia`](https://github.com/inferdi/inferdi/tree/main/packages/elysia)   | [JSR](https://jsr.io/@inferdi/elysia)  | [npm](https://www.npmjs.com/package/@inferdi/elysia)  | Elysia request-scope plugin                                         |
-| [`@inferdi/react`](https://github.com/inferdi/inferdi/tree/main/packages/react)     | [JSR](https://jsr.io/@inferdi/react)   | [npm](https://www.npmjs.com/package/@inferdi/react)   | React 19 providers, hooks, Suspense and managed scopes               |
-
-The project repository lives at [inferdi/inferdi](https://github.com/inferdi/inferdi). This adapter targets [Express](https://expressjs.com) 5.
+A single `skipInferdiDispose(req)` call applies to every InferDI middleware instance on that request. Application code must retain and dispose every scope; `req.di` exposes the scope assigned by the last middleware.

@@ -10,13 +10,29 @@ pnpm add @inferdi/inferdi @inferdi/hono hono
 
 ```ts
 import { Hono } from 'hono'
+import { Container } from '@inferdi/inferdi'
 import { inferdiHono, type InferdiHonoScopeEnv } from '@inferdi/hono'
 ```
 
 ## 请求作用域
 
 ```ts
-const root = buildRootContainer()
+type RequestContext = {
+  requestId: string
+  userId?: string
+}
+
+class Users {
+  constructor(readonly request: RequestContext) {}
+
+  profile(id: string) {
+    return { id, userId: this.request.userId }
+  }
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('users', Users, ['request'], 'scoped')
 const openRequestScope = (requestId: string, userId?: string) =>
   root.createScope({ request: { requestId, userId } })
 type RequestScope = ReturnType<typeof openRequestScope>

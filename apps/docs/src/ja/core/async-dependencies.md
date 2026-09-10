@@ -168,3 +168,24 @@ const monitor = await legacy.getAsync('monitor')
 - Promise 境界後の `AsyncLazy.get()` による動的循環は、自身の cached pending Promise を待ち続ける可能性があります。
 
 同期構築は[ファクトリー](./factories)、所有権モデルは[スコープとリソース破棄](./scopes)を参照してください。
+
+## コンパイラーによる検証
+
+宣言的な async 登録は同期 `.get()` から除外され、`.getAsync()` で利用できます。
+
+```ts twoslash
+// @errors: 2345
+import { Container } from '@inferdi/inferdi'
+
+class Database {
+  query() {}
+}
+
+const container = new Container()
+  .registerAsyncFactory('database', async () => new Database(), [])
+
+container.get('database') // [!code error]
+
+const database = await container.getAsync('database')
+//    ^?
+```

@@ -6,13 +6,19 @@
   "scripts": {
     "dev": "vitepress dev",
     "check": "node scripts/check-docs.mjs",
+    "check:snippets": "tsc --project tsconfig.snippets.json",
     "check:seo": "node scripts/check-seo.mjs",
-    "build": "pnpm run check && vitepress build && pnpm run check:seo",
+    "check:urls": "node scripts/check-urls.mjs",
+    "build": "pnpm run check && pnpm run check:snippets && node --max-old-space-size=6144 node_modules/vitepress/bin/vitepress.js build && pnpm run check:seo && pnpm run check:urls",
     "view": "vitepress preview --port 4173 --strictPort",
     "preview": "vitepress preview --port 4173 --strictPort",
     "stop": "node scripts/stop-preview.mjs"
   },
   "devDependencies": {
+    "@inferdi/inferdi": "workspace:*",
+    "@shikijs/twoslash": "2.5.0",
+    "@shikijs/vitepress-twoslash": "2.5.0",
+    "typescript": "5.9.3",
     "vitepress": "1.6.4"
   }
 }

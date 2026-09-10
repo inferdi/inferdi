@@ -35,14 +35,16 @@ The container type tracks which inputs have been provided and hides dependent se
 
 ## Ownership
 
-Each container disposes only instances it created.
+Ownership depends on the registration kind, not simply on which code called a constructor.
 
-| Instance                                                             | Owner                |
-|----------------------------------------------------------------------|----------------------|
-| Singleton registered on the root, even when resolved through a child | Root container       |
-| Singleton registered on a child                                      | That child container |
-| Scoped service                                                       | Request scope        |
-| Transient                                                            | Caller               |
+| Value | Owner and cleanup |
+| --- | --- |
+| Singleton factory or class result | The container that owns the registration |
+| Scoped factory or class result | The scope that resolves and caches it |
+| Transient factory or class result | Caller; InferDI does not retain it for disposal |
+| `registerValue` value | Application |
+| `.override()` value | Application or test fixture |
+| Scope input | Code that opens the scope |
 
 `root.dispose()` does not cascade into already-created child scopes. Dispose scopes at their own lifecycle boundary.
 

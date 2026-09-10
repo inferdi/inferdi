@@ -1,5 +1,36 @@
 # テストとオーバーライド
 
+## サービスを直接テストする
+
+ビジネスサービスは普通の値を受け取るため、単体テストにコンテナーは不要です。
+
+```ts
+type Logger = { info(message: string): void }
+type Database = { findUser(id: string): { id: string } | undefined }
+
+class UserRepo {
+  constructor(readonly logger: Logger, readonly db: Database) {}
+
+  find(id: string) {
+    this.logger.info(`find ${id}`)
+    return this.db.findUser(id)
+  }
+}
+
+const messages: string[] = []
+const repo = new UserRepo(
+  { info: (message) => messages.push(message) },
+  { findUser: (id) => ({ id }) }
+)
+
+expect(repo.find('42')).toEqual({ id: '42' })
+expect(messages).toEqual(['find 42'])
+```
+
+アプリケーションの依存グラフ自体を検証するときは、統合テストでコンテナーを使います。
+
+## 組み立てたグラフをテストする
+
 テストで既存の登録をモックに置き換える必要がある場合は、`.override()` を使用します。
 
 ```ts

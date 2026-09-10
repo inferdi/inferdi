@@ -1,6 +1,6 @@
 # Адаптер Hono
 
-[`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) - это middleware для Hono v4. Он создаёт один scope запроса на вызов middleware, выставляет его через переменные контекста Hono и очищает после завершения ограниченного pipeline маршрута.
+[`@inferdi/hono`](https://github.com/inferdi/inferdi/tree/main/packages/hono) добавляет middleware для Hono v4. При каждом вызове middleware создаётся один скоуп запроса. Он доступен через переменные контекста Hono и освобождается после завершения цепочки обработчиков маршрута.
 
 ## Установка
 
@@ -10,13 +10,29 @@ pnpm add @inferdi/inferdi @inferdi/hono hono
 
 ```ts
 import { Hono } from 'hono'
+import { Container } from '@inferdi/inferdi'
 import { inferdiHono, type InferdiHonoScopeEnv } from '@inferdi/hono'
 ```
 
-## Scope запроса
+## Скоуп запроса {#scope-запроса}
 
 ```ts
-const root = buildRootContainer()
+type RequestContext = {
+  requestId: string
+  userId?: string
+}
+
+class Users {
+  constructor(readonly request: RequestContext) {}
+
+  profile(id: string) {
+    return { id, userId: this.request.userId }
+  }
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('users', Users, ['request'], 'scoped')
 const openRequestScope = (requestId: string, userId?: string) =>
   root.createScope({ request: { requestId, userId } })
 type RequestScope = ReturnType<typeof openRequestScope>
@@ -59,7 +75,7 @@ app.get('/users/:id', async (c) => {
 })
 ```
 
-Адаптер не делает global augmentation для Hono `ContextVariableMap`, поэтому пропущенное middleware остаётся видимым для TypeScript.
+Адаптер не расширяет глобальный тип `ContextVariableMap` в Hono. Поэтому TypeScript может заметить, что middleware не подключено.
 
 ## Опции
 
@@ -67,15 +83,15 @@ app.get('/users/:id', async (c) => {
 | --- | --- | --- |
 | `container` | обязательна | Корневой контейнер. Middleware его не очищает. |
 | `key` | `'di'` | Ключ переменной контекста. |
-| `createScope` | `root.createScope()` | Пользовательское создание scope запроса. |
-| `setupScope` | нет | Выполняет дополнительную инициализацию после создания scope. |
-| `disposeScope` | `scope.dispose()` | Пользовательская очистка. |
-| `autoDispose` | `true` | `false` или предикат `false` передаёт владение. |
-| `onDisposeError` | `console.error` | Приёмник ошибок очистки. |
+| `createScope` | `root.createScope()` | Позволяет задать создание скоупа запроса. |
+| `setupScope` | нет | Выполняет дополнительную инициализацию после создания скоупа. |
+| `disposeScope` | `scope.dispose()` | Позволяет задать освобождение ресурсов. |
+| `autoDispose` | `true` | `false` или предикат, вернувший `false`, передаёт владение приложению. |
+| `onDisposeError` | `console.error` | Обработчик ошибок очистки. |
 
 ## Стриминг
 
-Helpers для стриминга в Hono могут вернуть `Response` до завершения stream callback. В таких маршрутах вызывайте `skipInferdiDispose(c)` и очищайте scope из жизненного цикла stream.
+Функции потоковой передачи Hono могут вернуть `Response` до завершения обработчика потока. В таких маршрутах вызывайте `skipInferdiDispose(c)` и освобождайте скоуп при завершении потока.
 
 ```ts
 import { stream } from 'hono/streaming'
@@ -99,4 +115,4 @@ app.get('/events', (c) => {
 })
 ```
 
-`skipInferdiDispose` подавляет очистку только для успешного ответа. Пути с ошибкой всё равно очищают scope.
+`skipInferdiDispose` пропускает очистку только при успешном ответе. При ошибке скоуп всё равно освобождается, если это допускает `autoDispose`.

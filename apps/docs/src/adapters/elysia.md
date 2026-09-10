@@ -10,13 +10,29 @@ pnpm add @inferdi/inferdi @inferdi/elysia elysia
 
 ```ts
 import { Elysia } from 'elysia'
+import { Container } from '@inferdi/inferdi'
 import { inferdiElysia } from '@inferdi/elysia'
 ```
 
 ## Request Scope
 
 ```ts
-const root = buildRootContainer()
+type RequestContext = {
+  requestId: string
+  userId?: string
+}
+
+class Users {
+  constructor(readonly request: RequestContext) {}
+
+  profile(id: string) {
+    return { id, userId: this.request.userId }
+  }
+}
+
+const root = new Container()
+  .declareScopeInputs<{ request: RequestContext }>()
+  .registerClass('users', Users, ['request'], 'scoped')
 
 const app = new Elysia()
   .use(inferdiElysia({

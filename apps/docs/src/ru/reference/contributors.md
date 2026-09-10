@@ -6,7 +6,7 @@ const maintainers = [
     avatar: 'https://github.com/maxrendel.png',
     name: 'Вячеслав Кабанов',
     title: 'Мейнтейнер',
-    desc: 'Поддерживает InferDI и отвечает за публичную поверхность пакетов.',
+    desc: 'Поддерживает InferDI и отвечает за публичный API пакетов.',
     links: [
       { icon: 'github', link: 'https://github.com/maxrendel' },
     ],
