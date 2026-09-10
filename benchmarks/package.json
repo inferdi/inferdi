@@ -22,7 +22,7 @@
     "typed-inject": "^5.0.0",
     "reflect-metadata": "^0.2.2",
     "tinybench": "2.9.0",
-    "vitest": "^4.1.5",
+    "vitest": "^4.1.11",
     "unplugin-swc": "^1.5.9",
     "@swc/core": "^1.15.33",
     "typescript": "^5.6.0",
