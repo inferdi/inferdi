@@ -628,6 +628,45 @@ describe('v6 — requirements-based named modules', () => {
     expectTypeOf(result.get('mailer')).toEqualTypeOf<L>()
   })
 
+  it('accepts aliased and inferred modules alongside extra actual registrations', () => {
+    type MailerModule = Module<ConfigRequirement, MailerProvides>
+    const aliasedModule: MailerModule = (c) => c.registerClass('mailer', L, [])
+    const inferredModule = (c: Container<ConfigRequirement>) =>
+      c.registerClass('mailer', L, [])
+    const actual = new Container()
+      .registerValue('extra', 1 as const)
+      .registerValue('config', {env: 'test'})
+
+    expectTypeOf(actual.use(aliasedModule).get('mailer')).toEqualTypeOf<L>()
+    expectTypeOf(actual.use(aliasedModule).get('extra')).toEqualTypeOf<1>()
+    expectTypeOf(actual.use(inferredModule).get('mailer')).toEqualTypeOf<L>()
+    expectTypeOf(actual.use(inferredModule).get('extra')).toEqualTypeOf<1>()
+
+    // @ts-expect-error — config is missing
+    new Container().use(aliasedModule)
+    // @ts-expect-error — config is missing
+    new Container().use(inferredModule)
+    // @ts-expect-error — mailer collides with the complete actual graph
+    actual.use(aliasedModule).use(aliasedModule)
+    // @ts-expect-error — mailer collides with the complete actual graph
+    actual.use(inferredModule).use(inferredModule)
+  })
+
+  it('provides the keys every branch of an inferred module registers', () => {
+    const branchingModule = (c: Container<ConfigRequirement>) =>
+      c.get('config').env === 'test'
+        ? c.registerClass('mailer', L, []).registerValue('fixture', true)
+        : c.registerClass('mailer', L, [])
+    const result = new Container()
+      .registerValue('extra', 1 as const)
+      .registerValue('config', {env: 'test'})
+      .use(branchingModule)
+
+    expectTypeOf(result.get('mailer')).toEqualTypeOf<L>()
+    // @ts-expect-error — only one branch registers fixture
+    result.get('fixture')
+  })
+
   it('rejects missing requirements and output collisions', () => {
     // @ts-expect-error — config is missing
     new Container().use(mailerModule)

@@ -1,16 +1,28 @@
 import ts from 'typescript'
 import {describe, expect, it} from 'vitest'
 
+const modules = {
+  direct: `
+      const module: Module<Requirements, Provides> = (container) =>
+        container.registerValue('service', {run() {}})`,
+  aliased: `
+      type ServiceModule = Module<Requirements, Provides>
+      const module: ServiceModule = (container) =>
+        container.registerValue('service', {run() {}})`,
+  inferred: `
+      const module = (container: Container<Requirements>) =>
+        container.registerValue('service', {run() {}})`
+}
+
 describe('module diagnostics', () => {
-  it('includes stable requirement and collision properties', () => {
+  it.each(Object.entries(modules))('includes stable requirement and collision properties for %s modules', (_, declaration) => {
     const fixture = `${process.cwd()}/__tests__/module-diagnostics.fixture.ts`
     const source = `
       import {Container, type Module, type Spec} from '../src/Container'
 
       type Requirements = {config: Spec<{env: string}>}
       type Provides = {service: Spec<{run(): void}>}
-      const module: Module<Requirements, Provides> = (container) =>
-        container.registerValue('service', {run() {}})
+      ${declaration}
 
       new Container().use(module)
       new Container()
