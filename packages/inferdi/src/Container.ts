@@ -595,6 +595,21 @@ type RefineModuleProvides<
   >
 }
 
+/*
+ * A module's outputs are its return graph minus its requirements. Inferring
+ * them from `Module<Requirements, Provides>` only works when the argument is
+ * written as `Module<…>`. Aliased and inferred modules would widen `Provides`
+ * to `DependenciesMap` and collide with every key in the actual graph
+ */
+type ModuleRequirementsOf<M> =
+  M extends (c: Container<infer R>) => unknown ? R : never
+
+type ModuleGraphOf<M> = M extends (c: never) => infer C
+  ? C extends Container<infer G> ? G : never
+  : never
+
+type ModuleProvidesOf<M> = Omit<ModuleGraphOf<M>, keyof ModuleRequirementsOf<M>>
+
 /**
  * Construction options for {@link Container}.
  *
@@ -1864,13 +1879,9 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   public use<R extends DependenciesMap>(
     fn: (c: Container<T>) => Container<T & R>
   ): Container<T & R>
-  public use<
-    Requirements extends DependenciesMap,
-    Provides extends DependenciesMap
-  >(
-    fn: Module<Requirements, Provides> &
-      ModuleUseCheck<T, Requirements, Provides>
-  ): Container<T & RefineModuleProvides<T, Provides>>
+  public use<M extends Module<any, any>>(
+    fn: M & ModuleUseCheck<T, ModuleRequirementsOf<M>, ModuleProvidesOf<M>>
+  ): Container<T & RefineModuleProvides<T, ModuleProvidesOf<M>>>
   public use(
     fn: (c: Container<any>) => Container<any>
   ): Container<any> {

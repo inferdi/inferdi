@@ -173,3 +173,23 @@ new Container().use(serviceModule)
 // @ts-expect-error — the module declares `service` but never registers it
 const unfulfilledModule: Module<Record<never, never>, ServiceOutput> = (c) => c
 void unfulfilledModule
+
+// Aliased and inferred modules must also apply to a graph with extra
+// registrations through the published declarations.
+type ServiceModule = Module<ConfigRequirement, ServiceOutput>
+
+const aliasedServiceModule: ServiceModule = (c) =>
+  c.registerValue('service', {run() {}})
+
+const inferredServiceModule = (c: Container<ConfigRequirement>) =>
+  c.registerValue('service', {run() {}})
+
+const base = new Container()
+  .registerValue('config', {env: 'test'})
+  .registerValue('region', 'eu')
+
+const aliasedService: {run(): void} = base.use(aliasedServiceModule).get('service')
+const inferredService: {run(): void} = base.use(inferredServiceModule).get('service')
+
+void aliasedService
+void inferredService
