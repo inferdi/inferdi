@@ -129,7 +129,7 @@ const enNav: DefaultTheme.NavItem[] = [
   { text: 'Guide', link: '/guide/why-inferdi' },
   { text: 'Performance', link: '/guide/performance' },
   { text: 'Adapters', link: '/adapters/' },
-  { text: '6.1.0', items: [
+  { text: '6.1.1', items: [
       { text: 'Migration', link: '/reference/migration' },
     ],
   },
@@ -139,7 +139,7 @@ const ruNav: DefaultTheme.NavItem[] = [
   { text: 'Руководство', link: '/ru/guide/why-inferdi' },
   { text: 'Производительность', link: '/ru/guide/performance' },
   { text: 'Адаптеры', link: '/ru/adapters/' },
-  { text: '6.1.0', items: [
+  { text: '6.1.1', items: [
       { text: 'Миграция', link: '/ru/reference/migration' },
     ],
   },
@@ -149,7 +149,7 @@ const zhNav: DefaultTheme.NavItem[] = [
   { text: '指南', link: '/zh/guide/why-inferdi' },
   { text: '性能', link: '/zh/guide/performance' },
   { text: '适配器', link: '/zh/adapters/' },
-  { text: '6.1.0', items: [
+  { text: '6.1.1', items: [
       { text: '迁移', link: '/zh/reference/migration' },
     ],
   },
@@ -159,7 +159,7 @@ const jaNav: DefaultTheme.NavItem[] = [
   { text: 'ガイド', link: '/ja/guide/why-inferdi' },
   { text: 'パフォーマンス', link: '/ja/guide/performance' },
   { text: 'アダプター', link: '/ja/adapters/' },
-  { text: '6.1.0', items: [
+  { text: '6.1.1', items: [
       { text: '移行', link: '/ja/reference/migration' },
     ],
   },
@@ -169,7 +169,7 @@ const esNav: DefaultTheme.NavItem[] = [
   { text: 'Guía', link: '/es/guide/why-inferdi' },
   { text: 'Rendimiento', link: '/es/guide/performance' },
   { text: 'Adaptadores', link: '/es/adapters/' },
-  { text: '6.1.0', items: [
+  { text: '6.1.1', items: [
       { text: 'Migración', link: '/es/reference/migration' },
     ],
   },
@@ -524,7 +524,7 @@ const deNav: DefaultTheme.NavItem[] = [
   { text: 'Leitfaden', link: '/de/guide/why-inferdi' },
   { text: 'Performance', link: '/de/guide/performance' },
   { text: 'Adapter', link: '/de/adapters/' },
-  { text: '6.1.0', items: [
+  { text: '6.1.1', items: [
       { text: 'Migration', link: '/de/reference/migration' }
     ]
   }
@@ -603,7 +603,7 @@ const frNav: DefaultTheme.NavItem[] = [
   { text: 'Guide', link: '/fr/guide/why-inferdi' },
   { text: 'Performances', link: '/fr/guide/performance' },
   { text: 'Adaptateurs', link: '/fr/adapters/' },
-  { text: '6.1.0', items: [
+  { text: '6.1.1', items: [
       { text: 'Migration', link: '/fr/reference/migration' }
     ]
   }
@@ -905,7 +905,7 @@ export default defineConfig({
               name: 'InferDI',
               applicationCategory: 'DeveloperApplication',
               operatingSystem: 'Node.js, Bun, Deno, Browser, Edge runtimes',
-              softwareVersion: '6.1.0',
+              softwareVersion: '6.1.1',
               programmingLanguage: 'TypeScript',
               url: `${siteUrl}/`,
               downloadUrl: packageUrl,

@@ -1,7 +1,7 @@
 packages: []
 
 overrides:
-  vite: 8.0.16
+  vite: 8.1.6
   postcss: 8.5.23
   nanoid: 3.3.18
 

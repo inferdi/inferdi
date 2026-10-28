@@ -1,6 +1,6 @@
 {
   "name": "@inferdi/fastify",
-  "version": "6.1.0",
+  "version": "6.1.1",
   "description": "Fastify request-scope adapter for InferDI.",
   "keywords": [
     "typescript",
@@ -62,11 +62,11 @@
   },
   "devDependencies": {
     "@inferdi/inferdi": "workspace:*",
-    "@vitest/coverage-v8": "^4.1.11",
-    "fastify": "^5.12.3",
+    "@vitest/coverage-v8": "^4.1.12",
+    "fastify": "^5.12.7",
     "tsup": "^8.3.0",
     "typescript": "^5.6.0",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   },
   "publishConfig": {
     "access": "public"

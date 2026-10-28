@@ -1,6 +1,6 @@
 {
   "name": "@inferdi/express",
-  "version": "6.1.0",
+  "version": "6.1.1",
   "description": "Express request-scope middleware for InferDI.",
   "keywords": [
     "typescript",
@@ -66,11 +66,11 @@
   "devDependencies": {
     "@inferdi/inferdi": "workspace:*",
     "@types/express": "^5.0.0",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "^4.1.12",
     "express": "^5.0.0",
     "tsup": "^8.3.0",
     "typescript": "^5.6.0",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   },
   "publishConfig": {
     "access": "public"
