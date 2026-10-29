@@ -773,6 +773,8 @@ interface DisposableLike {
  * ```
  */
 export class Container<T extends DependenciesMap = Record<never, never>> {
+  /** Type-only: keeps `T` invariant in published declarations. */
+  declare protected readonly graphVariance?: (graph: T) => T
 
   /** @internal */
   private readonly regs = new Map<keyof T, Registration<T, keyof T>>()
