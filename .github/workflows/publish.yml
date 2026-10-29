@@ -210,6 +210,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Build core for workspace consumers
+        run: pnpm --filter @inferdi/inferdi run build
+
       # `prepublishOnly` runs clean → typecheck → build for each package.
       - name: Publish @inferdi/inferdi ${{ needs.verify.outputs.version }} to npm
         working-directory: packages/inferdi
