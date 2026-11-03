@@ -667,6 +667,62 @@ describe('v6 — requirements-based named modules', () => {
     result.get('fixture')
   })
 
+  it('rejects a collision from any branch of an inferred module', () => {
+    const branchingModule = (c: Container<ConfigRequirement>) =>
+      c.get('config').env === 'test'
+        ? c.registerClass('mailer', L, []).registerValue('fixture', true)
+        : c.registerClass('mailer', L, [])
+    const actual = new Container()
+      .registerValue('config', {env: 'test'})
+      .registerValue('fixture', false)
+
+    // @ts-expect-error — fixture collides in one branch
+    actual.use(branchingModule)
+  })
+
+  it('checks the requirements of every module in a union', () => {
+    type OtherRequirement = {other: Spec<string, 'singleton'>}
+    const configModule = (c: Container<ConfigRequirement>) =>
+      c.registerClass('mailer', L, [])
+    const otherModule = (c: Container<OtherRequirement>) =>
+      c.registerClass('mailer', L, []).registerValue('fixture', true)
+    const selected = Math.random() > 0.5 ? configModule : otherModule
+    const config = new Container().registerValue('config', {env: 'test'})
+
+    // @ts-expect-error — config and other are missing
+    new Container().registerValue('extra', 1).use(selected)
+    // @ts-expect-error — other is missing
+    config.use(selected)
+
+    const result = config.registerValue('other', 'other' as string).use(selected)
+    expectTypeOf(result.get('mailer')).toEqualTypeOf<L>()
+    // @ts-expect-error — only one module registers fixture
+    result.get('fixture')
+  })
+
+  it('rejects modules whose result drops or retypes their requirements', () => {
+    const droppingModule = (_c: Container<ConfigRequirement>) =>
+      new Container().registerClass('mailer', L, [])
+    const retyped = new Container()
+      .registerValue('config', 1)
+      .registerClass('mailer', L, [])
+    const retypingModule = (_c: Container<ConfigRequirement>) => retyped
+    const branchDroppingModule = (c: Container<ConfigRequirement>) =>
+      c.get('config').env === 'test'
+        ? c.registerClass('mailer', L, [])
+        : new Container().registerClass('mailer', L, [])
+    const actual = new Container()
+      .registerValue('config', {env: 'test'})
+      .registerValue('extra', 42)
+
+    // @ts-expect-error — the result drops config
+    actual.use(droppingModule)
+    // @ts-expect-error — the result retypes config
+    actual.use(retypingModule)
+    // @ts-expect-error — one branch drops config
+    actual.use(branchDroppingModule)
+  })
+
   it('rejects missing requirements and output collisions', () => {
     // @ts-expect-error — config is missing
     new Container().use(mailerModule)

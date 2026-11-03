@@ -560,25 +560,38 @@ type IncompatibleModuleRequirements<
     ModuleEntryCompatible<Actual[K], Requirements[K]> extends true ? never : K
 }[keyof Requirements & keyof Actual]
 
+type DroppedModuleRequirements<
+  Requirements extends DependenciesMap,
+  Graph
+> = Graph extends unknown
+  ? {
+      [K in keyof Requirements]: K extends keyof Graph
+        ? EqualTypes<Graph[K], Requirements[K]> extends true ? never : K
+        : K
+    }[keyof Requirements]
+  : never
+
 type ModuleUseCheck<
   Actual extends DependenciesMap,
-  Requirements extends DependenciesMap,
-  Provides extends DependenciesMap
-> = [MissingModuleRequirements<Actual, Requirements>] extends [never]
-  ? [IncompatibleModuleRequirements<Actual, Requirements>] extends [never]
-    ? [keyof Actual & keyof Provides] extends [never]
-      ? unknown
+  M,
+  Errors extends ModuleUseErrors<Actual, M> = ModuleUseErrors<Actual, M>
+> = [Errors['dropped']] extends [never]
+  ? [Errors['missing']] extends [never]
+    ? [Errors['incompatible']] extends [never]
+      ? [Errors['collisions']] extends [never]
+        ? unknown
+        : {
+            readonly 'Module output keys collide with the container graph':
+              Errors['collisions']
+          }
       : {
-          readonly 'Module output keys collide with the container graph':
-            keyof Actual & keyof Provides
+          readonly 'Incompatible module requirements': Errors['incompatible']
         }
     : {
-        readonly 'Incompatible module requirements':
-          IncompatibleModuleRequirements<Actual, Requirements>
+        readonly 'Missing module requirements': Errors['missing']
       }
   : {
-      readonly 'Missing module requirements':
-        MissingModuleRequirements<Actual, Requirements>
+      readonly 'Module result drops requirements': Errors['dropped']
     }
 
 type ProvidedScopeInputKeys<T extends DependenciesMap> = {
@@ -599,7 +612,11 @@ type RefineModuleProvides<
  * A module's outputs are its return graph minus its requirements. Inferring
  * them from `Module<Requirements, Provides>` only works when the argument is
  * written as `Module<…>`. Aliased and inferred modules would widen `Provides`
- * to `DependenciesMap` and collide with every key in the actual graph
+ * to `DependenciesMap` and collide with every key in the actual graph.
+ *
+ * `M` may be a union of modules, each returning a union of graphs. `keyof`
+ * over either union keeps only the shared keys: right for the outputs callers
+ * may resolve, but `ModuleUseErrors` must check each module and graph alone
  */
 type ModuleRequirementsOf<M> =
   M extends (c: Container<infer R>) => unknown ? R : never
@@ -609,6 +626,24 @@ type ModuleGraphOf<M> = M extends (c: never) => infer C
   : never
 
 type ModuleProvidesOf<M> = Omit<ModuleGraphOf<M>, keyof ModuleRequirementsOf<M>>
+
+type KeysOfEach<G> = G extends unknown ? keyof G : never
+
+type ModuleUseErrors<Actual extends DependenciesMap, M> = M extends unknown
+  ? {
+      dropped: DroppedModuleRequirements<
+        ModuleRequirementsOf<M>,
+        ModuleGraphOf<M>
+      >
+      missing: MissingModuleRequirements<Actual, ModuleRequirementsOf<M>>
+      incompatible: IncompatibleModuleRequirements<
+        Actual,
+        ModuleRequirementsOf<M>
+      >
+      collisions: keyof Actual &
+        Exclude<KeysOfEach<ModuleGraphOf<M>>, keyof ModuleRequirementsOf<M>>
+    }
+  : never
 
 /**
  * Construction options for {@link Container}.
@@ -1880,7 +1915,7 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
     fn: (c: Container<T>) => Container<T & R>
   ): Container<T & R>
   public use<M extends Module<any, any>>(
-    fn: M & ModuleUseCheck<T, ModuleRequirementsOf<M>, ModuleProvidesOf<M>>
+    fn: M & ModuleUseCheck<T, M>
   ): Container<T & RefineModuleProvides<T, ModuleProvidesOf<M>>>
   public use(
     fn: (c: Container<any>) => Container<any>

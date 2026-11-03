@@ -209,3 +209,28 @@ const inferredService: {run(): void} = base.use(inferredServiceModule).get('serv
 
 void aliasedService
 void inferredService
+
+// Every module in a union, every returned graph and every return branch must
+// stay checked through the published declarations.
+const branchingServiceModule = (c: Container<ConfigRequirement>) =>
+  c.get('config').env === 'test'
+    ? c.registerValue('service', {run() {}}).registerValue('fixture', true)
+    : c.registerValue('service', {run() {}})
+
+// @ts-expect-error — `fixture` collides in one branch of the module
+base.registerValue('fixture', false).use(branchingServiceModule)
+
+const regionServiceModule = (c: Container<{region: Spec<string>}>) =>
+  c.registerValue('service', {run() {}})
+const selectedServiceModule = Math.random() > 0.5
+  ? inferredServiceModule
+  : regionServiceModule
+
+// @ts-expect-error — neither module's requirement is available
+new Container().registerValue('extra', 1).use(selectedServiceModule)
+
+const droppingServiceModule = (_c: Container<ConfigRequirement>) =>
+  new Container().registerValue('service', {run() {}})
+
+// @ts-expect-error — the module's result drops `config`
+base.use(droppingServiceModule)
