@@ -652,6 +652,33 @@ describe('v6 — requirements-based named modules', () => {
     actual.use(inferredModule).use(inferredModule)
   })
 
+  it('accepts explicit requirement and provides type arguments', () => {
+    type MailerModule = Module<ConfigRequirement, MailerProvides>
+    const aliasedModule: MailerModule = (c) => c.registerClass('mailer', L, [])
+    const inferredModule = (c: Container<ConfigRequirement>) =>
+      c.registerClass('mailer', L, [])
+    const actual = new Container()
+      .registerValue('extra', 1 as const)
+      .registerValue('config', {env: 'test'})
+    const result = actual.use<ConfigRequirement, MailerProvides>(mailerModule)
+
+    expectTypeOf(result.get('mailer')).toEqualTypeOf<L>()
+    expectTypeOf(result.get('extra')).toEqualTypeOf<1>()
+    expectTypeOf(
+      actual.use<ConfigRequirement, MailerProvides>(aliasedModule).get('mailer')
+    ).toEqualTypeOf<L>()
+    expectTypeOf(
+      actual.use<ConfigRequirement, MailerProvides>(inferredModule).get('mailer')
+    ).toEqualTypeOf<L>()
+
+    // @ts-expect-error — config is missing
+    new Container().use<ConfigRequirement, MailerProvides>(mailerModule)
+    // @ts-expect-error — mailer collides with the actual graph
+    result.use<ConfigRequirement, MailerProvides>(mailerModule)
+    // @ts-expect-error — the module does not provide other
+    actual.use<ConfigRequirement, {other: Spec<string>}>(mailerModule)
+  })
+
   it('provides the keys every branch of an inferred module registers', () => {
     const branchingModule = (c: Container<ConfigRequirement>) =>
       c.get('config').env === 'test'

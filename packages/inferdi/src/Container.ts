@@ -627,7 +627,13 @@ type ModuleGraphOf<M> = M extends (c: never) => infer C
 
 type ModuleProvidesOf<M> = Omit<ModuleGraphOf<M>, keyof ModuleRequirementsOf<M>>
 
-type KeysOfEach<G> = G extends unknown ? keyof G : never
+/*
+ * Blocks inference like the built-in `NoInfer`, which needs TypeScript 5.4.
+ * It keeps the explicit `use<Requirements, Provides>` overload from applying
+ * unless callers write both type arguments, so inferred calls keep the checks
+ * and diagnostics of the `use<M>` overload.
+ */
+type NoInference<T> = [T][T extends unknown ? 0 : never]
 
 type ModuleUseErrors<Actual extends DependenciesMap, M> = M extends unknown
   ? {
@@ -641,7 +647,7 @@ type ModuleUseErrors<Actual extends DependenciesMap, M> = M extends unknown
         ModuleRequirementsOf<M>
       >
       collisions: keyof Actual &
-        Exclude<KeysOfEach<ModuleGraphOf<M>>, keyof ModuleRequirementsOf<M>>
+        Exclude<KeysOfUnion<ModuleGraphOf<M>>, keyof ModuleRequirementsOf<M>>
     }
   : never
 
@@ -1917,6 +1923,15 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
   public use<M extends Module<any, any>>(
     fn: M & ModuleUseCheck<T, M>
   ): Container<T & RefineModuleProvides<T, ModuleProvidesOf<M>>>
+  public use<
+    Requirements extends DependenciesMap,
+    Provides extends DependenciesMap
+  >(
+    fn: Module<NoInference<Requirements>, NoInference<Provides>> &
+      ModuleUseCheck<T, Module<Requirements, Provides>>
+  ): Container<
+    T & RefineModuleProvides<T, ModuleProvidesOf<Module<Requirements, Provides>>>
+  >
   public use(
     fn: (c: Container<any>) => Container<any>
   ): Container<any> {

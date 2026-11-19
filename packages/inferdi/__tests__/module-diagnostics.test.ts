@@ -75,6 +75,27 @@ describe('module diagnostics', () => {
     ])
   })
 
+  it('includes stable requirement and collision properties for explicit type arguments', () => {
+    const messages = diagnose(`
+      ${modules.direct}
+
+      new Container().use<Requirements, Provides>(module)
+      new Container()
+        .registerFactory('config', () => ({env: 'test'}), 'transient')
+        .use<Requirements, Provides>(module)
+      new Container()
+        .registerValue('config', {env: 'test'})
+        .registerValue('service', {run() {}})
+        .use<Requirements, Provides>(module)
+    `)
+
+    expect(messages).toEqual([
+      expect.stringContaining('Missing module requirements'),
+      expect.stringContaining('Incompatible module requirements'),
+      expect.stringContaining('Module output keys collide with the container graph')
+    ])
+  })
+
   it('checks every module in a union, every returned graph and every branch', () => {
     const messages = diagnose(`
       const dropping = (_container: Container<Requirements>) =>

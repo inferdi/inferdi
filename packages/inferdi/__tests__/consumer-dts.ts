@@ -210,6 +210,30 @@ const inferredService: {run(): void} = base.use(inferredServiceModule).get('serv
 void aliasedService
 void inferredService
 
+// Explicit requirement and provides type arguments must keep working and
+// stay checked through the published declarations.
+const explicitService: {run(): void} = base
+  .use<ConfigRequirement, ServiceOutput>(serviceModule)
+  .get('service')
+const explicitAliasedService: {run(): void} = base
+  .use<ConfigRequirement, ServiceOutput>(aliasedServiceModule)
+  .get('service')
+const explicitInferredService: {run(): void} = base
+  .use<ConfigRequirement, ServiceOutput>(inferredServiceModule)
+  .get('service')
+
+void explicitService
+void explicitAliasedService
+void explicitInferredService
+
+// @ts-expect-error — `config` is a module requirement the container lacks
+new Container().use<ConfigRequirement, ServiceOutput>(serviceModule)
+
+base
+  .use(serviceModule)
+  // @ts-expect-error — `service` collides with the container graph
+  .use<ConfigRequirement, ServiceOutput>(serviceModule)
+
 // Every module in a union, every returned graph and every return branch must
 // stay checked through the published declarations.
 const branchingServiceModule = (c: Container<ConfigRequirement>) =>
