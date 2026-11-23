@@ -170,6 +170,22 @@ const serviceModule: Module<ConfigRequirement, ServiceOutput> = (c) =>
 // @ts-expect-error — `config` is a module requirement the container lacks
 new Container().use(serviceModule)
 
+// @ts-expect-error — the registered `config.env` must be a string
+new Container().registerValue('config', {env: 1}).use(serviceModule)
+
+const configuredContainer = new Container()
+  .registerValue('config', {env: 'test'})
+  .registerValue('region', 'eu')
+  .use(serviceModule)
+
+const service: {run(): void} = configuredContainer.get('service')
+const region: string = configuredContainer.get('region')
+void service
+void region
+
+// @ts-expect-error — the module output `service` is already registered
+configuredContainer.use(serviceModule)
+
 // @ts-expect-error — the module declares `service` but never registers it
 const unfulfilledModule: Module<Record<never, never>, ServiceOutput> = (c) => c
 void unfulfilledModule
