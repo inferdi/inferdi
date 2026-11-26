@@ -258,3 +258,37 @@ const droppingServiceModule = (_c: Container<ConfigRequirement>) =>
 
 // @ts-expect-error — the module's result drops `config`
 base.use(droppingServiceModule)
+
+// Output keys only some branches or modules register must be rejected through
+// the published declarations, so later modules and registrations cannot
+// silently overwrite them.
+const maybeFixtureModule = (c: Container<ConfigRequirement>) =>
+  c.get('config').env === 'test'
+    ? c.registerValue('fixture', true)
+    : c
+const fixtureModule = (c: Container<ConfigRequirement>) =>
+  c.get('config').env === 'test'
+    ? c.registerValue('fixture', true)
+    : c.registerValue('fixture', false)
+const overwritingModule = (c: Container<ConfigRequirement>) =>
+  c.registerValue('fixture', false)
+const plainModule = (c: Container<ConfigRequirement>) => c
+
+// @ts-expect-error — only one branch registers `fixture`
+base.use(maybeFixtureModule)
+
+// @ts-expect-error — only one module registers `fixture`
+base.use(Math.random() > 0.5 ? plainModule : overwritingModule)
+
+// @ts-expect-error — only one branch of the inline module registers `fixture`
+base.use((c) => c.get('config').env === 'test' ? c.registerValue('fixture', true) : c)
+
+const withFixture = base.use(fixtureModule)
+const fixture: boolean = withFixture.get('fixture')
+void fixture
+
+// @ts-expect-error — `fixture` collides with the container graph
+withFixture.use(overwritingModule)
+
+// @ts-expect-error — `fixture` collides with the container graph
+withFixture.registerValue('fixture', false)

@@ -121,4 +121,32 @@ describe('module diagnostics', () => {
       expect.stringContaining('Module output keys collide with the container graph')
     ])
   })
+
+  it('rejects output keys only some modules or branches register', () => {
+    const messages = diagnose(`
+      const first = (container: Container<Requirements>) =>
+        container.get('config').env === 'test'
+          ? container.registerValue('fixture', true)
+          : container
+      const second = (container: Container<Requirements>) =>
+        container.registerValue('fixture', false)
+      const plain = (container: Container<Requirements>) => container
+      const base = new Container()
+        .registerValue('config', {env: 'test'})
+        .registerValue('extra', 42)
+
+      base.use(first)
+      base.use(Math.random() > 0.5 ? plain : second)
+      base.use((container) =>
+        container.get('config').env === 'test'
+          ? container.registerValue('fixture', true)
+          : container)
+    `)
+
+    expect(messages).toEqual([
+      expect.stringContaining('Module output keys are not registered by every branch'),
+      expect.stringContaining('Module output keys are not registered by every branch'),
+      expect.stringContaining('Module output keys are not registered by every branch')
+    ])
+  })
 })

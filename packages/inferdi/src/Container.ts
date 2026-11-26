@@ -579,7 +579,12 @@ type ModuleUseCheck<
   ? [Errors['missing']] extends [never]
     ? [Errors['incompatible']] extends [never]
       ? [Errors['collisions']] extends [never]
-        ? unknown
+        ? [BranchDependentModuleOutputs<M>] extends [never]
+          ? unknown
+          : {
+              readonly 'Module output keys are not registered by every branch':
+                BranchDependentModuleOutputs<M>
+            }
         : {
             readonly 'Module output keys collide with the container graph':
               Errors['collisions']
@@ -646,10 +651,25 @@ type ModuleUseErrors<Actual extends DependenciesMap, M> = M extends unknown
         Actual,
         ModuleRequirementsOf<M>
       >
-      collisions: keyof Actual &
-        Exclude<KeysOfUnion<ModuleGraphOf<M>>, keyof ModuleRequirementsOf<M>>
+      collisions: keyof Actual & ModuleOutputKeysOf<M>
     }
   : never
+
+/** Keys any graph of `M` may output, distributed over each module. */
+type ModuleOutputKeysOf<M> = M extends unknown
+  ? Exclude<KeysOfUnion<ModuleGraphOf<M>>, keyof ModuleRequirementsOf<M>>
+  : never
+
+/*
+ * Keys only some modules or branches register. `get()` cannot resolve them, but
+ * the container still holds them at runtime, so later registrations would
+ * overwrite them unchecked. Reject them until the type graph can track keys
+ * that may be registered.
+ */
+type BranchDependentModuleOutputs<M> = Exclude<
+  ModuleOutputKeysOf<M>,
+  keyof ModuleGraphOf<M>
+>
 
 /**
  * Construction options for {@link Container}.
@@ -1898,7 +1918,8 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    *
    * Returns a container extended with the module's newly registered keys. Useful
    * for grouping registrations into reusable chunks or reading already-registered
-   * values to decide what to register next.
+   * values to decide what to register next. Every branch of a module must
+   * register the same output keys.
    *
    * @template R - The additional dependencies map introduced by the module.
    *
@@ -1912,8 +1933,8 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    *   .use((c) => {
    *     const port = c.get('config').port
    *     return port === 8080
-   *       ? c.registerClass('a', A, [])
-   *       : c.registerClass('b', B, [])
+   *       ? c.registerClass('server', HttpServer, [])
+   *       : c.registerClass('server', HttpsServer, [])
    *   })
    * ```
    */

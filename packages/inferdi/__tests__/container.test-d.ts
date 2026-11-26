@@ -683,15 +683,55 @@ describe('v6 — requirements-based named modules', () => {
     const branchingModule = (c: Container<ConfigRequirement>) =>
       c.get('config').env === 'test'
         ? c.registerClass('mailer', L, []).registerValue('fixture', true)
-        : c.registerClass('mailer', L, [])
+        : c.registerClass('mailer', L, []).registerValue('fixture', false)
     const result = new Container()
       .registerValue('extra', 1 as const)
       .registerValue('config', {env: 'test'})
       .use(branchingModule)
 
     expectTypeOf(result.get('mailer')).toEqualTypeOf<L>()
+    expectTypeOf(result.get('fixture')).toEqualTypeOf<boolean>()
+  })
+
+  it('rejects output keys only some branches register', () => {
+    const branchingModule = (c: Container<ConfigRequirement>) =>
+      c.get('config').env === 'test'
+        ? c.registerClass('mailer', L, []).registerValue('fixture', true)
+        : c.registerClass('mailer', L, [])
+    const actual = new Container()
+      .registerValue('config', {env: 'test'})
+      .registerValue('extra', 42)
+
     // @ts-expect-error — only one branch registers fixture
-    result.get('fixture')
+    actual.use(branchingModule)
+    // @ts-expect-error — only one branch of the inline module registers fixture
+    actual.use((c) => c.get('config').env === 'test' ? c.registerValue('fixture', true) : c)
+  })
+
+  it('keeps branch outputs from being overwritten by later modules or registrations', () => {
+    const first = (c: Container<ConfigRequirement>) =>
+      c.get('config').env === 'test'
+        ? c.registerValue('fixture', true)
+        : c
+    const always = (c: Container<ConfigRequirement>) =>
+      c.get('config').env === 'test'
+        ? c.registerValue('fixture', true)
+        : c.registerValue('fixture', false)
+    const second = (c: Container<ConfigRequirement>) =>
+      c.registerValue('fixture', false)
+    const actual = new Container()
+      .registerValue('config', {env: 'test'})
+      .registerValue('extra', 42)
+
+    // @ts-expect-error — only one branch registers fixture
+    actual.use(first)
+
+    const result = actual.use(always)
+
+    // @ts-expect-error — fixture collides with the container graph
+    result.use(second)
+    // @ts-expect-error — fixture collides with the container graph
+    result.registerValue('fixture', false)
   })
 
   it('rejects a collision from any branch of an inferred module', () => {
@@ -712,6 +752,8 @@ describe('v6 — requirements-based named modules', () => {
     const configModule = (c: Container<ConfigRequirement>) =>
       c.registerClass('mailer', L, [])
     const otherModule = (c: Container<OtherRequirement>) =>
+      c.registerClass('mailer', L, [])
+    const fixtureModule = (c: Container<OtherRequirement>) =>
       c.registerClass('mailer', L, []).registerValue('fixture', true)
     const selected = Math.random() > 0.5 ? configModule : otherModule
     const config = new Container().registerValue('config', {env: 'test'})
@@ -721,10 +763,11 @@ describe('v6 — requirements-based named modules', () => {
     // @ts-expect-error — other is missing
     config.use(selected)
 
-    const result = config.registerValue('other', 'other' as string).use(selected)
-    expectTypeOf(result.get('mailer')).toEqualTypeOf<L>()
+    const both = config.registerValue('other', 'other' as string)
+    expectTypeOf(both.use(selected).get('mailer')).toEqualTypeOf<L>()
+
     // @ts-expect-error — only one module registers fixture
-    result.get('fixture')
+    both.use(Math.random() > 0.5 ? configModule : fixtureModule)
   })
 
   it('rejects modules whose result drops or retypes their requirements', () => {
