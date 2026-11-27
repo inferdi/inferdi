@@ -189,3 +189,106 @@ configuredContainer.use(serviceModule)
 // @ts-expect-error — the module declares `service` but never registers it
 const unfulfilledModule: Module<Record<never, never>, ServiceOutput> = (c) => c
 void unfulfilledModule
+
+// Aliased and inferred modules must also apply to a graph with extra
+// registrations through the published declarations.
+type ServiceModule = Module<ConfigRequirement, ServiceOutput>
+
+const aliasedServiceModule: ServiceModule = (c) =>
+  c.registerValue('service', {run() {}})
+
+const inferredServiceModule = (c: Container<ConfigRequirement>) =>
+  c.registerValue('service', {run() {}})
+
+const base = new Container()
+  .registerValue('config', {env: 'test'})
+  .registerValue('region', 'eu')
+
+const aliasedService: {run(): void} = base.use(aliasedServiceModule).get('service')
+const inferredService: {run(): void} = base.use(inferredServiceModule).get('service')
+
+void aliasedService
+void inferredService
+
+// Explicit requirement and provides type arguments must keep working and
+// stay checked through the published declarations.
+const explicitService: {run(): void} = base
+  .use<ConfigRequirement, ServiceOutput>(serviceModule)
+  .get('service')
+const explicitAliasedService: {run(): void} = base
+  .use<ConfigRequirement, ServiceOutput>(aliasedServiceModule)
+  .get('service')
+const explicitInferredService: {run(): void} = base
+  .use<ConfigRequirement, ServiceOutput>(inferredServiceModule)
+  .get('service')
+
+void explicitService
+void explicitAliasedService
+void explicitInferredService
+
+// @ts-expect-error — `config` is a module requirement the container lacks
+new Container().use<ConfigRequirement, ServiceOutput>(serviceModule)
+
+base
+  .use(serviceModule)
+  // @ts-expect-error — `service` collides with the container graph
+  .use<ConfigRequirement, ServiceOutput>(serviceModule)
+
+// Every module in a union, every returned graph and every return branch must
+// stay checked through the published declarations.
+const branchingServiceModule = (c: Container<ConfigRequirement>) =>
+  c.get('config').env === 'test'
+    ? c.registerValue('service', {run() {}}).registerValue('fixture', true)
+    : c.registerValue('service', {run() {}})
+
+// @ts-expect-error — `fixture` collides in one branch of the module
+base.registerValue('fixture', false).use(branchingServiceModule)
+
+const regionServiceModule = (c: Container<{region: Spec<string>}>) =>
+  c.registerValue('service', {run() {}})
+const selectedServiceModule = Math.random() > 0.5
+  ? inferredServiceModule
+  : regionServiceModule
+
+// @ts-expect-error — neither module's requirement is available
+new Container().registerValue('extra', 1).use(selectedServiceModule)
+
+const droppingServiceModule = (_c: Container<ConfigRequirement>) =>
+  new Container().registerValue('service', {run() {}})
+
+// @ts-expect-error — the module's result drops `config`
+base.use(droppingServiceModule)
+
+// Output keys only some branches or modules register must be rejected through
+// the published declarations, so later modules and registrations cannot
+// silently overwrite them.
+const maybeFixtureModule = (c: Container<ConfigRequirement>) =>
+  c.get('config').env === 'test'
+    ? c.registerValue('fixture', true)
+    : c
+const fixtureModule = (c: Container<ConfigRequirement>) =>
+  c.get('config').env === 'test'
+    ? c.registerValue('fixture', true)
+    : c.registerValue('fixture', false)
+const overwritingModule = (c: Container<ConfigRequirement>) =>
+  c.registerValue('fixture', false)
+const plainModule = (c: Container<ConfigRequirement>) => c
+
+// @ts-expect-error — only one branch registers `fixture`
+base.use(maybeFixtureModule)
+
+// @ts-expect-error — only one module registers `fixture`
+base.use(Math.random() > 0.5 ? plainModule : overwritingModule)
+
+// @ts-expect-error — only one branch of the inline module registers `fixture`
+base.use((c) => c.get('config').env === 'test' ? c.registerValue('fixture', true) : c)
+
+const withFixture = base.use(fixtureModule)
+const fixture: boolean = withFixture.get('fixture')
+void fixture
+
+// @ts-expect-error — `fixture` collides with the container graph
+withFixture.use(overwritingModule)
+
+// @ts-expect-error — `fixture` collides with the container graph
+withFixture.registerValue('fixture', false)

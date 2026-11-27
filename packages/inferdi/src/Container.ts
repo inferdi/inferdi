@@ -560,25 +560,43 @@ type IncompatibleModuleRequirements<
     ModuleEntryCompatible<Actual[K], Requirements[K]> extends true ? never : K
 }[keyof Requirements & keyof Actual]
 
+type DroppedModuleRequirements<
+  Requirements extends DependenciesMap,
+  Graph
+> = Graph extends unknown
+  ? {
+      [K in keyof Requirements]: K extends keyof Graph
+        ? EqualTypes<Graph[K], Requirements[K]> extends true ? never : K
+        : K
+    }[keyof Requirements]
+  : never
+
 type ModuleUseCheck<
   Actual extends DependenciesMap,
-  Requirements extends DependenciesMap,
-  Provides extends DependenciesMap
-> = [MissingModuleRequirements<Actual, Requirements>] extends [never]
-  ? [IncompatibleModuleRequirements<Actual, Requirements>] extends [never]
-    ? [keyof Actual & keyof Provides] extends [never]
-      ? unknown
+  M,
+  Errors extends ModuleUseErrors<Actual, M> = ModuleUseErrors<Actual, M>
+> = [Errors['dropped']] extends [never]
+  ? [Errors['missing']] extends [never]
+    ? [Errors['incompatible']] extends [never]
+      ? [Errors['collisions']] extends [never]
+        ? [BranchDependentModuleOutputs<M>] extends [never]
+          ? unknown
+          : {
+              readonly 'Module output keys are not registered by every branch':
+                BranchDependentModuleOutputs<M>
+            }
+        : {
+            readonly 'Module output keys collide with the container graph':
+              Errors['collisions']
+          }
       : {
-          readonly 'Module output keys collide with the container graph':
-            keyof Actual & keyof Provides
+          readonly 'Incompatible module requirements': Errors['incompatible']
         }
     : {
-        readonly 'Incompatible module requirements':
-          IncompatibleModuleRequirements<Actual, Requirements>
+        readonly 'Missing module requirements': Errors['missing']
       }
   : {
-      readonly 'Missing module requirements':
-        MissingModuleRequirements<Actual, Requirements>
+      readonly 'Module result drops requirements': Errors['dropped']
     }
 
 type ProvidedScopeInputKeys<T extends DependenciesMap> = {
@@ -594,6 +612,64 @@ type RefineModuleProvides<
     Exclude<RequirementsOf<Provides[K]>, ProvidedScopeInputKeys<Actual>>
   >
 }
+
+/*
+ * A module's outputs are its return graph minus its requirements. Inferring
+ * them from `Module<Requirements, Provides>` only works when the argument is
+ * written as `Module<…>`. Aliased and inferred modules would widen `Provides`
+ * to `DependenciesMap` and collide with every key in the actual graph.
+ *
+ * `M` may be a union of modules, each returning a union of graphs. `keyof`
+ * over either union keeps only the shared keys: right for the outputs callers
+ * may resolve, but `ModuleUseErrors` must check each module and graph alone
+ */
+type ModuleRequirementsOf<M> =
+  M extends (c: Container<infer R>) => unknown ? R : never
+
+type ModuleGraphOf<M> = M extends (c: never) => infer C
+  ? C extends Container<infer G> ? G : never
+  : never
+
+type ModuleProvidesOf<M> = Omit<ModuleGraphOf<M>, keyof ModuleRequirementsOf<M>>
+
+/*
+ * Blocks inference like the built-in `NoInfer`, which needs TypeScript 5.4.
+ * It keeps the explicit `use<Requirements, Provides>` overload from applying
+ * unless callers write both type arguments, so inferred calls keep the checks
+ * and diagnostics of the `use<M>` overload.
+ */
+type NoInference<T> = [T][T extends unknown ? 0 : never]
+
+type ModuleUseErrors<Actual extends DependenciesMap, M> = M extends unknown
+  ? {
+      dropped: DroppedModuleRequirements<
+        ModuleRequirementsOf<M>,
+        ModuleGraphOf<M>
+      >
+      missing: MissingModuleRequirements<Actual, ModuleRequirementsOf<M>>
+      incompatible: IncompatibleModuleRequirements<
+        Actual,
+        ModuleRequirementsOf<M>
+      >
+      collisions: keyof Actual & ModuleOutputKeysOf<M>
+    }
+  : never
+
+/** Keys any graph of `M` may output, distributed over each module. */
+type ModuleOutputKeysOf<M> = M extends unknown
+  ? Exclude<KeysOfUnion<ModuleGraphOf<M>>, keyof ModuleRequirementsOf<M>>
+  : never
+
+/*
+ * Keys only some modules or branches register. `get()` cannot resolve them, but
+ * the container still holds them at runtime, so later registrations would
+ * overwrite them unchecked. Reject them until the type graph can track keys
+ * that may be registered.
+ */
+type BranchDependentModuleOutputs<M> = Exclude<
+  ModuleOutputKeysOf<M>,
+  keyof ModuleGraphOf<M>
+>
 
 /**
  * Construction options for {@link Container}.
@@ -1842,7 +1918,8 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    *
    * Returns a container extended with the module's newly registered keys. Useful
    * for grouping registrations into reusable chunks or reading already-registered
-   * values to decide what to register next.
+   * values to decide what to register next. Every branch of a module must
+   * register the same output keys.
    *
    * @template R - The additional dependencies map introduced by the module.
    *
@@ -1856,21 +1933,26 @@ export class Container<T extends DependenciesMap = Record<never, never>> {
    *   .use((c) => {
    *     const port = c.get('config').port
    *     return port === 8080
-   *       ? c.registerClass('a', A, [])
-   *       : c.registerClass('b', B, [])
+   *       ? c.registerClass('server', HttpServer, [])
+   *       : c.registerClass('server', HttpsServer, [])
    *   })
    * ```
    */
   public use<R extends DependenciesMap>(
     fn: (c: Container<T>) => Container<T & R>
   ): Container<T & R>
+  public use<M extends Module<any, any>>(
+    fn: M & ModuleUseCheck<T, M>
+  ): Container<T & RefineModuleProvides<T, ModuleProvidesOf<M>>>
   public use<
     Requirements extends DependenciesMap,
     Provides extends DependenciesMap
   >(
-    fn: Module<Requirements, Provides> &
-      ModuleUseCheck<T, Requirements, Provides>
-  ): Container<T & RefineModuleProvides<T, Provides>>
+    fn: Module<NoInference<Requirements>, NoInference<Provides>> &
+      ModuleUseCheck<T, Module<Requirements, Provides>>
+  ): Container<
+    T & RefineModuleProvides<T, ModuleProvidesOf<Module<Requirements, Provides>>>
+  >
   public use(
     fn: (c: Container<any>) => Container<any>
   ): Container<any> {
